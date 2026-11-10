@@ -49,6 +49,19 @@ void test_checks_control_cases(void);
 void test_checks_build_cases(void);
 
 /**
+ * @brief Register isolated benchmark catalogue, measurement and Markdown publication regressions.
+ * @return No value; the sequential harness owns selection, timing and result reporting.
+ * @note Fixtures use temporary storage and never mutate the repository benchmark database or documentation.
+ */
+void test_checks_benchmark_cases(void);
+
+/**
+ * @brief Run the documented benchmark-retention command after ordinary regressions.
+ * @return No value. Registers a runnable README example using an independently owned temporary database.
+ */
+void test_checks_benchmark_readme_cases(void);
+
+/**
  * @brief Register the documented SQLCipher repair-command check after ordinary tests.
  * @return No value; results are recorded by the shared harness.
  * @details Compares release failure instructions with the build guide and checks shell syntax without

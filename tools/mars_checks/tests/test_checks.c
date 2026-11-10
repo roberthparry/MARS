@@ -69,6 +69,7 @@ int tests_main(void)
     test_checks_parser_cases();
     test_checks_control_cases();
     test_checks_build_cases();
+    test_checks_benchmark_cases();
     test_checks_coverage_cases();
     test_checks_evidence_cases();
     test_checks_policy_cases();
@@ -79,5 +80,6 @@ int tests_main(void)
     test_checks_build_readme_cases();
     test_checks_readme_cases();
     test_checks_policy_readme_cases();
+    test_checks_benchmark_readme_cases();
     return TEST_EXIT_CODE();
 }

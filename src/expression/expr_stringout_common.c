@@ -822,8 +822,8 @@ static int factor_group(const expr_t *f)
     if (expr_tostring_is_named_const_pow_d(f))
         return 3;
 
-    /* A symbolic coefficient remains before its coordinate even when written as an algebraic sum. */
-    if (expr_is_addsub(f) && factor_constant_expression(f, 0u))
+    /* Constant radicals, quotients and parameter sums are coefficients too, not coordinate-dependent functions. */
+    if (factor_constant_expression(f, 0u))
         return 3;
 
     return 5;
@@ -922,9 +922,11 @@ static int factor_power_log_order(const expr_t *left, const expr_t *right)
     if (left_preserved_sqrt && right_preserved_power)
         return 1;
 
-    if (left_sum && right_power)
+    bool constant_pair = (left_sum || right_sum) && factor_constant_expression(left, 0u) &&
+                         factor_constant_expression(right, 0u);
+    if (left_sum && right_power && !constant_pair)
         return -1;
-    if (left_power && right_sum)
+    if (left_power && right_sum && !constant_pair)
         return 1;
     if (left_power && right_log)
         return -1;

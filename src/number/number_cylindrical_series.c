@@ -1,6 +1,6 @@
 /**
  * @file number_cylindrical_series.c
- * @brief Guarded Bessel I and Struve H/L series with shared cylindrical precision handling.
+ * @brief Guarded Bessel J/I and Struve H/L series with shared cylindrical precision handling.
  *
  * Keeps the public Bessel I and Struve wrappers alongside their common series and private logarithmic-gamma
  * kernel. Exact component conversion, cancellation guards and numeric-scope ownership follow the existing number
@@ -17,6 +17,7 @@
 
 typedef enum number_modified_family_t {
     NUMBER_MODIFIED_BESSEL_I,
+    NUMBER_ORDINARY_BESSEL_J,
     NUMBER_MODIFIED_STRUVE_L,
     NUMBER_MODIFIED_STRUVE_H
 } number_modified_family_t;
@@ -275,8 +276,8 @@ done:
 static number_t number_modified_series(number_t order, number_t argument, number_modified_family_t family)
 {
     NUM_SCOPE(scope);
-    bool struve = family != NUMBER_MODIFIED_BESSEL_I;
-    bool alternating = family == NUMBER_MODIFIED_STRUVE_H;
+    bool struve = family == NUMBER_MODIFIED_STRUVE_L || family == NUMBER_MODIFIED_STRUVE_H;
+    bool alternating = family == NUMBER_MODIFIED_STRUVE_H || family == NUMBER_ORDINARY_BESSEL_J;
     double gamma_offset = struve ? 1.5 : 1.0;
     unsigned power_offset = struve ? 1u : 0u;
     if (!num_is_finite(order) || !num_is_finite(argument))
@@ -333,6 +334,14 @@ static number_t number_modified_series(number_t order, number_t argument, number
     mpc_clear(z);
     mpc_clear(result);
     return num_scope_detach(value);
+}
+
+/* Reuse the guarded alternating cylinder series for complex Bessel J, preserving its principal branch. */
+number_t number_bessel_j_complex(number_t order, number_t argument)
+{
+    number_t value = number_modified_series(order, argument, NUMBER_ORDINARY_BESSEL_J);
+    number_scope_register_value(&value);
+    return value;
 }
 
 /* Evaluate principal modified Bessel I, including its negative-integer order limits. */

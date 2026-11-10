@@ -68,6 +68,14 @@ const string_t *equ_lhs_display_unbound(const equation_t *equation);
 const string_t *equ_rhs_display_unbound(const equation_t *equation);
 void equ_set_power_series_domain(equation_t *equation, bool power_series);
 
+/**
+ * @brief Read the equation's exact-fraction presentation preference.
+ * @param[in] equation Borrowed equation, or NULL; no ownership transfers.
+ * @return True when its exact coefficients must stay fractional, or false for NULL or the default preference.
+ * @note Only equation rendering and its semantic provider consume this module-private query.
+ */
+bool equ_fractional_coefficients(const equation_t *equation);
+
 bool equ_match_quadratic_expr(const expr_t *expr, const expr_t *wrt, number_t *constant_out, number_t *linear_out,
                               number_t *quadratic_out);
 

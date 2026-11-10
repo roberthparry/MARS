@@ -58,6 +58,7 @@ struct _expr_autoname_entry_t {
  * @return Owned numeric text released with string_free(), or NULL on formatting or allocation failure.
  * @note No mathematical markup is introduced. Inexact values round to the requested significant digits;
  * exact rationals use a lossless decimal when clearly shorter, otherwise their exact fractional spelling.
+ * A scoped exact-coefficient preference keeps rationals fractional in native and semantic notation alike.
  * With no precision override, ordinary output
  * retains the number module's default representation. The caller must restore any temporary formatting state
  * and serialise access to the owning renderer. No input ownership is transferred or retained.

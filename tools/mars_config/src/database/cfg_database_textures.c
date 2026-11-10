@@ -92,9 +92,13 @@ static int texture_retained(sqlite_stmt_t *query, unsigned level, unsigned colum
     return retained;
 }
 
-static bool texture_import(sqlite_stmt_t *insert, const string_t *directory, const json_t *assets,
+static bool texture_import(sqlite_stmt_t *insert, const string_t *directory, const json_t *manifest,
                            unsigned level, unsigned column, unsigned row, texture_progress_t *progress)
 {
+    string_t *name = cfg_database_texture_name(manifest, level, column);
+    cfg_progress_segment_name(progress->reporter, name);
+    string_free(name);
+    const json_t *assets = texture_field(manifest, "assets");
     static const unsigned widths[] = {2048, 8192, 1800, 1800, 1800}, heights[] = {1024, 4096, 1800, 1800, 1800};
     string_t *relative = level == 4 ? string_sprintf("earth_tiles_detail/%02u-%02u.png", column, row) :
                         level == 3 ? string_sprintf("regional/%02u.png", column) :
@@ -171,7 +175,7 @@ static bool texture_regions(sqlite_t *db, sqlite_stmt_t *insert, const string_t 
         }
         ok = ok && b[0] >= -180 && b[2] <= 180 && b[1] >= -90 && b[3] <= 90 &&
              b[0] < b[2] && b[1] < b[3] &&
-             texture_import(insert, directory, texture_field(manifest, "assets"), 3, (unsigned)i, 0, progress) &&
+             texture_import(insert, directory, manifest, 3, (unsigned)i, 0, progress) &&
              sqlite_stmt_bind_int(q, 1, (int)i);
         for (unsigned j = 0; ok && j < 4; ++j) ok = sqlite_stmt_bind_double(q, j + 2, b[j]);
         ok = ok && sqlite_stmt_bind_text(q, 6, credit) && sqlite_stmt_bind_text(q, 7, url) &&
@@ -279,10 +283,10 @@ bool cfg_database_textures(sqlite_t *db, const string_t *root)
     for (unsigned level = 0; ok && level < 3; ++level)
         for (unsigned row = 0; ok && row < (level == 2 ? 6u : 1u); ++row)
             for (unsigned column = 0; ok && column < (level == 2 ? 12u : 1u); ++column)
-                ok = texture_import(insert, directory, assets, level, column, row, &imported);
+                ok = texture_import(insert, directory, manifest, level, column, row, &imported);
     for (unsigned row = 0; ok && detail && row < 24; ++row)
         for (unsigned column = 0; ok && column < 48; ++column)
-            ok = texture_import(insert, directory, assets, 4, column, row, &imported);
+            ok = texture_import(insert, directory, manifest, 4, column, row, &imported);
     if (ok) ok = texture_regions(db, insert, directory, manifest, &imported);
     sqlite_stmt_finalize(insert);
     sqlite_stmt_finalize(existing);

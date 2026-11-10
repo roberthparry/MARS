@@ -894,8 +894,27 @@ number_t number_qdigamma(const number_t q, const number_t z);
  * @return An owning number containing @f$\psi_q(z)@f$, or NaN outside the implemented domain.
  */
 number_t num_qdigamma(const number_t q, const number_t z);
+/**
+ * @brief Evaluate trigamma with guarded multiprecision real and complex asymptotics.
+ * @param number Argument, retained by the caller; non-positive integers are poles.
+ * @return Owning first polygamma, or NaN at a pole or on exhausted convergence guards.
+ * Release with num_destroy(), or use an enclosing NUM_SCOPE. The input is not consumed or modified.
+ */
 number_t num_trigamma(const number_t number);
+/**
+ * @brief Evaluate the second polygamma with guarded multiprecision real and complex asymptotics.
+ * @param number Argument, retained by the caller; non-positive integers are poles.
+ * @return Owning second polygamma, or NaN at a pole or on exhausted convergence guards.
+ * Release with num_destroy(), or use an enclosing NUM_SCOPE. The input is not consumed or modified.
+ */
 number_t num_tetragamma(const number_t number);
+/**
+ * @brief Evaluate an integral-order derivative of digamma without narrowing multiprecision operands.
+ * @param order Derivative order, with zero denoting digamma.
+ * @param number Argument, retained by the caller; non-positive integers are poles.
+ * @return Owning polygamma value, or NaN at a pole or on exhausted convergence guards.
+ * Release with num_destroy(), or use an enclosing NUM_SCOPE. The input is not consumed or modified.
+ */
 number_t num_polygamma(unsigned int order, const number_t number);
 
 /**
@@ -987,6 +1006,17 @@ number_t num_chebyshev_u(number_t degree, number_t argument);
 
 /** @brief Evaluate the physicists' Hermite polynomial of non-negative integral degree. */
 number_t num_hermite_h(number_t degree, number_t argument);
+/**
+ * @brief Evaluate Appell F1 using a total-degree recurrence for multiprecision real and complex operands.
+ * @param a First upper parameter, retained by the caller.
+ * @param b1 Upper parameter paired with x, retained by the caller.
+ * @param b2 Upper parameter paired with y, retained by the caller.
+ * @param c Lower parameter, retained by the caller; denominator poles are unsupported.
+ * @param x First argument, retained by the caller; the convergent series requires |x| < 0.95.
+ * @param y Second argument, retained by the caller; the convergent series requires |y| < 0.95.
+ * @return Owning result at the participating precision; NaN on a pole, unsupported range or exhausted guard.
+ * Release with num_destroy(), or use an enclosing NUM_SCOPE. No input is consumed or modified.
+ */
 number_t num_appell_f1(const number_t a, const number_t b1, const number_t b2, const number_t c, const number_t x,
                        const number_t y);
 number_t num_lauricella_f(const number_t a, const number_t *b, const number_t c, const number_t *x,
@@ -994,6 +1024,14 @@ number_t num_lauricella_f(const number_t a, const number_t *b, const number_t c,
 number_t num_hypergeometric_pFq(const number_t *upper, size_t upper_count, const number_t *lower, size_t lower_count,
                                 const number_t argument);
 number_t num_legendre_chi(const number_t order, const number_t number);
+/**
+ * @brief Evaluate principal Bessel J for real or complex orders and arguments.
+ * @param order Cylinder order, retained by the caller.
+ * @param argument Cylinder argument, retained by the caller; the negative real axis uses the upper-bank value.
+ * @return Owning result at the participating precision; NaN for undefined limits or exhausted numerical guards.
+ * Complex series inputs above magnitude 1000 and work above 65536 bits are unsupported. Release with
+ * num_destroy(), or use an enclosing NUM_SCOPE. Inputs are not consumed or modified.
+ */
 number_t num_bessel_j(const number_t order, const number_t argument);
 
 /** @brief Principal modified Bessel K; zero arguments and unsupported numerical ranges return NaN. */
@@ -1034,11 +1072,47 @@ number_t num_struve_h(const number_t order, const number_t argument);
  * value. Non-finite inputs, unsupported ranges and exhausted guards return NaN. See docs/number.md.
  */
 number_t num_bessel_y(const number_t order, const number_t argument);
+/**
+ * @brief Evaluate the principal Lommel s function for real or complex parameters.
+ * @param mu First parameter, retained by the caller.
+ * @param nu Second parameter, retained by the caller.
+ * @param argument Function argument, retained by the caller; principal powers use the upper bank of the cut.
+ * @return Owning result; NaN for singular parameters, undefined limits or exhausted numerical guards.
+ * The complex series supports |argument| <= 1000 and work up to 65536 bits. Release with num_destroy(), or
+ * use an enclosing NUM_SCOPE. Inputs are not consumed or modified.
+ */
 number_t num_lommel_s(const number_t mu, const number_t nu, const number_t argument);
 number_t num_gammainv(const number_t number);
+/**
+ * @brief Evaluate the Gaussian error function without reducing multiprecision inputs to double.
+ * @param number Real or complex argument, retained by the caller.
+ * @return Owning result, or NaN for non-finite complex inputs or exhausted numerical guards.
+ * The complex series supports |number| <= 140, subject to a 65536-bit work limit. Release with num_destroy(),
+ * or use an enclosing NUM_SCOPE. The input is not consumed or modified.
+ */
 number_t num_erf(const number_t number);
+/**
+ * @brief Evaluate complementary erf, retaining small real complementary values with MPFR.
+ * @param number Real or complex argument, retained by the caller.
+ * @return Owning result, or NaN outside the complex-series guards documented for num_erf().
+ * Release with num_destroy(), or use an enclosing NUM_SCOPE. The input is not consumed or modified.
+ */
 number_t num_erfc(const number_t number);
+/**
+ * @brief Evaluate inverse erf using checked multiprecision Halley refinement.
+ * @param number Real argument in [-1, 1], or a complex argument on the supported principal branch.
+ * @return Owning inverse, signed infinity at real endpoints, or NaN outside the supported range or on
+ * non-convergence. Complex iterates obey the guards of num_erf(). Release with num_destroy(), or use an
+ * enclosing NUM_SCOPE. The input is retained by the caller and is not modified.
+ */
 number_t num_erfinv(const number_t number);
+/**
+ * @brief Evaluate inverse erfc directly, preserving small positive real probabilities.
+ * @param number Real argument in [0, 2], or a complex argument on the supported principal branch.
+ * @return Owning inverse, signed infinity at real endpoints, or NaN outside the supported range or on
+ * non-convergence. Complex iterates obey the guards of num_erf(). Release with num_destroy(), or use an
+ * enclosing NUM_SCOPE. The input is retained by the caller and is not modified.
+ */
 number_t num_erfcinv(const number_t number);
 number_t num_lambert_wn(const number_t branch, const number_t number);
 number_t num_lambert_w0(const number_t number);
@@ -1048,8 +1122,27 @@ number_t num_logbeta(const number_t a, const number_t b);
 number_t num_binomial(const number_t n, const number_t k);
 number_t num_beta_pdf(const number_t x, const number_t a, const number_t b);
 number_t num_logbeta_pdf(const number_t x, const number_t a, const number_t b);
+/**
+ * @brief Evaluate the standard Gaussian density at real or complex working precision.
+ * @param number Argument retained by the caller.
+ * @return Owning density; non-finite inputs follow the selected backend's NaN/infinity conventions.
+ * Release with num_destroy(), or use an enclosing NUM_SCOPE. The input is not consumed or modified.
+ */
 number_t num_normal_pdf(const number_t number);
+/**
+ * @brief Evaluate the standard Gaussian cumulative distribution without cancelling its negative tail.
+ * @param number Real or complex argument retained by the caller.
+ * @return Owning cumulative value, or NaN on an exhausted complex error-function guard.
+ * MPC operands retain their working precision. Release with num_destroy(), or use an enclosing NUM_SCOPE.
+ * The input is not consumed or modified.
+ */
 number_t num_normal_cdf(const number_t number);
+/**
+ * @brief Evaluate the analytic standard Gaussian log density at the participating precision.
+ * @param number Real or complex argument retained by the caller.
+ * @return Owning analytic log density; non-finite inputs follow the backend's NaN/infinity conventions.
+ * Release with num_destroy(), or use an enclosing NUM_SCOPE. The input is not consumed or modified.
+ */
 number_t num_normal_logpdf(const number_t number);
 number_t num_productlog(const number_t number);
 number_t num_gammainc_lower(const number_t s, const number_t x);

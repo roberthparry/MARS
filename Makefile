@@ -144,7 +144,7 @@ TEST_OBJS         := $(TEST_SRCS:tests/%.c=$(TEST_BUILD_DIR)/%.o)
 TEST_HELPER_OBJS  := $(TEST_HELPER_SRCS:tests/%.c=$(TEST_BUILD_DIR)/%.o)
 TEST_COMMON_HELPER_OBJS := $(TEST_COMMON_SRCS:tests/%.c=$(TEST_BUILD_DIR)/%.o)
 TEST_DATABASE_OBJS := $(filter %/test_database_store.o %/test_database_profile.o %/test_database_cases.o \
-    %/test_database_command.o %/test_database_seed.o %/test_database_history.o %/test_database_migrate.o,\
+    %/test_database_command.o %/test_database_stats.o %/test_database_seed.o %/test_database_history.o %/test_database_migrate.o,\
     $(TEST_COMMON_HELPER_OBJS))
 BENCH_SRCS        := $(shell find bench -name 'bench_*.c' 2>/dev/null | sort)
 BENCH_OBJS        := $(BENCH_SRCS:bench/%.c=$(BUILD_DIR)/bench/%.o)
@@ -220,9 +220,12 @@ all: check-deps native-tools check-public-distribution check-native-numeric-boun
 debug:
 	$(MAKE) DEBUG=1 all
 
+# Recursive release phases still validate dependencies; only the initial Make level reports success.
+release: export SQLCIPHER_REPORT_LEVEL := $(MAKELEVEL)
 release: check-native-deps
 	$(MAKE) DEBUG=0 check-compliance
 	$(MAKE) DEBUG=0 all
+	$(MAKE) --no-print-directory DEBUG=0 test-db-sync-if-needed
 	@if [ -x "$(MARS_LAB_LAUNCHER)" ]; then \
 		$(MAKE) --no-print-directory DEBUG=0 configure-mars && \
 		$(MAKE) --no-print-directory DEBUG=0 update-mars-db; \
@@ -343,7 +346,7 @@ check-sqlcipher-deps:
 	        '  Custom installations: check SQLCIPHER_CFLAGS, SQLCIPHER_LIBS and the runtime library path.'; \
 	    exit 1; \
 	fi; \
-	"$$probe_dir/probe"
+	"$$probe_dir/probe" $(if $(and $(SQLCIPHER_REPORT_LEVEL),$(filter-out $(SQLCIPHER_REPORT_LEVEL),$(MAKELEVEL))),--quiet)
 
 # Library, installation and maintenance-tool targets do not need TypeScript.
 check-native-deps: check-sqlcipher-deps
@@ -586,18 +589,20 @@ README_EXAMPLE_CHECK = "$(CHECKS_BIN)" readme-examples --cc="$(CC)" --cflags="$(
 test-readme-examples: $(STATIC_LIB) $(CHECKS_BIN) $(HTTP_FIXTURE_BIN)
 	@$(README_EXAMPLE_CHECK)
 
-.PHONY: test-db test-db-sync
+.PHONY: test-db test-db-sync test-db-sync-if-needed
 test-db test-db-sync: $(CHECKS_BIN)
 	@"$(CHECKS_BIN)" test-db $(if $(strip $(ARGS)),$(ARGS),sync)
 
+test-db-sync-if-needed: $(CHECKS_BIN)
+	@"$(CHECKS_BIN)" test-db sync-if-needed
+
+.PHONY: bench-db
+bench-db: $(CHECKS_BIN)
+	@"$(CHECKS_BIN)" bench-db $(if $(strip $(ARGS)),$(ARGS),status)
+
 test: check-public-distribution $(TEST_BINS)
 	@rc=0; "$(CHECKS_BIN)" source-policy || rc=1; for t in $(TEST_BINS); do \
-	    printf "  %-40s" "$$t ..."; \
-	    if $$t $(TEST_ARGS) > /dev/null 2>&1; then \
-	        echo "PASS"; \
-	    else \
-	        echo "FAIL"; rc=1; \
-	    fi; \
+	    "$(CHECKS_BIN)" test-suite "$$t" $(TEST_ARGS) || rc=1; \
 	done; $(README_EXAMPLE_CHECK) || rc=1; exit $$rc
 
 memtest: $(TEST_BINS)
@@ -865,6 +870,7 @@ help:
 	@echo "    If MARS Lab is installed, also install missing globe, almanac and jurisdiction databases."
 	@echo "    Creates or migrates encrypted mars.db first; the desktop key store may prompt for an unlock."
 	@echo "    Existing databases receive pending updates; their other data and settings are preserved."
+	@echo "    Synchronises an existing tests/tests.db when its SQL or test catalogue has changed; never creates it."
 	@printf '  %-40s %s\n' "make release-evidence" "Build a release and record its binary dependency evidence"
 	@printf '  %-40s %s\n' "make native-lab" "Build the Lab server and WebAssembly assets"
 	@printf '  %-40s %s\n' "make image-wasm" "Build the standalone image-library WebAssembly module"
@@ -906,12 +912,16 @@ help:
 	@printf '  %-40s %s\n' "make test_webserver" "Run offline Linux web server tests and its README example"
 	@printf '  %-40s %s\n' "make test-readme-examples" "Compile/run complete Markdown C examples"
 	@printf '  %-40s %s\n' "make test-db-sync" "Synchronise the versioned tests/tests.db case catalogue (survives clean)"
+	@printf '  %-40s %s\n' "make test-db-sync-if-needed" "Synchronise existing test storage only when source contents change (also in release)"
 	@printf '  %-40s %s\n' "make test-db ARGS='help'" "Manage saved selections, case tables and bounded run history"
 	@echo "    Test executables accept TEST_ARGS='--test-profile NAME' or '--test-database off'."
 	@echo "    Builds, make release, installation and running the Labs do not create a test database."
 	@printf '  %-40s %s\n' "make memtest" "Run all tests under valgrind"
 	@printf '  %-40s %s\n' "make memtest_<name>" "Build and run a single test under valgrind"
 	@printf '  %-40s %s\n' "make bench_<name>" "Build and run a benchmark (e.g. make bench_integrator)"
+	@printf '  %-40s %s\n' "make bench-db ARGS='run'" "Run persistent mathematical benchmarks sequentially"
+	@printf '  %-40s %s\n' "make bench-db ARGS='stats' | less -R" "Browse coloured benchmark timings and comparisons"
+	@printf '  %-40s %s\n' "make bench-db ARGS='help'" "Benchmark filters, run history and Markdown table refresh"
 	@printf '\n%s\n' "Dependencies"
 	@printf '  %-40s %s\n' "make check-deps" "Check development libraries and native TypeScript compilers"
 	@printf '  %-40s %s\n' "make check-native-deps" "Check development libraries without browser build tools"

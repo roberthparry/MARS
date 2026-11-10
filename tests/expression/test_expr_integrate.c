@@ -2649,12 +2649,12 @@ static void test_integrate_hyperbolic_table_tail(void)
 
     assert_string_antiderivative_contains("{ cosh(x) }", "sinh(x)");
     assert_string_antiderivative_matches("{ cosh(x) }", points, sizeof(points) / sizeof(points[0]));
-    assert_string_antiderivative_contains("{ exp(a*x)*cosh(b*x) }", "exp(ax)/(a² - b²)·(a·cosh(bx) - b·sinh(bx))");
+    assert_string_antiderivative_contains("{ exp(a*x)*cosh(b*x) }", "exp(ax)·(a·cosh(bx) - b·sinh(bx))/(a² - b²)");
     assert_string_antiderivative_matches_with_ab("{ exp(a*x)*cosh(b*x) }", 3.0, 2.0, points,
                                                  sizeof(points) / sizeof(points[0]));
     assert_string_antiderivative_contains("{ sinh(x) }", "cosh(x)");
     assert_string_antiderivative_matches("{ sinh(x) }", points, sizeof(points) / sizeof(points[0]));
-    assert_string_antiderivative_contains("{ exp(a*x)*sinh(b*x) }", "exp(ax)/(a² - b²)·(a·sinh(bx) - b·cosh(bx))");
+    assert_string_antiderivative_contains("{ exp(a*x)*sinh(b*x) }", "exp(ax)·(a·sinh(bx) - b·cosh(bx))/(a² - b²)");
     assert_string_antiderivative_matches_with_ab("{ exp(a*x)*sinh(b*x) }", 3.0, 2.0, points,
                                                  sizeof(points) / sizeof(points[0]));
     assert_string_antiderivative_contains("{ exp(x)*tanh(x) }", "exp(x) - 2·atan(exp(x))");
@@ -3952,7 +3952,7 @@ static void test_integrate_trigonometric_progression_closed_forms(void)
     char *round_trip_text = round_trip ? expr_to_string(round_trip, style_UNBOUND) : NULL;
 
     ASSERT_NOT_NULL(round_trip_text);
-    TEST_ASSERT_STR_EQ(round_trip_text, "sin(½nx)·cos(½x·(n + 1))/sin(x/2)");
+    TEST_ASSERT_STR_EQ(round_trip_text, "sin(½nx)·cos(½·(n + 1)·x)/sin(x/2)");
 
     free(round_trip_text);
     expr_free(round_trip);
@@ -3968,7 +3968,7 @@ static void test_integrate_trigonometric_progression_closed_forms(void)
     round_trip_text = round_trip ? expr_to_string(round_trip, style_UNBOUND) : NULL;
 
     ASSERT_NOT_NULL(round_trip_text);
-    TEST_ASSERT_STR_EQ(round_trip_text, "sin(½nx)·cos(½x·(n + 1))/sin(x/2)");
+    TEST_ASSERT_STR_EQ(round_trip_text, "sin(½nx)·cos(½·(n + 1)·x)/sin(x/2)");
 
     free(round_trip_text);
     expr_free(round_trip);

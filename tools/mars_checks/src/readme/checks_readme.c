@@ -163,8 +163,8 @@ static const char *checks_readme_execute_example(const string_t *root, const str
             string_t *working = checks_text(file_path(temporary));
             file_free(temporary);
             arguments = checks_strings_new();
-            checks_strings_add(arguments, string_clone(binary));
-            bool ready = checks_fixtures_arguments(fixtures, checks_example_path(example), code, arguments);
+            bool ready = checks_fixtures_programme(fixtures, checks_example_path(example), code, binary, working,
+                                                  arguments);
             stdout_text = stderr_text = NULL;
             ran =
                 ready && checks_process_run(arguments, working, options->timeout, &stdout_text, &stderr_text, &status);

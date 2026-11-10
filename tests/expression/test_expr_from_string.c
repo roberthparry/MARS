@@ -793,7 +793,7 @@ static void test_from_string_series_ellipsis(void)
             ASSERT_NOT_NULL(sine_closed);
             ASSERT_NOT_NULL(sine_closed_text);
             ASSERT_NOT_NULL(sine_identity_TeX);
-            TEST_ASSERT_STR_EQ(sine_closed_text, "sin(nx/2)·sin(x/2·(n + 1))/sin(x/2)");
+            TEST_ASSERT_STR_EQ(sine_closed_text, "sin(nx/2)·sin((n + 1)·x/2)/sin(x/2)");
             TEST_ASSERT_STR_EQ(sine_identity_TeX,
                                "\\sum_{k=1}^{n}\\sin(k\\mkern-2mu x) = "
                                "\\frac{\\sin(\\frac{n\\mkern-2mu x}{2})\\mkern-2mu "
@@ -889,7 +889,7 @@ static void test_from_string_series_ellipsis(void)
             ASSERT_NOT_NULL(lerch_form);
             ASSERT_NOT_NULL(lerch_x);
             ASSERT_NOT_NULL(lerch_derivative);
-            TEST_ASSERT_STR_EQ(lerch_derivative_text, "sinh(nx/2)·cosh(x/2·(n + 1))/sinh(x/2)");
+            TEST_ASSERT_STR_EQ(lerch_derivative_text, "sinh(nx/2)·cosh((n + 1)·x/2)/sinh(x/2)");
             free(lerch_derivative_text);
             expr_free(lerch_derivative);
             expr_free(lerch_form);
@@ -1121,7 +1121,7 @@ static void test_from_string_series_ellipsis(void)
         cosine_progression_text = expr_to_string(cosine_progression, style_UNBOUND);
         ASSERT_NOT_NULL(cosine_progression_text);
         ASSERT_NOT_NULL(strstr(cosine_progression_text, "sin(nx/2)"));
-        ASSERT_NOT_NULL(strstr(cosine_progression_text, "cos(x/2·(n + 1))"));
+        ASSERT_NOT_NULL(strstr(cosine_progression_text, "cos((n + 1)·x/2)"));
         ASSERT_NOT_NULL(strstr(cosine_progression_text, "sin(x/2)"));
         ASSERT_NOT_NULL(strstr(string_c_str(cosine_progression_derivation_TeX),
                                "\\sum_{k=1}^{n}\\cos(k\\mkern-2mu x)"));
@@ -1180,8 +1180,8 @@ static void test_from_string_series_ellipsis(void)
             hyperbolic_text = expr_to_string(hyperbolic_progression, style_UNBOUND);
             ASSERT_NOT_NULL(hyperbolic_text);
             ASSERT_NOT_NULL(strstr(hyperbolic_text, "sinh(nx/2)"));
-            ASSERT_NOT_NULL(strstr(hyperbolic_text, hyperbolic_kind == 0u ? "sinh(x/2·(n + 1))"
-                                                                         : "cosh(x/2·(n + 1))"));
+            ASSERT_NOT_NULL(strstr(hyperbolic_text, hyperbolic_kind == 0u ? "sinh((n + 1)·x/2)"
+                                                                         : "cosh((n + 1)·x/2)"));
             ASSERT_NOT_NULL(strstr(hyperbolic_text, "sinh(x/2)"));
             ASSERT_NOT_NULL(strstr(string_c_str(hyperbolic_derivation_TeX), series_TeX[hyperbolic_kind]));
             free(hyperbolic_text);
@@ -1395,7 +1395,7 @@ static void test_from_string_series_ellipsis(void)
     ASSERT_NOT_NULL(expression_text);
     ASSERT_NOT_NULL(function_text);
     TEST_ASSERT_STR_EQ(expression_text,
-                       "{ a/(r - 1)·(r^(n + 1) - 1) | r = ?; a = ?, n = ? }");
+                       "{ a·(r^(n + 1) - 1)/(r - 1) | r = ?; a = ?, n = ? }");
     ASSERT_NOT_NULL(strstr(function_text, "return a.(r^(n + 1) - 1)/(r - 1)."));
     ASSERT_NOT_NULL(strstr(string_c_str(derivation_TeX), "\\sum_{k=0}^{n}a\\mkern-2mu r^{k}"));
     printf("Geometric series derivation: %s\n", string_c_str(derivation_TeX));

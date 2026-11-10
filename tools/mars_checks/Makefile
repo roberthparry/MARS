@@ -35,6 +35,12 @@ CHECKS_TEST_OBJS := $(patsubst tools/mars_checks/tests/%.c,$(CHECKS_BUILD_DIR)/t
 CHECKS_TEST_BIN := $(CHECKS_BUILD_DIR)/tests/test_mars_checks
 CHECKS_TEST_FIXTURE_BIN := $(CHECKS_BUILD_DIR)/tests/fixtures/checks_process_fixture
 CHECKS_HEADERS := $(wildcard tools/mars_checks/include/*.h tools/mars_checks/tests/*.h)
+CHECKS_HEADERS += $(wildcard tools/mars_checks/src/benchmarks/*.h)
+CHECKS_BENCHMARK_FLAGS := $(CC) $(CFLAGS)
+
+$(CHECKS_BUILD_DIR)/benchmarks/benchmarks_run.o: CFLAGS += \
+    -DMARS_BENCHMARK_BUILD_FLAGS='"$(CHECKS_BENCHMARK_FLAGS)"' \
+    -DMARS_BENCHMARK_LIBRARY='"$(STATIC_LIB)"'
 
 $(CHECKS_BUILD_DIR)/%.o: tools/mars_checks/src/%.c $(CHECKS_HEADERS) tools/mars_checks/Makefile Makefile
 	@mkdir -p $(dir $@) $(dir $@).deps
@@ -48,6 +54,7 @@ $(CHECKS_BUILD_DIR)/tests/%.o: tools/mars_checks/tests/%.c $(CHECKS_HEADERS) $(T
 	@mkdir -p $(dir $@) $(dir $@).deps
 	$(CC) $(CFLAGS) $(DEPFLAGS) $(INCLUDES) -Itools/mars_checks/include -Itools/mars_checks/tests \
 	    -DMARS_CHECKS_ROOT_DIR='"$(CURDIR)"' \
+	    -DMARS_CHECKS_PROGRAM_PATH='"$(abspath $(CHECKS_BIN))"' \
 	    -DMARS_CHECKS_BENCHMARK_PATH='"$(abspath $(BUILD_DIR)/bench/expression/bench_expr_parse)"' \
 	    -DMARS_CHECKS_PROCESS_FIXTURE_PATH='"$(abspath $(CHECKS_TEST_FIXTURE_BIN))"' -c $< -o $@
 

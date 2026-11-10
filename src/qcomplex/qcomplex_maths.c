@@ -18,8 +18,6 @@
 #include "qcomplex-t.h"
 
 enum {
-    QC_ERFINV_NEWTON_MAX_STEPS = 10,
-    QC_ERFCINV_NEWTON_MAX_STEPS = 10,
     QC_GAMMAINV_NEWTON_MAX_STEPS = 20,
     QC_LAMBERT_WM1_HALLEY_MAX_STEPS = 60,
     QC_PRODUCTLOG_HALLEY_MAX_STEPS = 40,
@@ -38,73 +36,6 @@ static qfloat_t qc_abs2_local(qcomplex_t z)
     return qf_add(qf_mul(qc_real(z), qc_real(z)), qf_mul(qc_imag(z), qc_imag(z)));
 }
 
-static qcomplex_t qc_faddeeva_inside(qcomplex_t z)
-{
-    qcomplex_t sum = QC_ZERO;
-
-    for (size_t k = 0; k < QFI_FADDEEVA_TERM_COUNT; ++k) {
-        qcomplex_t denom = qc_make(qc_real(z), qf_sub(qc_imag(z), QFI_FADDEEVA_AK[k]));
-        sum = qc_add(sum, qc_div(qc_make(QFI_FADDEEVA_CK[k], QF_ZERO), denom));
-    }
-
-    /* inside = 1 + (2i / sqrt(pi)) * sum */
-    qcomplex_t two_i_sum = qc_mul(qc_make(qf_from_double(0.0), qf_from_double(2.0)), sum);
-    return qc_add(QC_ONE, qc_div(two_i_sum, QC_SQRT_PI));
-}
-
-qcomplex_t qc_erf(qcomplex_t z)
-{
-    if (qf_eq(qc_imag(z), qf_from_double(0.0)))
-        return qc_make(qf_erf(qc_real(z)), QF_ZERO);
-    /* Faddeeva requires Im(iz) = Re(z) >= 0; use antisymmetry erf(-z) = -erf(z) otherwise */
-    if (qf_lt(qc_real(z), qf_from_double(0.0)))
-        return qc_neg(qc_erf(qc_neg(z)));
-    qcomplex_t iz = qc_make(qf_neg(qc_imag(z)), qc_real(z));
-    return qc_sub(QC_ONE, qc_faddeeva_inside(iz));
-}
-
-qcomplex_t qc_erfc(qcomplex_t z)
-{
-    if (qf_eq(qc_imag(z), qf_from_double(0.0)))
-        return qc_make(qf_erfc(qc_real(z)), QF_ZERO);
-    /* Use erfc(-z) = 2 - erfc(z) to keep Re(z) >= 0 for Faddeeva */
-    if (qf_lt(qc_real(z), qf_from_double(0.0)))
-        return qc_sub(QC_TWO, qc_erfc(qc_neg(z)));
-    qcomplex_t iz = qc_make(qf_neg(qc_imag(z)), qc_real(z));
-    return qc_faddeeva_inside(iz);
-}
-
-qcomplex_t qc_erfinv(qcomplex_t z)
-{
-    /* Newton iteration: solve erf(w) = z.  Initial guess good for small |z|. */
-    qcomplex_t w = qc_mul(z, qc_make(QF_SQRT_PI_OVER_TWO, QF_ZERO));
-
-    for (int i = 0; i < QC_ERFINV_NEWTON_MAX_STEPS; i++) {
-        qcomplex_t f = qc_sub(qc_erf(w), z);
-        qcomplex_t fp = qc_mul(qc_make(QF_2_SQRTPI, QF_ZERO), qc_exp(qc_neg(qc_mul(w, w))));
-        qcomplex_t delta = qc_div(f, fp);
-        w = qc_sub(w, delta);
-        if (qf_lt(qc_abs2_local(delta), qf_from_double(1e-60)))
-            break;
-    }
-    return w;
-}
-
-qcomplex_t qc_erfcinv(qcomplex_t z)
-{
-    /* Newton iteration: solve erfc(w) = z.  Initial guess via erfinv(1-z). */
-    qcomplex_t w = qc_erfinv(qc_sub(QC_ONE, z));
-
-    for (int i = 0; i < QC_ERFCINV_NEWTON_MAX_STEPS; i++) {
-        qcomplex_t f = qc_sub(qc_erfc(w), z);
-        qcomplex_t fp = qc_mul(qc_make(QF_NEG_TWO_OVER_SQRT_PI, QF_ZERO), qc_exp(qc_neg(qc_mul(w, w))));
-        qcomplex_t delta = qc_div(f, fp);
-        w = qc_sub(w, delta);
-        if (qf_lt(qc_abs(delta), qf_from_double(1e-30)))
-            break;
-    }
-    return w;
-}
 
 /* Lanczos coefficients (g=7, N=9) */
 static qcomplex_t lanczos_sum(qcomplex_t z_minus_one)
@@ -734,13 +665,14 @@ qcomplex_t qc_normal_pdf(qcomplex_t z)
     return qc_mul(QC_INV_SQRT_2PI, qc_exp(qc_mul(qc_neg(QC_HALF), qc_mul(z, z))));
 }
 
+/* Preserve the Gaussian negative tail through the complementary error function. */
 qcomplex_t qc_normal_cdf(qcomplex_t z)
 {
     if (qf_eq(qc_imag(z), qf_from_double(0.0)))
         return qc_make(qf_normal_cdf(qc_real(z)), QF_ZERO);
 
-    /* Φ(z) = 0.5 * (1 + erf(z / sqrt(2))) */
-    return qc_mul(QC_HALF, qc_add(QC_ONE, qc_erf(qc_div(z, QC_SQRT2))));
+    /* Φ(z) = erfc(-z / sqrt(2)) / 2 preserves the negative tail. */
+    return qc_mul(QC_HALF, qc_erfc(qc_div(qc_neg(z), QC_SQRT2)));
 }
 
 qcomplex_t qc_normal_logpdf(qcomplex_t z)

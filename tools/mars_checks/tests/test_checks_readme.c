@@ -13,6 +13,7 @@
 
 #include <errno.h>
 #include <signal.h>
+#include <stdlib.h>
 #include <sys/wait.h>
 
 #include "file-t.h"
@@ -135,6 +136,41 @@ static void test_checks_readme_success_and_separate_stderr(void)
     TEST_ASSERT_TRUE(ok, "README example succeeds with exact stdout and separately retained stderr");
 }
 
+static void test_checks_readme_globe_fixture(void)
+{
+    string_t *root = test_checks_root();
+    const char *inherited = getenv("MARS_GLOBE_DB_PATH");
+    string_t *before = checks_text(inherited ? inherited : "");
+    bool ok = test_checks_write(root, "tests/test_config.json", "{}\n") &&
+              test_checks_write(root, "README.md",
+                                "```c\n#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n"
+                                "/* A globe_reader_identity( example requires private file-backed storage. */\n"
+                                "int main(void) { const char *path = getenv(\"MARS_GLOBE_DB_PATH\");\n"
+                                "const char *key = getenv(\"MARS_GLOBE_DB_KEY\");\n"
+                                "FILE *file = path ? fopen(path, \"rb\") : NULL; char header[16];\n"
+                                "int ok = file && key && !*key && fread(header, 1, 16, file) == 16 &&\n"
+                                "!memcmp(header, \"SQLite format 3\", 15) && !header[15];\n"
+                                "if (file && fclose(file)) ok = 0;\n"
+                                "if (ok) { puts(\"Private globe fixture available\"); }\n"
+                                "return ok ? 0 : 1; }\n```\n"
+                                "```text\nPrivate globe fixture available\n```\n");
+    ok = test_checks_run_readme(root, false) == 0 && test_checks_readme_result(root, 1, NULL) && ok;
+    inherited = getenv("MARS_GLOBE_DB_PATH");
+    ok = checks_equal(before, inherited ? inherited : "") && ok;
+    if (!ok) {
+        string_t *path = checks_path(root, "build/readme-examples/README_001.compile.log");
+        string_t *diagnostic = checks_read(path);
+        if (diagnostic)
+            string_fprintf(stderr, "%S", diagnostic);
+        string_free(diagnostic);
+        string_free(path);
+    }
+    string_free(before);
+    ok = test_checks_finish(root) && ok;
+    TEST_ASSERT_TRUE(ok, "Standalone globe reader examples receive disposable SQLite storage without changing "
+                         "the parent configuration");
+}
+
 static void test_checks_readme_negative_results(void)
 {
     const char *const programmes[] = {"call();\n",
@@ -246,4 +282,5 @@ void test_checks_readme_cases(void)
     TEST_RUN_IN_GROUP(test_checks_readme_negative_results, readme_examples, NULL);
     TEST_RUN_IN_GROUP(test_checks_readme_interrupt_cleanup, readme_examples, NULL);
     TEST_RUN_IN_GROUP(test_checks_readme_success_and_separate_stderr, readme_examples, NULL);
+    TEST_RUN_IN_GROUP(test_checks_readme_globe_fixture, readme_examples, NULL);
 }

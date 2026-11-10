@@ -6,6 +6,7 @@
  * deterministic local fixtures to test the documented client workflow.
  */
 
+#include <stdio.h>
 #include <stdlib.h>
 
 #include "http-t.h"
@@ -28,6 +29,10 @@ int main(int argc, char **argv)
         string_printf("WebSocket echo: %S\n", output);
     if (http_websocket_is_open(socket))
         ok = http_websocket_close(socket, 1000, NULL) && ok;
+    if (!ok) {
+        const string_t *error = http_client_error_text(client);
+        fprintf(stderr, "WebSocket echo failed: %s\n", error ? string_c_str(error) : "no text reply or clean close");
+    }
     string_free(output);
     array_destroy(reply);
     http_websocket_free(socket);

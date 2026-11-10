@@ -117,7 +117,9 @@ Solution families: 1
 For $y'=a(x)y^2+b(x)y+c(x)$, with regular coefficients and $a\ne0$,
 the substitution $y=-a^{-1}(u'/u)$ gives
 
-$$u''-\left(b+\frac{a'}a\right)u'+ac\,u=0.$$
+
+$\quad\begin{array}{l}\displaystyle u''-\left(b+\frac{a'}a\right)u'+ac\,u=0.\end{array}$
+
 
 This is the linear lift associated with the Riccati
 [SL(2, ℝ) Lie system](https://arxiv.org/abs/1212.5779).
@@ -125,7 +127,9 @@ It does not require an elementary solution or a same-order point transformation.
 The native solver removes the first derivative by setting
 $r=(b+a'/a)/2$ and using $y=-a^{-1}(v'/v+r)$. Then
 
-$$v''+Q(x)v=0,\qquad Q=ac+r'-r^2.$$
+
+$\quad\begin{array}{l}\displaystyle v''+Q(x)v=0,\qquad Q=ac+r'-r^2.\end{array}$
+
 
 The native derivation simplifies the substitution coefficients and auxiliary equation before
 formatting either plain text or TeX. It removes zero shifts and redundant unit factors,
@@ -141,7 +145,9 @@ equation has two basis coefficients, but their common scale cancels in the
 logarithmic derivative: the first-order solution has only one arbitrary constant.
 For the example $y'=y^2+x^2$, put $z=x^2/2$. On $x>0$ the displayed family is
 
-$$y=x\,\frac{J_{3/4}(z)-C J_{-3/4}(z)}{J_{-1/4}(z)+C J_{1/4}(z)},$$
+
+$\quad\begin{array}{l}\displaystyle y=x\,\frac{J_{3/4}(z)-C J_{-3/4}(z)}{J_{-1/4}(z)+C J_{1/4}(z)},\end{array}$
+
 
 with the separate limiting member $y=-xJ_{-3/4}(z)/J_{1/4}(z)$, corresponding to
 $C\to\infty$. This is not a second independent integration constant.
@@ -156,8 +162,9 @@ TeX uses conventional piecewise notation for the same continuous extension.
 Native evaluation retains an equivalent analytic basis, with $m=n+2$ and
 $w=-kx^m/m^2$:
 
-$$u_0={}_0F_1\left(;1-\frac1m;w\right),\qquad
-u_1=x\,{}_0F_1\left(;1+\frac1m;w\right).$$
+
+$\quad\begin{array}{l}\displaystyle u_0={}_0F_1\left(;1-\frac1m;w\right),\qquad u_1=x\,{}_0F_1\left(;1+\frac1m;w\right).\end{array}$
+
 
 These are analytic across zero, with Wronskian one. This avoids evaluating
 singular Bessel factors separately at a removable singularity. Expression and
@@ -211,10 +218,9 @@ Solution: y = x·J_{¾}(½·x²)/J_{-¼}(½·x²); x ≠ 0; y(0) = 0
 
 Here the auxiliary equation is $v''+x^2v=0$, and the displayed solution is
 
-$$y=\begin{cases}
-x\,J_{3/4}(x^2/2)/J_{-1/4}(x^2/2),&x\ne0,\\
-0,&x=0.
-\end{cases}$$
+
+$\quad\begin{array}{l}\displaystyle y=\begin{cases} x\,J_{3/4}(x^2/2)/J_{-1/4}(x^2/2),&x\ne0,\\ 0,&x=0. \end{cases}\end{array}$
+
 
 ## Autonomous exponential forces
 
@@ -224,19 +230,15 @@ the constant bindings. The selected family is `DE_SOLVER_AUTONOMOUS_ENERGY`.
 It also recognises equivalent exponential bases and
 renamed coordinates and fields. Multiplying by `y'` gives
 
-$$
-(y')^2 = \frac{2A}{B}e^{By}+E.
-$$
+
+$\quad\begin{array}{l}\displaystyle (y')^2 = \frac{2A}{B}e^{By}+E.\end{array}$
+
 
 For `y''=exp(y)`, all three real energy cases are explicit:
 
-$$
-\begin{aligned}
-E>0:&\quad y=\ln\!\left(\frac{2C_1^2}{\sinh^2(C_1(x-C_2))}\right),\\
-E<0:&\quad y=\ln\!\left(\frac{2C_1^2}{\cos^2(C_1(x-C_2))}\right),\\
-E=0:&\quad y=\ln\!\left(\frac{2}{(x-C_2)^2}\right).
-\end{aligned}
-$$
+
+$\quad\begin{array}{l}\displaystyle \begin{aligned} E>0:&\quad y=\ln\!\left(\frac{2C_1^2}{\sinh^2(C_1(x-C_2))}\right),\\ E<0:&\quad y=\ln\!\left(\frac{2C_1^2}{\cos^2(C_1(x-C_2))}\right),\\ E=0:&\quad y=\ln\!\left(\frac{2}{(x-C_2)^2}\right). \end{aligned}\end{array}$
+
 
 Here `C₁ > 0`, `C₂` is real, and `E = ±4C₁²` in the first two
 families. Each solution applies on real intervals away from its denominator's
@@ -715,9 +717,9 @@ solution = x = (2t + C₁)/(⅓α·(t² + C₁t + C₂))
 
 Equivalently, for $\alpha\ne0$ and a non-zero denominator,
 
-$$
-x(t)=\frac{3(2t+C_1)}{\alpha(t^2+C_1t+C_2)}.
-$$
+
+$\quad\begin{array}{l}\displaystyle x(t)=\frac{3(2t+C_1)}{\alpha(t^2+C_1t+C_2)}.\end{array}$
+
 
 Set $x=3u'/(\alpha u)$ to obtain $u'''=0$; the auxiliary $u$ is quadratic.
 No separate instruction to linearise is required. The keyboard-only form
@@ -757,11 +759,9 @@ On a local branch with $x\ne0$, put $r=x'/x^2$ and $Q(r)=2r^2+\alpha r+\beta$.
 On a connected interval where
 $Q$ is non-zero, choose a fixed reference $r_0$ and define
 
-$$
-J(r)=\int_{r_0}^{r}\frac{s}{Q(s)}\,ds,\qquad
-x(r)=C_1e^{-J(r)},\qquad
-t(r)=C_2-\frac{1}{C_1}\int_{r_0}^{r}\frac{e^{J(u)}}{Q(u)}\,du.
-$$
+
+$\quad\begin{array}{l}\displaystyle J(r)=\int_{r_0}^{r}\frac{s}{Q(s)}\,ds,\qquad x(r)=C_1e^{-J(r)},\qquad t(r)=C_2-\frac{1}{C_1}\int_{r_0}^{r}\frac{e^{J(u)}}{Q(u)}\,du.\end{array}$
+
 
 Here $C_1\ne0$ and $C_2$ are the two integration constants. The reference $r_0$
 is fixed within that regular interval; changing it reparametrises these constants
@@ -2343,6 +2343,10 @@ each order and displays them beside their powers of $h$, rather than exposing
 the nested expressions used to construct them. Series are displayed in ascending
 powers of $h$, omitting zero coefficients and placing the remainder last, in
 both text and TeX. This also applies when initial data give numeric coefficients.
+Exact rational Taylor coefficients always stay fractional, even when a terminating
+decimal would be shorter: `17/10` remains a fraction rather than `1.7`. This
+series-specific presentation also applies to function output and survives contextual
+simplification. It does not change ordinary expressions' fraction-versus-decimal rule.
 
 The automatic fallback retains terms through degree six. Use
 `de_solve_series()` to request a degree from two through eight. The result

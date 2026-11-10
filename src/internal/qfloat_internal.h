@@ -23,17 +23,8 @@
 
 #include "qfloat-t.h"
 
-/** @brief Number of entries in each immutable Faddeeva coefficient table. */
-extern const size_t QFI_FADDEEVA_TERM_COUNT;
-
 /** @brief Number of entries in the immutable Lanczos coefficient table. */
 extern const size_t QFI_LANCZOS_COEFF_COUNT;
-
-/** @brief Immutable Faddeeva coefficients shared with native complex arithmetic. */
-extern const qfloat_t QFI_FADDEEVA_AK[];
-
-/** @brief Immutable companion Faddeeva coefficients shared with native complex arithmetic. */
-extern const qfloat_t QFI_FADDEEVA_CK[];
 
 /** @brief Immutable Lanczos coefficients used by native gamma-related implementations. */
 extern const qfloat_t QFI_LANCZOS_C[];

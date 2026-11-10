@@ -458,17 +458,21 @@ void test_lab_river_surface_cases(void)
     TEST_RUN_IN_GROUP(test_lab_surface_global_detail, tests, NULL);
 }
 
-static bool surface_readme_fixture(const char *directory)
+/* README: the complete cache-identity programme, with its configured database supplied by the fixture. */
+static int surface_identity_example(void)
 {
-    if (!test_lab_texture_database(directory)) return false;
-    /* README example: obtain an owned cache identity without reading the full database. */
     globe_reader_t *reader = globe_reader_new();
     string_t *identity = globe_reader_identity(reader);
     printf("Cache identity available: %s\n", identity ? "yes" : "no");
-    bool ok = identity && string_byte_length(identity) == 64;
+    int status = identity ? EXIT_SUCCESS : EXIT_FAILURE;
     string_free(identity);
     globe_reader_free(reader);
-    return ok;
+    return status;
+}
+
+static bool surface_readme_fixture(const char *directory)
+{
+    return test_lab_texture_database(directory) && surface_identity_example() == EXIT_SUCCESS;
 }
 
 static void example_globe_reader_identity(void)

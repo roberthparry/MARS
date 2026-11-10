@@ -643,6 +643,9 @@ static void test_lab_eclipse_previews(void)
 
 static void test_lab_solar_times(void)
 {
+    bool configured = test_lab_resource_settings();
+    TEST_ASSERT_TRUE(configured, "load the installed ephemeris and jurisdiction configuration before solar tests");
+    if (!configured) return;
     almanac_t *engine = almanac_open();
     jurisdiction_t *jurisdiction = jurisdict_open("GB-ENG");
     string_t *zone = string_new_with("Europe/London");
@@ -704,6 +707,9 @@ static void test_lab_solar_times(void)
 
 static void test_lab_sky_status(void)
 {
+    bool configured = test_lab_resource_settings();
+    TEST_ASSERT_TRUE(configured, "load the installed ephemeris configuration before sky-strip tests");
+    if (!configured) return;
     json_t *response = test_lab_json(
         "{\"fields\":{\"date\":\"2026-10-22\",\"time\":\"19:00:20.0\"},"
         "\"observer_latitude\":\"52.7\",\"observer_longitude\":\"-2.75\","

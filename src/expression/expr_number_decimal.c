@@ -5,7 +5,8 @@
  * Native output and semantic notation share this presentation decision. A terminating rational may use fixed
  * or scientific decimal notation when that spelling saves at least two characters over its ASCII fraction.
  * Repeating rationals and compact familiar fractions stay fractional. Integer arithmetic preserves every digit;
- * no floating-point approximation or change to the expression graph is involved.
+ * no floating-point approximation or change to the expression graph is involved. Exact-coefficient rendering
+ * scopes, such as Taylor equations, suppress decimal alternatives without changing ordinary output.
  */
 #include <gmp.h>
 #include <stdlib.h>
@@ -15,6 +16,16 @@
 #include "string-t.h"
 #define MARS_EXPR_STRINGOUT_INTERNAL_ACCESS
 #include "expr_stringout_internal.h"
+
+static _Thread_local bool expr_fractional_numbers = false;
+
+/* A caller's exact-coefficient rendering scope never changes another thread's display choices. */
+bool expr_set_number_fractional_local(bool fractional)
+{
+    bool previous = expr_fractional_numbers;
+    expr_fractional_numbers = fractional;
+    return previous;
+}
 
 /* Compare complete spellings before allocating padding or committing to one notation. */
 string_t *expr_number_preferred_decimal_local(number_t value)
@@ -43,7 +54,7 @@ string_t *expr_number_preferred_decimal_local(number_t value)
 /* Binding literals retain exact digits independently of the current numeric working-precision budget. */
 string_t *expr_rational_preferred_decimal_local(const string_t *top, const string_t *bottom)
 {
-    if (!top || !bottom)
+    if (expr_fractional_numbers || !top || !bottom)
         return NULL;
     mpz_t scaled, rest, factor;
     mpz_inits(scaled, rest, factor, NULL);

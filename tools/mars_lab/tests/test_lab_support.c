@@ -23,8 +23,23 @@
 #include "array-t.h"
 #include "sqlite-t.h"
 #include "string-t.h"
+#include "mars_settings.h"
 
 #include "test_lab_support.h"
+
+/* Installed ephemeris checks need the same configuration snapshot as the application and almanac suite. */
+bool test_lab_resource_settings(void)
+{
+    static struct {
+        bool attempted;
+        bool ready;
+    } settings;
+    if (!settings.attempted) {
+        settings.attempted = true;
+        settings.ready = mars_settings_isolate() && mars_settings_load();
+    }
+    return settings.ready;
+}
 
 /* Independently seed image rows so HTTP tests exercise runtime reads without depending on installer objects. */
 bool test_lab_texture_database(const char *directory)

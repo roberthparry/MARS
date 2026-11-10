@@ -3,7 +3,7 @@
  * @brief Preserve non-photographic globe data in a fresh staged database.
  *
  * Copies tables through SQLite's public SQL interface from the attached previous database. Rowid tables use
- * bounded keyset batches; virtual and WITHOUT ROWID tables use native bulk insertion. Geometry and source
+ * bounded single-pass keyset batches; virtual and WITHOUT ROWID tables use native bulk insertion. Geometry and source
  * values are unchanged. Shadow tables are owned by their virtual-table modules and are never copied directly.
  * Deferred indexes, views, triggers and sequence state preserve unrelated user schema without replaying triggers.
  */
@@ -77,48 +77,50 @@ static string_t *column_list(sqlite_t *db, const char *name, bool *rowid)
 static bool copy_rows(sqlite_t *db, const char *name, bool rowid, bool batch, cfg_progress_t *progress)
 {
     string_t *table = quoted_name(name), *columns = column_list(db, name, &rowid);
+    string_t *description = name ? string_new_with(name) : NULL;
     batch = batch && rowid;
     string_t *sql = table ? string_sprintf("SELECT count(*) FROM previous.%s", string_c_str(table)) : NULL;
     int64_t total = 0, copied = 0;
     bool ok = sql && columns && scalar(db, string_c_str(sql), &total) && total >= 0;
     string_free(sql);
     static const char label[] = "Preserving globe data";
-    if (ok) cfg_progress_update_items(progress, label, 0, total, "rows copied");
+    int64_t segment_size = batch || !total ? 4096 : total;
+    if (ok) {
+        cfg_progress_update_segments(progress, label, 0, total, "rows copied", segment_size);
+        cfg_progress_segment_name(progress, description);
+    }
     if (ok && batch) {
         /* The first column is a verified unshadowed rowid alias. Preserve even INT64_MIN and INT64_MAX. */
         string_offset_t end = string_find(columns, ",");
         string_t *identity = end > 0 ? string_substr(columns, 0, (size_t)end) : NULL;
-        string_t *bounds_sql = identity ? string_sprintf(
-            "SELECT max(id),count(*) FROM (SELECT %s AS id FROM previous.%s\n"
-            "WHERE %s>=?1 ORDER BY %s LIMIT 4096)", string_c_str(identity), string_c_str(table),
-            string_c_str(identity), string_c_str(identity)) : NULL;
         string_t *copy_sql = identity ? string_sprintf(
             "INSERT INTO main.%s(%s) SELECT %s FROM previous.%s\n"
-            "WHERE %s>=?1 AND %s<=?2 ORDER BY %s", string_c_str(table), string_c_str(columns),
-            string_c_str(columns), string_c_str(table), string_c_str(identity), string_c_str(identity),
-            string_c_str(identity)) : NULL;
-        sqlite_stmt_t *bounds = bounds_sql ? sqlite_stmt_prepare(db, string_c_str(bounds_sql)) : NULL;
+            "WHERE %s>=?1 ORDER BY %s LIMIT ?2", string_c_str(table), string_c_str(columns),
+            string_c_str(columns), string_c_str(table), string_c_str(identity), string_c_str(identity)) : NULL;
+        sqlite_stmt_t *result = sqlite_stmt_prepare(db, "SELECT last_insert_rowid(), changes()");
         sqlite_stmt_t *write = copy_sql ? sqlite_stmt_prepare(db, string_c_str(copy_sql)) : NULL;
-        ok = bounds && write;
+        ok = result && write;
         int64_t first = INT64_MIN;
         while (ok && copied < total) {
-            ok = sqlite_stmt_bind_int64(bounds, 1, first) && sqlite_stmt_step(bounds) == SQLITE_STEP_ROW;
-            int64_t last = ok ? sqlite_stmt_column_int64(bounds, 0) : 0;
-            int64_t count = ok ? sqlite_stmt_column_int64(bounds, 1) : 0;
-            ok = ok && count > 0 && count <= total - copied;
-            sqlite_stmt_reset(bounds);
-            ok = ok && sqlite_stmt_bind_int64(write, 1, first) && sqlite_stmt_bind_int64(write, 2, last) &&
+            ok = sqlite_stmt_bind_int64(write, 1, first) && sqlite_stmt_bind_int64(write, 2, segment_size) &&
                  sqlite_stmt_step(write) == SQLITE_STEP_DONE;
             sqlite_stmt_reset(write);
+            /* Deferred triggers cannot change these values. Explicit ascending rowids make the final one the next key. */
+            ok = ok && sqlite_stmt_step(result) == SQLITE_STEP_ROW;
+            int64_t last = ok ? sqlite_stmt_column_int64(result, 0) : 0;
+            int64_t count = ok ? sqlite_stmt_column_int64(result, 1) : 0;
+            ok = ok && count > 0 && count <= segment_size && count <= total - copied && last >= first;
+            sqlite_stmt_reset(result);
             if (ok) {
                 copied += count;
-                cfg_progress_update_items(progress, label, copied, total, "rows copied");
+                cfg_progress_update_segments(progress, label, copied, total, "rows copied", segment_size);
+                cfg_progress_segment_name(progress, description);
             }
             if (last == INT64_MAX) break;
             first = last + 1;
         }
-        sqlite_stmt_finalize(write); sqlite_stmt_finalize(bounds);
-        string_free(copy_sql); string_free(bounds_sql); string_free(identity);
+        sqlite_stmt_finalize(write); sqlite_stmt_finalize(result);
+        string_free(copy_sql); string_free(identity);
     } else if (ok) {
         sql = string_sprintf("INSERT INTO main.%s(%s) SELECT %s FROM previous.%s", string_c_str(table),
                              string_c_str(columns), string_c_str(columns), string_c_str(table));
@@ -129,8 +131,8 @@ static bool copy_rows(sqlite_t *db, const char *name, bool rowid, bool batch, cf
     int64_t actual = 0;
     sql = table ? string_sprintf("SELECT count(*) FROM main.%s", string_c_str(table)) : NULL;
     ok = ok && copied == total && sql && scalar(db, string_c_str(sql), &actual) && actual == total;
-    if (ok) cfg_progress_update_items(progress, label, copied, total, "rows copied");
-    string_free(sql); string_free(columns); string_free(table);
+    if (ok) cfg_progress_update_segments(progress, label, copied, total, "rows copied", segment_size);
+    string_free(sql); string_free(columns); string_free(table); string_free(description);
     return ok;
 }
 

@@ -6,6 +6,7 @@
  * CONFIG_PROGRAM with this executable in a private self-fixture mode, avoiding
  * another jurisdiction import. Only build/dependency prerequisites are bypassed;
  * the installer recipe and its target-specific exports remain authoritative.
+ * Test-storage synchronisation has its own database regressions and is bypassed here to avoid real catalogue writes.
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -39,7 +40,8 @@ void test_cfg_make_self_fixture(void)
                        !memcmp(bytes + prefix, "settings\0init", sizeof("settings\0init"));
         bool update = ok && length == prefix + sizeof("databases-ensure") &&
                       !memcmp(bytes + prefix, "databases-ensure", sizeof("databases-ensure"));
-        ok = setup || migrate || update;
+        const char *report_level = getenv("SQLCIPHER_REPORT_LEVEL");
+        ok = (setup || migrate || update) && report_level && *report_level;
         file_free(command);
         const char *phase = setup ? "setup" : migrate ? "migration" : "update";
         if (ok) { printf("release %s fixture verified\n", phase); fflush(stdout); }
@@ -283,7 +285,8 @@ static bool test_cfg_make_release_fixture(const char *directory)
     ok = ok && program && launcher_arg && launcher && !setenv("MARS_TEST_MAKE_PROGRAM", target, 1) &&
          !setenv("MARS_TEST_MAKE_RELEASE", "1", 1) && !unsetenv("MARS_TEST_MAKE_FAIL");
     const char *args[] = {"make", "--no-print-directory", "-j1", "-o", "check-native-deps",
-        "MAKE=make --no-print-directory -j1 -o check-compliance -o all -o native-config -o check-native-deps",
+        "MAKE=make --no-print-directory -j1 -o check-compliance -o all -o native-config -o check-native-deps "
+        "-o test-db-sync-if-needed",
         program ? string_c_str(program) : "", launcher_arg ? string_c_str(launcher_arg) : "", "release", NULL};
     for (unsigned pass = 0; pass < 6 && ok; ++pass) {
         if (pass == 1) ok = file_write_all_bytes(launcher, "fixture", 7) && file_chmod(launcher, 0600);
@@ -296,8 +299,10 @@ static bool test_cfg_make_release_fixture(const char *directory)
         string_offset_t setup = string_find(output, "release setup fixture verified");
         string_offset_t migration = string_find(output, "release migration fixture verified");
         string_offset_t update = string_find(output, "release update fixture verified");
-        ok = ok && ((setup >= 0) == (pass >= 2)) &&
+        string_offset_t sync = string_find(output, "DEBUG=0 test-db-sync-if-needed");
+        ok = ok && sync >= 0 && ((setup >= 0) == (pass >= 2)) &&
              ((migration >= 0) == (pass >= 2 && pass != 4)) && ((update >= 0) == (pass == 2 || pass == 3)) &&
+             (setup < 0 || setup > sync) &&
              (migration < 0 || migration > setup) && (update < 0 || update > migration);
         if (!ok) fprintf(stderr, "Release dispatch pass %u failed: %s\n", pass, output ? string_c_str(output) : "no output");
         string_free(output);

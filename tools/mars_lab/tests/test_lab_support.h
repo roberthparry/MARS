@@ -11,6 +11,15 @@
 
 #include "json-t.h"
 
+/**
+ * @brief Load the configured read-only resource snapshot for tests that require installed ephemeris data.
+ * @return True when settings are available; false when the secure key source or stored configuration is unavailable.
+ * @note Call in the parent before forking ephemeris fixtures. The first call loads once through the isolated
+ * settings helper; later calls reuse the copied process environment. No database or user setting is created,
+ * overwritten or removed. Mathematical tests that do not need installed resources need not call this function.
+ */
+bool test_lab_resource_settings(void);
+
 /** Register bounded native solver plot cache regressions and timings. */
 void test_lab_plot_cache_cases(void);
 

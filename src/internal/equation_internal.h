@@ -259,6 +259,15 @@ string_t *equ_solutions_compact_text(const equation_solutions_t *solutions, cons
 string_t *equ_solution_pair_rhs_text(const equation_t *first, const equation_t *second, style_t style);
 
 /**
+ * @brief Retain exact fractional coefficients when presenting an equation such as a Taylor expansion.
+ * @param[in,out] equation Borrowed equation whose presentation preference is changed; NULL is ignored.
+ * @param[in] fractional True keeps exact rational numbers fractional across native, function and TeX output.
+ * @return No value; the equation retains only the preference and does not change or take ownership of operands.
+ * @note Contextual simplification preserves this preference. Unrelated equations and threads are unaffected.
+ */
+void equ_set_fractional_coefficients(equation_t *equation, bool fractional);
+
+/**
  * @brief Attach faithful native mathematical notation to an equation's underlying expression trees.
  * @param equation Borrowed equation whose native metadata or solution set is inspected or updated as documented.
  * @param lhs Borrowed mathematical side or copied display notation, according to the declared parameter type.

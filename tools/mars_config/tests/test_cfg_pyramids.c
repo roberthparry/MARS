@@ -178,6 +178,8 @@ static bool installer_fixture(const char *directory)
     ok = ok && (!old || previous) && !setenv("MARS_GLOBE_TEXTURE_DIR", directory, 1) && sqlite_exec_cstr(target,
         "CREATE TABLE globe_texture_dataset(id,format_version);"
         "INSERT INTO globe_texture_dataset VALUES(1,2);"
+        "CREATE TABLE globe_texture_manifest(id INTEGER PRIMARY KEY,json TEXT);"
+        "INSERT INTO globe_texture_manifest VALUES(1,'{\"regions\":[{\"name\":\"corsica Sentinel tile 573\"}]}');"
         "CREATE TABLE globe_texture(level,column_index,row_index,width,height,byte_count,sha256,png,"
         "PRIMARY KEY(level,column_index,row_index));"
         "INSERT INTO globe_texture VALUES(3,0,0,1800,1800,4,"
@@ -188,6 +190,11 @@ static bool installer_fixture(const char *directory)
         "'cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc',zeroblob(4));") &&
         installer_progress(target, root, directory, true) &&
         sqlite_exec_cstr(target, "PRAGMA query_only=ON") && installer_progress(target, root, directory, false);
+    json_t *catalogue = cfg_database_texture_catalogue(target);
+    string_t *name = cfg_database_texture_name(catalogue, 3, 0);
+    ok = ok && name && !strcmp(string_c_str(name), "Corsica");
+    string_free(name);
+    json_free(catalogue);
     globe_t *globe = globe_open_databases(target, target, NULL);
     globe_texture_info_t installed, missing;
     ok = ok && globe_texture_metadata(globe, 3, 0, 0, &installed) && installed.pyramid &&

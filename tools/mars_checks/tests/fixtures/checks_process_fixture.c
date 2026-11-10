@@ -2,22 +2,38 @@
  * @file checks_process_fixture.c
  * @brief Native fork fixture retaining capture descriptors after its leader exits.
  *
- * Used only by the sequential process-group cleanup regression. Argument count
+ * Used by sequential process-group cleanup and live test-progress regressions. Argument count
  * selects successful exit, failed exit, timeout, invalid UTF-8 capture or parent
  * interruption (five arguments for SIGINT, six for SIGTERM). A pipe
  * handshake ensures the descendant has written to stderr before the leader prints
  * its PID. The descendant retains both capture streams until explicitly killed.
+ * The --suite mode instead emits split coloured results, a long diagnostic line and a final output burst.
  */
 #include <errno.h>
 #include <signal.h>
 #include <stdio.h>
+#include <string.h>
 #include <sys/wait.h>
+#include <time.h>
 #include <unistd.h>
 
 /* Create one persistent descendant and expose its PID to the owning test. */
 int main(int argc, char **argv)
 {
-    (void)argv;
+    if (argc > 1 && !strcmp(argv[1], "--suite")) {
+        fputs("\033[32mPA", stdout);
+        fflush(stdout);
+        struct timespec pause = {.tv_nsec = 300000000};
+        while (nanosleep(&pause, &pause) && errno == EINTR) {}
+        fputs("SS: first\033[0m\n", stdout);
+        for (unsigned i = 0; i < 70000; ++i)
+            putchar('x');
+        fputs("\nPASS: second\n", stdout);
+        fputs("fixture diagnostic\n", stderr);
+        if (argc > 2)
+            fputs("\033[31mFAIL: third\033[0m\n", stdout);
+        return argc > 2 ? 7 : 0;
+    }
     int ready[2];
     if (pipe(ready))
         return 90;

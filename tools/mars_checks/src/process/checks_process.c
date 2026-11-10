@@ -148,9 +148,10 @@ static double checks_process_monotonic_seconds(void)
     return (double)now.tv_sec + (double)now.tv_nsec / 1e9;
 }
 
-/* Execute a child and preserve separate standard streams. */
-bool checks_process_run(const checks_strings_t *arguments, const string_t *cwd, double timeout, string_t **output,
-                        string_t **errors, int *status)
+/* Execute a child and preserve separate standard streams, with an optional synchronous observer. */
+bool checks_process_run_observed(const checks_strings_t *arguments, const string_t *cwd, double timeout,
+                                string_t **output, string_t **errors, int *status,
+                                checks_process_observer_t observer, void *context)
 {
     *output = *errors = NULL;
     *status = -1;
@@ -208,8 +209,14 @@ bool checks_process_run(const checks_strings_t *arguments, const string_t *cwd, 
     free(argv);
     if (!error) {
         double started = checks_process_monotonic_seconds();
+        double next_observation = 0;
         int result = 0;
         for (;;) {
+            double elapsed = checks_process_monotonic_seconds() - started;
+            if (observer && elapsed >= next_observation) {
+                observer(out_path, elapsed, context);
+                next_observation = elapsed + .25;
+            }
             if (checks_process_interrupt_signal()) {
                 error = ECANCELED;
                 break;
@@ -241,6 +248,8 @@ bool checks_process_run(const checks_strings_t *arguments, const string_t *cwd, 
             *status = WIFEXITED(result) ? WEXITSTATUS(result) : -WTERMSIG(result);
         else if (!error)
             error = errno;
+        if (observer)
+            observer(out_path, checks_process_monotonic_seconds() - started, context);
         *output = checks_read(out_path);
         *errors = checks_read(err_path);
         if ((!*output || !*errors) && !error)
@@ -252,6 +261,13 @@ bool checks_process_run(const checks_strings_t *arguments, const string_t *cwd, 
     string_free(root);
     errno = error;
     return !error;
+}
+
+/* The unobserved path retains the same process and ownership rules. */
+bool checks_process_run(const checks_strings_t *arguments, const string_t *cwd, double timeout, string_t **output,
+                        string_t **errors, int *status)
+{
+    return checks_process_run_observed(arguments, cwd, timeout, output, errors, status, NULL, NULL);
 }
 
 /* Read the Git index using NUL-delimited records. */

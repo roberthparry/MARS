@@ -2,12 +2,29 @@
  * @file qcomplex_cylindrical.c
  * @brief Complex double-double adapters for Bessel and Struve functions.
  *
- * Groups the Bessel I, K and Y and Struve H/L entry points that use guarded number-layer kernels. Each adapter
+ * Groups Bessel J/I/K/Y, Lommel s and Struve H/L entry points that use guarded number-layer kernels. Each adapter
  * preserves its existing domain checks, conversion, rounding and numeric-scope cleanup. The numerical kernels
  * remain in the number module; this file does not introduce another special-function implementation.
  */
 
 #include "number-t.h"
+
+/* Round guarded principal Bessel J to complex double-double precision. */
+qcomplex_t qc_bessel_j(qcomplex_t order, qcomplex_t argument)
+{
+    NUM_SCOPE(scope);
+    number_t value = num_bessel_j(num_create_from_qcomplex(order), num_create_from_qcomplex(argument));
+    return num_is_finite(value) ? qc_make(num_to_qfloat(num_real_part(value)), num_to_qfloat(num_imag_part(value))) : QC_NAN;
+}
+
+/* Round the principal complex Lommel series to double-double precision. */
+qcomplex_t qc_lommel_s(qcomplex_t mu, qcomplex_t nu, qcomplex_t argument)
+{
+    NUM_SCOPE(scope);
+    number_t value = num_lommel_s(num_create_from_qcomplex(mu), num_create_from_qcomplex(nu),
+                                  num_create_from_qcomplex(argument));
+    return num_is_finite(value) ? qc_make(num_to_qfloat(num_real_part(value)), num_to_qfloat(num_imag_part(value))) : QC_NAN;
+}
 
 /* Round principal modified Bessel I to complex double-double precision. */
 qcomplex_t qc_bessel_i(qcomplex_t order, qcomplex_t argument)

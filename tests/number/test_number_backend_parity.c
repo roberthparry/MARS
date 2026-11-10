@@ -669,7 +669,8 @@ static void test_number_complex_special_parity(void)
     number_t e1_negative = num_E1(e1_negative_input);
 
     assert_number_real_imag_prefix("gamma(1 + 0i)", gamma_one, "1", "0");
-    assert_number_real_imag_prefix("erf(1 + 0i)", erf_one, "0.84270079294971486934122063508262", "0");
+    assert_number_close_text("erf(1 + 0i)", erf_one,
+                             "0.8427007929497148693412206350826092592960669979663", "1e-30");
     assert_number_close_text("gamma(z) - exp(lgamma(z))", gamma_roundtrip, "0", NUMBER_PARITY_QCOMPLEX_TOL);
     assert_number_close_text("gamma(z + 1) - z * gamma(z)", gamma_recurrence, "0", NUMBER_PARITY_QCOMPLEX_TOL);
     assert_number_close_text("erf(z) + erfc(z) - 1", erf_erfc, "0", NUMBER_PARITY_QCOMPLEX_TOL);

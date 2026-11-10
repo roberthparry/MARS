@@ -64,6 +64,12 @@ build/
 /tests/*.db-wal
 /tests/*.db-shm
 
+# Benchmark definitions are shared; measured history belongs to each machine.
+/bench/benchmarks.db
+/bench/*.db-journal
+/bench/*.db-wal
+/bench/*.db-shm
+
 # Generated files
 test_output.txt
 /a.out

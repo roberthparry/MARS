@@ -213,9 +213,9 @@ it encounters. A zero target searches the critical strip up to imaginary
 magnitude eighty, returning up to forty roots, and reports the negative even
 integers as a separate trivial family. Zero searches first use the starting points
 
-$$
-s_n = \frac12 + i\,\frac{2\pi(n-11/8)}{W_0((n-11/8)/e)},\qquad n=1,2,\ldots,20.
-$$
+
+$\quad\begin{array}{l}\displaystyle s_n = \frac12 + i\,\frac{2\pi(n-11/8)}{W_0((n-11/8)/e)},\qquad n=1,2,\ldots,20.\end{array}$
+
 
 Here `W0` is the principal Lambert W branch, including the negative argument for
 the first estimate. These approximate heights come from inverting the smooth
@@ -739,3 +739,26 @@ Output:
 ```text
 Roots in [80, 100]: 8; limited: 0
 ```
+
+<style data-mars-formula-preview>
+/* Formula placement belongs to the preview container, not to the alignment
+ * of columns inside a TeX array. Apply this to every Markdown guide. */
+body .katex-display {
+    margin: 1em 0;
+    padding-left: 1em;
+    text-align: left;
+    overflow-x: auto;
+    overflow-y: hidden;
+}
+
+body .katex-display > .katex {
+    text-align: left;
+    white-space: nowrap;
+}
+
+/* Standalone inline formulae already contain their small TeX indentation.
+ * Do not add padding here or prevent ordinary prose from wrapping. */
+body p:has(> .katex) {
+    text-align: left;
+}
+</style>

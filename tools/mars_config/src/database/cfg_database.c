@@ -264,6 +264,8 @@ int cfg_databases_update(void)
 /* Restore missing stores without replacing any existing database or prompting. */
 int cfg_databases_ensure(void)
 {
+    int reimport = cfg_database_reimport_pending();
+    if (reimport >= 0) return reimport;
     return cfg_databases_prepare(true);
 }
 

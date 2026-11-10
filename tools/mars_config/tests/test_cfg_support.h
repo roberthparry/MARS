@@ -62,6 +62,13 @@ void test_cfg_progress_cases(void);
 /** Register database installation tests. */
 void test_cfg_database_cases(void);
 
+/**
+ * @brief Register sequential one-time release-import replacement and recovery regressions.
+ * @return No value. Cases use disposable databases and synthetic settings, and run before README examples.
+ * No user files are read or changed; the shared harness owns registration and execution.
+ */
+void test_cfg_reimport_cases(void);
+
 /** Register installer-owned OSM river import and runtime-query regressions. */
 void test_cfg_rivers_cases(void);
 

@@ -83,8 +83,8 @@ test_database_t *test_database_open(const string_t *root, const string_t *path, 
         int version = test_database_integer(database, "PRAGMA user_version");
         bool empty = application == 0 && version == 0 &&
                      test_database_integer(database, "SELECT count(*) FROM sqlite_master WHERE name NOT LIKE 'sqlite_%'") == 0;
-        initialise = create && (empty || (application == 1297371988 && version > 0 && version < 4));
-        ok = (application == 1297371988 && version >= 1 && version <= 4) || (create && empty);
+        initialise = create && (empty || (application == 1297371988 && version > 0 && version < 5));
+        ok = (application == 1297371988 && version >= 1 && version <= 5) || (create && empty);
         if (!ok)
             test_database_fail(database, "Not a compatible MARS test database; the file was left unchanged.");
     }

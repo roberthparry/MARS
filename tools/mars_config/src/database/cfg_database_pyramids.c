@@ -21,9 +21,15 @@
 
 typedef struct _source_address_t { unsigned level, column, row; } source_address_t;
 
+typedef struct {
+    globe_texture_info_t info;
+    source_address_t address;
+} pending_source_t;
+
 static size_t pyramid_hash(const void *value)
 {
-    const globe_texture_info_t *info = value;
+    const pending_source_t *source = value;
+    const globe_texture_info_t *info = &source->info;
     size_t hash = 2166136261u;
     for (unsigned i = 0; i < 64; ++i) hash = (hash ^ (unsigned char)info->sha256[i]) * 16777619u;
     return hash ^ info->width;
@@ -31,7 +37,8 @@ static size_t pyramid_hash(const void *value)
 
 static int pyramid_compare(const void *left, const void *right)
 {
-    const globe_texture_info_t *a = left, *b = right;
+    const pending_source_t *first = left, *second = right;
+    const globe_texture_info_t *a = &first->info, *b = &second->info;
     int order = strcmp(a->sha256, b->sha256);
     return order ? order : (a->width > b->width) - (a->width < b->width);
 }
@@ -82,7 +89,8 @@ bool cfg_database_pyramids(sqlite_t *db, const string_t *root)
     sqlite_stmt_finalize(sources);
     /* Do not keep a read cursor open while upgrading to a source's independent writer transaction. */
     globe_t *globe = ok ? globe_open_databases(db, db, NULL) : NULL;
-    set_t *pending = globe ? set_create(sizeof(globe_texture_info_t), pyramid_hash, pyramid_compare, NULL, NULL) : NULL;
+    set_t *pending = globe ? set_create(sizeof(pending_source_t), pyramid_hash, pyramid_compare, NULL, NULL) : NULL;
+    json_t *catalogue = pending ? cfg_database_texture_catalogue(db) : NULL;
     uint64_t total = array_size(addresses), retained = 0, unavailable = 0;
     static const char checking[] = "Checking photographic source blocks";
     cfg_progress_t *progress = pending ? cfg_progress_start(checking) : NULL;
@@ -90,6 +98,9 @@ bool cfg_database_pyramids(sqlite_t *db, const string_t *root)
     ok = ok && pending;
     for (size_t i = 0; ok && i < total; ++i) {
         const source_address_t *address = array_get(addresses, i);
+        string_t *name = cfg_database_texture_name(catalogue, address->level, address->column);
+        cfg_progress_segment_name(progress, name);
+        string_free(name);
         globe_texture_info_t info;
         ok = globe_texture_metadata(globe, address->level, address->column, address->row, &info);
         if (ok && info.pyramid) {
@@ -98,7 +109,8 @@ bool cfg_database_pyramids(sqlite_t *db, const string_t *root)
             string_t *path = string_sprintf("%s/%s.db", string_c_str(directory), info.sha256);
             file_t *source = path ? file_new(path) : NULL;
             ok = source != NULL;
-            if (ok && file_exists(source)) ok = set_contains(pending, &info) || set_add(pending, &info);
+            pending_source_t candidate = {.info = info, .address = *address};
+            if (ok && file_exists(source)) ok = set_contains(pending, &candidate) || set_add(pending, &candidate);
             else if (ok) ++unavailable;
             file_free(source);
             string_free(path);
@@ -118,12 +130,17 @@ bool cfg_database_pyramids(sqlite_t *db, const string_t *root)
     progress = ok && total ? cfg_progress_start(installing) : NULL;
     cfg_progress_update_items(progress, installing, 0, total, "sources imported");
     for (size_t i = 0; ok && i < total; ++i) {
-        ok = pyramid_import(db, directory, set_get(pending, i));
+        const pending_source_t *source = set_get(pending, i);
+        string_t *name = cfg_database_texture_name(catalogue, source->address.level, source->address.column);
+        cfg_progress_segment_name(progress, name);
+        string_free(name);
+        ok = pyramid_import(db, directory, &source->info);
         if (ok) cfg_progress_update_items(progress, installing, i + 1, total, "sources imported");
     }
     cfg_progress_finish(progress, ok);
     if (ok && !total) fputs("Photographic source blocks: up to date; nothing to import.\n", stderr);
     set_destroy(pending); array_destroy(addresses);
+    json_free(catalogue);
     globe_close(globe); file_free(folder); string_free(directory);
     return ok;
 }

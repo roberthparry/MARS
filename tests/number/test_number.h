@@ -24,6 +24,11 @@ void run_number_physical_constant_tests(void);
 void run_number_public_api_tests(void);
 void run_number_formatting_tests(void);
 void run_number_special_function_tests(void);
+/**
+ * @brief Check SQL-authored special-function identities at fixed and multiprecision working sizes.
+ * @return Nothing; records failures through the test harness. Restores the caller's default precision.
+ */
+void run_number_benchmark_regressions(void);
 void run_number_bessel_k_ownership_tests(void);
 void run_number_bessel_y_tests(void);
 void run_number_bessel_y_qfloat_ownership_tests(void);

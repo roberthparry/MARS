@@ -11,6 +11,7 @@
 #include <errno.h>
 #include <limits.h>
 #include <signal.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <sys/prctl.h>
 #include <sys/wait.h>
@@ -22,6 +23,55 @@
 #include "checks_process.h"
 #include "checks_controls.h"
 #include "test_checks.h"
+
+static void test_checks_suite_progress(void)
+{
+#ifdef DEBUG
+    const char *configuration = "debug";
+#else
+    const char *configuration = "release";
+#endif
+    string_t *root = test_checks_root();
+    string_t *runner = string_sprintf("%s/tools/mars_checks/build/%s/mars_checks", MARS_CHECKS_ROOT_DIR, configuration);
+    string_t *program = checks_path(root, "suite"), *log = checks_path(root, "suite.log");
+    file_t *source = file_new_cstr(MARS_CHECKS_PROCESS_FIXTURE_PATH), *target = file_new(program), *report = file_new(log);
+    bool ok = runner && source && target && report && file_copy(source, target, false) && file_chmod(target, 0700);
+    for (unsigned pass = 0; ok && pass < 2; ++pass) {
+        checks_strings_t *arguments = checks_strings_new();
+        checks_strings_add(arguments, checks_text("env"));
+        checks_strings_add(arguments, string_sprintf("MARS_ROOT=%s", string_c_str(root)));
+        checks_strings_add(arguments, string_clone(runner));
+        checks_strings_add(arguments, checks_text("test-suite"));
+        checks_strings_add(arguments, string_clone(program));
+        checks_strings_add(arguments, checks_text("--suite"));
+        if (!pass)
+            checks_strings_add(arguments, checks_text("fail"));
+        string_t *output = NULL, *errors = NULL;
+        int status = -1;
+        bool ran = checks_process_run(arguments, root, 5, &output, &errors, &status);
+        ok = ran && status == (pass ? 0 : 7) && output &&
+             string_find(output, pass ? "\033[32mPASS\033[0m" : "\033[31mFAIL\033[0m") >= 0 &&
+             string_find(output, pass ? "2 passed, 0 failed" : "2 passed, 1 failed") >= 0 &&
+             string_find(output, "⠋") >= 0 && string_find(output, "working 00:") >= 0;
+        if (!pass) {
+            string_t *evidence = checks_read(log);
+            ok = ok && evidence && string_find(evidence, "fixture diagnostic") >= 0 &&
+                 string_find(evidence, "FAIL: third") >= 0;
+            string_free(evidence);
+        } else {
+            ok = !file_exists(report) && ok;
+        }
+        if (!ok)
+            fprintf(stderr, "Test suite runner: status=%d, output=%s, stderr=%s\n", status,
+                    output ? string_c_str(output) : "missing", errors ? string_c_str(errors) : "missing");
+        string_free(output); string_free(errors); checks_strings_free(arguments);
+    }
+    file_free(report); file_free(target); file_free(source);
+    string_free(log); string_free(program); string_free(runner);
+    ok = test_checks_finish(root) && ok;
+    TEST_ASSERT_TRUE(ok, "suite progress parses split escapes and a noisy final burst, colours outcomes, retains "
+                         "failure diagnostics and removes stale logs after success");
+}
 
 static string_t *test_checks_inventory(void)
 {
@@ -408,6 +458,7 @@ void test_checks_control_cases(void)
     TEST_RUN_IN_GROUP(test_checks_private_path_policy, tests, NULL);
     TEST_RUN_IN_GROUP(test_checks_git_index_and_staged_paths, tests, NULL);
     TEST_RUN_IN_GROUP(test_checks_process_capture_timeout_and_errors, tests, NULL);
+    TEST_RUN_IN_GROUP(test_checks_suite_progress, tests, NULL);
     TEST_RUN_IN_GROUP(test_checks_process_descendant_cleanup, tests, NULL);
     TEST_RUN_IN_GROUP(test_checks_process_interrupt_cleanup, tests, NULL);
     TEST_RUN_IN_GROUP(test_checks_markdown_command_failures, tests, NULL);

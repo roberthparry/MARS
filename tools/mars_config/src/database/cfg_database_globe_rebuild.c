@@ -23,7 +23,8 @@ static bool same_file(const struct stat *before, const struct stat *after)
            before->st_mtim.tv_nsec == after->st_mtim.tv_nsec;
 }
 
-static bool valid_replacement(sqlite_t *db)
+/* Validate imported photograph metadata and all foreign keys before committing either replacement path. */
+bool cfg_database_globe_replacement_valid(sqlite_t *db)
 {
     sqlite_stmt_t *q = sqlite_stmt_prepare(db, "PRAGMA main.foreign_key_check");
     bool ok = q && sqlite_stmt_step(q) == SQLITE_STEP_DONE;
@@ -88,7 +89,7 @@ bool cfg_database_rebuild_globe(sqlite_t **source, const string_t *path, const s
     if (ok) attached = attach_previous(db, path);
     ok = ok && attached && cfg_database_copy_globe_schema(db) && cfg_database_revision(db, "globe", revision);
     cfg_progress_t *progress = ok ? cfg_progress_start("Validating replacement globe") : NULL;
-    if (ok) ok = valid_replacement(db);
+    if (ok) ok = cfg_database_globe_replacement_valid(db);
     cfg_progress_finish(progress, ok);
     if (transaction) ok = cfg_database_finish_transaction(db, ok);
     if (attached && !sqlite_exec_cstr(db, "DETACH DATABASE previous")) ok = false;

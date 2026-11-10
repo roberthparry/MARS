@@ -1476,7 +1476,7 @@ static void test_lab_extra_solution_families(void)
     expect_response("/eval", "{\"expression\":\"y''+6yy'+4y^3=0; y(0)=0\",\"action\":\"plot\","
                              "\"plot_source_mode\":\"diffequation\"}", 200u, "plot_svg", "data-series=\"4\"");
     expect_response("/eval", "{\"expression\":\"{Dx(y)=a*y | x=?; a=?;}\",\"action\":\"plot\","
-                             "\"plot_source_mode\":\"diffequation\"}", 422u, "error", "parameter a");
+                             "\"plot_source_mode\":\"diffequation\"}", 200u, "plot_slices", "a\t");
     expect_response("/eval", "{\"expression\":\"{Dx(y)=a*y | x=?; a=2;}\",\"action\":\"plot\","
                              "\"plot_source_mode\":\"diffequation\"}", 200u, "plot_svg", "data-series=\"4\"");
     expect_response("/eval", "{\"expression\":\"Dxxx(y)=0\",\"action\":\"plot\","
@@ -1892,6 +1892,9 @@ static void test_lab_auto_range_readme(void)
 
 static void test_lab_screenshots_readme(void)
 {
+    bool configured = test_lab_resource_settings();
+    TEST_ASSERT_TRUE(configured, "load installed ephemeris resources before the Almanac README example");
+    if (!configured) return;
     /* README screenshot examples in docs/mars-lab.md: current surface and symbolic-result captures. */
     unsigned status = 0;
     json_t *fields = request("/eval", "{\"expression\":\"acos(sin(2-x*y))\",\"action\":\"plot\",\"wrt\":\"x\","
@@ -2161,7 +2164,7 @@ static void test_lab_extra_repeated_gaussian_integral(void)
             "\"action\":\"integral\",\"wrt\":\"x\",\"precision\":%u}", precisions[i]);
         json_t *result = payload ? request("/eval", string_c_str(payload), &status) : NULL;
         bool ok = status == 200u && test_lab_ok(result, true) &&
-                  contains(result, "integral", "½·(exp(-x²) + 2Cx + x·√π·erf(x)) + C₁ |") &&
+                  contains(result, "integral", "½·(exp(-x²) + 2Cx + √π·x·erf(x)) + C₁ |") &&
                   !contains(result, "integral_TeX", "\\frac{1}{\\sqrt{\\pi}}") &&
                   contains(result, "integral_TeX", " + C_{1}");
         string_t *route = string_new_with("/function-run"), *key = string_new_with("source");

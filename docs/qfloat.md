@@ -426,6 +426,9 @@ Y_0(1) = 0.088256964215677
 - `qfloat_t qf_normal_cdf(qfloat_t x)` — Φ(x), standard normal CDF
 - `qfloat_t qf_normal_logpdf(qfloat_t x)` — ln φ(x)
 
+The standard normal CDF uses `erfc(-x/sqrt(2))/2` to retain small negative-tail
+probabilities without subtracting nearly equal quantities.
+
 **Exponential integrals**
 
 - `qfloat_t qf_Ei(qfloat_t x)` — Ei(x) = −PV∫_{-x}^∞ (e^{-t}/t) dt, principal value; branch cut on (−∞, 0]
@@ -716,41 +719,165 @@ Run it with:
 make bench_qfloat_gamma_maths
 ```
 
-Current sample results from that command on this tree, measured on:
+Persistent timings are now recorded by `make bench-db ARGS='run'` and published
+with `make bench-db ARGS='update-docs'`. These tables identify the exact run,
+machine, backend and precision; the focused benchmark above remains available
+for separate investigations. See [the benchmark guide](benchmarks.md#persistent-mathematical-benchmarks)
+for selection, interruption recovery and raw sample storage.
 
-- `Linux x86_64`
-- kernel `6.8.0-110-generic`
-- `Intel(R) Core(TM) i7-4510U CPU @ 2.00GHz`
-- `4` logical CPUs
+<!-- MARS-BENCHMARKS:BEGIN -->
+Benchmark run **11**, 2026-11-10T10:25:23.939Z (UTC).
 
-Markdown output uses the release benchmark with `51` timed batches per case,
-records the sample median for each row, and times only the actual `qfloat`
-mathematical operation after argument parsing and warmup.
+Machine: ophelia; Intel(R) N95.
 
-Results:
+System: Linux 7.0.0-27-generic x86_64.
 
-| Case | Time |
-|---|---:|
-| `qf_exp(1)` | `1.5 µs` |
-| `qf_log(10)` | `3.7 µs` |
-| `qf_erf(0.5)` | `3.7 µs` |
-| `qf_erfc(0.5)` | `3.6 µs` |
-| `qf_gamma(2.3)` | `1.7 µs` |
-| `qf_lgamma(2.3)` | `6.3 µs` |
-| `qf_gamma(2.5)` | `1.8 µs` |
-| `qf_lgamma(2.5)` | `5.8 µs` |
-| `qf_gamma(3.5)` | `1.9 µs` |
-| `qf_lgamma(3.5)` | `9.6 µs` |
-| `qf_digamma(2.3)` | `3.5 µs` |
-| `qf_trigamma(2.3)` | `4.7 µs` |
-| `qf_tetragamma(2.3)` | `5.7 µs` |
-| `qf_gammainv(119292.4619946090070787515047110059)` | `143.7 µs` |
-| `qf_lambert_w0(1)` | `14.9 µs` |
-| `qf_lambert_wm1(-0.1)` | `81.8 µs` |
-| `qf_Ei(1)` | `4.7 µs` |
-| `qf_E1(1)` | `4.7 µs` |
-| `qf_beta(2.3, 4.5)` | `5.2 µs` |
-| `qf_logbeta(2.3, 4.5)` | `26.6 µs` |
+Compiler: 15.2.0; build flags: gcc -Wall -Wextra -Werror -O2 -fPIC -D_GNU_SOURCE -pthread -DHAVE_UNISTRING -I/usr/include/sqlcipher -DSQLITE_HAS_CODEC   -I/usr/include/x86_64-linux-gnu -isystem /usr/include/mit-krb5 -isystem /usr/include/mit-krb5 -I/usr/include/p11-kit-1.
+
+Median per call from 7 timed batches.
+
+Timing method: CLOCK_MONOTONIC; warmup=20ms; target_batch=250us; max_batch=512.
+
+Argument parsing, output validation, disposal and database writes are outside timing.
+Inputs show the actual operands, including +0.125i for permitted complex arguments; integer orders remain real.
+`number-double` includes generic number dispatch; the other fixed profiles call qfloat/qcomplex directly.
+Requested multiprecision bits do not guarantee that every algorithm achieves that accuracy.
+Operations and precision columns with only unsupported results are omitted; — denotes an unsupported cell.
+Failures and timeouts remain visible. † marks a retained slowdown outlier.
+
+### `qfloat`
+
+| Operation | Inputs | 106 bits |
+|---|---|---:|
+| E1 | 2.345678 | 6.7 µs |
+| Ei | 2.345678 | 8.5 µs |
+| Li | 2.345 | 8.2 µs |
+| abs | 0.7 | 2.1 ns |
+| acos | 0.7 | 1.9 µs |
+| acosec | 2.345 | 1.5 µs |
+| acosech | 0.7 | 3.0 µs |
+| acosh | 2.345 | 3.2 µs |
+| acot | 0.7 | 1.2 µs |
+| acoth | 2.345 | 2.7 µs |
+| add | 0.7, 0.7 | 5.7 ns |
+| appell_f1 | 0.5, 0.7, 0.8, 2.5, 0.2, 0.3 | 72.4 µs |
+| arccovercos | 0.5 | 1.5 µs |
+| arccoversin | 0.5 | 1.5 µs |
+| archacovercos | 0.5 | 44.9 ns |
+| archacoversin | 0.5 | 29.5 ns |
+| archavercos | 0.5 | 46.6 ns |
+| archaversin | 0.5 | 46.9 ns |
+| arcvercos | 0.5 | 1.5 µs |
+| arcversin | 0.5 | 1.5 µs |
+| asec | 2.345 | 1.7 µs |
+| asech | 0.7 | 3.3 µs |
+| asin | 0.7 | 1.5 µs |
+| asinh | 0.7 | 2.9 µs |
+| atan | 0.7 | 1.1 µs |
+| atan2 | 0.5, -0.75 | 1.5 µs |
+| atanh | 0.7 | 3.5 µs |
+| bessel_i | 2, 0.7 | 46.2 µs |
+| bessel_j | 2, 0.7 | 5.5 µs |
+| bessel_k | 2, 0.7 | 178.4 µs |
+| bessel_y | 2, 0.7 | 21.6 µs |
+| beta | 2.3, 4.5 | 4.3 µs |
+| beta_pdf | 0.5, 2.5, 3.5 | 27.0 µs |
+| binomial | 5, 2 | 26.1 µs |
+| chebyshev_t | 2, 0.7 | 33.1 ns |
+| chebyshev_u | 2, 0.7 | 33.6 ns |
+| circ | 0.7 | 12.1 ns |
+| clausen | 3, 0.7 | 266.6 µs |
+| clausen2 | 0.7 | 4.6 µs |
+| cos | 0.7 | 747.3 ns |
+| cosec | 0.7 | 793.0 ns |
+| cosech | 0.7 | 2.9 µs |
+| cosh | 0.7 | 2.9 µs |
+| cot | 0.7 | 1.6 µs |
+| coth | 0.7 | 5.8 µs |
+| covercos | 0.7 | 766.3 ns |
+| coversin | 0.7 | 760.2 ns |
+| cubrt | 0.7 | 4.0 µs |
+| digamma | 2.345 | 2.7 µs |
+| dilog | 0.7 | 12.3 µs |
+| div | 0.7, 0.7 | 27.7 ns |
+| erf | 0.7 | 3.3 µs |
+| erfc | 0.7 | 7.0 µs † |
+| erfcinv | 0.5 | 238.9 µs |
+| erfinv | 0.5 | 187.7 µs |
+| exp | 1.23456789 | 1.4 µs |
+| floor | 0.7 | 20.3 ns |
+| gamma | 2.345 | 1.4 µs |
+| gammainc_P | 2.3, 1.4 | 13.8 µs |
+| gammainc_Q | 2.3, 1.4 | 10.9 µs |
+| gammainc_lower | 2.3, 1.4 | 12.4 µs |
+| gammainc_upper | 2.3, 1.4 | 12.3 µs |
+| gammainv | 9.5 | 86.7 µs |
+| hacovercos | 0.7 | 777.8 ns |
+| hacoversin | 0.7 | 779.7 ns |
+| harmonic_poly | 2, 0.7 | 96.2 ns |
+| havercos | 0.7 | 781.0 ns |
+| haversin | 0.7 | 783.0 ns |
+| hermite_h | 2, 0.7 | 42.7 ns |
+| hypergeometric_pFq | 0.7, 2.5, 0.3 | 3.4 µs |
+| hypot | 0.7, 1.2 | 394.5 ns |
+| lambert_w0 | 0.7 | 12.3 µs |
+| lambert_wm1 | -0.2 | 15.0 µs |
+| lauricella_f | 0.5, 0.3, 2.5 | 34.6 µs † |
+| ldexp | 1.23456789, 3 | 8.4 ns |
+| legendre_chi | 2, 0.7 | 25.7 µs |
+| lerch_phi | 0.3, 2, 1.4 | 305.7 µs |
+| lg | 2.345678 | 3.3 µs |
+| lgamma | 2.345 | 4.7 µs |
+| ln | 2.345678 | 2.5 µs |
+| log | 2.345678 | 2.6 µs |
+| log10 | 2.345678 | 2.6 µs |
+| logbeta | 2.3, 4.5 | 23.8 µs |
+| logbeta_pdf | 0.5, 2.5, 3.5 | 25.6 µs |
+| lommel_s | 0.5, 0.7, 1.2 | 6.1 µs |
+| mul | 0.7, 0.7 | 6.3 ns |
+| mul_pow10 | 1.23456789, 3 | 36.1 ns |
+| neg | 0.7 | 1.7 ns |
+| normal_cdf | 0.7 | 3.1 µs |
+| normal_logpdf | 0.7 | 24.6 ns |
+| normal_pdf | 0.7 | 1.5 µs |
+| polygamma | 3, 2.345 | 4.2 µs |
+| polylog | 2, 0.7 | 14.2 µs |
+| polylog1 | 0.7 | 3.2 µs |
+| pow | 1.23456789, 3.5 | 5.0 µs |
+| pow10 | 3 | 23.0 ns |
+| pow_int | 1.23456789, 3 | 46.3 ns |
+| productlog | 0.7 | 14.4 µs |
+| qdigamma | 0.5, 2.3 | 27.4 µs |
+| rect | 0.7 | 15.3 ns |
+| root | 1.2345, 3 | 4.6 µs |
+| round | 0.7 | 31.0 ns |
+| roundn | 1.23456789, 3 | 4.5 µs |
+| rounds | 1.23456789, 3 | 13.3 µs |
+| sec | 0.7 | 1.3 µs † |
+| sech | 0.7 | 3.7 µs |
+| sgn | 0.7 | 8.0 ns |
+| sin | 0.567 | 746.2 ns |
+| sinc | 0.7 | 817.2 ns |
+| sinh | 0.7 | 3.0 µs |
+| sqr | 0.7 | 4.1 ns |
+| sqrt | 1.23456789 | 300.0 ns |
+| step | 0.7 | 7.1 ns |
+| struve_h | 2, 0.7 | 70.6 µs |
+| struve_l | 2, 0.7 | 82.3 µs |
+| sub | 0.7, 0.7 | 7.5 ns |
+| tan | 0.7 | 1.6 µs |
+| tanh | 0.7 | 1.5 µs |
+| tetragamma | 2.345 | 2.7 µs |
+| tri | 0.7 | 10.7 ns |
+| trigamma | 2.345 | 2.8 µs |
+| vercos | 0.7 | 1.1 µs |
+| versin | 0.7 | 960.1 ns |
+| zatahp | 2.3, 1.4 | 271.7 µs |
+| zeta | 2.345 | 326.6 µs |
+| zetah | 2.3, 1.4 | 267.1 µs |
+| zetap | 2.345 | 265.6 µs |
+
+<!-- MARS-BENCHMARKS:END -->
 
 For a broader benchmark overview, see
 [`docs/benchmarks.md`](./benchmarks.md).

@@ -1158,56 +1158,9 @@ qfloat_t qf_erfc(qfloat_t x)
     /* |x| */
     qfloat_t y = qf_abs(x);
 
-    const double cut = 1.5;
-
-    /* ------------------------------------------------------------
-       POWER SERIES for |x| < cut
-       ------------------------------------------------------------ */
-    if (y.hi < cut) {
-
-        /* ap = 0.5, s = 2.0, t = 2.0 */
-        qfloat_t ap = QF_HALF;
-        qfloat_t s = QF_TWO;
-        qfloat_t t = QF_TWO;
-
-        /* x^2 */
-        qfloat_t x2 = qf_mul(x, x);
-
-        int i;
-        for (i = 0; i < QF_ERF_SERIES_MAX_TERMS; i++) {
-
-            /* ap += 1 */
-            ap = qf_add(ap, QF_ONE);
-
-            /* t *= x2; t /= ap */
-            t = qf_mul(t, x2);
-            t = qf_div(t, ap);
-
-            /* s += t */
-            s = qf_add(s, t);
-
-            /* convergence: |t| < 1e-35 * |s| */
-            if (fabs(t.hi) < 1e-35 * fabs(s.hi)) {
-
-                /* ex2 = exp(x^2) */
-                qfloat_t ex2 = qf_exp(x2);
-
-                /* result = - ( x * (2/sqrt(pi)) * s / exp(x^2) - 1 ) */
-                qfloat_t result = x;
-                result = qf_mul(result, QF_SQRT1ONPI);
-                result = qf_mul(result, s);
-                result = qf_div(result, ex2);
-                result = qf_sub(result, one);
-                result = qf_neg(result);
-
-                return result;
-            }
-        }
-
-        /* failed to converge */
-        qfloat_t nan = {NAN, NAN};
-        return nan;
-    }
+    /* Subtraction is well conditioned here; share erf's small-argument series and transition. */
+    if (y.hi < 1.25)
+        return qf_sub(one, qf_erf(x));
 
     /* ------------------------------------------------------------
        CONTINUED FRACTION (Lentz method) for |x| >= cut
@@ -1261,8 +1214,8 @@ qfloat_t qf_erfc(qfloat_t x)
         /* h *= del */
         h = qf_mul(h, del);
 
-        /* convergence: del ≈ 1 */
-        if (del.hi == 1.0 && fabs(del.lo) < 1e-30)
+        /* Match erf's double-double convergence target, including small complementary probabilities. */
+        if (del.hi == 1.0 && fabs(del.lo) < 1e-32)
             break;
 
         if (i == QF_ERF_CF_MAX_TERMS - 1) {
@@ -2692,13 +2645,7 @@ qfloat_t qf_normal_pdf(qfloat_t x)
 
 qfloat_t qf_normal_cdf(qfloat_t x)
 {
-    qfloat_t half = QF_HALF;
-    qfloat_t one = QF_ONE;
-
-    qfloat_t t = qf_mul(x, QF_SQRT_HALF);
-    qfloat_t erf_t = qf_erf(t);
-
-    return qf_mul(half, qf_add(one, erf_t));
+    return qf_mul(QF_HALF, qf_erfc(qf_mul(qf_neg(x), QF_SQRT_HALF)));
 }
 
 /* Standard normal log-PDF: log φ(x) = -0.5 * log(2π) - 0.5 * x^2 */

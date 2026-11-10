@@ -24,7 +24,7 @@ typedef struct _test_database_t test_database_t;
 typedef struct _test_profile_t test_profile_t;
 
 /** @brief Owned case data loaded from one module-specific table; release the complete array together. */
-typedef struct _test_database_case_t {
+typedef struct {
     string_t *name; /**< Owned stable case identifier. */
     string_t *operation; /**< Owned identifier of the checking operation supplied by the C module runner. */
     string_t *input; /**< Owned native mathematical input or fixture SQL. */
@@ -54,7 +54,7 @@ test_database_case_t *test_database_cases_load(const string_t *root, const strin
 void test_database_cases_free(test_database_case_t *cases, size_t count);
 
 /** @brief Borrowed metadata for one completed, failed or skipped harness case. */
-typedef struct _test_database_result_t {
+typedef struct {
     const char *source; /**< Repository-relative test source; valid during the call. */
     const char *path; /**< Complete dotted group and case path. */
     const char *name; /**< Registered C function or README identifier. */
@@ -79,7 +79,8 @@ typedef struct _test_database_result_t {
  * @param[out] error Optional destination for an owned diagnostic released with string_free(); initially set to NULL.
  * @return Owned connection released with test_database_close(), or NULL on I/O, schema or SQLite failure.
  * @note Existing unrelated databases are rejected. Connections have a one-second busy timeout and a 64 MiB page cap.
- * Compatible older schemas are upgraded when create is true. New module case definitions otherwise require explicit sync.
+ * Compatible older schemas are upgraded when create is true. New module case definitions otherwise require
+ * explicit synchronisation or release's conditional synchronisation of existing storage.
  * Opening the default database for writing imports and removes a validated legacy test_results.db after commit.
  */
 test_database_t *test_database_open(const string_t *root, const string_t *path, bool create, string_t **error);
@@ -106,6 +107,8 @@ const char *test_database_error(const test_database_t *database);
  * @return True on success; false on invalid JSON, allocation or SQLite failure, with no partial import committed.
  * @note No synchronisation deletes catalogue entries, case rows, saved selections or results. An incomplete
  * configuration may leave entries unconfirmed; this status never controls test execution. Renames retain both keys.
+ * Complete imports with review_missing record a source fingerprint in the same transaction. Changing source
+ * contents during import is an error and rolls back the import; callers may retry once the sources are stable.
  */
 bool test_database_import(test_database_t *database, const string_t *root, const char *profile, bool review_missing);
 
@@ -199,7 +202,8 @@ bool test_database_fixture(const string_t *root, const string_t *destination, st
  * @param[in] argc Number of command arguments, excluding the tool and test-db subcommand.
  * @param[in] argv Borrowed argument array; accepted commands are documented by test-db help.
  * @return Zero on success, one on an operation failure, or two for invalid arguments.
- * @note Called only by an explicit command; linking this function does not create any files.
+ * @note Called by explicit commands and release's sync-if-needed check. That check never creates a missing file;
+ * linking this function does not create any files.
  */
 int test_database_command(const string_t *root, int argc, char **argv);
 

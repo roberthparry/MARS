@@ -154,7 +154,7 @@ static void test_checks_typescript_dependencies(void)
 }
 
 static bool test_build_sqlcipher_probe(const string_t *root, const char *target, const char *mode,
-                                      const char *diagnostic, string_t **instructions)
+                                      const char *diagnostic, string_t **instructions, bool quiet)
 {
     checks_strings_t *arguments = checks_strings_new();
     checks_strings_add(arguments, checks_text("env"));
@@ -167,6 +167,7 @@ static bool test_build_sqlcipher_probe(const string_t *root, const char *target,
     checks_strings_add(arguments, checks_text("make"));
     checks_strings_add(arguments, checks_text("--no-print-directory"));
     checks_strings_add(arguments, checks_text("-j1"));
+    if (quiet) checks_strings_add(arguments, checks_text("SQLCIPHER_REPORT_LEVEL=outer-release"));
     checks_strings_add(arguments, checks_text(target));
     checks_strings_add(arguments, checks_text("MARS_LAB_LAUNCHER=/bin/true"));
     checks_strings_add(arguments, checks_text(
@@ -176,8 +177,10 @@ static bool test_build_sqlcipher_probe(const string_t *root, const char *target,
     string_t *output = NULL, *errors = NULL;
     int status = -1;
     bool ran = checks_process_run(arguments, root, 30, &output, &errors, &status);
-    bool ok = ran && output && string_find(output, "SQLCipher ") >= 0 &&
-        string_find(output, "SQLite runtime ") >= 0 && string_find(output, "SQLite headers ") >= 0;
+    bool ok = ran && output && errors && string_find(output, "SQLCipher ") < 0;
+    if (!quiet || diagnostic)
+        ok = ok && string_find(errors, "SQLCipher ") >= 0 && string_find(errors, "SQLite runtime ") >= 0 &&
+             string_find(errors, "SQLite headers ") >= 0;
     if (diagnostic)
         ok = status != 0 && errors && string_find(errors, diagnostic) >= 0 &&
              string_find(errors, "Updating the separate sqlite3 package") >= 0 &&
@@ -185,10 +188,12 @@ static bool test_build_sqlcipher_probe(const string_t *root, const char *target,
              string_find(errors, "--branch v4.13.0") >= 0 &&
              string_find(errors, "--enable-fts5 --enable-rtree") >= 0 &&
              string_find(errors, "make check-native-deps") >= 0 &&
-             string_find(output, "SQLCipher version and required SQL features verified.") < 0 &&
+             string_find(errors, "SQLCipher version and required SQL features verified.") < 0 &&
              string_find(output, "check-compliance") < 0 && string_find(output, "Updating jurisdiction") < 0 && ok;
+    else if (quiet)
+        ok = status == 0 && !string_byte_length(errors) && ok;
     else
-        ok = status == 0 && string_find(output, "SQLCipher version and required SQL features verified.") >= 0 && ok;
+        ok = status == 0 && string_find(errors, "SQLCipher version and required SQL features verified.") >= 0 && ok;
     if (!ok)
         fprintf(stderr, "SQLCipher dependency probe %s/%s: status %d\n%s\n%s\n", target, mode, status,
                 output ? string_c_str(output) : "", errors ? string_c_str(errors) : "");
@@ -206,21 +211,24 @@ static void test_checks_sqlcipher_dependencies(void)
 {
     string_t *root = test_checks_root();
     bool ok = test_build_makefiles(root);
-    static const struct { const char *target, *mode, *diagnostic; } cases[] = {
-        {"check-sqlcipher-deps", "current", NULL},
-        {"check-sqlcipher-deps", "old", "requires SQLite 3.27.0 or newer"},
-        {"check-sqlcipher-deps", "cipher", "requires SQLCipher 4.1.0 or newer"},
-        {"check-native-deps", "fts5", "required FTS5 with Unicode accent removal"},
-        {"check-deps", "window", "required SQLite window functions"},
-        {"release", "fts5", "required FTS5 with Unicode accent removal"},
-        {"release", "old", "requires SQLite 3.27.0 or newer"},
-        {"release", "cipher", "requires SQLCipher 4.1.0 or newer"},
-        {"release", "window", "required SQLite window functions"},
-        {"update-mars-db", "fts5", "required FTS5 with Unicode accent removal"},
-        {"install-jurisdiction-db", "fts5", "required FTS5 with Unicode accent removal"}
+    static const struct { const char *target, *mode, *diagnostic; bool quiet; } cases[] = {
+        {"check-sqlcipher-deps", "current", NULL, false},
+        {"check-sqlcipher-deps", "old", "requires SQLite 3.27.0 or newer", false},
+        {"check-sqlcipher-deps", "cipher", "requires SQLCipher 4.1.0 or newer", false},
+        {"check-native-deps", "fts5", "required FTS5 with Unicode accent removal", false},
+        {"check-deps", "window", "required SQLite window functions", false},
+        {"release", "fts5", "required FTS5 with Unicode accent removal", false},
+        {"release", "old", "requires SQLite 3.27.0 or newer", false},
+        {"release", "cipher", "requires SQLCipher 4.1.0 or newer", false},
+        {"release", "window", "required SQLite window functions", false},
+        {"update-mars-db", "fts5", "required FTS5 with Unicode accent removal", false},
+        {"install-jurisdiction-db", "fts5", "required FTS5 with Unicode accent removal", false},
+        {"check-sqlcipher-deps", "current", NULL, true},
+        {"check-sqlcipher-deps", "old", "requires SQLite 3.27.0 or newer", true},
+        {"check-sqlcipher-deps", "fts5", "required FTS5 with Unicode accent removal", true}
     };
     for (size_t i = 0; ok && i < sizeof cases / sizeof *cases; ++i)
-        ok = test_build_sqlcipher_probe(root, cases[i].target, cases[i].mode, cases[i].diagnostic, NULL);
+        ok = test_build_sqlcipher_probe(root, cases[i].target, cases[i].mode, cases[i].diagnostic, NULL, cases[i].quiet);
     ok = test_checks_finish(root) && ok;
     TEST_ASSERT_TRUE(ok, "dependency checks report linked versions and stop unsupported SQLCipher before database work");
 }
@@ -229,7 +237,7 @@ static void test_checks_sqlcipher_readme(void)
 {
     string_t *root = test_checks_root(), *instructions = NULL;
     bool ok = test_build_makefiles(root) && test_build_sqlcipher_probe(root, "release", "fts5",
-        "required FTS5 with Unicode accent removal", &instructions);
+        "required FTS5 with Unicode accent removal", &instructions, false);
     string_t *path = checks_path(root, "docs/building.md"), *guide = checks_read(path);
     const char *text = guide ? string_c_str(guide) : "";
     const char *section = strstr(text, "#### Updating SQLCipher on Debian or Ubuntu\n");

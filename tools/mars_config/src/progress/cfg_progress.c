@@ -21,6 +21,7 @@
 #include <unistd.h>
 
 #include "thread-t.h"
+#include "string-t.h"
 #include "cfg_progress.h"
 
 struct _cfg_progress_t {
@@ -30,8 +31,10 @@ struct _cfg_progress_t {
     lock_t *wake;
     const char *label;
     const char *unit;
+    string_t *segment_name;
     uint64_t completed;
     uint64_t total;
+    uint64_t segment_size;
     uint64_t initial_completed;
     uint64_t advances;
     struct timespec started;
@@ -62,6 +65,35 @@ static void cfg_progress_remaining(char *text, size_t capacity, long double seco
     }
 }
 
+static void cfg_progress_bar(const cfg_progress_t *progress, unsigned percent, bool finished, char bar[61])
+{
+    static const char *const fractions[] = {" ", "▏", "▎", "▍", "▌", "▋", "▊", "▉"};
+    size_t used = 0;
+    unsigned eighths = percent * 160 / 100;
+    for (unsigned column = 0; column < 20; ++column) {
+        if (!progress->terminal) {
+            bar[used++] = progress->total || finished ? (column < percent / 5 ? '=' : ' ')
+                                                      : (column == progress->tick % 20 ? '>' : ' ');
+            continue;
+        }
+        const char *cell = " ";
+        if (progress->total || finished) {
+            if (column < eighths / 8)
+                cell = "█";
+            else if (column == eighths / 8)
+                cell = fractions[eighths % 8];
+        } else if (column == progress->tick % 20) {
+            cell = "█";
+        }
+        size_t bytes = strlen(cell);
+        memcpy(bar + used, cell, bytes);
+        used += bytes;
+    }
+    if (!progress->terminal && !finished && progress->total)
+        bar[percent / 5] = "|/-\\"[progress->tick % 4];
+    bar[used] = '\0';
+}
+
 static void cfg_progress_render(const cfg_progress_t *progress, bool finished, bool success)
 {
     struct timespec now;
@@ -74,57 +106,68 @@ static void cfg_progress_render(const cfg_progress_t *progress, bool finished, b
         percent = 99;
     if (finished && success)
         percent = 100;
-    char bar[21];
-    for (unsigned i = 0; i < 20; ++i)
-        bar[i] = progress->total || finished ? (i < percent / 5 ? '=' : ' ')
-                                            : (i == progress->tick % 20 ? '>' : ' ');
-    if (!finished && progress->total) bar[percent / 5] = "|/-\\"[progress->tick % 4];
-    bar[20] = '\0';
+    char bar[61];
+    cfg_progress_bar(progress, percent, finished, bar);
     char counter[128] = {0};
     if (progress->unit && progress->total)
         snprintf(counter, sizeof counter, " %" PRIu64 "/%" PRIu64 " %s",
                  progress->completed, progress->total, progress->unit);
-    char percentage[8] = {0}, status[64], detail[96] = {0};
+    char percentage[8] = {0}, status[64], detail[256] = {0};
     if (progress->total && !finished) snprintf(percentage, sizeof percentage, " %u%%", percent);
     snprintf(status, sizeof status, " — %s (%.0fs)", finished ? (success ? "done" : "failed") : "working", seconds);
     if (!finished && progress->total && progress->completed == progress->total && source_seconds >= 5)
         snprintf(detail, sizeof detail, "%s", progress->terminal ? "; finishing" : "; awaiting stage completion");
-    else if (!finished && progress->total && unchanged >= 5)
-        snprintf(detail, sizeof detail, progress->terminal ? "; unchanged %.0fs" : "; count unchanged for %.0fs",
-                 unchanged);
+    else if (!finished && progress->total > progress->completed && progress->segment_size) {
+        uint64_t count = progress->total / progress->segment_size + (progress->total % progress->segment_size != 0);
+        uint64_t current = progress->completed / progress->segment_size + 1;
+        const char *name = progress->segment_name ? string_c_str(progress->segment_name) : NULL;
+        snprintf(detail, sizeof detail, "; segment %" PRIu64 "/%" PRIu64 "%s%s%s - %.0fs", current, count,
+                 name ? " (" : "", name ? name : "", name ? ")" : "", unchanged);
+    } else if (!finished && progress->total && unchanged >= 5)
+        snprintf(detail, sizeof detail, "; segment - %.0fs", unchanged);
     else if (!finished && !progress->total && source_seconds >= 5)
         snprintf(detail, sizeof detail, "%s", progress->terminal ? "; no count available" :
                                                                  "; no intermediate count available");
-    else if (!finished && progress->total > progress->completed && progress->advances >= 3 && source_seconds >= 3) {
+    if (!finished && progress->total > progress->completed && unchanged < 5 &&
+        progress->advances >= 3 && source_seconds >= 3) {
         long double remaining = (long double)(progress->total - progress->completed) * source_seconds /
                                 (progress->completed - progress->initial_completed);
-        cfg_progress_remaining(detail, sizeof detail, remaining, progress->terminal);
+        size_t used = strlen(detail);
+        cfg_progress_remaining(detail + used, sizeof detail - used, remaining, progress->terminal);
     }
     flockfile(stderr);
     if (progress->terminal)
         fputs("\r\033[2K", stderr);
     struct winsize window = {0};
     int label_width = 200;
+    size_t bar_columns = progress->terminal ? 25 : 23;
     if (progress->terminal && !ioctl(STDERR_FILENO, TIOCGWINSZ, &window) && window.ws_col) {
         /* The status's UTF-8 dash occupies one column; leave one spare column to avoid terminal wrapping. */
-        size_t reserved = 23 + strlen(counter) + strlen(percentage) + strlen(status) + strlen(detail) - 2 + 1;
+        size_t reserved = bar_columns + strlen(counter) + strlen(percentage) + strlen(status) + strlen(detail) - 2 + 1;
         if (!finished && reserved >= window.ws_col) {
             snprintf(status, sizeof status, " (%.0fs)", seconds);
-            reserved = 23 + strlen(counter) + strlen(percentage) + strlen(status) + strlen(detail) + 1;
+            reserved = bar_columns + strlen(counter) + strlen(percentage) + strlen(status) + strlen(detail) + 1;
             if (reserved >= window.ws_col && progress->unit && progress->total) {
                 size_t noun = strcspn(progress->unit, " ");
                 snprintf(counter, sizeof counter, " %" PRIu64 "/%" PRIu64 " %.*s",
                          progress->completed, progress->total, (int)noun, progress->unit);
-                reserved = 23 + strlen(counter) + strlen(percentage) + strlen(status) + strlen(detail) + 1;
+                reserved = bar_columns + strlen(counter) + strlen(percentage) + strlen(status) + strlen(detail) + 1;
             }
             if (reserved >= window.ws_col) {
                 detail[0] = '\0';
-                reserved = 23 + strlen(counter) + strlen(percentage) + strlen(status) + 1;
+                reserved = bar_columns + strlen(counter) + strlen(percentage) + strlen(status) + 1;
             }
         }
         label_width = window.ws_col > reserved ? (int)(window.ws_col - reserved) : 0;
     }
-    fprintf(stderr, "[%s] %.*s%s%s%s%s%s", bar, label_width, progress->label, counter, percentage, status, detail,
+    if (progress->terminal) {
+        static const char *const frames[] = {"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"};
+        const char *symbol = finished ? (success ? "✓" : "✗") : frames[progress->tick % 10];
+        fprintf(stderr, "\033[%sm%s [%s]\033[0m ", finished ? (success ? "32" : "31") : "36", symbol, bar);
+    } else {
+        fprintf(stderr, "[%s] ", bar);
+    }
+    fprintf(stderr, "%.*s%s%s%s%s%s", label_width, progress->label, counter, percentage, status, detail,
             !progress->terminal || finished ? "\n" : "");
     fflush(stderr);
     funlockfile(stderr);
@@ -133,7 +176,7 @@ static void cfg_progress_render(const cfg_progress_t *progress, bool finished, b
 static void *cfg_progress_run(void *argument)
 {
     cfg_progress_t *progress = argument;
-    while (!lock_wait_for(progress->wake, 1000)) {
+    while (!lock_wait_for(progress->wake, progress->terminal ? 250 : 1000)) {
         if (errno != ETIMEDOUT || !lock_wait(progress->worker_mutex))
             break;
         if (!lock_check(progress->wake)) {
@@ -177,7 +220,7 @@ failed:
 }
 
 static void cfg_progress_set(cfg_progress_t *progress, const char *label, uint64_t completed, uint64_t total,
-                              const char *unit)
+                              const char *unit, uint64_t segment_size)
 {
     if (!progress || !label)
         return;
@@ -185,6 +228,7 @@ static void cfg_progress_set(cfg_progress_t *progress, const char *label, uint64
         return;
     completed = completed > total ? total : completed;
     bool changed = progress->label != label || progress->unit != unit || progress->total != total ||
+                   progress->segment_size != segment_size ||
                    completed < progress->completed;
     struct timespec now;
     bool timed = !clock_gettime(CLOCK_MONOTONIC, &now);
@@ -196,10 +240,15 @@ static void cfg_progress_set(cfg_progress_t *progress, const char *label, uint64
         ++progress->advances;
         if (timed) progress->advanced = now;
     }
+    if (changed || completed > progress->completed) {
+        string_free(progress->segment_name);
+        progress->segment_name = NULL;
+    }
     progress->label = label;
     progress->unit = unit;
     progress->completed = completed;
     progress->total = total;
+    progress->segment_size = segment_size;
     if (changed)
         cfg_progress_render(progress, false, false);
     lock_unlock(progress->mutex);
@@ -208,14 +257,45 @@ static void cfg_progress_set(cfg_progress_t *progress, const char *label, uint64
 /* All measured sources show their byte counts, replacing any previous item unit. */
 void cfg_progress_update(cfg_progress_t *progress, const char *label, uint64_t completed, uint64_t total)
 {
-    cfg_progress_set(progress, label, completed, total, "bytes processed");
+    cfg_progress_set(progress, label, completed, total, "bytes processed", 0);
 }
 
 /* Count updates are constant-time; the worker never waits for a timer tick. */
 void cfg_progress_update_items(cfg_progress_t *progress, const char *label, uint64_t completed, uint64_t total,
                                const char *unit)
 {
-    if (unit) cfg_progress_set(progress, label, completed, total, unit);
+    if (unit) cfg_progress_set(progress, label, completed, total, unit, 1);
+}
+
+/* Keep batch counts explicit rather than inferring them from reporting frequency or elapsed time. */
+void cfg_progress_update_segments(cfg_progress_t *progress, const char *label, uint64_t completed, uint64_t total,
+                                  const char *unit, uint64_t segment_size)
+{
+    if (unit && segment_size) cfg_progress_set(progress, label, completed, total, unit, segment_size);
+}
+
+/* Copy optional display context so catalogue storage can be released independently of the reporting thread. */
+void cfg_progress_segment_name(cfg_progress_t *progress, const string_t *name)
+{
+    if (!progress) return;
+    string_t *copy = name && string_byte_length(name) && string_byte_length(name) <= 96 ? string_new() : NULL;
+    string_cursor_t *cursor = copy ? string_cursor_new(name) : NULL;
+    bool ok = !copy || cursor;
+    while (ok && cursor && !string_cursor_done(cursor)) {
+        rune_t rune = string_cursor_peek(cursor);
+        string_pos_t start = string_cursor_position(cursor);
+        string_cursor_next(cursor);
+        ok = rune_is_control(rune) ? !string_append_char(copy, ' ') :
+             !string_cursor_append_slice_between(copy, start, string_cursor_position(cursor), cursor);
+    }
+    string_cursor_free(cursor);
+    if (!ok) { string_free(copy); copy = NULL; }
+    if (!lock_wait(progress->mutex)) { string_free(copy); return; }
+    string_free(progress->segment_name);
+    progress->segment_name = copy;
+    if (progress->completed == progress->initial_completed && progress->total > progress->completed)
+        cfg_progress_render(progress, false, false);
+    lock_unlock(progress->mutex);
 }
 
 /* Leave a durable explanation above the live line without exposing caller paths or SQL. */
@@ -244,5 +324,6 @@ void cfg_progress_finish(cfg_progress_t *progress, bool success)
     lock_free(progress->wake);
     lock_free(progress->worker_mutex);
     lock_free(progress->mutex);
+    string_free(progress->segment_name);
     free(progress);
 }

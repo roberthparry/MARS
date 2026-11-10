@@ -179,6 +179,15 @@ bool expr_set_number_scientific_local(bool scientific);
 int expr_set_number_precision_local(int precision);
 
 /**
+ * @brief Prefer exact fractions while rendering coefficients in the calling thread.
+ * @param[in] fractional True suppresses lossless decimal alternatives to exact rational numbers.
+ * @return Previous thread-local setting; restore it after the rendering scope, including failure paths.
+ * @note Values, precision and expression ownership are unchanged. Native output and semantic notation share
+ * this setting; it does not replace genuinely inexact numbers with fractions or affect other threads.
+ */
+bool expr_set_number_fractional_local(bool fractional);
+
+/**
  * @brief Initialise a temporary naming table.
  * @param table Caller-owned naming table to initialise before assigning temporary names.
  * autoname_restore.

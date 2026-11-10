@@ -317,6 +317,7 @@ static diffequ_solve_result_t *de_solve_series_impl(const diffequ_t *de, size_t 
     expr_t *rhs = polynomial && tail ? expr_add(polynomial, tail) : NULL;
     solution = rhs ? equ_new(dependent, rhs) : NULL;
     expr_free(rhs);
+    equ_set_fractional_coefficients(solution, true);
     if (!solution || de_solve_result_append(result, solution) != 0)
         goto failed;
     solution = NULL;

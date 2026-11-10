@@ -30,6 +30,17 @@ enum {
 /** Open the selected format: an empty key means plaintext; NULL is a configuration failure. */
 sqlite_t *cfg_database_open(const string_t *path, const string_t *key);
 
+/**
+ * @brief Consume a saved, one-time release re-import request, resuming at its first unfinished database.
+ * @return Minus one when no request exists; zero after all requested imports succeed; one on invalid state,
+ * import failure or failure to save progress. Failed stages retain their request for a later retry.
+ * @note Called serially by cfg_databases_ensure. Stages are globe, almanac and jurisdiction. The globe must
+ * already exist in plaintext: its full transactional reimport retains rivers and prepared image blocks in place
+ * while recreating packaged geography and photographs. The other stores use their ordinary fresh staged installers.
+ * Saved paths, credentials, calendar choices and Lab history are retained. No argument or ownership transfers.
+ */
+int cfg_database_reimport_pending(void);
+
 /** @brief Import optional bundled country flags into the jurisdiction catalogue, preserving other tables. */
 bool cfg_database_flags(sqlite_t *db, const string_t *root);
 
@@ -100,6 +111,26 @@ bool cfg_database_mapped_water(sqlite_t *db, const string_t *root);
 bool cfg_database_textures(sqlite_t *db, const string_t *root);
 
 /**
+ * @brief Read the installed texture catalogue for optional progress descriptions, without reading image payloads.
+ * @param[in] db Borrowed readable connection, used serially; no data or transaction is changed.
+ * @return Owned bounded JSON catalogue released with json_free(), or NULL when unavailable, invalid or on failure.
+ * @note A missing description must not prevent importing otherwise validated imagery. No argument is consumed.
+ */
+json_t *cfg_database_texture_catalogue(sqlite_t *db);
+
+/**
+ * @brief Obtain a short progress name by direct regional-slot lookup in a texture catalogue.
+ * @param[in] catalogue Borrowed manifest; NULL is permitted for unnamed regional sources.
+ * @param[in] level Texture level; level three addresses regional imagery, other supported levels are global.
+ * @param[in] column Regional slot when level is three; otherwise ignored.
+ * @return Owned display string released with string_free(), or NULL for missing, unsafe or oversized names,
+ * unsupported levels or allocation failure. No input is retained, consumed or changed.
+ * @note Removes a trailing Sentinel tile designation, capitalises an initial ASCII lower-case letter and rejects
+ * control characters. The name is presentation only; indexed addresses and content identities remain unchanged.
+ */
+string_t *cfg_database_texture_name(const json_t *catalogue, unsigned level, unsigned column);
+
+/**
  * @brief Compare the prepared texture manifest with the installed snapshot without loading PNG payloads.
  * @param[in] db Borrowed readable globe database; access must be serialised for the call.
  * @param[in] root Borrowed resource-location context, resolved through the normal path configuration.
@@ -143,6 +174,34 @@ bool cfg_database_copy_globe(sqlite_t *db);
  * The connection remains caller-owned; no argument is retained or consumed.
  */
 bool cfg_database_copy_globe_schema(sqlite_t *db);
+
+/**
+ * @brief Validate the complete photographic catalogue metadata and database foreign keys before commit.
+ * @param[in,out] db Borrowed open globe connection with the candidate import visible; remains open.
+ * @return True when foreign keys are valid and the photographic dataset has the expected format, a complete
+ * minimum image set and payload lengths matching their declared lengths; false on invalid data or SQL failure.
+ * @note The image importer checks PNG structure and digests separately. No input is consumed or retained.
+ * Call serially inside the caller-owned import transaction; this function never commits or rolls it back.
+ */
+bool cfg_database_globe_replacement_valid(sqlite_t *db);
+
+/**
+ * @brief Reimport all packaged globe content in one durable transaction, leaving unrelated data in place.
+ * @param[in,out] db Borrowed writable globe connection with no active transaction; remains open.
+ * @param[in] root Borrowed resource context passed to apply; neither retained nor changed.
+ * @param[in] staging Borrowed installer-owned working directory passed to apply; neither retained nor changed.
+ * @param[in] apply Borrowed full-import callback; must recreate the packaged geographic layers and photographs.
+ * @param[in] revision Expected final revision; a newer installed revision fails without importing.
+ * @return True only after validation and commit; false attempts complete rollback and leaves the request pending.
+ * @note Original photograph tables are removed before apply, forcing validation and insertion of every source
+ * image rather than incremental retention. Rivers, prepared image blocks, custom tables, rowids and sequence
+ * counters remain in place. Non-photographic triggers and views are suspended and restored; import does not replay
+ * triggers. Full commit synchronisation remains enabled. SQLite may require substantial rollback-journal space.
+ * Foreign-key enforcement is suspended during replacement, checked before commit and restored before returning.
+ * No input is consumed or retained. Serialise calls and close other database consumers during the import.
+ */
+bool cfg_database_reimport_globe(sqlite_t *db, const string_t *root, const string_t *staging,
+                                bool (*apply)(sqlite_t *, const string_t *, const string_t *), int revision);
 
 /**
  * @brief Require an existing destination to have no journal, WAL or shared-memory sidecar files.

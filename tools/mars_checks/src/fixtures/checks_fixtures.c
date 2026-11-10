@@ -5,6 +5,7 @@
  * Reuses the unrelated HTTP, gRPC and WebSocket test servers. Only descriptor
  * three reaches a spawned fixture; other listeners retain close-on-exec. Peer
  * cleanup is bounded and escalates to SIGKILL before reaping when necessary.
+ * Globe reader examples use a tiny disposable SQLite file with child-only configuration.
  */
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE
@@ -26,6 +27,7 @@
 #include <time.h>
 #include <unistd.h>
 
+#include "sqlite-t.h"
 #include "checks_process.h"
 #include "checks_fixtures.h"
 #define MARS_CHECKS_FIXTURES_INTERNAL_ACCESS
@@ -216,4 +218,27 @@ bool checks_fixtures_arguments(checks_fixtures_t *fixtures, const string_t *path
         return checks_fixtures_add_url(
             fixtures, 0, string_find(code, "/get?message=MARS") >= 0 ? "/get?message=MARS" : "/post", arguments);
     return true;
+}
+
+/* Keep standalone cache-identity examples independent of installed data and the parent's configuration. */
+bool checks_fixtures_programme(checks_fixtures_t *fixtures, const string_t *path, const string_t *code,
+                              const string_t *binary, const string_t *working, checks_strings_t *arguments)
+{
+    if (string_find(code, "globe_reader_identity(") >= 0) {
+        string_t *database = checks_path(working, "globe.db");
+        sqlite_t *db = database ? sqlite_open_plain(database) : NULL;
+        bool ready = db && sqlite_exec_cstr(db, "CREATE TABLE readme_fixture (id INTEGER PRIMARY KEY)");
+        sqlite_close(db);
+        if (ready) {
+            checks_strings_add(arguments, checks_text("env"));
+            checks_strings_add(arguments, string_sprintf("MARS_HOME=%s", string_c_str(working)));
+            checks_strings_add(arguments, string_sprintf("MARS_GLOBE_DB_PATH=%s", string_c_str(database)));
+            checks_strings_add(arguments, checks_text("MARS_GLOBE_DB_KEY="));
+        }
+        string_free(database);
+        if (!ready)
+            return false;
+    }
+    checks_strings_add(arguments, string_clone(binary));
+    return checks_fixtures_arguments(fixtures, path, code, arguments);
 }

@@ -10,12 +10,15 @@
  */
 
 #include <stdio.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include "diffequation-t.h"
 #define MARS_EXPR_INTERNAL_ACCESS
 #include "expression/expr_internal.h"
+#define MARS_SHARED_EQUATION_INTERNAL_ACCESS
+#include "internal/equation_internal.h"
 
 #include "test_harness.h"
 #include "test_database.h"
@@ -1242,7 +1245,7 @@ static void test_diffequ_linear_solution_uses_special_function(void)
     WANT_POINTER("special-function solution text", text, true);
     if (text)
         WANT_TEXT("special-function linear solution", string_c_str(text),
-                    "y = √π·(erf(x·√(-1)) - erf(0))/(2·√(-1)·exp(x²))");
+                    "y = √π·(erf(√(-1)·x) - erf(0))/(2·√(-1)·exp(x²))");
 
     string_free(text);
     de_solve_result_free(result);
@@ -2045,16 +2048,43 @@ static void test_diffequ_series_general_data(void)
         assert_series_numbers_exact(de_solve_result_series_coefficient(result, n));
         char *coefficient = expr_to_string(de_solve_result_series_coefficient(result, n), style_UNBOUND);
         WANT_LONG("compact symbolic Taylor coefficient", coefficient && strlen(coefficient) < 400u, 1L);
-        WANT_LONG("no decimal Taylor coefficients", coefficient && !strchr(coefficient, '.'), 1L);
         free(coefficient);
-        char *coefficient_TeX = expr_to_string(de_solve_result_series_coefficient(result, n), style_LATEX);
-        WANT_LONG("TeX retains fractional Taylor coefficients",
-                  coefficient_TeX && !strchr(coefficient_TeX, '.') && strstr(coefficient_TeX, "\\frac"), 1L);
-        free(coefficient_TeX);
     }
     string_t *series_text = equ_to_text(de_solve_result_at(result, 0u), style_UNBOUND);
     WANT_LONG("readable Taylor series", series_text && strlen(string_c_str(series_text)) < 1500u, 1L);
+    WANT_LONG("no decimal Taylor coefficients", series_text && !strchr(string_c_str(series_text), '.'), 1L);
+    WANT_LONG("Taylor coefficient 17/10 remains fractional",
+              series_text && strstr(string_c_str(series_text), "¹⁷⁄₁₀"), 1L);
     string_free(series_text);
+    string_t *series_TeX = equ_to_text(de_solve_result_at(result, 0u), style_LATEX);
+    WANT_LONG("TeX retains fractional Taylor coefficients",
+              series_TeX && !strchr(string_c_str(series_TeX), '.') &&
+              strstr(string_c_str(series_TeX), "\\frac{17}{10}"), 1L);
+    string_free(series_TeX);
+    const size_t limits[] = {SIZE_MAX, 1u};
+    for (size_t i = 0u; i < sizeof limits / sizeof *limits; ++i) {
+        char *wrapped = equ_to_TeX_body_wrapped(de_solve_result_at(result, 0u), limits[i]);
+        WANT_LONG("Lab TeX cards retain fractional Taylor coefficients at either line limit",
+                  wrapped && strstr(wrapped, "\\frac{17}{10}") && !strstr(wrapped, "1.7"), 1L);
+        free(wrapped);
+    }
+    string_t *series_function = equ_to_text(de_solve_result_at(result, 0u), style_FUNCTION);
+    WANT_LONG("function output retains fractional Taylor coefficients",
+              series_function && strstr(string_c_str(series_function), "17/10") &&
+              !strstr(string_c_str(series_function), "1.7"), 1L);
+    string_free(series_function);
+    equation_t *refined_series = equ_simplify_with_context(de_solve_result_at(result, 0u), NULL);
+    string_t *refined_text = refined_series ? equ_to_text(refined_series, style_UNBOUND) : NULL;
+    WANT_LONG("contextual simplification preserves fractional Taylor presentation",
+              refined_text && strstr(string_c_str(refined_text), "¹⁷⁄₁₀") &&
+              !strchr(string_c_str(refined_text), '.'), 1L);
+    string_free(refined_text);
+    equ_free(refined_series);
+    expr_t *ordinary = expr_from_string("17/10", NULL);
+    char *ordinary_text = ordinary ? expr_to_string(ordinary, style_UNBOUND) : NULL;
+    WANT_TEXT("fractional Taylor rendering does not leak into ordinary output", ordinary_text, "1.7");
+    free(ordinary_text);
+    expr_free(ordinary);
     expr_t *square = expr_mul(a, a);
     expr_t *fourth = expr_mul(square, square);
     expr_t *product = expr_mul(a, b);
@@ -2232,7 +2262,7 @@ static void test_diffequ_solves_hydrogen_ground_state(void)
     WANT_POINTER("hydrogen eigenfunction steps", strstr(de_solve_result_steps(result), "derived constant rate"),
                    true);
     if (text)
-        WANT_TEXT("hydrogen ground-state wavefunction", string_c_str(text), "ψ = exp(0.5it - √(x² + y² + z²))/√(π)");
+        WANT_TEXT("hydrogen ground-state wavefunction", string_c_str(text), "ψ = exp(½it - √(x² + y² + z²))/√(π)");
 
     string_free(text);
     de_solve_result_free(result);
@@ -3235,13 +3265,13 @@ static void test_diffequ_solves_second_order_pde_degenerate_operator(void)
 static void test_diffequ_solves_second_order_pde_surd_and_complex_roots(void)
 {
     WANT_SECOND_ORDER_PDE_SOLUTION("z_xx - 2z_yy = 0",
-                                   "z = F(y - ½x·√(8)) + G(½x·√(8) + y)");
+                                   "z = F(y - ½·√(8)·x) + G(½·√(8)·x + y)");
     WANT_SECOND_ORDER_PDE_SOLUTION("z_xx + 2z_yy = 0",
-                                   "z = F(y - 0.5ix·√(8)) + G(0.5ix·√(8) + y)");
+                                   "z = F(y - ½i·√(8)·x) + G(½i·√(8)·x + y)");
     WANT_SECOND_ORDER_PDE_SOLUTION("-z_xx - 2z_yy = 0",
-                                   "z = F(y - 0.5ix·√(8)) + G(0.5ix·√(8) + y)");
+                                   "z = F(y - ½i·√(8)·x) + G(½i·√(8)·x + y)");
     WANT_SECOND_ORDER_PDE_SOLUTION("2z_xx + 2z_xy + z_yy = 0",
-                                   "z = F((-0.5 - 0.5i)x + y) + G((-0.5 + 0.5i)x + y)");
+                                   "z = F((-½ - ½i)x + y) + G((-½ + ½i)x + y)");
 }
 
 static void test_diffequ_second_order_pde_rejects_outside_family(void)

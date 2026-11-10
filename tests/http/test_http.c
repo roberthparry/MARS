@@ -21,6 +21,7 @@
 #include <signal.h>
 #undef stack_t
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
@@ -72,15 +73,20 @@ static bool fixture_available(void)
 
 static pid_t start_fixture(bool tls, bool identity, unsigned *port)
 {
-    if (!fixture_available())
+    if (!fixture_available()) {
+        fprintf(stderr, "HTTP fixture is missing or not executable: %s\n", MARS_HTTP_FIXTURE_PATH);
         return -1;
+    }
     int fd = socket(AF_INET, SOCK_STREAM, 0);
     struct sockaddr_in address = {.sin_family = AF_INET, .sin_addr.s_addr = htonl(INADDR_LOOPBACK)};
     socklen_t length = sizeof(address);
-    if (fd < 0)
+    if (fd < 0) {
+        perror("HTTP fixture: creating a loopback socket");
         return -1;
+    }
     if (bind(fd, (struct sockaddr *)&address, length) || listen(fd, 8) ||
         getsockname(fd, (struct sockaddr *)&address, &length)) {
+        perror("HTTP fixture: preparing the loopback listener");
         close(fd);
         return -1;
     }
@@ -96,8 +102,11 @@ static pid_t start_fixture(bool tls, bool identity, unsigned *port)
                    "tests/http/test-cert.pem", "tests/http/test-key.pem", (char *)NULL);
         else
             execl(MARS_HTTP_FIXTURE_PATH, "http_fixture", "http", string_c_str(descriptor), (char *)NULL);
+        perror("HTTP fixture: starting the fixture executable");
         _exit(127);
     }
+    if (descriptor && pid < 0)
+        perror("HTTP fixture: creating the fixture process");
     string_free(descriptor);
     close(fd);
     return pid;
@@ -1196,6 +1205,7 @@ int tests_main(void)
     tls_pid = start_fixture(true, false, &tls_port);
     if (plain_pid <= 0 || tls_pid <= 0) {
         stop_fixture(plain_pid); stop_fixture(tls_pid);
+        fputs("HTTP suite setup failed; no protocol tests were executed.\n", stderr);
         return 1;
     }
     TEST_SECTION("HTTP");

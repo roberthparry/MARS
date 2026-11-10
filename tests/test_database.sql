@@ -1,6 +1,13 @@
 -- Portable test definitions, persistent statistics and bounded detailed reports; used only by test tools.
 PRAGMA application_id = 1297371988;
-PRAGMA user_version = 4;
+PRAGMA user_version = 5;
+
+-- Only a successfully committed, complete catalogue import records this content fingerprint.
+CREATE TABLE IF NOT EXISTS test_source_sync (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    source_sha256 TEXT NOT NULL CHECK (length(source_sha256) = 64),
+    synced_utc TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+);
 
 CREATE TABLE IF NOT EXISTS test_catalogue (
     source TEXT NOT NULL,

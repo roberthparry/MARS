@@ -99,9 +99,9 @@ Output:
 
 Rendered mathematics:
 
-$$
-\sqrt{\frac{x}{2}}
-$$
+
+$\quad\begin{array}{l}\displaystyle \sqrt{\frac{x}{2}}\end{array}$
+
 
 ## Reverse Polish construction contract
 
@@ -309,15 +309,9 @@ Output:
 
 Rendered stack contents, from bottom to top in each row:
 
-$$
-\begin{array}{ll}
-\text{DUP} & 12\quad 34\quad 34 \\
-\text{DROP} & 12\quad 34 \\
-\text{SWAP} & 34\quad 12 \\
-\text{ROT} & 34\quad 56\quad 12 \\
-\text{ROLL} & 444\quad 333\quad 222\quad 555
-\end{array}
-$$
+
+$\quad\begin{array}{l}\displaystyle \begin{array}{ll} \text{DUP} & 12\quad 34\quad 34 \\ \text{DROP} & 12\quad 34 \\ \text{SWAP} & 34\quad 12 \\ \text{ROT} & 34\quad 56\quad 12 \\ \text{ROLL} & 444\quad 333\quad 222\quad 555 \end{array}\end{array}$
+
 
 
 ## Indexed expression with nested roots
@@ -393,9 +387,9 @@ Output:
 
 Rendered mathematics:
 
-$$
-{r}_{n} = \frac{\sqrt[3]{1 + {x}_{n}^{2}}}{\sqrt{1 + {\lambda}^{2}}}\qquad \text{scaled \& normalised}
-$$
+
+$\quad\begin{array}{l}\displaystyle {r}_{n} = \frac{\sqrt[3]{1 + {x}_{n}^{2}}}{\sqrt{1 + {\lambda}^{2}}}\qquad \text{scaled \& normalised}\end{array}$
+
 
 ## A symmetric projection matrix
 
@@ -471,9 +465,9 @@ P\left(x\right) = \frac{1}{1 + {x}^{2}}\,\begin{bmatrix}1 & x \\[6pt] x & {x}^{2
 
 Rendered mathematics:
 
-$$
-P\left(x\right) = \frac{1}{1 + {x}^{2}}\,\begin{bmatrix}1 & x \\[6pt] x & {x}^{2}\end{bmatrix}
-$$
+
+$\quad\begin{array}{l}\displaystyle P\left(x\right) = \frac{1}{1 + {x}^{2}}\,\begin{bmatrix}1 & x \\[6pt] x & {x}^{2}\end{bmatrix}\end{array}$
+
 
 ## Calculus and tensor notation
 
@@ -721,25 +715,25 @@ i\,\hbar\,\frac{\partial {\psi\left(x, t\right)}}{\partial {t}} = -\frac{{\hbar}
 
 Rendered mathematics:
 
-$$
-{R}_{\mu \nu} - \frac{1}{2}\,R\,{g}_{\mu \nu} + \Lambda\,{g}_{\mu \nu} = \frac{8\,\pi\,G}{{c}^{4}}\,{T}_{\mu \nu}
-$$
 
-$$
-i\,\hbar\,\frac{\partial {\psi\left(x, t\right)}}{\partial {t}} = -\frac{{\hbar}^{2}}{2\,m}\,\frac{\partial^{2} {\psi\left(x, t\right)}}{\partial {x}^{2}} + V\left(x, t\right)\,\psi\left(x, t\right)
-$$
+$\quad\begin{array}{l}\displaystyle {R}_{\mu \nu} - \frac{1}{2}\,R\,{g}_{\mu \nu} + \Lambda\,{g}_{\mu \nu} = \frac{8\,\pi\,G}{{c}^{4}}\,{T}_{\mu \nu}\end{array}$
 
-$$
-\left( i\,{\gamma}^{\mu}\,{\partial}_{\mu} - m \right)\,\psi = 0
-$$
 
-$$
-\psi\left(x\right) = \sum_{n = 0}^{\infty} {{a}_{n}\,{\phi}_{n}\left(x\right)}
-$$
 
-$$
-\int_{-\infty}^{\infty} {{\left| \psi\left(x\right) \right|}^{2}}\,\mathrm{d}{x} = 1
-$$
+$\quad\begin{array}{l}\displaystyle i\,\hbar\,\frac{\partial {\psi\left(x, t\right)}}{\partial {t}} = -\frac{{\hbar}^{2}}{2\,m}\,\frac{\partial^{2} {\psi\left(x, t\right)}}{\partial {x}^{2}} + V\left(x, t\right)\,\psi\left(x, t\right)\end{array}$
+
+
+
+$\quad\begin{array}{l}\displaystyle \left( i\,{\gamma}^{\mu}\,{\partial}_{\mu} - m \right)\,\psi = 0\end{array}$
+
+
+
+$\quad\begin{array}{l}\displaystyle \psi\left(x\right) = \sum_{n = 0}^{\infty} {{a}_{n}\,{\phi}_{n}\left(x\right)}\end{array}$
+
+
+
+$\quad\begin{array}{l}\displaystyle \int_{-\infty}^{\infty} {{\left| \psi\left(x\right) \right|}^{2}}\,\mathrm{d}{x} = 1\end{array}$
+
 
 ## Existing renderers
 
@@ -855,21 +849,21 @@ Output:
 
 Rendered:
 
-$$
-\left\{ x \;\middle|\; x = 1 \right\}
-$$
 
-$$
-2\mkern-5mu x
-$$
+$\quad\begin{array}{l}\displaystyle \left\{ x \;\middle|\; x = 1 \right\}\end{array}$
 
-$$
-\begin{aligned}&x \\[10pt] &{}+ i\mkern-2mu y\end{aligned}
-$$
 
-$$
-\frac{x \pm \left(y\right)}{2}
-$$
+
+$\quad\begin{array}{l}\displaystyle 2\mkern-5mu x\end{array}$
+
+
+
+$\quad\begin{array}{l}\displaystyle \begin{aligned}&x \\[10pt] &{}+ i\mkern-2mu y\end{aligned}\end{array}$
+
+
+
+$\quad\begin{array}{l}\displaystyle \frac{x \pm \left(y\right)}{2}\end{array}$
+
 
 ## RPN counterparts to native calculus
 
@@ -1202,105 +1196,105 @@ x \cong y
 
 Rendered mathematics, in the same order as the programme output:
 
-$$
-\mathcal{F}_{x\to k}\{{e}^{-{x}^{2}}\}
-$$
 
-$$
-\mathcal{F}^{-1}_{k\to x}\{{e}^{-{k}^{2}}\}
-$$
+$\quad\begin{array}{l}\displaystyle \mathcal{F}_{x\to k}\{{e}^{-{x}^{2}}\}\end{array}$
 
-$$
-\mathcal{L}_{t\to s}\{\sin(t)\}
-$$
 
-$$
-\mathcal{L}^{-1}_{s\to t}\{\frac{1}{s + 1}\}
-$$
 
-$$
-\prod_{k = 1}^{3} {k}
-$$
+$\quad\begin{array}{l}\displaystyle \mathcal{F}^{-1}_{k\to x}\{{e}^{-{k}^{2}}\}\end{array}$
 
-$$
-\Gamma(x)
-$$
 
-$$
-{J}_{2}\left(x\right)
-$$
 
-$$
-{W}_{0}\left(x\right)
-$$
+$\quad\begin{array}{l}\displaystyle \mathcal{L}_{t\to s}\{\sin(t)\}\end{array}$
 
-$$
-\int {{x}^{2}}\,\mathrm{d}{x}
-$$
 
-$$
-\int_{0}^{1} {{x}^{2}}\,\mathrm{d}{x}
-$$
 
-$$
-\sum_{k = 1}^{3} {{k}^{2}}
-$$
+$\quad\begin{array}{l}\displaystyle \mathcal{L}^{-1}_{s\to t}\{\frac{1}{s + 1}\}\end{array}$
 
-$$
-\frac{\partial}{\partial x}\left[\sin(x)\right]
-$$
 
-$$
-\frac{\partial^{2}}{\partial x^{2}}\left[\sin(x)\right]
-$$
 
-$$
-\frac{\partial^{2}}{\partial y\,\partial x}\left[{x}^{2}\,{y}^{3}\right]
-$$
+$\quad\begin{array}{l}\displaystyle \prod_{k = 1}^{3} {k}\end{array}$
 
-$$
-\frac{\partial^{2}}{\partial y\,\partial x}\left[{x}^{2}\,{y}^{3}\right]
-$$
 
-$$
-\frac{\partial^{3}}{\partial x\,\partial y\,\partial x}\left[{x}^{3}\,{y}^{2}\right]
-$$
 
-$$
-x < y
-$$
+$\quad\begin{array}{l}\displaystyle \Gamma(x)\end{array}$
 
-$$
-x \le y
-$$
 
-$$
-x \ge y
-$$
 
-$$
-x > y
-$$
+$\quad\begin{array}{l}\displaystyle {J}_{2}\left(x\right)\end{array}$
 
-$$
-x \ne y
-$$
 
-$$
-x = y
-$$
 
-$$
-x \approx y
-$$
+$\quad\begin{array}{l}\displaystyle {W}_{0}\left(x\right)\end{array}$
 
-$$
-x \cong y
-$$
 
-$$
-0 < x \le 1
-$$
+
+$\quad\begin{array}{l}\displaystyle \int {{x}^{2}}\,\mathrm{d}{x}\end{array}$
+
+
+
+$\quad\begin{array}{l}\displaystyle \int_{0}^{1} {{x}^{2}}\,\mathrm{d}{x}\end{array}$
+
+
+
+$\quad\begin{array}{l}\displaystyle \sum_{k = 1}^{3} {{k}^{2}}\end{array}$
+
+
+
+$\quad\begin{array}{l}\displaystyle \frac{\partial}{\partial x}\left[\sin(x)\right]\end{array}$
+
+
+
+$\quad\begin{array}{l}\displaystyle \frac{\partial^{2}}{\partial x^{2}}\left[\sin(x)\right]\end{array}$
+
+
+
+$\quad\begin{array}{l}\displaystyle \frac{\partial^{2}}{\partial y\,\partial x}\left[{x}^{2}\,{y}^{3}\right]\end{array}$
+
+
+
+$\quad\begin{array}{l}\displaystyle \frac{\partial^{2}}{\partial y\,\partial x}\left[{x}^{2}\,{y}^{3}\right]\end{array}$
+
+
+
+$\quad\begin{array}{l}\displaystyle \frac{\partial^{3}}{\partial x\,\partial y\,\partial x}\left[{x}^{3}\,{y}^{2}\right]\end{array}$
+
+
+
+$\quad\begin{array}{l}\displaystyle x < y\end{array}$
+
+
+
+$\quad\begin{array}{l}\displaystyle x \le y\end{array}$
+
+
+
+$\quad\begin{array}{l}\displaystyle x \ge y\end{array}$
+
+
+
+$\quad\begin{array}{l}\displaystyle x > y\end{array}$
+
+
+
+$\quad\begin{array}{l}\displaystyle x \ne y\end{array}$
+
+
+
+$\quad\begin{array}{l}\displaystyle x = y\end{array}$
+
+
+
+$\quad\begin{array}{l}\displaystyle x \approx y\end{array}$
+
+
+
+$\quad\begin{array}{l}\displaystyle x \cong y\end{array}$
+
+
+
+$\quad\begin{array}{l}\displaystyle 0 < x \le 1\end{array}$
+
 
 ## Inequalities and approximate relations
 
@@ -1420,41 +1414,41 @@ x ~== y -> x \cong y
 
 Rendered mathematics, in the same order:
 
-$$
-x < y
-$$
 
-$$
-x \le y
-$$
+$\quad\begin{array}{l}\displaystyle x < y\end{array}$
 
-$$
-x \ge y
-$$
 
-$$
-x > y
-$$
 
-$$
-x \ne y
-$$
+$\quad\begin{array}{l}\displaystyle x \le y\end{array}$
 
-$$
-x = y
-$$
 
-$$
-x \approx y
-$$
 
-$$
-x \cong y
-$$
+$\quad\begin{array}{l}\displaystyle x \ge y\end{array}$
 
-$$
-0 < x \le 1
-$$
+
+
+$\quad\begin{array}{l}\displaystyle x > y\end{array}$
+
+
+
+$\quad\begin{array}{l}\displaystyle x \ne y\end{array}$
+
+
+
+$\quad\begin{array}{l}\displaystyle x = y\end{array}$
+
+
+
+$\quad\begin{array}{l}\displaystyle x \approx y\end{array}$
+
+
+
+$\quad\begin{array}{l}\displaystyle x \cong y\end{array}$
+
+
+
+$\quad\begin{array}{l}\displaystyle 0 < x \le 1\end{array}$
+
 
 ## RPN constants and infinity
 
@@ -1577,49 +1571,49 @@ i
 
 Rendered mathematics, in the same order:
 
-$$
-\infty
-$$
 
-$$
-\infty
-$$
+$\quad\begin{array}{l}\displaystyle \infty\end{array}$
 
-$$
--\infty
-$$
 
-$$
-\gamma
-$$
 
-$$
-\gamma
-$$
+$\quad\begin{array}{l}\displaystyle \infty\end{array}$
 
-$$
-\pi
-$$
 
-$$
-\phi
-$$
 
-$$
-\tau
-$$
+$\quad\begin{array}{l}\displaystyle -\infty\end{array}$
 
-$$
-e
-$$
 
-$$
-i
-$$
 
-$$
-\int_{0}^{\infty} {{e}^{-x}}\,\mathrm{d}{x}
-$$
+$\quad\begin{array}{l}\displaystyle \gamma\end{array}$
+
+
+
+$\quad\begin{array}{l}\displaystyle \gamma\end{array}$
+
+
+
+$\quad\begin{array}{l}\displaystyle \pi\end{array}$
+
+
+
+$\quad\begin{array}{l}\displaystyle \phi\end{array}$
+
+
+
+$\quad\begin{array}{l}\displaystyle \tau\end{array}$
+
+
+
+$\quad\begin{array}{l}\displaystyle e\end{array}$
+
+
+
+$\quad\begin{array}{l}\displaystyle i\end{array}$
+
+
+
+$\quad\begin{array}{l}\displaystyle \int_{0}^{\infty} {{e}^{-x}}\,\mathrm{d}{x}\end{array}$
+
 
 ## Prime notation with RPN
 
@@ -1721,9 +1715,9 @@ y'' + 3\,y' + 40\,y = 0\qquad y'\left(0\right) = 1\qquad y\left(0\right) = 0
 
 Rendered mathematics:
 
-$$
-y'' + 3\,y' + 40\,y = 0\qquad y'\left(0\right) = 1\qquad y\left(0\right) = 0
-$$
+
+$\quad\begin{array}{l}\displaystyle y'' + 3\,y' + 40\,y = 0\qquad y'\left(0\right) = 1\qquad y\left(0\right) = 0\end{array}$
+
 
 ## General tensor and connection notation
 
@@ -1944,33 +1938,33 @@ Output:
 
 Rendered mathematics, in the same order:
 
-$$
-{T}^{\rho}{}_{\sigma}{}^{\mu}{}_{\nu \lambda}
-$$
 
-$$
-{R}^{\rho}{}_{\sigma \mu \nu}
-$$
+$\quad\begin{array}{l}\displaystyle {T}^{\rho}{}_{\sigma}{}^{\mu}{}_{\nu \lambda}\end{array}$
 
-$$
-{\Gamma}_{\rho \mu \nu}
-$$
 
-$$
-{\Gamma}^{\rho}{}_{\mu \nu}
-$$
 
-$$
-{V}^{\nu}{}_{;\mu} = {V}^{\nu}{}_{,\mu} + {\Gamma}^{\nu}{}_{\mu \lambda}\,{V}^{\lambda}
-$$
+$\quad\begin{array}{l}\displaystyle {R}^{\rho}{}_{\sigma \mu \nu}\end{array}$
 
-$$
-{\omega}_{\nu;\mu} = {\omega}_{\nu,\mu} - {\Gamma}^{\lambda}{}_{\mu \nu}\,{\omega}_{\lambda}
-$$
 
-$$
-{G}_{\mu \nu'}
-$$
+
+$\quad\begin{array}{l}\displaystyle {\Gamma}_{\rho \mu \nu}\end{array}$
+
+
+
+$\quad\begin{array}{l}\displaystyle {\Gamma}^{\rho}{}_{\mu \nu}\end{array}$
+
+
+
+$\quad\begin{array}{l}\displaystyle {V}^{\nu}{}_{;\mu} = {V}^{\nu}{}_{,\mu} + {\Gamma}^{\nu}{}_{\mu \lambda}\,{V}^{\lambda}\end{array}$
+
+
+
+$\quad\begin{array}{l}\displaystyle {\omega}_{\nu;\mu} = {\omega}_{\nu,\mu} - {\Gamma}^{\lambda}{}_{\mu \nu}\,{\omega}_{\lambda}\end{array}$
+
+
+
+$\quad\begin{array}{l}\displaystyle {G}_{\mu \nu'}\end{array}$
+
 
 
 ## Lists and HP48-style matrix assembly
@@ -2059,13 +2053,13 @@ f\left(\left\{1, 2\right\}, 3\right)
 
 Rendered mathematics:
 
-$$
-f\left(\left\{1, 2\right\}, 3\right)
-$$
 
-$$
-\begin{pmatrix}1 & 2 \\ 3 & 4\end{pmatrix}
-$$
+$\quad\begin{array}{l}\displaystyle f\left(\left\{1, 2\right\}, 3\right)\end{array}$
+
+
+
+$\quad\begin{array}{l}\displaystyle \begin{pmatrix}1 & 2 \\ 3 & 4\end{pmatrix}\end{array}$
+
 
 
 ## Newlines, indentation and alignment
@@ -2175,21 +2169,13 @@ Output:
 
 Rendered mathematics:
 
-$$
-\begin{aligned}
-x &= 1 \\
-y &\ge 2 \\
-z &\approx 3 \\
-&\hspace{12pt}x + y
-\end{aligned}
-$$
 
-$$
-\begin{array}{ll}
-a & b \\
-c & d
-\end{array}
-$$
+$\quad\begin{array}{l}\displaystyle \begin{aligned} x &= 1 \\ y &\ge 2 \\ z &\approx 3 \\ &\hspace{12pt}x + y \end{aligned}\end{array}$
+
+
+
+$\quad\begin{array}{l}\displaystyle \begin{array}{ll} a & b \\ c & d \end{array}\end{array}$
+
 
 
 ## Comma and semicolon derivative indices
@@ -2332,21 +2318,21 @@ Output:
 
 Rendered mathematics:
 
-$$
-{\partial}_{\mu}\,{V}^{\nu} = {V}^{\nu}{}_{,\mu}
-$$
 
-$$
-{\nabla}_{j}\,{V}_{i} = {V}_{i;j}
-$$
+$\quad\begin{array}{l}\displaystyle {\partial}_{\mu}\,{V}^{\nu} = {V}^{\nu}{}_{,\mu}\end{array}$
 
-$$
-{V}^{\nu}{}_{,\mu\,\rho}
-$$
 
-$$
-{V}_{i;j\,k}
-$$
+
+$\quad\begin{array}{l}\displaystyle {\nabla}_{j}\,{V}_{i} = {V}_{i;j}\end{array}$
+
+
+
+$\quad\begin{array}{l}\displaystyle {V}^{\nu}{}_{,\mu\,\rho}\end{array}$
+
+
+
+$\quad\begin{array}{l}\displaystyle {V}_{i;j\,k}\end{array}$
+
 
 ## Primed indices and coordinate transformations
 
@@ -2376,12 +2362,9 @@ coordinates, each upper index contributes a forward Jacobian and each lower
 index an inverse Jacobian. This example writes the transformation law for a
 mixed tensor of type $(1,1)$:
 
-$$
-T^{\mu'}{}_{\nu'} =
-\frac{\partial x^{\mu'}}{\partial x^\alpha}
-\frac{\partial x^\beta}{\partial x^{\nu'}}
-T^\alpha{}_{\beta}.
-$$
+
+$\quad\begin{array}{l}\displaystyle T^{\mu'}{}_{\nu'} = \frac{\partial x^{\mu'}}{\partial x^\alpha} \frac{\partial x^\beta}{\partial x^{\nu'}} T^\alpha{}_{\beta}.\end{array}$
+
 
 Repeated unprimed indices $\alpha$ and $\beta$ are summed. The primed indices
 $\mu'$ and $\nu'$ are free on both sides. No Cartesian coordinates, orthogonal
@@ -2489,9 +2472,9 @@ Output:
 
 Rendered mathematics:
 
-$$
-{T}^{\mu'}{}_{\nu'} = \frac{\partial {{x}^{\mu'}}}{\partial {{x}^{\alpha}}}\,\frac{\partial {{x}^{\beta}}}{\partial {{x}^{\nu'}}}\,{T}^{\alpha}{}_{\beta}
-$$
+
+$\quad\begin{array}{l}\displaystyle {T}^{\mu'}{}_{\nu'} = \frac{\partial {{x}^{\mu'}}}{\partial {{x}^{\alpha}}}\,\frac{\partial {{x}^{\beta}}}{\partial {{x}^{\nu'}}}\,{T}^{\alpha}{}_{\beta}\end{array}$
+
 
 ### Barred-variable equivalent
 
@@ -2499,12 +2482,9 @@ Some textbooks distinguish the coordinate systems by barring the variables and
 components. Alongside the primed-index convention above, the same transformation
 can be written in this older notation as
 
-$$
-\overline{T}^{\mu}{}_{\nu} =
-\frac{\partial \overline{x}^{\mu}}{\partial x^\alpha}
-\frac{\partial x^\beta}{\partial \overline{x}^{\nu}}
-T^\alpha{}_{\beta}.
-$$
+
+$\quad\begin{array}{l}\displaystyle \overline{T}^{\mu}{}_{\nu} = \frac{\partial \overline{x}^{\mu}}{\partial x^\alpha} \frac{\partial x^\beta}{\partial \overline{x}^{\nu}} T^\alpha{}_{\beta}.\end{array}$
+
 
 Here $\overline{x}^\mu$ labels the coordinates written as $x^{\mu'}$ above,
 and $\overline{T}^\mu{}_{\nu}$ gives the corresponding components. The repeated
@@ -2610,21 +2590,18 @@ Output:
 
 Rendered mathematics:
 
-$$
-{\overline{T}}^{\mu}{}_{\nu} = \frac{\partial {{\overline{x}}^{\mu}}}{\partial {{x}^{\alpha}}}\,\frac{\partial {{x}^{\beta}}}{\partial {{\overline{x}}^{\nu}}}\,{T}^{\alpha}{}_{\beta}
-$$
+
+$\quad\begin{array}{l}\displaystyle {\overline{T}}^{\mu}{}_{\nu} = \frac{\partial {{\overline{x}}^{\mu}}}{\partial {{x}^{\alpha}}}\,\frac{\partial {{x}^{\beta}}}{\partial {{\overline{x}}^{\nu}}}\,{T}^{\alpha}{}_{\beta}\end{array}$
+
 
 ### Latin-index equivalent
 
 Using lowercase Latin labels $a,b,c,d,e,\ldots$ and their primed counterparts
 $a',b',c',d',e',\ldots$, the same component law is
 
-$$
-T^{a'}{}_{b'} =
-\frac{\partial x^{a'}}{\partial x^{c}}
-\frac{\partial x^{d}}{\partial x^{b'}}
-T^{c}{}_{d}.
-$$
+
+$\quad\begin{array}{l}\displaystyle T^{a'}{}_{b'} = \frac{\partial x^{a'}}{\partial x^{c}} \frac{\partial x^{d}}{\partial x^{b'}} T^{c}{}_{d}.\end{array}$
+
 
 Here $a'$ and $b'$ are free, whilst $c$ and $d$ are summed over the coordinate
 dimension. The Latin labels cover the whole coordinate range; they do not
@@ -2736,20 +2713,17 @@ Output:
 
 Rendered mathematics:
 
-$$
-{T}^{a'}{}_{b'} = \frac{\partial {{x}^{a'}}}{\partial {{x}^{c}}}\,\frac{\partial {{x}^{d}}}{\partial {{x}^{b'}}}\,{T}^{c}{}_{d}
-$$
+
+$\quad\begin{array}{l}\displaystyle {T}^{a'}{}_{b'} = \frac{\partial {{x}^{a'}}}{\partial {{x}^{c}}}\,\frac{\partial {{x}^{d}}}{\partial {{x}^{b'}}}\,{T}^{c}{}_{d}\end{array}$
+
 
 ## Maxwell's equations in tensor form
 
 In SI units, Maxwell's equations with electric sources can be written as
 
-$$
-\begin{aligned}
-F^{\mu\nu}{}_{;\mu} &= \mu_0 J^\nu, \\
-F_{\mu\nu;\lambda}+F_{\nu\lambda;\mu}+F_{\lambda\mu;\nu} &= 0.
-\end{aligned}
-$$
+
+$\quad\begin{array}{l}\displaystyle \begin{aligned} F^{\mu\nu}{}_{;\mu} &= \mu_0 J^\nu, \\ F_{\mu\nu;\lambda}+F_{\nu\lambda;\mu}+F_{\lambda\mu;\nu} &= 0. \end{aligned}\end{array}$
+
 
 Here $F_{\mu\nu}=-F_{\nu\mu}$ is the electromagnetic field tensor and $J^\nu$
 is the four-current. Use signature $(+,-,-,-)$ and $x^0=ct$; in Cartesian
@@ -2863,12 +2837,9 @@ Output:
 
 Rendered mathematics:
 
-$$
-\begin{aligned}
-{F}^{\mu \nu}{}_{;\mu} &= {\mu}_{0}\,{J}^{\nu} \\
-{F}_{\mu \nu;\lambda} + {F}_{\nu \lambda;\mu} + {F}_{\lambda \mu;\nu} &= 0
-\end{aligned}
-$$
+
+$\quad\begin{array}{l}\displaystyle \begin{aligned} {F}^{\mu \nu}{}_{;\mu} &= {\mu}_{0}\,{J}^{\nu} \\ {F}_{\mu \nu;\lambda} + {F}_{\nu \lambda;\mu} + {F}_{\lambda \mu;\nu} &= 0 \end{aligned}\end{array}$
+
 
 ## Quantum operators, states and adjoints
 
@@ -2996,29 +2967,29 @@ Output:
 
 Rendered mathematics:
 
-$$
-\widehat{H} = \frac{{\widehat{p}}^{2}}{2\,m} + V\left(x, t\right)
-$$
 
-$$
-\left\langle p \right\rangle = \left\langle \psi \middle| \widehat{p} \middle| \psi \right\rangle
-$$
+$\quad\begin{array}{l}\displaystyle \widehat{H} = \frac{{\widehat{p}}^{2}}{2\,m} + V\left(x, t\right)\end{array}$
 
-$$
-\left\langle \phi \middle| \psi \right\rangle
-$$
 
-$$
-\left| \psi \right\rangle\!\left\langle \phi \right|
-$$
 
-$$
-{\widehat{A}}^{\dagger}
-$$
+$\quad\begin{array}{l}\displaystyle \left\langle p \right\rangle = \left\langle \psi \middle| \widehat{p} \middle| \psi \right\rangle\end{array}$
 
-$$
-{\left| \psi \right\rangle}^{\dagger} = \left\langle \psi \right|
-$$
+
+
+$\quad\begin{array}{l}\displaystyle \left\langle \phi \middle| \psi \right\rangle\end{array}$
+
+
+
+$\quad\begin{array}{l}\displaystyle \left| \psi \right\rangle\!\left\langle \phi \right|\end{array}$
+
+
+
+$\quad\begin{array}{l}\displaystyle {\widehat{A}}^{\dagger}\end{array}$
+
+
+
+$\quad\begin{array}{l}\displaystyle {\left| \psi \right\rangle}^{\dagger} = \left\langle \psi \right|\end{array}$
+
 
 ### ASCII text equivalents
 
@@ -3085,29 +3056,29 @@ Output:
 
 Rendered mathematics, retaining the native text renderer's spacing:
 
-$$
-\widehat{H} = \frac{\widehat{p}^{2}}{2\mkern-2mu m} + V\left(x, t\right)
-$$
 
-$$
-\left\langle p \right\rangle = \left\langle \psi \middle| \widehat{p} \middle| \psi \right\rangle
-$$
+$\quad\begin{array}{l}\displaystyle \widehat{H} = \frac{\widehat{p}^{2}}{2\mkern-2mu m} + V\left(x, t\right)\end{array}$
 
-$$
-\left\langle \phi \middle| \psi \right\rangle
-$$
 
-$$
-\left| \psi \right\rangle\!\left\langle \phi \right|
-$$
 
-$$
-{\widehat{A}}^{\dagger}
-$$
+$\quad\begin{array}{l}\displaystyle \left\langle p \right\rangle = \left\langle \psi \middle| \widehat{p} \middle| \psi \right\rangle\end{array}$
 
-$$
-{\left| \psi \right\rangle}^{\dagger} = \left\langle \psi \right|
-$$
+
+
+$\quad\begin{array}{l}\displaystyle \left\langle \phi \middle| \psi \right\rangle\end{array}$
+
+
+
+$\quad\begin{array}{l}\displaystyle \left| \psi \right\rangle\!\left\langle \phi \right|\end{array}$
+
+
+
+$\quad\begin{array}{l}\displaystyle {\widehat{A}}^{\dagger}\end{array}$
+
+
+
+$\quad\begin{array}{l}\displaystyle {\left| \psi \right\rangle}^{\dagger} = \left\langle \psi \right|\end{array}$
+
 
 ## Optional input shortcuts
 
@@ -3182,9 +3153,9 @@ Output:
 
 Rendered mathematics:
 
-$$
-\frac{1}{2}\mkern-2mu \frac{\left(x^{2} - 4\right)\mkern-2mu \sin(x)\mkern-2mu \lg(\frac{1}{x})}{x\mkern-2mu \left(x - 1\right)}
-$$
+
+$\quad\begin{array}{l}\displaystyle \frac{1}{2}\mkern-2mu \frac{\left(x^{2} - 4\right)\mkern-2mu \sin(x)\mkern-2mu \lg(\frac{1}{x})}{x\mkern-2mu \left(x - 1\right)}\end{array}$
+
 
 Push the result with `TeX_notation` to use it in a matrix, sequence or any
 other builder operation. `TeX_text` escapes literal text;
@@ -3304,105 +3275,105 @@ x \cong y
 
 Rendered mathematics, in the same order as the programme output:
 
-$$
-\mathcal{F}_{x\to k}\{e^{-x^{2}}\}
-$$
 
-$$
-\mathcal{F}^{-1}_{k\to x}\{e^{-k^{2}}\}
-$$
+$\quad\begin{array}{l}\displaystyle \mathcal{F}_{x\to k}\{e^{-x^{2}}\}\end{array}$
 
-$$
-\mathcal{L}_{t\to s}\{\sin(t)\}
-$$
 
-$$
-\mathcal{L}^{-1}_{s\to t}\{\frac{1}{s + 1}\}
-$$
 
-$$
-\prod_{k=1}^{3}k
-$$
+$\quad\begin{array}{l}\displaystyle \mathcal{F}^{-1}_{k\to x}\{e^{-k^{2}}\}\end{array}$
 
-$$
-\Gamma(x)
-$$
 
-$$
-J_{2}\left(x\right)
-$$
 
-$$
-W_{0}(x)
-$$
+$\quad\begin{array}{l}\displaystyle \mathcal{L}_{t\to s}\{\sin(t)\}\end{array}$
 
-$$
-\int x^{2}\, dx
-$$
 
-$$
-\int_{0}^{1} x^{2}\, dx
-$$
 
-$$
-\sum_{k=1}^{3}k^{2}
-$$
+$\quad\begin{array}{l}\displaystyle \mathcal{L}^{-1}_{s\to t}\{\frac{1}{s + 1}\}\end{array}$
 
-$$
-\frac{\partial}{\partial x}\left[\sin(x)\right]
-$$
 
-$$
-\frac{\partial^{2}}{\partial x^{2}}\left[\sin(x)\right]
-$$
 
-$$
-\frac{\partial^{2}}{\partial y\,\partial x}\left[x^{2}\mkern-2mu y^{3}\right]
-$$
+$\quad\begin{array}{l}\displaystyle \prod_{k=1}^{3}k\end{array}$
 
-$$
-\frac{\partial^{2}}{\partial y\,\partial x}\left[x^{2}\mkern-2mu y^{3}\right]
-$$
 
-$$
-\frac{\partial^{3}}{\partial x\,\partial y\,\partial x}\left[x^{3}\mkern-2mu y^{2}\right]
-$$
 
-$$
-x < y
-$$
+$\quad\begin{array}{l}\displaystyle \Gamma(x)\end{array}$
 
-$$
-x \le y
-$$
 
-$$
-x \ge y
-$$
 
-$$
-x > y
-$$
+$\quad\begin{array}{l}\displaystyle J_{2}\left(x\right)\end{array}$
 
-$$
-x \ne y
-$$
 
-$$
-x = y
-$$
 
-$$
-x \approx y
-$$
+$\quad\begin{array}{l}\displaystyle W_{0}(x)\end{array}$
 
-$$
-x \cong y
-$$
 
-$$
-0 < x \le 1
-$$
+
+$\quad\begin{array}{l}\displaystyle \int x^{2}\, dx\end{array}$
+
+
+
+$\quad\begin{array}{l}\displaystyle \int_{0}^{1} x^{2}\, dx\end{array}$
+
+
+
+$\quad\begin{array}{l}\displaystyle \sum_{k=1}^{3}k^{2}\end{array}$
+
+
+
+$\quad\begin{array}{l}\displaystyle \frac{\partial}{\partial x}\left[\sin(x)\right]\end{array}$
+
+
+
+$\quad\begin{array}{l}\displaystyle \frac{\partial^{2}}{\partial x^{2}}\left[\sin(x)\right]\end{array}$
+
+
+
+$\quad\begin{array}{l}\displaystyle \frac{\partial^{2}}{\partial y\,\partial x}\left[x^{2}\mkern-2mu y^{3}\right]\end{array}$
+
+
+
+$\quad\begin{array}{l}\displaystyle \frac{\partial^{2}}{\partial y\,\partial x}\left[x^{2}\mkern-2mu y^{3}\right]\end{array}$
+
+
+
+$\quad\begin{array}{l}\displaystyle \frac{\partial^{3}}{\partial x\,\partial y\,\partial x}\left[x^{3}\mkern-2mu y^{2}\right]\end{array}$
+
+
+
+$\quad\begin{array}{l}\displaystyle x < y\end{array}$
+
+
+
+$\quad\begin{array}{l}\displaystyle x \le y\end{array}$
+
+
+
+$\quad\begin{array}{l}\displaystyle x \ge y\end{array}$
+
+
+
+$\quad\begin{array}{l}\displaystyle x > y\end{array}$
+
+
+
+$\quad\begin{array}{l}\displaystyle x \ne y\end{array}$
+
+
+
+$\quad\begin{array}{l}\displaystyle x = y\end{array}$
+
+
+
+$\quad\begin{array}{l}\displaystyle x \approx y\end{array}$
+
+
+
+$\quad\begin{array}{l}\displaystyle x \cong y\end{array}$
+
+
+
+$\quad\begin{array}{l}\displaystyle 0 < x \le 1\end{array}$
+
 
 For a complete push-and-operation counterpart to every expression above, see
 [RPN counterparts to native calculus](#rpn-counterparts-to-native-calculus).
@@ -3480,9 +3451,9 @@ TeX source: \frac{\sqrt{x^{2} + c}}{x + 1}
 
 Rendered mathematics:
 
-$$
-\frac{\sqrt{x^{2} + c}}{x + 1}
-$$
+
+$\quad\begin{array}{l}\displaystyle \frac{\sqrt{x^{2} + c}}{x + 1}\end{array}$
+
 
 ## Text-based alternatives to structured composition
 
@@ -3556,23 +3527,23 @@ i\mkern-2mu h\mkern-2mu \frac{\partial}{\partial t}\left[\psi\right] = -\frac{h^
 
 Rendered mathematics, in the same order (the caption is separate text):
 
-$$
-\sqrt{\frac{x}{2}}
-$$
 
-$$
-r_{n} = \frac{\sqrt[3]{x_{n}^{2} + 1}}{\sqrt{\lambda^{2} + 1}}
-$$
+$\quad\begin{array}{l}\displaystyle \sqrt{\frac{x}{2}}\end{array}$
+
+
+
+$\quad\begin{array}{l}\displaystyle r_{n} = \frac{\sqrt[3]{x_{n}^{2} + 1}}{\sqrt{\lambda^{2} + 1}}\end{array}$
+
 
 scaled & normalised
 
-$$
-P\left(x\right) = \frac{1}{x^{2} + 1}\mkern-5mu \begin{bmatrix}1 & x \\[10pt] x & x^{2}\end{bmatrix}
-$$
 
-$$
-i\mkern-2mu h\mkern-2mu \frac{\partial}{\partial t}\left[\psi\right] = -\frac{h^{2}}{2\mkern-2mu m}\mkern-2mu \frac{\partial^{2}}{\partial x^{2}}\left[\psi\right] + V\mkern-2mu \psi
-$$
+$\quad\begin{array}{l}\displaystyle P\left(x\right) = \frac{1}{x^{2} + 1}\mkern-5mu \begin{bmatrix}1 & x \\[10pt] x & x^{2}\end{bmatrix}\end{array}$
+
+
+
+$\quad\begin{array}{l}\displaystyle i\mkern-2mu h\mkern-2mu \frac{\partial}{\partial t}\left[\psi\right] = -\frac{h^{2}}{2\mkern-2mu m}\mkern-2mu \frac{\partial^{2}}{\partial x^{2}}\left[\psi\right] + V\mkern-2mu \psi\end{array}$
+
 
 ## Native constants and infinity
 
@@ -3635,49 +3606,49 @@ i
 
 Rendered mathematics, in the same order:
 
-$$
-\infty
-$$
 
-$$
-\infty
-$$
+$\quad\begin{array}{l}\displaystyle \infty\end{array}$
 
-$$
--\infty
-$$
 
-$$
-\gamma
-$$
 
-$$
-\gamma
-$$
+$\quad\begin{array}{l}\displaystyle \infty\end{array}$
 
-$$
-\pi
-$$
 
-$$
-\phi
-$$
 
-$$
-\tau
-$$
+$\quad\begin{array}{l}\displaystyle -\infty\end{array}$
 
-$$
-e
-$$
 
-$$
-i
-$$
 
-$$
-\int_{0}^{\infty} e^{-x}\, dx
-$$
+$\quad\begin{array}{l}\displaystyle \gamma\end{array}$
+
+
+
+$\quad\begin{array}{l}\displaystyle \gamma\end{array}$
+
+
+
+$\quad\begin{array}{l}\displaystyle \pi\end{array}$
+
+
+
+$\quad\begin{array}{l}\displaystyle \phi\end{array}$
+
+
+
+$\quad\begin{array}{l}\displaystyle \tau\end{array}$
+
+
+
+$\quad\begin{array}{l}\displaystyle e\end{array}$
+
+
+
+$\quad\begin{array}{l}\displaystyle i\end{array}$
+
+
+
+$\quad\begin{array}{l}\displaystyle \int_{0}^{\infty} e^{-x}\, dx\end{array}$
+
 
 For the equivalent construction using symbols and stack operations, see
 [RPN constants and infinity](#rpn-constants-and-infinity).
@@ -3734,9 +3705,9 @@ Output:
 
 Rendered mathematics:
 
-$$
-{\begin{bmatrix}1 & 2 \\[10pt] 3 & 4\end{bmatrix}}^{x}
-$$
+
+$\quad\begin{array}{l}\displaystyle {\begin{bmatrix}1 & 2 \\[10pt] 3 & 4\end{bmatrix}}^{x}\end{array}$
+
 
 ## Bound matrix powers and differential-equation problems
 
@@ -3798,13 +3769,13 @@ y'' + 3\mkern-2mu y' + 40\mkern-2mu y = 0,\qquad y'\left(0\right) = 1,\qquad y\l
 
 Rendered mathematics:
 
-$$
-{\begin{bmatrix}1 & 2 \\[10pt] 3 & 4\end{bmatrix}}^{x}
-$$
 
-$$
-y'' + 3\mkern-2mu y' + 40\mkern-2mu y = 0,\qquad y'\left(0\right) = 1,\qquad y\left(0\right) = 0
-$$
+$\quad\begin{array}{l}\displaystyle {\begin{bmatrix}1 & 2 \\[10pt] 3 & 4\end{bmatrix}}^{x}\end{array}$
+
+
+
+$\quad\begin{array}{l}\displaystyle y'' + 3\mkern-2mu y' + 40\mkern-2mu y = 0,\qquad y'\left(0\right) = 1,\qquad y\left(0\right) = 0\end{array}$
+
 
 ## Raw TeX syntax
 
@@ -3874,13 +3845,13 @@ Output:
 
 Rendered mathematics:
 
-$$
-\frac{\sqrt{x^{2}+c}}{x+1}
-$$
 
-$$
-{\left( \sin x + \cos x \right)}^{2}
-$$
+$\quad\begin{array}{l}\displaystyle \frac{\sqrt{x^{2}+c}}{x+1}\end{array}$
+
+
+
+$\quad\begin{array}{l}\displaystyle {\left( \sin x + \cos x \right)}^{2}\end{array}$
+
 
 <style data-mars-formula-preview>
 /* Formula placement belongs to the preview container, not to the alignment

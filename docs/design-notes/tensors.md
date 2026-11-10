@@ -83,18 +83,15 @@ explicit choices, rather than global switches.
 Fix curvature by an equation, not just a sign label. For a torsion-free
 connection in a coordinate frame, use
 
-$$
-(\nabla_c\nabla_d-\nabla_d\nabla_c)V^a=R^a{}_{bcd}V^b,
-\qquad R_{bd}=R^a{}_{bad},
-\qquad G_{ab}=R_{ab}-\tfrac12 Rg_{ab}.
-$$
+
+$\quad\begin{array}{l}\displaystyle (\nabla_c\nabla_d-\nabla_d\nabla_c)V^a=R^a{}_{bcd}V^b, \qquad R_{bd}=R^a{}_{bad}, \qquad G_{ab}=R_{ab}-\tfrac12 Rg_{ab}.\end{array}$
+
 
 Equivalently, with $\nabla_c e_b=\Gamma^a{}_{bc}e_a$ in that frame,
 
-$$
-R^a{}_{bcd}=\partial_c\Gamma^a{}_{bd}-\partial_d\Gamma^a{}_{bc}
-+\Gamma^a{}_{ec}\Gamma^e{}_{bd}-\Gamma^a{}_{ed}\Gamma^e{}_{bc}.
-$$
+
+$\quad\begin{array}{l}\displaystyle R^a{}_{bcd}=\partial_c\Gamma^a{}_{bd}-\partial_d\Gamma^a{}_{bc} +\Gamma^a{}_{ec}\Gamma^e{}_{bd}-\Gamma^a{}_{ed}\Gamma^e{}_{bc}.\end{array}$
+
 
 The profile also specifies symmetrisation and antisymmetrisation weights,
 orientation, the volume form, Hodge-dual signs, electromagnetic normalisation,
@@ -180,11 +177,9 @@ Cartesian epsilon array in a curved chart.
 
 For example, the covariant derivative must distinguish a vector from a one-form:
 
-$$
-V^a{}_{;b}=\partial_b V^a+\Gamma^a{}_{cb}V^c,
-\qquad
-\omega_{a;b}=\partial_b\omega_a-\Gamma^c{}_{ab}\omega_c.
-$$
+
+$\quad\begin{array}{l}\displaystyle V^a{}_{;b}=\partial_b V^a+\Gamma^a{}_{cb}V^c, \qquad \omega_{a;b}=\partial_b\omega_a-\Gamma^c{}_{ab}\omega_c.\end{array}$
+
 
 Retain the user's comma and semicolon component notation as presentation options.
 Appending derivative indices records their order: $V^a{}_{;b;c}$ means
@@ -230,10 +225,9 @@ the electromagnetic stress–energy tensor and the Lorentz force. For a smooth
 potential, construct $F=dA$ and verify $dF=0$. In a Levi–Civita coordinate frame,
 the MTW-profile component equations are
 
-$$
-F^{ab}{}_{;b}=4\pi J^a,
-\qquad F_{ab;c}+F_{bc;a}+F_{ca;b}=0.
-$$
+
+$\quad\begin{array}{l}\displaystyle F^{ab}{}_{;b}=4\pi J^a, \qquad F_{ab;c}+F_{bc;a}+F_{ca;b}=0.\end{array}$
+
 
 The sourced differential-form equation must be derived from the profile's Hodge,
 current and orientation definitions; do not borrow its sign from a different
@@ -244,7 +238,9 @@ must include torsion terms when the connection has torsion.
 Build Einstein's equation with cosmological constant, stress–energy conservation
 and matter-field residuals using the same operations:
 
-$$G_{ab}+\Lambda g_{ab}=8\pi T_{ab}$$
+
+$\quad\begin{array}{l}\displaystyle G_{ab}+\Lambda g_{ab}=8\pi T_{ab}\end{array}$
+
 
 in geometric gravitational units. Later work can add action variation,
 perturbations, hypersurface geometry, extrinsic curvature and ADM decompositions.
@@ -323,9 +319,9 @@ T[^a', _b'] = x[^a'],c * x[^d],b' * T[^c, _d]
 
 Expected mathematical output:
 
-$$T^{a'}{}_{b'}=
-\frac{\partial x^{a'}}{\partial x^c}
-\frac{\partial x^d}{\partial x^{b'}}T^c{}_d.$$
+
+$\quad\begin{array}{l}\displaystyle T^{a'}{}_{b'}= \frac{\partial x^{a'}}{\partial x^c} \frac{\partial x^d}{\partial x^{b'}}T^c{}_d.\end{array}$
+
 
 The first derivative is the forward Jacobian; the second is its inverse.
 The unprimed indices `c` and `d` are summed, while `a'` and `b'` are free.
@@ -486,15 +482,15 @@ Proposed problem fields:
 
 The authored source field is
 
-$$
-V=-y\,\partial_x+x\,\partial_y.
-$$
+
+$\quad\begin{array}{l}\displaystyle V=-y\,\partial_x+x\,\partial_y.\end{array}$
+
 
 Expected result, labelled **Polar coordinate-basis components**:
 
-$$
-V^r=0,\qquad V^\phi=1,\qquad V=\partial_\phi.
-$$
+
+$\quad\begin{array}{l}\displaystyle V^r=0,\qquad V^\phi=1,\qquad V=\partial_\phi.\end{array}$
+
 
 For comparison, if the Euclidean metric and the orthonormal polar frame are
 explicitly selected, the expected components are $(0,r)$. The two component
@@ -507,28 +503,24 @@ provides an independent reference for making these distinctions visible.
 With the same coordinate relations, enter the one-form `omega[_a]` with
 Cartesian components $\omega_x=-y$, $\omega_y=x$. Its expected output is
 
-$$
-\omega=-y\,dx+x\,dy=r^2\,d\phi,
-\qquad \omega_r=0,\quad \omega_\phi=r^2.
-$$
+
+$\quad\begin{array}{l}\displaystyle \omega=-y\,dx+x\,dy=r^2\,d\phi, \qquad \omega_r=0,\quad \omega_\phi=r^2.\end{array}$
+
 
 This deliberately uses the same source component values as the vector example:
 the different slot variance requires a different transformation.
 
 Select the metric `g[_a, _b]` and supply its Cartesian component matrix
 
-$$
-g_{\mathrm{Cartesian}}=
-\begin{pmatrix}1&0\\0&1\end{pmatrix}.
-$$
+
+$\quad\begin{array}{l}\displaystyle g_{\mathrm{Cartesian}}= \begin{pmatrix}1&0\\0&1\end{pmatrix}.\end{array}$
+
 
 Expected polar coordinate-basis output:
 
-$$
-g_{\mathrm{polar}}=
-\begin{pmatrix}1&0\\0&r^2\end{pmatrix},
-\qquad ds^2=dr^2+r^2\,d\phi^2.
-$$
+
+$\quad\begin{array}{l}\displaystyle g_{\mathrm{polar}}= \begin{pmatrix}1&0\\0&r^2\end{pmatrix}, \qquad ds^2=dr^2+r^2\,d\phi^2.\end{array}$
+
 
 The general tensor workflow uses the same chart relationship and an arbitrary
 ordered slot declaration. Each upper slot receives a forward Jacobian and each
@@ -542,12 +534,9 @@ domains without requiring a built-in name for the chart. For example, take
 Cartesian source coordinates $(t,x,y,z)$, toroidal target coordinates
 $(t,u,v,\phi)$, unchanged time, a constant scale $a>0$ and the relations
 
-$$
-D=\cosh v-\cos u,\qquad
-x=\frac{a\sinh v\cos\phi}{D},\quad
-y=\frac{a\sinh v\sin\phi}{D},\quad
-z=\frac{a\sin u}{D}.
-$$
+
+$\quad\begin{array}{l}\displaystyle D=\cosh v-\cos u,\qquad x=\frac{a\sinh v\cos\phi}{D},\quad y=\frac{a\sinh v\sin\phi}{D},\quad z=\frac{a\sin u}{D}.\end{array}$
+
 
 Here $v>0$ and $u,\phi$ have explicitly chosen open angular branches, for example
 $(0,2\pi)$. The focal circle, axis and chart seams require other patches when
@@ -557,10 +546,9 @@ the [MathWorld toroidal-coordinate reference](https://mathworld.wolfram.com/Toro
 With flat spacetime as the supplied source geometry, the expected transformed
 line element is
 
-$$
-ds^2=-dt^2+\frac{a^2}{D^2}
-\left(du^2+dv^2+\sinh^2v\,d\phi^2\right).
-$$
+
+$\quad\begin{array}{l}\displaystyle ds^2=-dt^2+\frac{a^2}{D^2} \left(du^2+dv^2+\sinh^2v\,d\phi^2\right).\end{array}$
+
 
 The connection coefficients need not vanish, while the Riemann tensor remains
 zero. MARS should derive these results from the coordinate relations and source
@@ -573,10 +561,9 @@ supplies unknown metric components or a declared metric ansatz in that chart.
 When source coordinates are supplied as functions of target coordinates,
 differentiate those functions to obtain
 
-$$
-K^a{}_{b'}=\frac{\partial x^a}{\partial x^{b'}},
-\qquad J^{a'}{}_b=(K^{-1})^{a'}{}_b.
-$$
+
+$\quad\begin{array}{l}\displaystyle K^a{}_{b'}=\frac{\partial x^a}{\partial x^{b'}}, \qquad J^{a'}{}_b=(K^{-1})^{a'}{}_b.\end{array}$
+
 
 Substitute the supplied coordinate relations into the source component
 functions and apply the appropriate factors of $J$ and $K$. In the polar
@@ -624,10 +611,9 @@ The user could select spherical polar coordinates $(t,r,\theta,\phi)$ and
 declare the additional assumption of spherical symmetry. On a patch admitting
 diagonal areal-radius coordinates, supply the unknown metric
 
-$$
-ds^2=-e^{2\nu(t,r)}dt^2+e^{2\lambda(t,r)}dr^2
-     +r^2\left(d\theta^2+\sin^2\theta\,d\phi^2\right).
-$$
+
+$\quad\begin{array}{l}\displaystyle ds^2=-e^{2\nu(t,r)}dt^2+e^{2\lambda(t,r)}dr^2 +r^2\left(d\theta^2+\sin^2\theta\,d\phi^2\right).\end{array}$
+
 
 Choosing spherical coordinates alone must not impose this ansatz. With the MTW
 profile and $G=c=1$, request expansion of
@@ -635,27 +621,15 @@ $G_{ab}+\Lambda g_{ab}=8\pi T_{ab}$. Write primes for partial differentiation
 with respect to $r$ and dots for partial differentiation with respect to $t$.
 Expected normalised non-trivial component equations are
 
-$$
-\begin{aligned}
-e^{-2\lambda}\left(\frac2r\lambda'-\frac1{r^2}\right)
-  +\frac1{r^2}-\Lambda&=8\pi e^{-2\nu}T_{tt},\\[6pt]
-e^{-2\lambda}\left(\frac2r\nu'+\frac1{r^2}\right)
-  -\frac1{r^2}+\Lambda&=8\pi e^{-2\lambda}T_{rr},\\[6pt]
-\frac2r\dot\lambda&=8\pi T_{tr}.
-\end{aligned}
-$$
+
+$\quad\begin{array}{l}\displaystyle \begin{aligned} e^{-2\lambda}\left(\frac2r\lambda'-\frac1{r^2}\right) +\frac1{r^2}-\Lambda&=8\pi e^{-2\nu}T_{tt},\\[6pt] e^{-2\lambda}\left(\frac2r\nu'+\frac1{r^2}\right) -\frac1{r^2}+\Lambda&=8\pi e^{-2\lambda}T_{rr},\\[6pt] \frac2r\dot\lambda&=8\pi T_{tr}. \end{aligned}\end{array}$
+
 
 The angular component is
 
-$$
-\begin{aligned}
-&e^{-2\lambda}\left[\nu''+(\nu')^2-\nu'\lambda'
-                     +\frac1r(\nu'-\lambda')\right]\\
-&\quad-e^{-2\nu}\left[\ddot\lambda+(\dot\lambda)^2
-                        -\dot\nu\dot\lambda\right]+\Lambda
-  =\frac{8\pi}{r^2}T_{\theta\theta}.
-\end{aligned}
-$$
+
+$\quad\begin{array}{l}\displaystyle \begin{aligned} &e^{-2\lambda}\left[\nu''+(\nu')^2-\nu'\lambda' +\frac1r(\nu'-\lambda')\right]\\ &\quad-e^{-2\nu}\left[\ddot\lambda+(\dot\lambda)^2 -\dot\nu\dot\lambda\right]+\Lambda =\frac{8\pi}{r^2}T_{\theta\theta}. \end{aligned}\end{array}$
+
 
 Before normalisation, the $\phi\phi$ equation is the $\theta\theta$ equation
 multiplied by $\sin^2\theta$, requiring
@@ -693,36 +667,33 @@ geometry. Approximate Mercury as a test body around an isolated, non-rotating,
 spherical Sun, with $\Lambda=0$. This establishes a leading relativistic
 comparison case, not a complete planetary ephemeris. Set
 
-$$
-f(r)=1-\frac{2M}{r},\qquad
-ds^2=-f(r)dt^2+f(r)^{-1}dr^2
-     +r^2(d\theta^2+\sin^2\theta\,d\phi^2),
-$$
+
+$\quad\begin{array}{l}\displaystyle f(r)=1-\frac{2M}{r},\qquad ds^2=-f(r)dt^2+f(r)^{-1}dr^2 +r^2(d\theta^2+\sin^2\theta\,d\phi^2),\end{array}$
+
 
 where $M$ is the Sun's geometric mass parameter; physical input supplies
 $M=GM_\odot/c^2$. Work in the exterior $r>2M$ and choose the orbital plane
 $\theta=\pi/2$. From the metric,
 derive the timelike geodesic equations and normalisation
 
-$$
-\frac{dU^a}{d\tau}+\Gamma^a{}_{bc}U^bU^c=0,
-\qquad U^a=\frac{dx^a}{d\tau},\qquad g_{ab}U^aU^b=-1.
-$$
+
+$\quad\begin{array}{l}\displaystyle \frac{dU^a}{d\tau}+\Gamma^a{}_{bc}U^bU^c=0, \qquad U^a=\frac{dx^a}{d\tau},\qquad g_{ab}U^aU^b=-1.\end{array}$
+
 
 The time-translation and rotation symmetries give conserved specific energy
 $E=f\dot t$ and specific angular momentum $\ell=r^2\dot\phi$, where dots
 in this subsection mean proper-time derivatives. Expected radial first integral:
 
-$$
-\dot r^2+f(r)\left(1+\frac{\ell^2}{r^2}\right)=E^2.
-$$
+
+$\quad\begin{array}{l}\displaystyle \dot r^2+f(r)\left(1+\frac{\ell^2}{r^2}\right)=E^2.\end{array}$
+
 
 For a non-radial orbit with $\ell\ne0$, define $u=1/r$. Reducing the geodesic
 equations gives the expected orbit equation
 
-$$
-\boxed{\frac{d^2u}{d\phi^2}+u=\frac{M}{\ell^2}+3Mu^2.}
-$$
+
+$\quad\begin{array}{l}\displaystyle \boxed{\frac{d^2u}{d\phi^2}+u=\frac{M}{\ell^2}+3Mu^2.}\end{array}$
+
 
 Retain circular solutions and extend the equation through turning points;
 division by $du/d\phi$ must not discard them. A numerical first-order system is
@@ -735,18 +706,16 @@ $3Mu^2$. Starting with $u_0=(1+e\cos\phi)/p$, where
 $p=\ell^2/M$ at Newtonian order, perturbation of the orbit equation produces
 a secular term. Its leading precession can be written
 
-$$
-u(\phi)\simeq\frac1p\left[1+e\cos\left((1-\delta)\phi\right)\right],
-\qquad \delta=\frac{3M}{p}.
-$$
+
+$\quad\begin{array}{l}\displaystyle u(\phi)\simeq\frac1p\left[1+e\cos\left((1-\delta)\phi\right)\right], \qquad \delta=\frac{3M}{p}.\end{array}$
+
 
 This expression retains the leading secular effect and omits bounded
 first-order corrections. With $p\simeq a(1-e^2)$, the expected advance is
 
-$$
-\Delta\phi\simeq\frac{6\pi GM_\odot}{a(1-e^2)c^2}
-\quad\text{radians per orbit}.
-$$
+
+$\quad\begin{array}{l}\displaystyle \Delta\phi\simeq\frac{6\pi GM_\odot}{a(1-e^2)c^2} \quad\text{radians per orbit}.\end{array}$
+
 
 For representative Mercury data $a=57.909\times10^9$ metres,
 $e=0.2056$ and period $87.969$ days, use the nominal solar mass parameter
@@ -771,12 +740,9 @@ Work in vacuum geometric optics. Specify future-directed unit observer
 four-velocities $U^a$, emission and reception events, and a connecting null ray
 with wave covector $k_a$. Expected local angular frequency and frequency ratio:
 
-$$
-\omega=-k_aU^a,\qquad
-\frac{\omega_{\mathrm r}}{\omega_{\mathrm e}}
-=\frac{(-k_aU^a)_{\mathrm r}}{(-k_aU^a)_{\mathrm e}},
-\qquad 1+z=\frac{\omega_{\mathrm e}}{\omega_{\mathrm r}}.
-$$
+
+$\quad\begin{array}{l}\displaystyle \omega=-k_aU^a,\qquad \frac{\omega_{\mathrm r}}{\omega_{\mathrm e}} =\frac{(-k_aU^a)_{\mathrm r}}{(-k_aU^a)_{\mathrm e}}, \qquad 1+z=\frac{\omega_{\mathrm e}}{\omega_{\mathrm r}}.\end{array}$
+
 
 Use the same propagated ray at both endpoints. Its affine tangent obeys
 $k^b\nabla_bk^a=0$ and $g_{ab}k^ak^b=0$; it is not a photon four-velocity.
@@ -791,19 +757,16 @@ and choose the positive $x$ direction along the light ray. With relative speed
 $0<\beta=v/c<1$ and $\gamma=(1-\beta^2)^{-1/2}$, the native derivation should
 construct
 
-$$
-U_{\mathrm e}^a=(1,0,0,0),\quad
-U_{\mathrm r}^a=\gamma(1,\beta,0,0),\quad
-k_a=\omega_{\mathrm e}(-1,1,0,0).
-$$
+
+$\quad\begin{array}{l}\displaystyle U_{\mathrm e}^a=(1,0,0,0),\quad U_{\mathrm r}^a=\gamma(1,\beta,0,0),\quad k_a=\omega_{\mathrm e}(-1,1,0,0).\end{array}$
+
 
 Contracting gives $\omega_{\mathrm r}=\gamma(1-\beta)\omega_{\mathrm e}$,
 and the expected ratio is
 
-$$
-\frac{\omega_{\mathrm r}}{\omega_{\mathrm e}}
-=\sqrt{\frac{1-\beta}{1+\beta}}.
-$$
+
+$\quad\begin{array}{l}\displaystyle \frac{\omega_{\mathrm r}}{\omega_{\mathrm e}} =\sqrt{\frac{1-\beta}{1+\beta}}.\end{array}$
+
 
 At $\beta=3/5$ this is $1/2$; the corresponding approaching case gives $2$.
 The [Einstein Online Doppler discussion](https://www.einstein-online.info/en/spotlight/doppler/)
@@ -814,10 +777,9 @@ time-translation energy $E_\gamma=-k_t$ and the observer normalisation
 $U^t=f(r)^{-1/2}$ give $\omega=E_\gamma f(r)^{-1/2}$. The expected
 gravitational ratio is
 
-$$
-\frac{\omega_{\mathrm r}}{\omega_{\mathrm e}}
-=\sqrt{\frac{f(r_{\mathrm e})}{f(r_{\mathrm r})}}.
-$$
+
+$\quad\begin{array}{l}\displaystyle \frac{\omega_{\mathrm r}}{\omega_{\mathrm e}} =\sqrt{\frac{f(r_{\mathrm e})}{f(r_{\mathrm r})}}.\end{array}$
+
 
 Emission at $r_{\mathrm e}=4M$ and reception at $r_{\mathrm r}=8M$ give
 $\sqrt{2/3}<1$. The result card should identify the observers, events, ray and
@@ -829,17 +791,16 @@ boundary-value solver, beyond the initial ODE initial-value scope.
 
 Calculate elapsed clock time along the specified timelike worldline from
 
-$$
-d\tau^2=-g_{ab}\,dx^a dx^b.
-$$
+
+$\quad\begin{array}{l}\displaystyle d\tau^2=-g_{ab}\,dx^a dx^b.\end{array}$
+
 
 With a monotonic coordinate time $t$ and spatial coordinate velocities
 $v^i=dx^i/dt$, the expected rate is
 
-$$
-\frac{d\tau}{dt}
-=\sqrt{-g_{tt}-2g_{ti}v^i-g_{ij}v^iv^j}.
-$$
+
+$\quad\begin{array}{l}\displaystyle \frac{d\tau}{dt} =\sqrt{-g_{tt}-2g_{ti}v^i-g_{ij}v^iv^j}.\end{array}$
+
 
 Integrate this rate over the requested worldline segment. Identify the event
 pair and comparison protocol; two clocks departing from the same event and
@@ -867,9 +828,9 @@ These formulas use $c=1$ and metric signature $(-,+,+,+)$, so the timelike
 normalisation is $U^aU_a=-1$. Lower the index with the metric: $U_a=g_{ab}U^b$.
 Construct the local rest-space projector and its covariant spatial metric
 
-$$
-h^a{}_b=\delta^a{}_b+U^aU_b,\qquad h_{ab}=g_{ab}+U_aU_b.
-$$
+
+$\quad\begin{array}{l}\displaystyle h^a{}_b=\delta^a{}_b+U^aU_b,\qquad h_{ab}=g_{ab}+U_aU_b.\end{array}$
+
 
 Here $\delta^a{}_b$ is the identity map. The mixed tensor $h^a{}_b$ removes the
 component along $U^a$, leaving spatial directions in the observer's local rest
@@ -883,9 +844,9 @@ rod moving inertially in flat spacetime, first choose endpoint events that are
 simultaneous in the measuring inertial frame, then evaluate their spatial
 separation. The expected result for motion parallel to the rod is
 
-$$
-L=\frac{L_0}{\gamma},\qquad \gamma=(1-v^2/c^2)^{-1/2},
-$$
+
+$\quad\begin{array}{l}\displaystyle L=\frac{L_0}{\gamma},\qquad \gamma=(1-v^2/c^2)^{-1/2},\end{array}$
+
 
 where $L_0$ is its proper rest length. At $v=3c/5$, $L=4L_0/5$; transverse
 dimensions are unchanged. To derive this, let primed coordinates denote the
@@ -902,10 +863,9 @@ of simultaneity. Extended lengths need an explicit spatial slice or operational
 definition. For example, on a static Schwarzschild $t=\mathrm{constant}$ slice,
 the expected radial proper distance and circumferential length are
 
-$$
-\ell_{12}=\int_{r_1}^{r_2}f(r)^{-1/2}\,dr,
-\qquad C(r)=2\pi r,\qquad r_2>r_1>2M.
-$$
+
+$\quad\begin{array}{l}\displaystyle \ell_{12}=\int_{r_1}^{r_2}f(r)^{-1/2}\,dr, \qquad C(r)=2\pi r,\qquad r_2>r_1>2M.\end{array}$
+
 
 This describes a spatial measurement on that slice; it is not a universal
 material stretching law. Return the observer, slice, endpoint events and units

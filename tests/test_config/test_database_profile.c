@@ -103,10 +103,11 @@ bool test_database_import(test_database_t *database, const string_t *root, const
 {
     if (profile && !test_database_profile_name(profile))
         return test_database_fail(database, "Invalid profile name.");
+    string_t *fingerprint = test_database_sources_fingerprint(root);
     string_t *path = string_sprintf("%s/tests/test_config.json", root ? string_c_str(root) : ".");
     json_t *configuration = path ? json_from_file(path) : NULL;
     string_free(path);
-    bool ok = configuration && json_type(configuration) == JSON_OBJECT &&
+    bool ok = fingerprint && configuration && json_type(configuration) == JSON_OBJECT &&
               test_database_exec(database, "BEGIN IMMEDIATE") &&
               test_database_seed(database, root) &&
               test_database_exec(database, "CREATE TEMP TABLE IF NOT EXISTS catalogue_seen(\n"
@@ -135,6 +136,23 @@ bool test_database_import(test_database_t *database, const string_t *root, const
             ");");
     if (database)
         database->importing = false;
+    if (ok) {
+        string_t *after = test_database_sources_fingerprint(root);
+        ok = after && string_compare(fingerprint, after) == 0;
+        string_free(after);
+        if (!ok)
+            test_database_fail(database, "Test sources changed during synchronisation; retry the operation.");
+    }
+    if (ok && review_missing) {
+        sqlite3_stmt *statement = test_database_prepare(database,
+            "INSERT INTO test_source_sync(id, source_sha256) VALUES (1, ?1)\n"
+            "ON CONFLICT(id) DO UPDATE SET\n"
+            "    source_sha256 = excluded.source_sha256,\n"
+            "    synced_utc = excluded.synced_utc");
+        if (statement)
+            sqlite3_bind_text(statement, 1, string_c_str(fingerprint), -1, SQLITE_TRANSIENT);
+        ok = test_database_write(database, statement);
+    }
     if (ok)
         ok = test_database_exec(database, "COMMIT");
     else {
@@ -142,7 +160,10 @@ bool test_database_import(test_database_t *database, const string_t *root, const
             sqlite3_exec(database->connection, "ROLLBACK", NULL, NULL, NULL);
         if (!configuration)
             test_database_fail(database, "Cannot read the default JSON test configuration.");
+        else if (!fingerprint)
+            test_database_fail(database, "Cannot fingerprint the test catalogue and SQL sources.");
     }
+    string_free(fingerprint);
     json_free(configuration);
     return ok;
 }

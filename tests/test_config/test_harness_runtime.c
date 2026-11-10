@@ -1607,6 +1607,11 @@ static void test_report_missing_config_keys(void)
         string_fprintf(stderr, C_YELLOW "  added: %S\n" C_RESET, test_runtime.missing_config_paths[i]);
 }
 
+/* Suites may override this early entry to dispatch their native fixture subprocesses. */
+__attribute__((weak)) void test_program_setup(void)
+{
+}
+
 static int test_database_arguments(int argc, char **argv)
 {
     test_runtime.database_selection_disabled = !test_suite_database_selection_enabled();
@@ -1700,6 +1705,7 @@ int main(int argc, char **argv)
     int rc;
     int exit_code;
     int prune_stale_config;
+    test_program_setup();
     int arguments = test_database_arguments(argc, argv);
     if (arguments) {
         test_runtime_release();

@@ -288,8 +288,13 @@ static void test_constant_cases_and_binding_specialisation(void)
     const json_t *r = math_fourier_fields("{@F{sinh(a*t+b)^n} | ω=?; a=-2; b=1; n=-1/2}", "ω");
     lab_math_contains(math_fourier_text(r, "function"), "fourier(", false);
     lab_math_contains(math_fourier_text(r, "function"), "const n", false);
-    lab_math_equal(math_fourier_text(math_fourier_fields(math_fourier_text(r, "expression"), "ω"), "tex"),
-        math_fourier_text(r, "tex"));
+    const json_t *copied = math_fourier_fields(math_fourier_text(r, "expression"), "ω");
+    /* Parsing may combine numeric denominators; the copied notation must then be stable. */
+    lab_math_equal(math_fourier_text(math_fourier_fields(math_fourier_text(copied, "expression"), "ω"), "tex"),
+                   math_fourier_text(copied, "tex"));
+    r = math_fourier_fields("{@F{sinh(a*t+b)^n} | ω=0.4; a=-2; b=1; n=-1/2}", "ω");
+    lab_math_close(math_fourier_number(math_fourier_fields(math_fourier_text(r, "expression"), "ω")),
+                    math_fourier_number(r), 1e-12);
 }
 
 static void test_proven_growth_is_rejected_in_both_directions(void)

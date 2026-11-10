@@ -46,7 +46,7 @@ int cfg_command_run(int argc, char **argv)
              "       mars_config paths [list | init | set NAME PATH | unset NAME]\n"
              "       mars_config settings [list | init | set NAME VALUE | unset NAME | import JSON_FILE]\n"
              "MARS_CONFIG_FILE optionally selects mars.json; its database field locates mars.db.");
-        puts("       mars_config globe-install | globe-check | globe-update | globe-uninstall");
+        puts("       mars_config globe-install | globe-check | globe-update | globe-reimport | globe-uninstall");
         puts("       mars_config databases | databases-ensure | databases-update | uninstall DATABASE");
         puts("       mars_config globe-stage-rivers INPUT.geojsonseq[.zst] NEW-CANDIDATE.db");
         puts("       mars_config globe-resume-rivers INPUT.geojsonseq[.zst] CANDIDATE.db");
@@ -74,7 +74,8 @@ int cfg_command_run(int argc, char **argv)
     if (cfg_app_is(argv[1], "globe-install-rivers"))
         return argc == 3 ? cfg_globe_river_install(argv[2]) : 2;
     if (cfg_app_is(argv[1], "globe-install") || cfg_app_is(argv[1], "globe-check") ||
-        cfg_app_is(argv[1], "globe-update") || cfg_app_is(argv[1], "globe-uninstall"))
+        cfg_app_is(argv[1], "globe-update") || cfg_app_is(argv[1], "globe-reimport") ||
+        cfg_app_is(argv[1], "globe-uninstall"))
         return argc == 2 ? cfg_globe_run(argv[1]) : 2;
     bool weather = cfg_app_is(argv[1], "weather"), jurisdiction = cfg_app_is(argv[1], "jurisdiction");
     if (!weather && !jurisdiction && !cfg_app_is(argv[1], "almanac")) {

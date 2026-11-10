@@ -15,10 +15,12 @@
 
 /**
  * @brief Install, verify or update independent shoreline storage using saved settings or environment overrides.
- * @param action globe-install, globe-check, globe-update or globe-uninstall.
+ * @param action globe-install, globe-check, globe-update, globe-reimport or globe-uninstall.
  * @note Installation builds a fresh staged database and replaces the destination only after validation. Existing
  * river and custom tables are removed on success. Updating replaces packaged geography and texture tables in one
- * transaction, retaining the configuration and other layers. Both operations report import progress.
+ * transaction, retaining the configuration and other layers. Reimport recreates every packaged image and
+ * geographic layer in one rollback-protected transaction, keeping large unrelated tables on their existing pages.
+ * All import operations report progress; reimport does not retain unchanged photograph rows incrementally.
  * @return Zero on success, one on operational failure, two for an unsupported action.
  * Installation reuses the selected path and key; saved river staging credentials survive replacement.
  * Empty or absent keys select plaintext. Failed builds leave the installed database unchanged.
@@ -69,6 +71,9 @@ int cfg_databases_update(void);
  * @brief Install missing databases and migrate existing ones sequentially, without prompting.
  * Reuses configured paths and keys; new configurations default to plaintext. Existing stores and settings are
  * preserved except for pending managed migrations. Failed installation or migration stops before later stores.
+ * A saved MARS_RELEASE_DB_REIMPORT request first fully reimports the three stores once, remembering completed stages
+ * across failures. The globe transaction retains installed rivers and prepared image blocks on their existing pages; its
+ * destination must be plaintext. The request is cleared only after every stage succeeds.
  * @return Zero on success, one on failure.
  */
 int cfg_databases_ensure(void);

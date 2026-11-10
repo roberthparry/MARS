@@ -33,6 +33,7 @@ typedef struct _equation_t {
     string_t *lhs_display_unbound;
     string_t *rhs_display_unbound;
     bool power_series_domain;
+    bool fractional_coefficients;
 } equation_t;
 
 /* Simplify an independent result while preserving specialised solver notation and domains. */
@@ -60,6 +61,7 @@ equation_t *equ_simplify_with_context(const equation_t *equation, const expr_con
     result = equation->bindings ? equ_new_with_inferred_bindings(lhs, rhs) : equ_new(lhs, rhs);
     if (result) {
         result->power_series_domain = equation->power_series_domain;
+        result->fractional_coefficients = equation->fractional_coefficients;
         if (equ_set_display_TeX(result, equation->lhs_display_TeX, equation->rhs_display_TeX) != 0 ||
             equ_set_display_unbound(result, equation->lhs_display_unbound, equation->rhs_display_unbound) != 0) {
             equ_free(result);
@@ -218,6 +220,19 @@ void equ_set_power_series_domain(equation_t *equation, bool power_series)
 {
     if (equation)
         equation->power_series_domain = power_series;
+}
+
+/* Retain a rendering preference without modifying the underlying mathematical expression. */
+void equ_set_fractional_coefficients(equation_t *equation, bool fractional)
+{
+    if (equation)
+        equation->fractional_coefficients = fractional;
+}
+
+/* Equation-owned renderers consult this preference without exposing the private representation. */
+bool equ_fractional_coefficients(const equation_t *equation)
+{
+    return equation && equation->fractional_coefficients;
 }
 
 /* Describe the convergence domain retained by an open inverse-power series equation. */

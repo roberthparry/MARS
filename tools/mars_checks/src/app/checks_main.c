@@ -11,6 +11,7 @@
 #include <string.h>
 
 #include "file-t.h"
+#include "checks_benchmarks.h"
 #include "checks_process.h"
 #include "checks_controls.h"
 #include "checks_coverage.h"
@@ -22,11 +23,13 @@
 static void checks_app_usage(void)
 {
     puts("Usage: mars_checks compliance [--allow-untracked] [--quiet]\n"
+         "       mars_checks bench-db help\n"
          "       mars_checks markdown-api\n"
          "       mars_checks file-coverage DIRECTORY\n"
          "       mars_checks release-evidence [--library FILE] [--output FILE] [--allow-dirty]\n"
          "       mars_checks source-policy\n"
          "       mars_checks test-db help\n"
+         "       mars_checks test-suite EXECUTABLE [TEST_ARGUMENTS...]\n"
          "       mars_checks public-distribution [--staged]\n"
          "       mars_checks readme-examples --libs LIBS [--cc CC] [--cflags FLAGS]\n"
          "           [--archive FILE] [--compile-only] [--timeout SECONDS] [--output DIRECTORY]");
@@ -84,14 +87,16 @@ static int checks_app_command_compare(const void *key, const void *element)
 /* Dispatch a single native repository command. */
 int main(int argc, char **argv)
 {
-    static const struct command commands[] = {{"compliance", checks_app_compliance_command},
+    static const struct command commands[] = {{"bench-db", checks_benchmarks},
+                                              {"compliance", checks_app_compliance_command},
                                               {"file-coverage", checks_coverage},
                                               {"markdown-api", checks_app_markdown_command},
                                               {"public-distribution", checks_app_distribution_command},
                                               {"readme-examples", checks_readme},
                                               {"release-evidence", checks_evidence},
                                               {"source-policy", checks_policy},
-                                              {"test-db", test_database_command}};
+                                              {"test-db", test_database_command},
+                                              {"test-suite", checks_test_suite}};
     if (argc < 2) {
         checks_app_usage();
         return 2;

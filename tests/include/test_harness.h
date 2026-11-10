@@ -111,6 +111,16 @@ extern test_post_summary_fn test_post_summary_hook;
 #define C_GREY "\x1b[90m"
 #define C_MAGENTA "\x1b[95m"
 
+/**
+ * @brief Optional executable-owned dispatch before the shared harness parses test-selection arguments.
+ * @return No value. The default implementation does nothing; a suite may supply one strong definition.
+ * @details A suite that also serves native subprocess fixtures can inspect its private startup state and exit
+ * after handling a fixture command. Returning continues ordinary argument parsing, setup and test reporting.
+ * No test database has been opened at this point. Run only single-threaded startup work here; fixture handlers
+ * own and release any resources they acquire. Ordinary test registration remains in tests_main.
+ */
+void test_program_setup(void);
+
 /** Print a labelled section heading in test output. */
 void test_section(const char *title);
 

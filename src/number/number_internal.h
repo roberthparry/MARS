@@ -352,4 +352,150 @@ number_t number_const_like(const number_t *like, number_const_id_t id);
 /* Widest cylindrical input precision, treating exact complex components like exact real inputs. */
 size_t number_cylindrical_precision(number_t order, number_t argument);
 
+/**
+ * @brief Evaluate principal Bessel J through the shared guarded complex cylinder series.
+ * @param[in] order Borrowed real or complex order, retained at its effective precision.
+ * @param[in] argument Borrowed argument; the negative real axis uses its upper-bank value.
+ * @return Owned value released with num_destroy(), or NaN outside the supported range or on unresolved cancellation.
+ * Inputs remain caller-owned. Magnitudes above 1000 or work precision above 65536 bits are unsupported.
+ */
+number_t number_bessel_j_complex(number_t order, number_t argument);
+
+/**
+ * @brief Evaluate complex erf using a guarded entire series, or MPFR on the real axis.
+ * @param[out] out Initialised complex destination whose precision selects accuracy; may alias input.
+ * @param[in] input Borrowed argument, valid throughout the call.
+ * @param[in] rounding Final output rounding mode.
+ * @return Zero after resolved evaluation, or -1 with NaN for an unsupported range or exhausted guard.
+ * All MPC storage remains caller-owned; complex magnitudes above 140 or work precision above 65536 are unsupported.
+ */
+int number_mpc_erf(mpc_ptr out, mpc_srcptr input, mpc_rnd_t rounding);
+
+/**
+ * @brief Evaluate complex erfc with extra precision to preserve complementary cancellation.
+ * @param[out] out Initialised destination selecting accuracy; may alias input.
+ * @param[in] input Borrowed argument; real values use MPFR's complementary implementation directly.
+ * @param[in] rounding Final output rounding mode.
+ * @return Zero on resolved evaluation, or -1 with NaN outside the supported complex range or numerical guards.
+ * Inputs remain caller-owned. The same work and magnitude limits apply as for number_mpc_erf().
+ */
+int number_mpc_erfc(mpc_ptr out, mpc_srcptr input, mpc_rnd_t rounding);
+
+/**
+ * @brief Evaluate the Gaussian cumulative distribution as erfc(-input/sqrt(2))/2.
+ * @param[out] out Initialised destination selecting accuracy; may alias input.
+ * @param[in] input Caller-owned argument, valid throughout this call.
+ * @param[in] rounding Final output rounding mode.
+ * @return Zero on resolved evaluation; -1 with NaN on an exhausted error-function guard.
+ * The caller retains and clears both MPC operands. No shared mutable state is used.
+ */
+int number_mpc_normal_cdf(mpc_ptr out, mpc_srcptr input, mpc_rnd_t rounding);
+
+/**
+ * @brief Evaluate the analytic Gaussian log density with guarded complex arithmetic.
+ * @param[out] out Initialised destination selecting accuracy; may alias input.
+ * @param[in] input Caller-owned argument, valid throughout this call.
+ * @param[in] rounding Final output rounding mode.
+ * @return Zero; non-finite arithmetic follows MPC's NaN/infinity conventions.
+ * The caller retains and clears both operands. No shared mutable state is used.
+ */
+int number_mpc_normal_logpdf(mpc_ptr out, mpc_srcptr input, mpc_rnd_t rounding);
+
+/**
+ * @brief Evaluate the Gaussian density by exponentiating its guarded analytic log density.
+ * @param[out] out Initialised destination selecting accuracy; may alias input.
+ * @param[in] input Caller-owned argument, valid throughout this call.
+ * @param[in] rounding Final output rounding mode.
+ * @return Zero; non-finite arithmetic follows MPC's NaN/infinity conventions.
+ * The caller retains and clears both operands. No shared mutable state is used.
+ */
+int number_mpc_normal_pdf(mpc_ptr out, mpc_srcptr input, mpc_rnd_t rounding);
+
+/**
+ * @brief Refine inverse erf and verify the defining residual at the destination's precision.
+ * @param[out] out Initialised destination, allowed to alias input.
+ * @param[in] input Borrowed value; real endpoints -1 and 1 return their signed infinite limits.
+ * @param[in] rounding Final output rounding mode.
+ * @return Zero after convergence or an exact endpoint; -1 with NaN on unresolved iteration or unsupported work size.
+ * No storage escapes and the caller retains every operand. Approximate seeds never limit final precision.
+ */
+int number_mpc_erfinv(mpc_ptr out, mpc_srcptr input, mpc_rnd_t rounding);
+
+/**
+ * @brief Refine inverse erfc directly and check its complementary residual without narrowing precision.
+ * @param[out] out Initialised destination, allowed to alias input.
+ * @param[in] input Borrowed value; real endpoints 0 and 2 return their signed infinite limits.
+ * @param[in] rounding Final output rounding mode.
+ * @return Zero after convergence or an endpoint; -1 with NaN on unsupported work or unresolved iteration.
+ * All MPC operands remain caller-owned and valid throughout the call.
+ */
+int number_mpc_erfcinv(mpc_ptr out, mpc_srcptr input, mpc_rnd_t rounding);
+
+/**
+ * @brief Replace a real MPFR operand with its precision-preserving inverse erf value.
+ * @param[in,out] value Caller-owned initialised operand in [-1,1], overwritten only at its own precision.
+ * @return Zero on convergence or an infinite endpoint; -1 with NaN outside the real domain or on failure.
+ * The caller remains responsible for clearing value; no shared state or retained pointers are used.
+ */
+int number_mpfr_erfinv_mut(mpfr_t value);
+
+/**
+ * @brief Replace a real MPFR operand with its precision-preserving inverse erfc value.
+ * @param[in,out] value Caller-owned initialised operand in [0,2], retaining its precision.
+ * @return Zero on convergence or an infinite endpoint; -1 with NaN outside the domain or on unresolved iteration.
+ * The caller remains responsible for clearing value; no shared mutable storage is used.
+ */
+int number_mpfr_erfcinv_mut(mpfr_t value);
+
+/**
+ * @brief Evaluate principal complex Lommel s with a guarded power series.
+ * @param[out] out Initialised destination, selecting target precision; may alias any input.
+ * @param[in] mu Borrowed exponent parameter.
+ * @param[in] nu Borrowed Bessel order parameter.
+ * @param[in] argument Borrowed argument; the principal power uses the upper bank on the negative real axis.
+ * @param[in] rounding Final output rounding mode.
+ * @return Zero after convergence; -1 with NaN on poles, unsupported arguments or exhausted accuracy guards.
+ * The caller retains and releases all MPC operands; no shared mutable storage is used.
+ */
+int number_mpc_lommel_s(mpc_ptr out, mpc_srcptr mu, mpc_srcptr nu, mpc_srcptr argument, mpc_rnd_t rounding);
+
+/**
+ * @brief Evaluate the argument derivative of principal complex Lommel s using the same convergent series.
+ * @param[out] out Initialised destination, selecting target precision; may alias an input.
+ * @param[in] mu Borrowed exponent parameter. @param[in] nu Borrowed Bessel order parameter.
+ * @param[in] argument Borrowed principal-branch argument.
+ * @param[in] rounding Final output rounding mode.
+ * @return Zero after convergence; -1 with NaN at undefined limits, poles or exhausted numerical guards.
+ * All operands remain caller-owned and valid for the duration of the call.
+ */
+int number_mpc_lommel_s_derivative(mpc_ptr out, mpc_srcptr mu, mpc_srcptr nu, mpc_srcptr argument,
+                                   mpc_rnd_t rounding);
+
+/**
+ * @brief Evaluate the convergent Appell F1 series using a total-degree coefficient recurrence.
+ * @param[out] out Initialised real destination; its precision selects the requested accuracy and it may alias an input.
+ * @param[in] a Borrowed first upper parameter. @param[in] b1 Borrowed first variable's upper parameter.
+ * @param[in] b2 Borrowed second variable's upper parameter. @param[in] c Borrowed lower parameter.
+ * @param[in] x Borrowed first argument with absolute value below 0.95.
+ * @param[in] y Borrowed second argument with absolute value below 0.95.
+ * @return Zero after convergence, or -1 with NaN on an unsupported domain, singular denominator or exhausted guard.
+ * No ownership transfers; callers initialise and clear their own MPFR values. No shared mutable state is used.
+ */
+int number_mpfr_appell_f1(mpfr_ptr out, mpfr_srcptr a, mpfr_srcptr b1, mpfr_srcptr b2, mpfr_srcptr c,
+                          mpfr_srcptr x, mpfr_srcptr y);
+
+/**
+ * @brief Evaluate complex Appell F1 at the destination's precision without nested summation.
+ * @param[out] out Initialised complex destination; may alias any input.
+ * @param[in] a Borrowed first upper parameter. @param[in] b1 Borrowed first variable's upper parameter.
+ * @param[in] b2 Borrowed second variable's upper parameter. @param[in] c Borrowed lower parameter.
+ * @param[in] x Borrowed first argument with modulus below 0.95.
+ * @param[in] y Borrowed second argument with modulus below 0.95.
+ * @param[in] rounding Final output rounding mode; guard calculations use nearest rounding.
+ * @return Zero after convergence, or -1 with NaN on an unsupported domain, pole or exhausted numerical guard.
+ * All operands remain caller-owned and valid throughout the call; no internal storage escapes.
+ */
+int number_mpc_appell_f1(mpc_ptr out, mpc_srcptr a, mpc_srcptr b1, mpc_srcptr b2, mpc_srcptr c,
+                         mpc_srcptr x, mpc_srcptr y, mpc_rnd_t rounding);
+
 #endif

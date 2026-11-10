@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "file-t.h"
 #define MARS_TEST_DATABASE_INTERNAL_ACCESS
 #include "test_database_internal.h"
 
@@ -17,16 +18,55 @@ static void test_database_usage(void)
 {
     puts("Usage: mars_checks test-db [--database PATH] COMMAND\n"
          "  init | sync                         Import the configured test/group catalogue\n"
+         "  sync-if-needed                      Sync changed sources only when the database already exists\n"
          "  list [SOURCE_PREFIX]                List catalogued tests and groups\n"
          "  profile-create NAME [all|none]       Create a saved selection (default: none)\n"
          "  profile-save NAME                   Snapshot the current JSON selection\n"
          "  profile-set NAME SOURCE PATH on|off  Change one test/group rule\n"
          "  runs [COUNT]                        Show recent run reports (default: 20)\n"
-         "  stats [SOURCE_PREFIX]               Show per-test lifetime timings and last memory-test dates\n"
+         "  stats [SOURCE_PREFIX] [--details] [--format=auto|grid|markdown|tsv]\n"
+         "                                      Show aligned per-test timings; --details includes every metric\n"
          "  help                                Show this help without creating storage\n"
+         "Stats defaults to the Unicode grid, independently of installed Markdown readers.\n"
+         "Pipe the grid to less -R to retain its bold headings and coloured results.\n"
+         "Use --format=grid to choose the grid, or --format=markdown|tsv for explicit exports; no reader is launched.\n"
          "Definitions, profiles, results and statistics: tests/tests.db; survives make clean.\n"
          "Sync retains missing identities as unconfirmed; it never removes or disables tests.\n"
+         "Release synchronises existing test storage when SQL or catalogue contents change.\n"
          "Normal builds, release, installation and applications create no test database.");
+}
+
+static int test_database_conditional_sync(const string_t *root, const string_t *path)
+{
+    string_t *location = path ? string_clone(path) :
+        string_sprintf("%s/tests/tests.db", root ? string_c_str(root) : ".");
+    file_t *file = location ? file_new(location) : NULL;
+    bool located = file != NULL;
+    bool available = file && file_exists(file);
+    file_free(file);
+    string_free(location);
+    if (!located) {
+        fputs("test-db: Cannot locate existing test storage.\n", stderr);
+        return 1;
+    }
+    if (!available) {
+        puts("Test database: not present; synchronisation skipped.");
+        return 0;
+    }
+    string_t *error = NULL;
+    /* Open without SQLITE_OPEN_CREATE, including if the file disappears after the existence check. */
+    test_database_t *database = test_database_open(root, path, false, &error);
+    bool current = false;
+    bool ok = database && test_database_sync_current(database, root, &current);
+    if (ok && !current)
+        ok = test_database_import(database, root, NULL, true);
+    if (ok)
+        puts(current ? "Test database: up to date; synchronisation skipped." : "Test database: sync complete.");
+    else
+        fprintf(stderr, "test-db: %s\n", error ? string_c_str(error) : test_database_error(database));
+    string_free(error);
+    test_database_close(database);
+    return ok ? 0 : 1;
 }
 
 static bool test_database_list(test_database_t *database, const char *prefix)
@@ -64,41 +104,6 @@ static bool test_database_runs(test_database_t *database, long count)
     return status == SQLITE_DONE || test_database_fail(database, NULL);
 }
 
-static bool test_database_stats(test_database_t *database, const char *prefix)
-{
-    sqlite3_stmt *statement = test_database_prepare(database,
-        "SELECT source, path, last_run_utc, last_outcome, last_elapsed_ms, normal_count, ordinary_count,\n"
-        "       last_normal_ms, previous_normal_ms, took_longer, change_ms, change_percent,\n"
-        "       fastest_ms, slowest_ms, mean_ms, median_ms, timing_outlier_count, last_normal_outlier,\n"
-        "       last_timing_outlier_utc, last_timing_outlier_ms, last_memory_test_utc\n"
-        "FROM test_case_metrics\n"
-        "WHERE run_count > 0 AND (?1 = '' OR substr(source, 1, length(?1)) = ?1)\n"
-        "ORDER BY source, path");
-    if (!statement)
-        return false;
-    sqlite3_bind_text(statement, 1, prefix ? prefix : "", -1, SQLITE_TRANSIENT);
-    for (int i = 0; i < sqlite3_column_count(statement); ++i)
-        printf("%s%s", i ? "\t" : "", sqlite3_column_name(statement, i));
-    putchar('\n');
-    int status;
-    while ((status = sqlite3_step(statement)) == SQLITE_ROW) {
-        for (int i = 0; i < sqlite3_column_count(statement); ++i) {
-            if (i)
-                putchar('\t');
-            int type = sqlite3_column_type(statement, i);
-            if (type == SQLITE_NULL)
-                fputs("-", stdout);
-            else if (type == SQLITE_FLOAT)
-                printf("%.6g", sqlite3_column_double(statement, i));
-            else
-                fputs((const char *)sqlite3_column_text(statement, i), stdout);
-        }
-        putchar('\n');
-    }
-    sqlite3_finalize(statement);
-    return status == SQLITE_DONE || test_database_fail(database, NULL);
-}
-
 /* No initialisation occurs until the caller explicitly requests an administration operation. */
 int test_database_command(const string_t *root, int argc, char **argv)
 {
@@ -114,6 +119,11 @@ int test_database_command(const string_t *root, int argc, char **argv)
         return argc ? 0 : 2;
     }
     const char *command = argv[0];
+    if (argc == 1 && !strcmp(command, "sync-if-needed")) {
+        int status = test_database_conditional_sync(root, path);
+        string_free(path);
+        return status;
+    }
     bool importing = argc == 1 && (!strcmp(command, "init") || !strcmp(command, "sync"));
     bool listing = argc <= 2 && !strcmp(command, "list");
     bool saving = argc == 2 && !strcmp(command, "profile-save");
@@ -122,7 +132,27 @@ int test_database_command(const string_t *root, int argc, char **argv)
     bool setting = argc == 5 && !strcmp(command, "profile-set") &&
                    (!strcmp(argv[4], "on") || !strcmp(argv[4], "off"));
     bool runs = argc <= 2 && !strcmp(command, "runs");
-    bool stats = argc <= 2 && !strcmp(command, "stats");
+    bool stats = !strcmp(command, "stats"), details = false, format_seen = false;
+    const char *stats_prefix = NULL;
+    test_database_stats_format_t format = TEST_DATABASE_STATS_AUTO;
+    if (stats) {
+        for (int i = 1; i < argc && stats; ++i) {
+            if (!strcmp(argv[i], "--details") && !details)
+                details = true;
+            else if (!strncmp(argv[i], "--format=", 9) && !format_seen) {
+                const char *value = argv[i] + 9;
+                format_seen = true;
+                if (!strcmp(value, "auto")) format = TEST_DATABASE_STATS_AUTO;
+                else if (!strcmp(value, "grid")) format = TEST_DATABASE_STATS_GRID;
+                else if (!strcmp(value, "markdown")) format = TEST_DATABASE_STATS_MARKDOWN;
+                else if (!strcmp(value, "tsv")) format = TEST_DATABASE_STATS_TSV;
+                else stats = false;
+            } else if (argv[i][0] != '-' && !stats_prefix)
+                stats_prefix = argv[i];
+            else
+                stats = false;
+        }
+    }
     long limit = 20;
     if (runs && argc == 2) {
         char *end = NULL;
@@ -148,7 +178,7 @@ int test_database_command(const string_t *root, int argc, char **argv)
     else if (ok && runs)
         ok = test_database_runs(database, limit);
     else if (ok && stats)
-        ok = test_database_stats(database, argc == 2 ? argv[1] : NULL);
+        ok = test_database_stats_print(database, stats_prefix, format, details);
     if (!ok)
         fprintf(stderr, "test-db: %s\n", error ? string_c_str(error) : test_database_error(database));
     else if (!listing && !runs && !stats)

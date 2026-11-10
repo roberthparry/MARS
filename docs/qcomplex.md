@@ -14,11 +14,12 @@ qfloat functions, not the magnitude or phase of the complex number.
 ## Implementation organisation
 
 
-The implementation groups Bessel I/K/Y and Struve H/L adapters in
+The implementation groups Bessel J/I/K/Y, Lommel s and Struve H/L adapters in
 `src/qcomplex/qcomplex_cylindrical.c` and polynomial and signal functions in
 `qcomplex_special.c`. These groups preserve the existing conversions, branch
 behaviour and numeric-scope cleanup. Core value operations, constants and
-larger mathematical algorithms remain separate.
+larger mathematical algorithms remain separate. Error-function adapters use
+`qcomplex_error.c` and the checked native number-layer evaluator.
 
 ## Signal functions
 
@@ -260,6 +261,8 @@ while `qc_acos(2)` is
 | `qc_erfc(z)` | complementary error function `1 - erf(z)` |
 | `qc_erfinv(z)` | inverse error function |
 | `qc_erfcinv(z)` | inverse complementary error function |
+| `qc_bessel_j(order, z)` | principal Bessel function of the first kind |
+| `qc_lommel_s(mu, nu, z)` | principal Lommel s function |
 | `qc_gamma(z)` | Γ(z) |
 | `qc_lgamma(z)` | ln Γ(z) |
 | `qc_digamma(z)` | ψ(z) = Γ′(z)/Γ(z) |
@@ -485,6 +488,22 @@ int main(void)
 L_0(1) = 0.7102431859378909
 ```
 
+Complex erf/erfc and their inverses use the guarded number-layer evaluator and
+round back to double-double components. Real inputs retain the direct qfloat
+path. The complex forward evaluator supports `|z| <= 140`, subject to its
+65536-bit work limit. Inverses use checked Halley refinement and reject an
+unresolved forward residual. Failed guards return `QC_NAN`.
+
+`qc_bessel_j` and `qc_lommel_s` also round guarded number-layer series. Their
+complex argument magnitudes are limited to 1000, with a 65536-bit work limit.
+Principal powers use the upper bank on the negative real axis. Singular
+parameters, undefined zero limits and exhausted guards return `QC_NAN`.
+
+The normal CDF uses `erfc(-z/sqrt(2))/2`, including the real qfloat path, to
+retain small negative-tail probabilities. Generic `number_t` calls to the
+Gaussian PDF, log PDF and CDF use native MPC when complex multiprecision is
+requested rather than rounding through this fixed-precision interface.
+
 ### Utility
 
 | Function | Description |
@@ -550,7 +569,7 @@ qcomplex_t qc_lambert_wn(int branch, qcomplex_t z);
 ## Implementation Notes
 
 - **Precision:** All arithmetic and elementary functions operate at full `qfloat_t` precision (~31–32 decimal digits, ~106 bits), both for real and complex arguments, unless otherwise noted.
-- **Special functions:** Real-valued fast paths are used where the function's domain and branch permit them. Real arguments can still require complex results. Bessel Y/I/K and Struve H/L use guarded number-layer evaluators for real and complex inputs before rounding to double-double components. Numerical range and convergence limits are documented with each family.
+- **Special functions:** Real-valued fast paths are used where the function's domain and branch permit them. Real arguments can still require complex results. Bessel J/Y/I/K, Lommel s and Struve H/L use guarded number-layer evaluators before rounding to double-double components. Complex error functions and their inverses use the same native precision and convergence policy. Numerical limits are documented with each family.
 - **Gamma and polygamma:** Implemented using high-precision algorithms (e.g., Lanczos, asymptotic expansions) to maintain as much precision as possible for both real and complex arguments.
 - **Lambert W, incomplete gamma, exponential integrals, polylogarithms and the hypergeometric families:** Use iterative or dynamically converged series/continued-fraction methods adapted for complex arguments, with careful attention to branch cuts and principal values. Appell F₁ delegates to the two-variable Lauricella F_D implementation.
 - **Parsing and formatting:** Parsing from string and printf-style formatting are supported for all complex numbers, with full control over decimal/scientific notation and alignment.
@@ -572,38 +591,168 @@ Run it with:
 make bench_qcomplex_maths
 ```
 
-Current sample results from that command on this tree, measured on:
+Persistent timings are now recorded by `make bench-db ARGS='run'` and published
+with `make bench-db ARGS='update-docs'`. These tables identify the exact run,
+machine, backend and precision; the focused benchmark above remains available
+for separate investigations. See [the benchmark guide](benchmarks.md#persistent-mathematical-benchmarks)
+for selection, interruption recovery and raw sample storage.
 
-- `Linux x86_64`
-- kernel `6.8.0-110-generic`
-- `Intel(R) Core(TM) i7-4510U CPU @ 2.00GHz`
-- `4` logical CPUs
+<!-- MARS-BENCHMARKS:BEGIN -->
+Benchmark run **11**, 2026-11-10T10:25:23.939Z (UTC).
 
-Markdown output uses the release benchmark with `51` timed batches per case,
-records the sample median for each row, and times only the actual `qcomplex`
-mathematical operation after argument parsing and warmup.
+Machine: ophelia; Intel(R) N95.
 
-Results:
+System: Linux 7.0.0-27-generic x86_64.
 
-| Case | Time |
-|---|---:|
-| `qc_exp(1+i)` | `3.3 µs` |
-| `qc_log(1+i)` | `5.8 µs` |
-| `qc_erf(0.5+0.5i)` | `9.7 µs` |
-| `qc_erfc(0.5+0.5i)` | `11.4 µs` |
-| `qc_gamma(1.5+0.7i)` | `16.6 µs` |
-| `qc_lgamma(1.5+0.7i)` | `14.9 µs` |
-| `qc_digamma(2+i)` | `16.3 µs` |
-| `qc_trigamma(2+0.5i)` | `5.7 µs` |
-| `qc_tetragamma(2+0.5i)` | `6.5 µs` |
-| `qc_gammainv(3.323350970447842551184064031264648)` | `89.4 µs` |
-| `qc_gammainv(qc_gamma(2.5+0.3i))` | `218.0 µs` |
-| `qc_productlog(1+i)` | `29.1 µs` |
-| `qc_lambert_wm1(-0.2-0.1i)` | `29.5 µs` |
-| `qc_Ei(1+i)` | `46.7 µs` |
-| `qc_E1(1+i)` | `47.9 µs` |
-| `qc_beta(1.5+0.5i, 2-0.3i)` | `41.5 µs` |
-| `qc_logbeta(1.5+0.5i, 2-0.3i)` | `37.4 µs` |
+Compiler: 15.2.0; build flags: gcc -Wall -Wextra -Werror -O2 -fPIC -D_GNU_SOURCE -pthread -DHAVE_UNISTRING -I/usr/include/sqlcipher -DSQLITE_HAS_CODEC   -I/usr/include/x86_64-linux-gnu -isystem /usr/include/mit-krb5 -isystem /usr/include/mit-krb5 -I/usr/include/p11-kit-1.
+
+Median per call from 7 timed batches.
+
+Timing method: CLOCK_MONOTONIC; warmup=20ms; target_batch=250us; max_batch=512.
+
+Argument parsing, output validation, disposal and database writes are outside timing.
+Inputs show the actual operands, including +0.125i for permitted complex arguments; integer orders remain real.
+`number-double` includes generic number dispatch; the other fixed profiles call qfloat/qcomplex directly.
+Requested multiprecision bits do not guarantee that every algorithm achieves that accuracy.
+Operations and precision columns with only unsupported results are omitted; — denotes an unsupported cell.
+Failures and timeouts remain visible. † marks a retained slowdown outlier.
+
+### `qcomplex`
+
+| Operation | Inputs | 106 bits |
+|---|---|---:|
+| E1 | 2.345678+0.125i | 53.4 µs |
+| Ei | 2.345678+0.125i | 42.2 µs |
+| Li | 2.345+0.125i | 36.7 µs |
+| abs | 0.7+0.125i | 502.2 ns |
+| acos | 0.7+0.125i | 7.6 µs |
+| acosec | 2.345+0.125i | 7.7 µs |
+| acosech | 0.7+0.125i | 9.6 µs |
+| acosh | 2.345+0.125i | 13.6 µs |
+| acot | 0.7+0.125i | 8.4 µs |
+| acoth | 2.345+0.125i | 4.4 µs |
+| add | 0.7+0.125i, 0.7+0.125i | 12.7 ns |
+| appell_f1 | 0.5+0.125i, 0.7+0.125i, 0.8+0.125i, 2.5+0.125i, 0.2+0.125i, 0.3+0.125i | 493.3 µs |
+| arccovercos | 0.5+0.125i | 7.6 µs |
+| arccoversin | 0.5+0.125i | 7.6 µs |
+| archacovercos | 0.5+0.125i | 4.6 µs |
+| archacoversin | 0.5+0.125i | 4.6 µs |
+| archavercos | 0.5+0.125i | 4.6 µs |
+| archaversin | 0.5+0.125i | 4.6 µs |
+| arcvercos | 0.5+0.125i | 7.7 µs |
+| arcversin | 0.5+0.125i | 7.6 µs |
+| arg | 0.7+0.125i | 1.0 µs |
+| asec | 2.345+0.125i | 7.8 µs |
+| asech | 0.7+0.125i | 11.1 µs |
+| asin | 0.7+0.125i | 7.6 µs |
+| asinh | 0.7+0.125i | 7.5 µs |
+| atan | 0.7+0.125i | 8.3 µs |
+| atan2 | 0.5+0.125i, -0.75+0.125i | 8.4 µs |
+| atanh | 0.7+0.125i | 4.3 µs |
+| bessel_i | 2, 0.7+0.125i | 86.6 µs |
+| bessel_j | 2, 0.7+0.125i | 87.5 µs |
+| bessel_k | 2, 0.7+0.125i | 999.4 µs |
+| bessel_y | 2, 0.7+0.125i | 91.4 µs |
+| beta | 2.3+0.125i, 4.5+0.125i | 32.3 µs |
+| beta_pdf | 0.5+0.125i, 2.5+0.125i, 3.5+0.125i | 46.4 µs |
+| binomial | 5+0.125i, 2+0.125i | 23.6 µs |
+| chebyshev_t | 2, 0.7+0.125i | 133.0 ns |
+| chebyshev_u | 2, 0.7+0.125i | 132.0 ns |
+| circ | 0.7 | 15.9 ns |
+| clausen | 3, 0.7+0.125i | 289.5 µs |
+| clausen2 | 0.7+0.125i | 21.6 µs |
+| conj | 0.7+0.125i | 4.1 ns |
+| cos | 0.7+0.125i | 7.3 µs |
+| cosec | 0.7+0.125i | 7.7 µs |
+| cosech | 0.7+0.125i | 7.5 µs |
+| cosh | 0.7+0.125i | 9.2 µs |
+| cot | 0.7+0.125i | 18.6 µs |
+| coth | 0.7+0.125i | 18.6 µs |
+| covercos | 0.7+0.125i | 9.2 µs |
+| coversin | 0.7+0.125i | 9.2 µs |
+| cubrt | 0.7+0.125i | 7.3 µs |
+| digamma | 2.345+0.125i | 10.2 µs |
+| dilog | 0.7+0.125i | 99.2 µs |
+| div | 0.7+0.125i, 0.7+0.125i | 138.7 ns |
+| erf | 0.7+0.125i | 68.5 µs † |
+| erfc | 0.7+0.125i | 69.7 µs † |
+| erfcinv | 0.5+0.125i | 425.0 µs |
+| erfinv | 0.5+0.125i | 536.6 µs † |
+| exp | 1.23456789+0.125i | 3.0 µs |
+| floor | 0.7+0.125i | 30.7 ns |
+| gamma | 2.345+0.125i | 11.6 µs |
+| gammainc_P | 2.3+0.125i, 1.4+0.125i | 54.1 µs |
+| gammainc_Q | 2.3+0.125i, 1.4+0.125i | 54.3 µs |
+| gammainc_lower | 2.3+0.125i, 1.4+0.125i | 42.6 µs |
+| gammainc_upper | 2.3+0.125i, 1.4+0.125i | 54.0 µs |
+| gammainv | 9.5+0.125i | 120.1 µs |
+| hacovercos | 0.7+0.125i | 7.3 µs |
+| hacoversin | 0.7+0.125i | 7.3 µs |
+| harmonic_poly | 2, 0.7+0.125i | 373.7 ns |
+| havercos | 0.7+0.125i | 7.3 µs |
+| haversin | 0.7+0.125i | 8.2 µs |
+| hermite_h | 2, 0.7+0.125i | 154.6 ns |
+| hypergeometric_pFq | 0.7+0.125i, 2.5+0.125i, 0.3+0.125i | 28.0 µs |
+| hypot | 0.7+0.125i, 1.2+0.125i | 1.2 µs |
+| imag_part | 0.7+0.125i | 2.1 ns |
+| inv | 0.7+0.125i | 141.2 ns |
+| lambert_w0 | 0.7+0.125i | 28.1 µs |
+| lambert_wm1 | -0.2+0.125i | 25.5 µs |
+| lambert_wn | 1, 0.7+0.125i | 30.6 µs |
+| lauricella_f | 0.5+0.125i, 0.3+0.125i, 2.5+0.125i | 172.1 µs |
+| ldexp | 1.23456789+0.125i, 3 | 21.8 ns |
+| legendre_chi | 2, 0.7+0.125i | 373.2 µs |
+| lerch_phi | 0.3+0.125i, 2+0.125i, 1.4+0.125i | 639.9 µs |
+| lg | 2.345678+0.125i | 5.1 µs |
+| lgamma | 2.345+0.125i | 12.2 µs |
+| ln | 2.345678+0.125i | 5.1 µs |
+| log | 2.345678+0.125i | 5.1 µs |
+| log10 | 2.345678+0.125i | 4.2 µs |
+| logbeta | 2.3+0.125i, 4.5+0.125i | 36.8 µs |
+| logbeta_pdf | 0.5+0.125i, 2.5+0.125i, 3.5+0.125i | 37.3 µs |
+| lommel_s | 0.5+0.125i, 0.7+0.125i, 1.2+0.125i | 144.4 µs |
+| mul | 0.7+0.125i, 0.7+0.125i | 42.5 ns |
+| neg | 0.7+0.125i | 4.5 ns |
+| normal_cdf | 0.7+0.125i | 64.9 µs † |
+| normal_logpdf | 0.7+0.125i | 120.3 ns |
+| normal_pdf | 0.7+0.125i | 3.1 µs |
+| polygamma | 3, 2.345+0.125i | 11.5 µs |
+| polylog | 2, 0.7+0.125i | 78.9 µs |
+| polylog1 | 0.7+0.125i | 4.1 µs |
+| pow | 1.23456789+0.125i, 3.5+0.125i | 7.1 µs |
+| productlog | 0.7+0.125i | 28.0 µs |
+| qdigamma | 0.5+0.125i, 2.3+0.125i | 141.4 µs |
+| real_part | 0.7+0.125i | 2.7 ns |
+| rect | 0.7 | 15.7 ns |
+| root | 1.2345+0.125i, 3 | 7.1 µs |
+| round | 0.7+0.125i | 78.7 ns |
+| roundn | 1.23456789+0.125i, 3 | 8.0 µs |
+| rounds | 1.23456789+0.125i, 3 | 28.2 µs |
+| sec | 0.7+0.125i | 7.4 µs |
+| sech | 0.7+0.125i | 7.4 µs |
+| sgn | 0.7 | 8.6 ns |
+| sin | 0.567+0.125i | 7.3 µs |
+| sinc | 0.7+0.125i | 7.5 µs |
+| sinh | 0.7+0.125i | 16.5 µs † |
+| sqr | 0.7+0.125i | 43.4 ns |
+| sqrt | 1.23456789+0.125i | 3.3 µs |
+| step | 0.7 | 8.6 ns |
+| struve_h | 2, 0.7+0.125i | 110.8 µs |
+| struve_l | 2, 0.7+0.125i | 112.4 µs |
+| sub | 0.7+0.125i, 0.7+0.125i | 13.0 ns |
+| tan | 0.7+0.125i | 14.9 µs |
+| tanh | 0.7+0.125i | 14.8 µs |
+| tetragamma | 2.345+0.125i | 3.6 µs |
+| tri | 0.7 | 14.4 ns |
+| trigamma | 2.345+0.125i | 2.8 µs |
+| vercos | 0.7+0.125i | 7.3 µs |
+| versin | 0.7+0.125i | 7.6 µs |
+| zatahp | 2.3+0.125i, 1.4+0.125i | 484.7 µs |
+| zeta | 2.345+0.125i | 367.5 µs |
+| zetah | 2.3+0.125i, 1.4+0.125i | 473.8 µs |
+| zetap | 2.345+0.125i | 379.0 µs |
+
+<!-- MARS-BENCHMARKS:END -->
 
 For a broader benchmark overview, see
 [`docs/benchmarks.md`](./benchmarks.md).

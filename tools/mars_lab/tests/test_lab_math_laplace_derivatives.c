@@ -119,6 +119,7 @@ static void test_laplace_derivative_order(void)
             lab_math_text(result, "tex"));
     }
     const unsigned orders[] = {3, 4, 8};
+    static const char *const superscripts[] = {"⁰", "¹", "²", "³", "⁴", "⁵", "⁶", "⁷", "⁸"};
     const char *keys[] = {"unbound", "function", "tex"};
     for (size_t i = 0; i < 3; ++i) {
         unsigned order = orders[i];
@@ -136,7 +137,8 @@ static void test_laplace_derivative_order(void)
                 string_offset_t previous = lab_math_laplace_derivatives_position(text, initial, false);
                 for (unsigned power = 2; power < order; ++power) {
                     const char *suffix = key == 2 ? lab_math_format("%s^{%u}", variable, power)
-                                                  : lab_math_format("%s^%u", variable, power);
+                                         : key == 0 ? lab_math_format("%s%s", variable, superscripts[power])
+                                                    : lab_math_format("%s^%u", variable, power);
                     string_offset_t position = lab_math_laplace_derivatives_position(text, suffix, true);
                     lab_math_check(previous >= 0 && position >= previous, "initial values in ascending powers");
                     previous = position;
@@ -152,7 +154,7 @@ static void test_laplace_derivative_order(void)
         }
     }
     lab_math_equal(lab_math_text(lab_math_laplace_derivatives_fields("@L{f'''(t)}"), "unbound"),
-                   "s^3·ℒ(f(t), t, s) - f''(0) - s·f'(0) - f(0)·s^2");
+                   "s³·ℒ(f(t), t, s) - f''(0) - f'(0)·s - f(0)·s²");
     lab_math_laplace_derivatives_same("@L{f^(0)(t)}", "@L{f(t)}", "tex");
     lab_math_laplace_derivatives_same("{@L{f^(n)(t)} | n=3}", "@L{f^(n)(t)}", "tex");
     lab_math_laplace_derivatives_contains(lab_math_laplace_derivatives_fields("@L{f^(30)(t)}"), "tex", "\\sum_", true);
@@ -176,7 +178,7 @@ static void test_laplace_derivative_readme(void)
     /* README examples: docs/expression.md and the integral-transform design note. */
     const char *cases[][2] = {
         {"@L{f'(t)}", "s·ℒ(f(t), t, s) - f(0)"}, {"@L{f'}", "s·ℒ(f(t), t, s) - f(0)"},
-        {"@L{f''(t)}", "s^2·ℒ(f(t), t, s) - f'(0) - s·f(0)"},
+        {"@L{f''(t)}", "s²·ℒ(f(t), t, s) - f'(0) - f(0)·s"},
         {"@L{f^(n)(t)}", "s^n·ℒ(f(t), t, s) - Σ_(k=0)^(n - 1) f^(k)(0)·s^(n - 1 - k) where (n ∈ ℤ≥0)"},
     };
     for (size_t i = 0; i < 4; ++i)

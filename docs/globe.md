@@ -495,11 +495,22 @@ preparing derived imagery. Release the returned string with `string_free()`.
 With a configured, readable globe database:
 
 ```c
-globe_reader_t *reader = globe_reader_new();
-string_t *identity = globe_reader_identity(reader);
-printf("Cache identity available: %s\n", identity ? "yes" : "no");
-string_free(identity);
-globe_reader_free(reader);
+#include <stdio.h>
+#include <stdlib.h>
+
+#include "globe-t.h"
+#include "string-t.h"
+
+int main(void)
+{
+    globe_reader_t *reader = globe_reader_new();
+    string_t *identity = globe_reader_identity(reader);
+    printf("Cache identity available: %s\n", identity ? "yes" : "no");
+    int status = identity ? EXIT_SUCCESS : EXIT_FAILURE;
+    string_free(identity);
+    globe_reader_free(reader);
+    return status;
+}
 ```
 
 Output:

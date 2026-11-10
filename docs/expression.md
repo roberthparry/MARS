@@ -126,6 +126,8 @@ Irrational roots retain their symbolic form, and a supplied variable binding doe
 not turn a symbolic power into a constant.
 Multiplication places an algebraic coefficient before its coordinate, including sums of constant parameters:
 the exponent of a linear ODE solution displays its characteristic rate before the time variable.
+Constant radicals and quotients also stay beside the expressions they scale;
+the sum-before-power preference does not move a constant sum ahead of its constant radical coefficient.
 Native and TeX output share this factor order; no algebraic substitution is performed by this rule.
 
 Numeric atoms share a lossless fraction-versus-decimal rule across Expression, Function and TeX output,
@@ -138,6 +140,8 @@ typesets it as a product with a power of ten and preserves the grouping of any e
 Every decimal digit is exact: display selection neither rounds the rational nor changes the stored value,
 and a long numerical coefficient is never approximated by a nearby simple fraction. Rational exponents
 still retain their mathematical role when root notation is appropriate.
+Taylor equations retain exact fractional coefficients throughout their presentation,
+so that `17/10` stays fractional in that series context even though an ordinary expression may display `1.7`.
 
 Exact function endpoint identities also simplify composite constant arguments
 that evaluate to real infinity. This includes scaled infinite arguments of
@@ -465,7 +469,7 @@ variable, after the leading transform term, including in multiline TeX output.
 | --- | --- |
 | `@L{f'(t)}` | `s·ℒ(f(t), t, s) - f(0)` |
 | `@L{f'}` | `s·ℒ(f(t), t, s) - f(0)` |
-| `@L{f''(t)}` | `s^2·ℒ(f(t), t, s) - f'(0) - s·f(0)` |
+| `@L{f''(t)}` | `s²·ℒ(f(t), t, s) - f'(0) - f(0)·s` |
 | `@L{f^(n)(t)}` | `s^n·ℒ(f(t), t, s) - Σ_(k=0)^(n - 1) f^(k)(0)·s^(n - 1 - k) where (n ∈ ℤ≥0)` |
 
 ### Laplace transforms of integrals

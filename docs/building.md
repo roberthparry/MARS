@@ -36,6 +36,8 @@ command-line programme is not needed.
 `make check-native-deps` and `make check-deps` include this probe.
 `make release` runs the native dependency gate before compliance or compilation,
 and database installation/update targets check it before changing installed data.
+Release prints the successful SQLCipher/SQLite version summary once; its recursive phases still run the checks
+but suppress repeated success messages. Failures always retain version details and repair instructions.
 On failure, the build prints the Debian/Ubuntu commands below to install the
 verified release with the required features, including when Lab is already installed.
 
@@ -156,6 +158,20 @@ them. Existing databases and saved configuration are retained when validation
 fails. Database and configuration publication uses separate atomic renames with
 rollback on reported errors; the pair is not a crash-atomic filesystem
 transaction. Run installations serially and close database consumers first.
+For a one-time full re-import on the next `make release`, set the saved
+`MARS_RELEASE_DB_REIMPORT` setting to `1`. Release fully reimports the globe, almanac and
+jurisdiction databases in that order. The existing plaintext globe's packaged geography
+and photograph tables are recreated in one SQLite transaction: every source photograph is
+validated and inserted again, including images whose digests have not changed. Rivers,
+prepared photographic blocks and custom tables stay on their existing pages, avoiding a
+large preservation copy. SQLite's durable rollback journal protects the complete reimport;
+failure or interruption restores the previous committed state. The almanac and jurisdiction
+installers publish fresh replacement files. The saved stage
+advances only after success, so retrying a failed release resumes at the unfinished
+database. Completion clears the request. Settings, calendar choices and Lab history
+are preserved. This request is also honoured by `make update-mars-db`. The globe reimport
+needs rollback-journal space for replaced content, but no duplicate of the retained image-block
+tables. Discarded photograph pages are reused and the rollback journal is removed after commit.
 Live source-byte progress bars and elapsed-time indicators distinguish measured
 imports from work without a known total. Every measured bar displays completed/total counts with the
 appropriate unit: bytes processed, tiles imported, files prepared, river chunks processed, river points copied
@@ -163,13 +179,26 @@ or calendar days generated. Source bytes are counted as they are processed, incl
 file without a newline; read-ahead bytes are not reported as completed work. Redirected output receives periodic
 status lines instead of terminal animation. The desktop installer also labels
 its stages; progress never claims successful completion after a failed stage.
+Interactive terminals use smooth UTF-8 block bars with blank space for unfinished work and a Braille activity spinner,
+with a green ✓ on completion or a red ✗ on failure. Animation updates four times
+per second independently of database work. Unknown totals use a moving solid block,
+and redirected logs retain plain periodic status lines without terminal escapes.
 Measured bars retain an animated activity marker while a single item is being processed. After enough
-observations, they show an approximate remaining time for the current source. Estimates reset when the source
-changes or a resumed count moves backwards, and are replaced by an unchanged-count duration if no count has
-advanced for five seconds. A full count awaiting stage completion is identified explicitly. Unmeasured stages
+observations, they show an approximate remaining time for the current source. Measured item stages also show
+the current segment and its elapsed time as `; segment 1/351 (Corsica) - 16s` when its region is known.
+Image and prepared-block imports obtain the name directly from the catalogue; acquisition and tile-number
+suffixes are omitted. Globe preservation shows the table being copied in parentheses instead of a region.
+Stages without either name leave the parentheses out. The index identifies the segment currently
+processing; the timer starts at the source's beginning or the preceding segment's completion. Each tile or source
+is one segment; preserved globe rows use batches of 4,096, including a shorter final batch. Bulk table copies are
+one segment. Byte-only stages omit an unknown segment total. Estimates reset when the source changes or a resumed
+count moves backwards.
+A full count awaiting stage completion is identified explicitly. Unmeasured stages
 state that no intermediate count is available; a reporting heartbeat alone does not prove that work is advancing.
 Expensive photograph preparation, import, finalisation and rollback stages explain their work above the live
 line. Extra timing detail is omitted when it cannot fit beside the counts on a narrow terminal.
+Full SQLite globe-integrity scans also show a live elapsed-time indicator and explain that no intermediate
+item count is available; scanning large copied tables and indexes can take several minutes.
 Photographic updates report table preparation before removing the previous image
 tables, then image import and finalisation. Preparation stays animated with elapsed
 time during blocking SQLite work; it has no estimated percentage. Image import shows the number of validated,
@@ -185,6 +214,8 @@ A current installed catalogue remains usable when optional preparation sources a
 Older plaintext photographic globe migrations build a replacement beside the installed database. They copy the
 non-image tables and preserve their rowids, indexes, views, triggers, sequence counters and database metadata,
 then import the verified photographs once into new pages. The source is writer-locked until publication.
+Rowid tables copy in single-pass batches: SQLite reports the inserted count and final rowid, avoiding a preliminary
+scan over each batch's large data pages. Source and destination row counts are still checked.
 The replacement uses 64 KiB pages, a bounded 64 MiB main cache and an 8 MiB source cache; rollback journalling
 and full commit synchronisation remain enabled. The completed file is synchronised and atomically renamed
 into place. Failure leaves the installed file unchanged. This needs temporary space for the complete replacement,

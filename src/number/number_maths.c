@@ -31,7 +31,6 @@ enum {
     NUMBER_EI_GUARD_BITS = 32,
     NUMBER_EI_SERIES_MAX_TERMS = 100000,
     NUMBER_POLYLOG_SERIES_MAX_TERMS = 100000,
-    NUMBER_APPELL_F1_SERIES_MAX_TERMS = 10000,
     NUMBER_BESSEL_GUARD_BITS = 64,
     NUMBER_BESSEL_MAX_EXTRA_BITS = 65536,
     NUMBER_BESSEL_MAX_SERIES_TERMS = 200000,
@@ -871,8 +870,8 @@ static int number_mpfr_normal_cdf_mut(mpfr_t value)
     mpfr_set_ui(sqrt2, 2u, MPFR_RNDN);
     mpfr_sqrt(sqrt2, sqrt2, MPFR_RNDN);
     mpfr_div(value, value, sqrt2, MPFR_RNDN);
-    mpfr_erf(value, value, MPFR_RNDN);
-    mpfr_add_ui(value, value, 1u, MPFR_RNDN);
+    mpfr_neg(value, value, MPFR_RNDN);
+    mpfr_erfc(value, value, MPFR_RNDN);
     mpfr_div_2ui(value, value, 1u, MPFR_RNDN);
     mpfr_clear(sqrt2);
     return 0;
@@ -1428,24 +1427,40 @@ static int number_mpfr_gammainc_q_mut(mpfr_t value, const mpfr_t other)
     return number_mpfr_gammainc_mut(value, other, NUMBER_MPFR_GAMMAINC_Q);
 }
 
-static int number_mpfr_erfinv_mut(mpfr_t value)
-{
-    mpfr_set_d(value, qf_to_double(qf_erfinv((qfloat_t){mpfr_get_d(value, MPFR_RNDN), 0.0})), MPFR_RNDN);
-    return 0;
-}
-
-static int number_mpfr_erfcinv_mut(mpfr_t value)
-{
-    mpfr_set_d(value, qf_to_double(qf_erfcinv((qfloat_t){mpfr_get_d(value, MPFR_RNDN), 0.0})), MPFR_RNDN);
-    return 0;
-}
 
 static int number_mpfr_set_bernoulli_even(mpfr_t value, size_t index)
 {
+    if (index > NUMBER_BERNOULLI_EVEN_TERM_COUNT) {
+        if (index > ULONG_MAX / 2u) return -1;
+        unsigned long degree = (unsigned long)index * 2u;
+        mpfr_prec_t work = mpfr_get_prec(value) + 32;
+        mpfr_t coefficient, scale, zeta;
+        mpfr_inits2(work, coefficient, scale, zeta, (mpfr_ptr)0);
+        /* B_(2k) = (-1)^(k+1) 2 (2k)! zeta(2k) / (2*pi)^(2k).
+         * Keep the small exact cache, but do not let its size limit achievable precision. */
+        mpfr_const_pi(scale, MPFR_RNDN);
+        mpfr_mul_2ui(scale, scale, 1u, MPFR_RNDN);
+        mpfr_pow_ui(scale, scale, degree, MPFR_RNDN);
+        mpfr_fac_ui(coefficient, degree, MPFR_RNDN);
+        mpfr_zeta_ui(zeta, degree, MPFR_RNDN);
+        mpfr_mul(coefficient, coefficient, zeta, MPFR_RNDN);
+        mpfr_mul_2ui(coefficient, coefficient, 1u, MPFR_RNDN);
+        mpfr_div(coefficient, coefficient, scale, MPFR_RNDN);
+        if (!(index & 1u)) mpfr_neg(coefficient, coefficient, MPFR_RNDN);
+        mpfr_set(value, coefficient, MPFR_RNDN);
+        mpfr_clears(coefficient, scale, zeta, (mpfr_ptr)0);
+        return mpfr_number_p(value) ? 0 : -1;
+    }
     if (number_bernoulli_even_ensure(index) != 0)
         return -1;
     mpfr_set_q(value, number_bernoulli_even_terms[index - 1u], MPFR_RNDN);
     return 0;
+}
+
+static size_t number_bernoulli_term_budget(mpfr_prec_t precision)
+{
+    size_t terms = (size_t)precision / 4u + 64u;
+    return terms > NUMBER_BERNOULLI_EVEN_TERM_COUNT ? terms : NUMBER_BERNOULLI_EVEN_TERM_COUNT;
 }
 
 static bool number_mpfr_term_below_target(mpfr_srcptr term, mpfr_prec_t target_prec)
@@ -1476,114 +1491,21 @@ static unsigned long number_polygamma_shift_target(mpfr_prec_t target_prec)
 
     if (target < 64ul)
         target = 64ul;
-    if (target > 4096ul)
-        target = 4096ul;
+    if (target > 65536ul)
+        target = 65536ul;
     return target;
 }
 
+static int number_mpfr_polygamma_order_mut(mpfr_t value, unsigned int order);
+
 static int number_mpfr_trigamma_mut(mpfr_t value)
 {
-    size_t bernoulli_terms;
-    mpfr_prec_t prec;
-    mpfr_t y, inv, inv2, power, term, sum;
-    size_t n;
-
-    if (!mpfr_number_p(value) || (mpfr_sgn(value) <= 0 && mpfr_integer_p(value))) {
-        mpfr_set_nan(value);
-        return 0;
-    }
-
-    prec = mpfr_get_prec(value) + 128;
-    mpfr_inits2(prec, y, inv, inv2, power, term, sum, (mpfr_ptr)0);
-    mpfr_set(y, value, MPFR_RNDN);
-    mpfr_set_zero(sum, 1);
-
-    while (mpfr_cmp_ui(y, 256u) < 0) {
-        mpfr_sqr(term, y, MPFR_RNDN);
-        mpfr_ui_div(term, 1u, term, MPFR_RNDN);
-        mpfr_add(sum, sum, term, MPFR_RNDN);
-        mpfr_add_ui(y, y, 1u, MPFR_RNDN);
-    }
-
-    mpfr_ui_div(inv, 1u, y, MPFR_RNDN);
-    mpfr_sqr(inv2, inv, MPFR_RNDN);
-    mpfr_add(sum, sum, inv, MPFR_RNDN);
-    mpfr_div_2ui(term, inv2, 1u, MPFR_RNDN);
-    mpfr_add(sum, sum, term, MPFR_RNDN);
-    mpfr_mul(power, inv2, inv, MPFR_RNDN);
-
-    bernoulli_terms = NUMBER_BERNOULLI_EVEN_TERM_COUNT;
-    for (n = 1u; n <= bernoulli_terms; ++n) {
-        if (number_mpfr_set_bernoulli_even(term, n) != 0) {
-            mpfr_clears(y, inv, inv2, power, term, sum, (mpfr_ptr)0);
-            return -1;
-        }
-        mpfr_mul(term, term, power, MPFR_RNDN);
-        mpfr_add(sum, sum, term, MPFR_RNDN);
-        /* Positive-argument asymptotic corrections alternate. Keep guard bits relative
-         * to the result, including very small tails at large arguments. */
-        if (!mpfr_zero_p(sum) && mpfr_number_p(sum) &&
-            (mpfr_zero_p(term) || mpfr_get_exp(term) <= mpfr_get_exp(sum) - mpfr_get_prec(value) - 16))
-            break;
-        mpfr_mul(power, power, inv2, MPFR_RNDN);
-    }
-
-    mpfr_set(value, sum, MPFR_RNDN);
-    mpfr_clears(y, inv, inv2, power, term, sum, (mpfr_ptr)0);
-    return 0;
+    return number_mpfr_polygamma_order_mut(value, 1u);
 }
 
 static int number_mpfr_tetragamma_mut(mpfr_t value)
 {
-    size_t bernoulli_terms;
-    mpfr_prec_t prec;
-    mpfr_t y, inv, inv2, power, term, sum;
-    size_t n;
-
-    if (!mpfr_number_p(value) || (mpfr_sgn(value) <= 0 && mpfr_integer_p(value))) {
-        mpfr_set_nan(value);
-        return 0;
-    }
-
-    prec = mpfr_get_prec(value) + 128;
-    mpfr_inits2(prec, y, inv, inv2, power, term, sum, (mpfr_ptr)0);
-    mpfr_set(y, value, MPFR_RNDN);
-    mpfr_set_zero(sum, 1);
-
-    while (mpfr_cmp_ui(y, 256u) < 0) {
-        mpfr_sqr(term, y, MPFR_RNDN);
-        mpfr_mul(term, term, y, MPFR_RNDN);
-        mpfr_ui_div(term, 2u, term, MPFR_RNDN);
-        mpfr_sub(sum, sum, term, MPFR_RNDN);
-        mpfr_add_ui(y, y, 1u, MPFR_RNDN);
-    }
-
-    mpfr_ui_div(inv, 1u, y, MPFR_RNDN);
-    mpfr_sqr(inv2, inv, MPFR_RNDN);
-    mpfr_neg(term, inv2, MPFR_RNDN);
-    mpfr_add(sum, sum, term, MPFR_RNDN);
-    mpfr_mul(power, inv2, inv, MPFR_RNDN);
-    mpfr_sub(sum, sum, power, MPFR_RNDN);
-    mpfr_mul(power, power, inv, MPFR_RNDN);
-
-    bernoulli_terms = NUMBER_BERNOULLI_EVEN_TERM_COUNT;
-    for (n = 1u; n <= bernoulli_terms; ++n) {
-        if (number_mpfr_set_bernoulli_even(term, n) != 0) {
-            mpfr_clears(y, inv, inv2, power, term, sum, (mpfr_ptr)0);
-            return -1;
-        }
-        mpfr_mul_ui(term, term, (unsigned long)(2 * n + 1), MPFR_RNDN);
-        mpfr_mul(term, term, power, MPFR_RNDN);
-        mpfr_sub(sum, sum, term, MPFR_RNDN);
-        if (!mpfr_zero_p(sum) && mpfr_number_p(sum) &&
-            (mpfr_zero_p(term) || mpfr_get_exp(term) <= mpfr_get_exp(sum) - mpfr_get_prec(value) - 16))
-            break;
-        mpfr_mul(power, power, inv2, MPFR_RNDN);
-    }
-
-    mpfr_set(value, sum, MPFR_RNDN);
-    mpfr_clears(y, inv, inv2, power, term, sum, (mpfr_ptr)0);
-    return 0;
+    return number_mpfr_polygamma_order_mut(value, 2u);
 }
 
 static int number_mpfr_polygamma_order_mut(mpfr_t value, unsigned int order)
@@ -1597,10 +1519,6 @@ static int number_mpfr_polygamma_order_mut(mpfr_t value, unsigned int order)
 
     if (order == 0u)
         return number_mpfr_digamma_mut(value);
-    if (order == 1u)
-        return number_mpfr_trigamma_mut(value);
-    if (order == 2u)
-        return number_mpfr_tetragamma_mut(value);
     if (!mpfr_number_p(value) || (mpfr_sgn(value) <= 0 && mpfr_integer_p(value))) {
         mpfr_set_nan(value);
         return 0;
@@ -1638,7 +1556,7 @@ static int number_mpfr_polygamma_order_mut(mpfr_t value, unsigned int order)
     mpfr_add(asymp, asymp, term, MPFR_RNDN);
 
     mpfr_mul(power, power, inv, MPFR_RNDN);
-    for (n = 1u; n <= NUMBER_BERNOULLI_EVEN_TERM_COUNT; ++n) {
+    for (n = 1u; n <= number_bernoulli_term_budget(target_prec); ++n) {
         if (number_mpfr_set_bernoulli_even(term, n) != 0) {
             mpfr_clears(y, inv, inv2, power, term, sum, asymp, fact, (mpfr_ptr)0);
             return -1;
@@ -1678,7 +1596,7 @@ static int number_mpc_polygamma_order(mpc_ptr out, mpc_srcptr z, unsigned int or
     bool converged = false;
     int rc = 0;
 
-    if (order < 3u)
+    if (order == 0u)
         return -1;
 
     target_prec = mpc_get_prec(out);
@@ -1728,7 +1646,7 @@ static int number_mpc_polygamma_order(mpc_ptr out, mpc_srcptr z, unsigned int or
     mpc_add(asymp, asymp, term, MPC_RNDNN);
 
     mpc_mul(power, power, inv, MPC_RNDNN);
-    for (n = 1u; n <= NUMBER_BERNOULLI_EVEN_TERM_COUNT; ++n) {
+    for (n = 1u; n <= number_bernoulli_term_budget(target_prec); ++n) {
         if (number_mpfr_set_bernoulli_even(coeff, n) != 0) {
             rc = -1;
             break;
@@ -1764,6 +1682,16 @@ static int number_mpc_polygamma_order(mpc_ptr out, mpc_srcptr z, unsigned int or
     mpc_clear(inv);
     mpc_clear(y);
     return rc;
+}
+
+static int number_mpc_trigamma_mut(mpc_ptr out, mpc_srcptr z, mpc_rnd_t rnd)
+{
+    return number_mpc_polygamma_order(out, z, 1u, rnd);
+}
+
+static int number_mpc_tetragamma_mut(mpc_ptr out, mpc_srcptr z, mpc_rnd_t rnd)
+{
+    return number_mpc_polygamma_order(out, z, 2u, rnd);
 }
 
 static int number_mpc_digamma_positive(mpc_ptr out, mpc_srcptr z, mpc_rnd_t rnd)
@@ -1804,7 +1732,7 @@ static int number_mpc_digamma_positive(mpc_ptr out, mpc_srcptr z, mpc_rnd_t rnd)
     mpc_sub(sum, sum, term, MPC_RNDNN);
     mpc_set(power, inv2, MPC_RNDNN);
 
-    for (size_t n = 1u; n <= NUMBER_BERNOULLI_EVEN_TERM_COUNT; ++n) {
+    for (size_t n = 1u; n <= number_bernoulli_term_budget(target_prec); ++n) {
         if (number_mpfr_set_bernoulli_even(coeff, n) != 0) {
             rc = -1;
             break;
@@ -1878,7 +1806,7 @@ static int number_mpc_digamma_mut(mpc_ptr out, mpc_srcptr z, mpc_rnd_t rnd)
 /* Scale the finite sum once for accuracy and oscillation before using bounded Bernoulli corrections. */
 static unsigned long number_zeta_sum_terms(mpfr_prec_t precision, mpc_srcptr argument)
 {
-    unsigned long accuracy = 128ul + (precision > 512 ? (unsigned long)(precision - 512) / 2ul : 0ul);
+    unsigned long accuracy = 128ul + (precision > 512 ? (unsigned long)(precision - 512) / 8ul : 0ul);
     double height = fabs(mpfr_get_d(mpc_imagref(argument), MPFR_RNDU));
     unsigned long oscillation = isfinite(height) ? 64ul + (unsigned long)fmin(131072.0, ceil(height / 2.0))
                                                  : 128ul;
@@ -1962,7 +1890,7 @@ static int number_mpc_zeta_euler_maclaurin(mpc_ptr out, mpc_srcptr s, bool want_
     mpc_sqr(power_step, power_step, MPC_RNDNN);
     mpc_ui_div(power_step, 1u, power_step, MPC_RNDNN);
 
-    for (size_t k = 1u; k <= NUMBER_BERNOULLI_EVEN_TERM_COUNT; ++k) {
+    for (size_t k = 1u; k <= number_bernoulli_term_budget(target_prec); ++k) {
         unsigned int rising_count = (unsigned int)(2u * k - 1u);
 
         if (number_mpfr_set_bernoulli_even(bernoulli, k) != 0) {
@@ -2119,7 +2047,7 @@ static int number_mpc_zetah_euler_maclaurin(mpc_ptr out, mpc_srcptr s, mpc_srcpt
     mpc_sqr(power_step, power_step, MPC_RNDNN);
     mpc_ui_div(power_step, 1u, power_step, MPC_RNDNN);
 
-    for (size_t k = 1u; k <= NUMBER_BERNOULLI_EVEN_TERM_COUNT; ++k) {
+    for (size_t k = 1u; k <= number_bernoulli_term_budget(target_prec); ++k) {
         unsigned int rising_count = (unsigned int)(2u * k - 1u);
 
         if (number_mpfr_set_bernoulli_even(bernoulli, k) != 0) {
@@ -5226,22 +5154,24 @@ number_t num_qdigamma(const number_t q, const number_t z)
     return number_qdigamma(q, z);
 }
 
+/* Evaluate the first polygamma without narrowing multiprecision operands. */
 number_t num_trigamma(const number_t number)
 {
     if (num_is_real(number) && num_is_inf(number) && num_get_sign(number) > 0)
         return num_clone(NUM_ZERO);
 
     return number_apply_nonreal_complex_unary_or_dispatch(number, NULL, qf_trigamma, qc_trigamma,
-                                                          number_mpfr_trigamma_mut, NULL);
+                                                          number_mpfr_trigamma_mut, number_mpc_trigamma_mut);
 }
 
+/* Evaluate the second polygamma through the same guarded asymptotic kernel. */
 number_t num_tetragamma(const number_t number)
 {
     if (num_is_real(number) && num_is_inf(number) && num_get_sign(number) > 0)
         return num_clone(NUM_ZERO);
 
     return number_apply_nonreal_complex_unary_or_dispatch(number, NULL, qf_tetragamma, qc_tetragamma,
-                                                          number_mpfr_tetragamma_mut, NULL);
+                                                          number_mpfr_tetragamma_mut, number_mpc_tetragamma_mut);
 }
 
 number_t num_polygamma(unsigned int order, const number_t number)
@@ -5726,187 +5656,6 @@ static int number_mpc_polylog_int(mpc_ptr out, int order, mpc_srcptr z, mpc_rnd_
     return rc;
 }
 
-static int number_mpfr_appell_f1(mpfr_ptr out, mpfr_srcptr a, mpfr_srcptr b1, mpfr_srcptr b2, mpfr_srcptr c,
-                                 mpfr_srcptr x, mpfr_srcptr y)
-{
-    mpfr_prec_t precision = mpfr_get_prec(out);
-    mpfr_t sum, row_start, row_sum, term, num, den, mn, nn, np1;
-    mpfr_t abs_term, abs_sum, threshold, tolerance, abs_x, abs_y, cutoff;
-
-    mpfr_inits2(precision, sum, row_start, row_sum, term, num, den, mn, nn, np1, abs_term, abs_sum, threshold,
-                tolerance, abs_x, abs_y, cutoff, (mpfr_ptr)0);
-    number_polylog_tolerance(tolerance, precision);
-    mpfr_abs(abs_x, x, MPFR_RNDN);
-    mpfr_abs(abs_y, y, MPFR_RNDN);
-    mpfr_set_d(cutoff, 0.95, MPFR_RNDN);
-    if (mpfr_cmp(abs_x, cutoff) >= 0 || mpfr_cmp(abs_y, cutoff) >= 0) {
-        mpfr_set_nan(out);
-        goto done;
-    }
-
-    mpfr_set_zero(sum, 0);
-    mpfr_set_ui(row_start, 1u, MPFR_RNDN);
-
-    for (unsigned long m = 0ul; m < NUMBER_APPELL_F1_SERIES_MAX_TERMS; ++m) {
-        mpfr_set_zero(row_sum, 0);
-        mpfr_set(term, row_start, MPFR_RNDN);
-
-        for (unsigned long n = 0ul; n < NUMBER_APPELL_F1_SERIES_MAX_TERMS; ++n) {
-            mpfr_add(row_sum, row_sum, term, MPFR_RNDN);
-            mpfr_abs(abs_term, term, MPFR_RNDN);
-            mpfr_abs(abs_sum, row_sum, MPFR_RNDN);
-            mpfr_add_ui(threshold, abs_sum, 1u, MPFR_RNDN);
-            mpfr_mul(threshold, threshold, tolerance, MPFR_RNDN);
-            if (mpfr_cmp(abs_term, threshold) <= 0)
-                break;
-
-            mpfr_set_ui(mn, m + n, MPFR_RNDN);
-            mpfr_set_ui(nn, n, MPFR_RNDN);
-            mpfr_set_ui(np1, n + 1ul, MPFR_RNDN);
-            mpfr_add(num, a, mn, MPFR_RNDN);
-            mpfr_add(den, b2, nn, MPFR_RNDN);
-            mpfr_mul(num, num, den, MPFR_RNDN);
-            mpfr_add(den, c, mn, MPFR_RNDN);
-            mpfr_mul(den, den, np1, MPFR_RNDN);
-            if (mpfr_zero_p(den)) {
-                mpfr_set_nan(out);
-                goto done;
-            }
-            mpfr_div(num, num, den, MPFR_RNDN);
-            mpfr_mul(num, num, y, MPFR_RNDN);
-            mpfr_mul(term, term, num, MPFR_RNDN);
-        }
-
-        mpfr_add(sum, sum, row_sum, MPFR_RNDN);
-        mpfr_abs(abs_term, row_sum, MPFR_RNDN);
-        mpfr_abs(abs_sum, sum, MPFR_RNDN);
-        mpfr_add_ui(threshold, abs_sum, 1u, MPFR_RNDN);
-        mpfr_mul(threshold, threshold, tolerance, MPFR_RNDN);
-        if (mpfr_cmp(abs_term, threshold) <= 0)
-            break;
-
-        mpfr_set_ui(mn, m, MPFR_RNDN);
-        mpfr_set_ui(np1, m + 1ul, MPFR_RNDN);
-        mpfr_add(num, a, mn, MPFR_RNDN);
-        mpfr_add(den, b1, mn, MPFR_RNDN);
-        mpfr_mul(num, num, den, MPFR_RNDN);
-        mpfr_add(den, c, mn, MPFR_RNDN);
-        mpfr_mul(den, den, np1, MPFR_RNDN);
-        if (mpfr_zero_p(den)) {
-            mpfr_set_nan(out);
-            goto done;
-        }
-        mpfr_div(num, num, den, MPFR_RNDN);
-        mpfr_mul(num, num, x, MPFR_RNDN);
-        mpfr_mul(row_start, row_start, num, MPFR_RNDN);
-    }
-
-    mpfr_set(out, sum, MPFR_RNDN);
-
-done:
-    mpfr_clears(sum, row_start, row_sum, term, num, den, mn, nn, np1, abs_term, abs_sum, threshold, tolerance, abs_x,
-                abs_y, cutoff, (mpfr_ptr)0);
-    return 0;
-}
-
-static int number_mpc_appell_f1(mpc_ptr out, mpc_srcptr a, mpc_srcptr b1, mpc_srcptr b2, mpc_srcptr c, mpc_srcptr x,
-                                mpc_srcptr y, mpc_rnd_t rnd)
-{
-    mpfr_prec_t precision = mpc_get_prec(out);
-    mpc_t sum, row_start, row_sum, term, num, den, mn, nn, np1;
-    mpfr_t abs_term, abs_sum, threshold, tolerance, abs_x, abs_y, cutoff;
-
-    mpc_init2(sum, precision);
-    mpc_init2(row_start, precision);
-    mpc_init2(row_sum, precision);
-    mpc_init2(term, precision);
-    mpc_init2(num, precision);
-    mpc_init2(den, precision);
-    mpc_init2(mn, precision);
-    mpc_init2(nn, precision);
-    mpc_init2(np1, precision);
-    mpfr_inits2(precision, abs_term, abs_sum, threshold, tolerance, abs_x, abs_y, cutoff, (mpfr_ptr)0);
-    number_polylog_tolerance(tolerance, precision);
-    mpc_abs(abs_x, x, MPFR_RNDN);
-    mpc_abs(abs_y, y, MPFR_RNDN);
-    mpfr_set_d(cutoff, 0.95, MPFR_RNDN);
-    if (mpfr_cmp(abs_x, cutoff) >= 0 || mpfr_cmp(abs_y, cutoff) >= 0) {
-        mpc_set_nan(out);
-        goto done;
-    }
-
-    mpc_set_ui_ui(sum, 0u, 0u, rnd);
-    mpc_set_ui_ui(row_start, 1u, 0u, rnd);
-
-    for (unsigned long m = 0ul; m < NUMBER_APPELL_F1_SERIES_MAX_TERMS; ++m) {
-        mpc_set_ui_ui(row_sum, 0u, 0u, rnd);
-        mpc_set(term, row_start, rnd);
-
-        for (unsigned long n = 0ul; n < NUMBER_APPELL_F1_SERIES_MAX_TERMS; ++n) {
-            mpc_add(row_sum, row_sum, term, rnd);
-            mpc_abs(abs_term, term, MPFR_RNDN);
-            mpc_abs(abs_sum, row_sum, MPFR_RNDN);
-            mpfr_add_ui(threshold, abs_sum, 1u, MPFR_RNDN);
-            mpfr_mul(threshold, threshold, tolerance, MPFR_RNDN);
-            if (mpfr_cmp(abs_term, threshold) <= 0)
-                break;
-
-            mpc_set_ui_ui(mn, m + n, 0u, rnd);
-            mpc_set_ui_ui(nn, n, 0u, rnd);
-            mpc_set_ui_ui(np1, n + 1ul, 0u, rnd);
-            mpc_add(num, a, mn, rnd);
-            mpc_add(den, b2, nn, rnd);
-            mpc_mul(num, num, den, rnd);
-            mpc_add(den, c, mn, rnd);
-            mpc_mul(den, den, np1, rnd);
-            if (mpc_cmp_si_si(den, 0l, 0l) == 0) {
-                mpc_set_nan(out);
-                goto done;
-            }
-            mpc_div(num, num, den, rnd);
-            mpc_mul(num, num, y, rnd);
-            mpc_mul(term, term, num, rnd);
-        }
-
-        mpc_add(sum, sum, row_sum, rnd);
-        mpc_abs(abs_term, row_sum, MPFR_RNDN);
-        mpc_abs(abs_sum, sum, MPFR_RNDN);
-        mpfr_add_ui(threshold, abs_sum, 1u, MPFR_RNDN);
-        mpfr_mul(threshold, threshold, tolerance, MPFR_RNDN);
-        if (mpfr_cmp(abs_term, threshold) <= 0)
-            break;
-
-        mpc_set_ui_ui(mn, m, 0u, rnd);
-        mpc_set_ui_ui(np1, m + 1ul, 0u, rnd);
-        mpc_add(num, a, mn, rnd);
-        mpc_add(den, b1, mn, rnd);
-        mpc_mul(num, num, den, rnd);
-        mpc_add(den, c, mn, rnd);
-        mpc_mul(den, den, np1, rnd);
-        if (mpc_cmp_si_si(den, 0l, 0l) == 0) {
-            mpc_set_nan(out);
-            goto done;
-        }
-        mpc_div(num, num, den, rnd);
-        mpc_mul(num, num, x, rnd);
-        mpc_mul(row_start, row_start, num, rnd);
-    }
-
-    mpc_set(out, sum, rnd);
-
-done:
-    mpfr_clears(abs_term, abs_sum, threshold, tolerance, abs_x, abs_y, cutoff, (mpfr_ptr)0);
-    mpc_clear(np1);
-    mpc_clear(nn);
-    mpc_clear(mn);
-    mpc_clear(den);
-    mpc_clear(num);
-    mpc_clear(term);
-    mpc_clear(row_sum);
-    mpc_clear(row_start);
-    mpc_clear(sum);
-    return 0;
-}
 
 static number_t number_dilog_real_gt_one(const number_t *number)
 {
@@ -6369,24 +6118,39 @@ number_t num_gammainv(const number_t number)
                                                           number_mpfr_gammainv_mut, NULL);
 }
 
+static number_t number_error_math(number_t number, number_double_unary_fn fast,
+                                  number_qfloat_unary_fn real, number_mpfr_unary_mut_fn mpfr,
+                                  number_mpc_complex_unary_mut_fn complex_function)
+{
+    if (number_math_family_value(&number) == NUMBER_MATH_QCOMPLEX) {
+        const number_unary_math_ops_t ops = {.mpc_complex = complex_function};
+        return number_apply_unary_mpc_complex(&number, &ops);
+    }
+    return number_apply_unary_math_with_double(number, fast, real, NULL, mpfr, complex_function);
+}
+
+/* Preserve native real and complex precision while evaluating the error function. */
 number_t num_erf(const number_t number)
 {
-    return number_apply_unary_math_with_double(number, erf, qf_erf, qc_erf, number_mpfr_erf_mut, NULL);
+    return number_error_math(number, erf, qf_erf, number_mpfr_erf_mut, number_mpc_erf);
 }
 
+/* Evaluate complementary values without a fixed-precision complex fallback. */
 number_t num_erfc(const number_t number)
 {
-    return number_apply_unary_math_with_double(number, erfc, qf_erfc, qc_erfc, number_mpfr_erfc_mut, NULL);
+    return number_error_math(number, erfc, qf_erfc, number_mpfr_erfc_mut, number_mpc_erfc);
 }
 
+/* Refine an inverse error-function seed at the selected real or complex precision. */
 number_t num_erfinv(const number_t number)
 {
-    return number_apply_unary_math(number, qf_erfinv, qc_erfinv, number_mpfr_erfinv_mut, NULL);
+    return number_error_math(number, NULL, qf_erfinv, number_mpfr_erfinv_mut, number_mpc_erfinv);
 }
 
+/* Refine inverse erfc directly and verify its defining residual. */
 number_t num_erfcinv(const number_t number)
 {
-    return number_apply_unary_math(number, qf_erfcinv, qc_erfcinv, number_mpfr_erfcinv_mut, NULL);
+    return number_error_math(number, NULL, qf_erfcinv, number_mpfr_erfcinv_mut, number_mpc_erfcinv);
 }
 
 number_t num_lambert_w0(const number_t number)
@@ -6428,20 +6192,39 @@ number_t num_beta(const number_t a, const number_t b)
     return number_apply_binary_math_with_double(a, b, number_double_beta, qf_beta, qc_beta, number_mpfr_beta_mut, NULL);
 }
 
+/* Preserve the real fast paths and use the guarded cylinder series for complex values and branch cuts. */
 number_t num_bessel_j(const number_t order, const number_t argument)
 {
+    number_math_family_t family = number_math_family_binary(number_math_family_value(&order),
+                                                           number_math_family_value(&argument));
+    if (family == NUMBER_MATH_QCOMPLEX || family == NUMBER_MATH_COMPLEX ||
+        (num_is_real(argument) && num_lt(argument, NUM_ZERO) && !num_is_integer(order)))
+        return number_bessel_j_complex(order, argument);
     return number_apply_binary_math_with_double(order, argument, number_double_bessel_j, qf_bessel_j, NULL,
                                                 number_mpfr_bessel_j_mut, NULL);
 }
 
+/* Evaluate real or complex Lommel s without narrowing a complex multiprecision operand. */
 number_t num_lommel_s(const number_t mu, const number_t nu, const number_t argument)
 {
+    number_math_family_t family = number_math_family_binary(number_math_family_value(&mu),
+        number_math_family_binary(number_math_family_value(&nu), number_math_family_value(&argument)));
+    if (family == NUMBER_MATH_QCOMPLEX || family == NUMBER_MATH_COMPLEX) {
+        const number_ternary_math_ops_t ops = {.mpc_complex = number_mpc_lommel_s};
+        return number_apply_ternary_mpc_complex(&mu, &nu, &argument, NUMBER_COMPLEX, &ops);
+    }
     return number_apply_ternary_math_with_double(mu, nu, argument, number_double_lommel_s, qf_lommel_s, NULL,
                                                  number_mpfr_lommel_s_mut, NULL);
 }
 
 number_t num_lommel_s_derivative_internal(const number_t mu, const number_t nu, const number_t argument)
 {
+    number_math_family_t family = number_math_family_binary(number_math_family_value(&mu),
+        number_math_family_binary(number_math_family_value(&nu), number_math_family_value(&argument)));
+    if (family == NUMBER_MATH_QCOMPLEX || family == NUMBER_MATH_COMPLEX) {
+        const number_ternary_math_ops_t ops = {.mpc_complex = number_mpc_lommel_s_derivative};
+        return number_apply_ternary_mpc_complex(&mu, &nu, &argument, NUMBER_COMPLEX, &ops);
+    }
     return number_apply_ternary_math_with_double(mu, nu, argument, number_double_lommel_s_derivative,
                                                  qf_lommel_s_derivative_internal, NULL,
                                                  number_mpfr_lommel_s_derivative_mut, NULL);
@@ -6490,22 +6273,25 @@ number_t num_logbeta_pdf(const number_t x, const number_t a, const number_t b)
                                                  number_mpfr_logbeta_pdf_mut, NULL);
 }
 
+/* Preserve complex working precision in the Gaussian density. */
 number_t num_normal_pdf(const number_t number)
 {
-    return number_apply_unary_math_with_double(number, number_double_normal_pdf, qf_normal_pdf, qc_normal_pdf,
-                                               number_mpfr_normal_pdf_mut, NULL);
+    return number_error_math(number, number_double_normal_pdf, qf_normal_pdf,
+                              number_mpfr_normal_pdf_mut, number_mpc_normal_pdf);
 }
 
+/* Evaluate the Gaussian cumulative distribution through complementary error functions. */
 number_t num_normal_cdf(const number_t number)
 {
-    return number_apply_unary_math_with_double(number, number_double_normal_cdf, qf_normal_cdf, qc_normal_cdf,
-                                               number_mpfr_normal_cdf_mut, NULL);
+    return number_error_math(number, number_double_normal_cdf, qf_normal_cdf,
+                              number_mpfr_normal_cdf_mut, number_mpc_normal_cdf);
 }
 
+/* Preserve complex working precision in the analytic Gaussian log density. */
 number_t num_normal_logpdf(const number_t number)
 {
-    return number_apply_unary_math_with_double(number, number_double_normal_logpdf, qf_normal_logpdf, qc_normal_logpdf,
-                                               number_mpfr_normal_logpdf_mut, NULL);
+    return number_error_math(number, number_double_normal_logpdf, qf_normal_logpdf,
+                              number_mpfr_normal_logpdf_mut, number_mpc_normal_logpdf);
 }
 
 number_t num_productlog(const number_t number)

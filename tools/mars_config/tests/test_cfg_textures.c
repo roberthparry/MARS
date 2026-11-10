@@ -10,6 +10,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
+/* Keep the POSIX signal-stack typedef distinct from the MARS stack API. */
+#define stack_t posix_signal_stack_t
+#include <sys/wait.h>
+#undef stack_t
 #include <unistd.h>
 
 #include "array-t.h"
@@ -562,6 +567,118 @@ static void test_cfg_textures_staged(void)
                      "fresh image replacement preserves unrelated schema, rowids and data; failures retain the original");
 }
 
+static bool texture_complete_reimport(sqlite_t *db, const string_t *root, const string_t *staging)
+{
+    (void)staging;
+    return cfg_database_textures(db, root) &&
+           sqlite_exec_cstr(db,
+               "INSERT INTO retained VALUES('during import'); DROP TABLE retained_parent;\n"
+               "CREATE TABLE retained_parent(id INTEGER PRIMARY KEY); INSERT INTO retained_parent VALUES(17);");
+}
+
+static bool texture_foreign_failure(sqlite_t *db, const string_t *root, const string_t *staging)
+{
+    return texture_complete_reimport(db, root, staging) &&
+           sqlite_exec_cstr(db, "INSERT INTO retained_child VALUES(999)");
+}
+
+static bool texture_interrupted_reimport(sqlite_t *db, const string_t *root, const string_t *staging)
+{
+    if (!texture_complete_reimport(db, root, staging)) _exit(9);
+    /* Force dirty pages to disk, then exit without closing SQLite or committing the outer transaction. */
+    if (!sqlite_exec_cstr(db, "PRAGMA cache_size=1; UPDATE retained SET value='uncommitted'")) _exit(10);
+    _exit(0);
+}
+
+static bool texture_reimport_fixture(const char *directory)
+{
+    (void)directory;
+    file_t *fixture = NULL;
+    sqlite_t *db = texture_database("", &fixture);
+    string_t *root = texture_fixture_root();
+    string_t *path = fixture ? string_sprintf("%s/textures.db", file_path(fixture)) : NULL;
+    string_t *parent = fixture ? string_new_with(file_path(fixture)) : NULL;
+    string_t *staging = parent ? cfg_database_stage(parent) : NULL;
+    file_t *installed = path ? file_new(path) : NULL;
+    struct stat before = {0}, after = {0};
+    bool ok = db && root && staging && installed && cfg_database_textures(db, root) &&
+        cfg_database_revision(db, "globe", CFG_GLOBE_DATA_REVISION) && sqlite_exec_cstr(db,
+            "CREATE TABLE retained(value TEXT); INSERT INTO retained VALUES('original');\n"
+            "CREATE TABLE retained_payload(id INTEGER PRIMARY KEY,bytes BLOB);\n"
+            "INSERT INTO retained_payload VALUES(17,zeroblob(1048576));\n"
+            "CREATE TABLE retained_parent(id INTEGER PRIMARY KEY); INSERT INTO retained_parent VALUES(17);\n"
+            "CREATE TABLE retained_child(parent INTEGER REFERENCES retained_parent(id) ON DELETE CASCADE);\n"
+            "INSERT INTO retained_child VALUES(17);\n"
+            "CREATE TABLE audit(value TEXT); CREATE INDEX retained_value ON retained(value);\n"
+            "CREATE VIEW \"retained\"\"view\" AS SELECT value FROM retained;\n"
+            "CREATE TRIGGER retained_audit AFTER INSERT ON retained BEGIN\n"
+            "  INSERT INTO audit VALUES(new.value); END;\n"
+            "UPDATE globe_texture SET png=zeroblob(byte_count) WHERE level=0;\n"
+            "INSERT INTO globe_texture VALUES(99,0,0,1,1,1,'obsolete',x'00');") &&
+        stat(file_path(installed), &before) == 0;
+    sqlite_stmt_t *page = ok ? sqlite_stmt_prepare(db,
+        "SELECT rootpage FROM main.sqlite_schema WHERE name='retained_payload'") : NULL;
+    ok = ok && page && sqlite_stmt_step(page) == SQLITE_STEP_ROW;
+    int64_t retained_page = ok ? sqlite_stmt_column_int64(page, 0) : 0;
+    sqlite_stmt_finalize(page);
+    ok = ok && cfg_database_reimport_globe(db, root, staging, texture_complete_reimport, CFG_GLOBE_DATA_REVISION) &&
+         cfg_database_textures_valid(db) && stat(file_path(installed), &after) == 0 &&
+         before.st_dev == after.st_dev && before.st_ino == after.st_ino &&
+         texture_scalar_is(db, "SELECT rootpage FROM main.sqlite_schema WHERE name='retained_payload'", retained_page) &&
+         texture_scalar_is(db, "SELECT length(bytes) FROM retained_payload WHERE id=17", 1048576) &&
+         texture_scalar_is(db, "SELECT count(*) FROM globe_texture WHERE level=99", 0) &&
+         texture_scalar_is(db, "SELECT count(*) FROM retained_child WHERE parent=17", 1) &&
+         texture_scalar_is(db, "PRAGMA foreign_keys", 1) &&
+         texture_scalar_is(db, "SELECT count(*) FROM \"retained\"\"view\"", 2) &&
+         texture_scalar_is(db, "SELECT count(*) FROM audit", 0) &&
+         sqlite_exec_cstr(db, "INSERT INTO retained VALUES('after import')") &&
+         texture_scalar_is(db, "SELECT count(*) FROM audit WHERE value='after import'", 1);
+    string_t *original = ok ? file_sha256(installed) : NULL;
+    ok = ok && original && !cfg_database_reimport_globe(db, root, staging, texture_invalid_update,
+                                                       CFG_GLOBE_DATA_REVISION);
+    string_t *unchanged = ok ? file_sha256(installed) : NULL;
+    ok = ok && unchanged && !strcmp(string_c_str(original), string_c_str(unchanged));
+    string_free(unchanged);
+    ok = ok && !cfg_database_reimport_globe(db, root, staging, texture_foreign_failure,
+                                           CFG_GLOBE_DATA_REVISION) && texture_scalar_is(db, "PRAGMA foreign_keys", 1);
+    unchanged = ok ? file_sha256(installed) : NULL;
+    ok = ok && unchanged && !strcmp(string_c_str(original), string_c_str(unchanged));
+    string_free(unchanged);
+    sqlite_t *writer = ok ? sqlite_open_plain(path) : NULL;
+    ok = ok && writer && sqlite_exec_cstr(writer, "BEGIN IMMEDIATE") &&
+         !cfg_database_reimport_globe(db, root, staging, texture_complete_reimport, CFG_GLOBE_DATA_REVISION) &&
+         texture_scalar_is(db, "PRAGMA foreign_keys", 1);
+    if (writer) ok = sqlite_exec_cstr(writer, "ROLLBACK") && ok;
+    sqlite_close(writer);
+    sqlite_close(db); db = NULL;
+    pid_t child = ok ? fork() : -1;
+    if (child == 0) {
+        sqlite_t *candidate = sqlite_open_plain(path);
+        bool completed = candidate && cfg_database_reimport_globe(candidate, root, staging,
+            texture_interrupted_reimport, CFG_GLOBE_DATA_REVISION);
+        sqlite_close(candidate);
+        _exit(completed ? 11 : 12);
+    }
+    int status = 0;
+    ok = ok && child > 0 && waitpid(child, &status, 0) == child && WIFEXITED(status) && WEXITSTATUS(status) == 0;
+    db = ok ? sqlite_open_plain(path) : NULL;
+    unchanged = db ? file_sha256(installed) : NULL;
+    ok = ok && db && unchanged && !strcmp(string_c_str(original), string_c_str(unchanged)) &&
+         cfg_database_textures_valid(db) && texture_scalar_is(db, "SELECT count(*) FROM retained", 3) &&
+         texture_scalar_is(db, "SELECT count(*) FROM audit", 1);
+    string_free(unchanged); string_free(original);
+    cfg_database_cleanup(staging); string_free(staging);
+    file_free(installed); string_free(path); string_free(parent); string_free(root);
+    texture_database_close(db, fixture);
+    return ok;
+}
+
+static void test_cfg_textures_reimport(void)
+{
+    TEST_ASSERT_TRUE(test_cfg_isolated(texture_reimport_fixture),
+        "full reimport replaces matching and obsolete images, retains payload pages and schema, and recovers interrupted work");
+}
+
 static void example_globe_texture_metadata(void)
 {
     /* README example: query one image and release its owned bytes after use. */
@@ -589,6 +706,7 @@ void test_cfg_textures_cases(void)
     TEST_RUN_IN_GROUP(test_cfg_textures_rollback, tests, NULL);
     TEST_RUN_IN_GROUP(test_cfg_textures_migration, tests, NULL);
     TEST_RUN_IN_GROUP(test_cfg_textures_staged, tests, NULL);
+    TEST_RUN_IN_GROUP(test_cfg_textures_reimport, tests, NULL);
 }
 
 void test_cfg_textures_readme_cases(void)

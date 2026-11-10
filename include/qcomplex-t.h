@@ -373,11 +373,57 @@ qcomplex_t qc_acoth(qcomplex_t z);   /**< acoth(z) */
  * @name Special functions
  * @{
  */
-qcomplex_t qc_erf(qcomplex_t z);                           /**< error function */
-qcomplex_t qc_erfc(qcomplex_t z);                          /**< complementary error function */
-qcomplex_t qc_erfinv(qcomplex_t z);                        /**< inverse error function */
-qcomplex_t qc_erfcinv(qcomplex_t z);                       /**< inverse complementary error function */
+/**
+ * @brief Evaluate the complex error function at fixed double-double precision.
+ * @param[in] z Argument copied by value; real values use the direct qfloat implementation.
+ * @return Value requiring no release, or QC_NAN outside the guarded complex range or on unresolved evaluation.
+ * Complex modulus above 140 and required work precision above 65536 bits are unsupported. No shared state is used.
+ */
+qcomplex_t qc_erf(qcomplex_t z);
+
+/**
+ * @brief Evaluate the complementary complex error function with cancellation guards.
+ * @param[in] z Argument copied by value; real complementary values use qfloat directly.
+ * @return Value requiring no release, or QC_NAN on unsupported range or exhausted accuracy guards.
+ * The guarded complex range is the same as qc_erf(); no operand ownership or retained pointer is involved.
+ */
+qcomplex_t qc_erfc(qcomplex_t z);
+
+/**
+ * @brief Evaluate inverse erf using checked native iteration for complex arguments.
+ * @param[in] z Argument copied by value; real values retain the established qfloat domain and endpoint behaviour.
+ * @return Fixed complex value requiring no release, or QC_NAN if iteration or its residual cannot be resolved.
+ * Approximate seeds do not determine result precision; temporary native values are released before return.
+ */
+qcomplex_t qc_erfinv(qcomplex_t z);
+
+/**
+ * @brief Evaluate inverse erfc and verify the defining complementary residual.
+ * @param[in] z Argument copied by value; real values use the direct qfloat inverse.
+ * @return Fixed complex value requiring no release, or QC_NAN on unresolved iteration or unsupported work size.
+ * No shared mutable state or operand ownership is transferred.
+ */
+qcomplex_t qc_erfcinv(qcomplex_t z);
 qcomplex_t qc_gamma(qcomplex_t z);                         /**< gamma function */
+
+/**
+ * @brief Evaluate principal Bessel J for complex order and argument with guarded precision.
+ * @param[in] order Order copied by value.
+ * @param[in] argument Argument copied by value.
+ * @return Fixed complex value requiring no release; QC_NAN for unsupported ranges or unresolved cancellation.
+ * The negative real axis takes its upper-bank value. Magnitudes above 1000 and work above 65536 bits are unsupported.
+ */
+qcomplex_t qc_bessel_j(qcomplex_t order, qcomplex_t argument);
+
+/**
+ * @brief Evaluate principal complex Lommel s using its convergent power series.
+ * @param[in] mu Exponent parameter copied by value.
+ * @param[in] nu Order parameter copied by value.
+ * @param[in] argument Principal-branch argument copied by value.
+ * @return Fixed complex value requiring no release; QC_NAN at poles or exhausted convergence and cancellation guards.
+ * Negative real arguments use the upper bank. Argument modulus above 1000 or work above 65536 bits is unsupported.
+ */
+qcomplex_t qc_lommel_s(qcomplex_t mu, qcomplex_t nu, qcomplex_t argument);
 
 /**
  * @brief Evaluate principal Bessel Y for real or complex order and argument, including Y_0.
@@ -533,7 +579,13 @@ qcomplex_t qc_binomial(qcomplex_t a, qcomplex_t b);                        /**< 
 qcomplex_t qc_beta_pdf(qcomplex_t x, qcomplex_t a, qcomplex_t b);          /**< beta PDF */
 qcomplex_t qc_logbeta_pdf(qcomplex_t x, qcomplex_t a, qcomplex_t b);       /**< log beta PDF */
 qcomplex_t qc_normal_pdf(qcomplex_t z);                                    /**< normal PDF */
-qcomplex_t qc_normal_cdf(qcomplex_t z);                                    /**< normal CDF */
+/**
+ * @brief Evaluate the Gaussian cumulative distribution without cancelling the negative tail.
+ * @param z Complex argument copied by value; real values use the qfloat implementation.
+ * @return Fixed complex value requiring no release, or QC_NAN on an exhausted error-function guard.
+ * The complex range is inherited from qc_erfc(); no caller-owned storage is retained or modified.
+ */
+qcomplex_t qc_normal_cdf(qcomplex_t z);
 qcomplex_t qc_normal_logpdf(qcomplex_t z);                                 /**< normal log PDF */
 qcomplex_t qc_lambert_wn(int branch, qcomplex_t z);                        /**< Lambert W integer branch */
 qcomplex_t qc_lambert_wm1(qcomplex_t z);                                   /**< Lambert W branch -1 */

@@ -8,6 +8,25 @@ The native harness prints individual case results, group totals, a final
 summary and the slowest cases to the terminal. It does not currently emit
 JUnit XML. Optional SQLite run reports are described below. Capture both standard output and standard error when preserving
 verification evidence, and keep a separate log for every isolated batch.
+`make test` retains a failing suite's standard output and standard error beside
+its executable, with a `.log` suffix, and prints that pathname beside `FAIL`.
+Successful suites' temporary logs are removed.
+The suite summary colours `PASS` green and `FAIL` red.
+While a suite runs, `make test` shows a UTF-8 Braille spinner, an elapsed timer,
+green ✓ and red ✗ result counts, and the latest completed check. A terminal
+updates the same line four times per second; redirected output receives a status
+line every ten seconds. The runner
+reads appended output incrementally, without rescanning a growing log or adding
+threads to the test process. These counts include nested result records and are
+not a claimed total number of tests. Suites still run sequentially, with no new
+execution deadline.
+Executables that also serve native subprocess fixtures may define
+`test_program_setup()` to dispatch those commands before test-option parsing.
+Ordinary suite registration and test-database reporting happen afterwards; a
+fixture command that exits from this hook does not start a test run.
+The configuration suite logs SQLCipher errors for its synthetic encrypted fixtures,
+without repeating memory-lock quota warnings for every allocation. Encryption and
+memory security remain enabled; this test-only log level does not change application diagnostics.
 
 ```sh
 make test_qfloat
@@ -28,8 +47,14 @@ the reviewable test inputs and expectations.
 
 Running tests appends results and updates statistics in that same database;
 case definitions and selection profiles are preserved. The file survives
-`make clean`. Compiling, installing, `make release` and running MARS Lab never
-create a test database. A missing database is initialised only by test execution
+`make clean`. `make release` synchronises an existing database only when its SQL
+definitions or JSON catalogue have changed since the last complete synchronisation.
+It compares SHA-256 content fingerprints, so a `git pull` is detected independently
+of checkout paths and file modification times. An unchanged database prints
+`Test database: up to date; synchronisation skipped.` A missing one prints
+`Test database: not present; synchronisation skipped.` Compiling, installing,
+`make release` and running MARS Lab never create a test database.
+A missing database is initialised only by test execution
 or explicit test-database commands. The test database is not installed with the
 application.
 
@@ -63,6 +88,15 @@ Unconfirmed status never controls execution. Sync never deletes test definitions
 case rows, saved selections or run reports, and an invalid import rolls back in
 full. History retention is a separate operation after a completed run.
 
+`make test-db-sync-if-needed` performs the same conditional check used by release.
+Both explicit and conditional synchronisation record their source fingerprint only
+after a complete successful catalogue import. Failed imports leave the previous
+fingerprint, cases, selections and history intact; the next release retries them.
+If source files change during the import, it rolls back and requests a retry.
+Synchronisation retains existing case edits and disabled rows; updating an existing
+case's expected result still requires an explicit data migration rather than an
+automatic overwrite from its SQL seed.
+
 The catalogue is populated from the JSON registration catalogue, module case
 tables and registrations observed during execution. Sync does not parse arbitrary
 C source or discover an unexecuted C registration absent from JSON. Neither an
@@ -83,6 +117,53 @@ profile runs do not rewrite JSON. `runs` shows recent reports and identifies mem
 tool runs. `stats`, optionally followed by a source prefix, displays per-test
 statistics; the same data is directly queryable through the `test_case_metrics`
 view in SQLite or DBeaver.
+
+Statistics output defaults to an aligned Unicode grid, independently of installed
+Markdown readers. Use `make -s test-db ARGS='stats' | less -R` to page the report
+while retaining its colours and bold headings. No reader is installed or launched
+by the command. The `-s` suppresses Make's command echo; dependency
+diagnostics go to stderr, leaving the report on stdout.
+
+Use `--format=grid`, `--format=markdown` or `--format=tsv` for an explicit format;
+`--format=auto` also selects the native grid. Compact reports group tests
+by source and align durations to the right. Grids use double outer borders and
+a double rule beneath the header, with single rules between data rows. Grid cells wrap long names without
+losing text; narrow terminals use per-test field/value grids instead. Set
+`COLUMNS` when piping to specify the available width. The `--details` option
+includes every timestamp, memory-test date, comparison and outlier field.
+Table headings are bold, source headings are bold bright gold and test names are bright cyan.
+Mean values are bold light cyan and median values are bold yellow. Change percentages below −5% have a bold bright green ▲
+(faster), above +5% have a bold bright red ▼ (slower), and within ±5% have a bold amber ▬ (little change).
+Amber uses the explicit orange RGB colour `#FF8C00` on terminals with true-colour support.
+The marker follows the value and remains visible when colours are disabled.
+Missing comparisons remain uncoloured. This display band does not change the timing-outlier policy.
+Displayed outcomes use `PASS`, `FAIL` and `SKIPPED`.
+The native grid retains styling when piped as well as when displayed directly
+in a terminal with a supported `TERM`. It shows `PASS` in
+bold bright green, `FAIL` in bold bright red and `SKIPPED` in bold bright yellow. `NO_COLOR` or `TERM=dumb` suppresses terminal
+styling; `CLICOLOR_FORCE=1` can request styling when a terminal is not otherwise
+detected. Colours are presentation only: stored outcomes and timings do not change.
+
+Markdown export always uses standard bold Markdown for headings and outcomes,
+without ANSI escape sequences, even when terminal colour is forced. Markdown
+readers control their own layout and theme; per-word result colours belong to
+the native grid. Glow's `pager: true`, `width: 140` and `preserveNewLines: true`
+settings can be used for this plain export without shell aliases.
+TSV always includes every original
+field and column name, with the stored lowercase outcomes and no terminal escapes.
+Control characters within stored text are displayed as literal hexadecimal escapes;
+their original values remain unchanged in the database.
+
+For example, the Markdown output from `stats --format=markdown` contains the
+following table for a single passing `group.original` test taking 2.5 ms.
+The format regression runs this example against an isolated database; actual
+names, durations and sample counts reflect your recorded runs.
+
+```text
+| **Test** | **Result** | **Last ms** | **Change %** | **Fastest ms** | **Slowest ms** | **Mean ms** | **Median ms** | **Samples** |
+| :--- | :--- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| group.original | **PASS** | 2.5 | - | 2.5 | 2.5 | 2.5 | 2.5 | 1 |
+```
 
 Profiles are loaded into dictionary indexes and the connection is closed before
 tests run. Reports are written afterwards in a transaction. A reporting failure
@@ -394,6 +475,9 @@ block, allowing only trailing whitespace differences. A missing `main()`,
 compiler error, non-zero exit, timeout, missing output block or output mismatch
 fails the check. It writes extracted sources, executables, compiler logs,
 captured output and a JSON report under `build/readme-examples/`.
+Globe reader identity examples receive a small temporary SQLite database in their
+disposable working directory. Child-only settings select that file; installed
+databases and the parent process's settings are left untouched.
 
 To run an extracted example yourself, execute its named binary in that
 directory. To compile a copied block independently, save it as a C source file

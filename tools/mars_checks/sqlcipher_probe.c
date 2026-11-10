@@ -10,6 +10,7 @@
  */
 #include <stdbool.h>
 #include <stdio.h>
+#include <string.h>
 
 #include <sqlcipher/sqlite3.h>
 
@@ -49,8 +50,10 @@ static void probe_install_instructions(void)
           "Full instructions: docs/building.md#updating-sqlcipher-on-debian-or-ubuntu\n", stderr);
 }
 
-static bool probe_version(sqlite3 *db)
+static bool probe_version(sqlite3 *db, bool quiet)
 {
+    bool runtime = sqlite3_libversion_number() >= 3027000;
+    bool headers = SQLITE_VERSION_NUMBER >= 3027000;
     sqlite3_stmt *query = NULL;
     bool found = sqlite3_prepare_v2(db, "PRAGMA cipher_version", -1, &query, NULL) == SQLITE_OK &&
                  sqlite3_step(query) == SQLITE_ROW && sqlite3_column_text(query, 0) &&
@@ -60,16 +63,16 @@ static bool probe_version(sqlite3 *db)
         const char *release = (const char *)sqlite3_column_text(query, 0);
         unsigned major = 0, minor = 0;
         cipher = sscanf(release, "%u.%u", &major, &minor) == 2 && (major > 4 || (major == 4 && minor >= 1));
-        printf("SQLCipher %s; SQLite runtime %s; SQLite headers %s.\n",
-               release, sqlite3_libversion(), SQLITE_VERSION);
-        fflush(stdout);
+        if (!quiet || !cipher || !runtime || !headers) {
+            fprintf(stderr, "SQLCipher %s; SQLite runtime %s; SQLite headers %s.\n",
+                   release, sqlite3_libversion(), SQLITE_VERSION);
+            fflush(stderr);
+        }
         if (!cipher)
             fprintf(stderr, "SQLCipher %s is unsupported; MARS requires SQLCipher 4.1.0 or newer.\n", release);
     } else
         fputs("The linked library does not report a SQLCipher version.\n", stderr);
     sqlite3_finalize(query);
-    bool runtime = sqlite3_libversion_number() >= 3027000;
-    bool headers = SQLITE_VERSION_NUMBER >= 3027000;
     if (!runtime)
         fprintf(stderr, "SQLCipher embeds SQLite %s; MARS requires SQLite 3.27.0 or newer.\n", sqlite3_libversion());
     if (!headers)
@@ -104,16 +107,22 @@ static bool probe_features(sqlite3 *db)
 }
 
 /* Validate the selected runtime without opening a user database or changing the installed library. */
-int main(void)
+int main(int argc, char **argv)
 {
+    bool quiet = argc == 2 && !strcmp(argv[1], "--quiet");
+    if (argc != 1 && !quiet) {
+        fputs("Usage: sqlcipher_probe [--quiet]\n", stderr);
+        return 2;
+    }
     sqlite3 *db = NULL;
     if (sqlite3_open(":memory:", &db) != SQLITE_OK) {
         fputs("Cannot open SQLCipher's in-memory dependency probe.\n", stderr);
         sqlite3_close(db);
         return 1;
     }
-    bool version = probe_version(db);
+    bool version = probe_version(db, quiet);
     bool features = probe_features(db);
+    if (quiet && version && !features) (void)probe_version(db, false);
     bool closed = sqlite3_close(db) == SQLITE_OK;
     if (!version || !features || !closed) {
         fputs("Install or rebuild the SQLCipher library and development headers with SQLite >= 3.27.0,\n"
@@ -123,6 +132,6 @@ int main(void)
         probe_install_instructions();
         return 1;
     }
-    puts("SQLCipher version and required SQL features verified.");
+    if (!quiet) fputs("SQLCipher version and required SQL features verified.\n", stderr);
     return 0;
 }

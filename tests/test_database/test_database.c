@@ -6,9 +6,12 @@
  * transaction fixtures. Each case owns a disposable repository and database. Shared database selection is disabled;
  * optional reporting occurs afterwards and cannot change the console result. The testing guide example runs last.
  */
+#include <locale.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
+#include <wchar.h>
 
 #include "array-t.h"
 #include "file-t.h"
@@ -438,7 +441,7 @@ static void test_legacy_reports_merge_once_and_upgrade(void)
     file_t *old_single = file_new(fixture.path);
     ok = ok && old_single && file_copy(copy, old_single, false);
     fixture.database = test_database_open(fixture.root, fixture.path, true, NULL);
-    ok = ok && fixture.database && scalar(&fixture, "PRAGMA user_version") == 4 &&
+    ok = ok && fixture.database && scalar(&fixture, "PRAGMA user_version") == 5 &&
          scalar(&fixture, "SELECT normal_count = 2 AND median_ms = 25 FROM test_case_metrics"
                           " WHERE path = 'legacy_case'") == 1 &&
          test_database_import(fixture.database, fixture.root, NULL, true) &&
@@ -505,6 +508,108 @@ static void test_help_creates_no_database(void)
     file_free(file);
     fixture_close(&fixture);
     TEST_ASSERT_TRUE(ok, "administration help never creates test storage");
+}
+
+static int conditional_sync(database_fixture_t *fixture)
+{
+    char *arguments[] = {"--database", (char *)string_c_str(fixture->path), "sync-if-needed"};
+    return test_database_command(fixture->root, 3, arguments);
+}
+
+static bool append_sql(const string_t *path, const char *sql)
+{
+    file_t *file = file_new(path);
+    string_t *content = file ? file_read_all_text(file) : NULL;
+    bool ok = content && !string_append_cstr(content, sql) && file_write_all_text(file, content);
+    string_free(content);
+    file_free(file);
+    return ok;
+}
+
+static void test_conditional_sync_never_creates_storage(void)
+{
+    database_fixture_t fixture = {0};
+    TEST_ASSERT_TRUE(fixture_open(&fixture, false), "prepare sources without a database");
+    char *arguments[] = {"sync-if-needed"};
+    string_t *default_path = string_sprintf("%s/tests/tests.db", string_c_str(fixture.root));
+    file_t *default_file = default_path ? file_new(default_path) : NULL;
+    file_t *override_file = file_new(fixture.path);
+    bool ok = default_file && override_file && test_database_command(fixture.root, 1, arguments) == 0 &&
+              !file_exists(default_file) && conditional_sync(&fixture) == 0 && !file_exists(override_file);
+    ok = ok && write_text(fixture.path, "not a MARS test database") && conditional_sync(&fixture) == 1;
+    string_t *unchanged = file_read_all_text(override_file);
+    ok = ok && unchanged && !strcmp(string_c_str(unchanged), "not a MARS test database");
+    string_free(unchanged);
+    file_free(override_file);
+    file_free(default_file);
+    string_free(default_path);
+    fixture_close(&fixture);
+    TEST_ASSERT_TRUE(ok, "release checks never create missing storage or replace unrelated files");
+}
+
+static void test_conditional_sync_tracks_contents(void)
+{
+    database_fixture_t fixture = {0};
+    TEST_ASSERT_TRUE(fixture_open(&fixture, true), "prepare an existing database");
+    test_database_result_t record = result_record();
+    bool ok = test_database_import(fixture.database, fixture.root, "saved", true) &&
+              test_database_run_begin(fixture.database, "preserved-report", "saved", false) &&
+              test_database_run_record(fixture.database, &record) &&
+              test_database_run_finish(fixture.database, 0, 2.5) &&
+              test_database_exec(fixture.database,
+                  "UPDATE test_source_sync SET synced_utc = '2000-01-01T00:00:00Z' WHERE id = 1;") &&
+              conditional_sync(&fixture) == 0 &&
+              scalar(&fixture, "SELECT synced_utc = '2000-01-01T00:00:00Z' FROM test_source_sync") == 1;
+    ok = ok && configure(&fixture, "{\"tests/example.c\":{\"new_from_pull\":true}}") &&
+         conditional_sync(&fixture) == 0 &&
+         scalar(&fixture, "SELECT count(*) FROM test_catalogue WHERE path = 'new_from_pull' AND confirmed = 1") == 1;
+    string_t *source = string_sprintf("%s/tests/expression/test_expression.sql", string_c_str(fixture.root));
+    file_t *source_file = source ? file_new(source) : NULL;
+    ok = ok && source_file && append_sql(source,
+        "\nINSERT OR IGNORE INTO expression_cases(name, operation, input, expected)\n"
+        "VALUES ('conditional_added_case', 'evaluate', '7+9', '16');\n") &&
+        file_set_times(source_file, 946684800, 0, 946684800, 0) && conditional_sync(&fixture) == 0 &&
+        scalar(&fixture, "SELECT count(*) FROM expression_cases WHERE name = 'conditional_added_case'") == 1 &&
+        test_database_exec(fixture.database,
+            "UPDATE test_source_sync SET synced_utc = '2000-01-01T00:00:00Z' WHERE id = 1;") &&
+        conditional_sync(&fixture) == 0 &&
+        scalar(&fixture, "SELECT synced_utc = '2000-01-01T00:00:00Z' FROM test_source_sync") == 1 &&
+        scalar(&fixture, "SELECT count(*) FROM test_run") == 1 &&
+        scalar(&fixture, "SELECT run_count FROM test_case_statistics WHERE source = 'tests/example.c'") == 1 &&
+        scalar(&fixture, "SELECT enabled FROM test_selection WHERE profile = 'saved' AND path = 'group.original'") == 0;
+    file_free(source_file);
+    string_free(source);
+    fixture_close(&fixture);
+    TEST_ASSERT_TRUE(ok, "content changes import once while unchanged sources, selections and history remain intact");
+}
+
+static void test_conditional_sync_retries_failed_import(void)
+{
+    database_fixture_t fixture = {0};
+    TEST_ASSERT_TRUE(fixture_open(&fixture, true), "prepare a complete synchronisation");
+    bool ok = test_database_import(fixture.database, fixture.root, NULL, true) &&
+              test_database_exec(fixture.database,
+                  "UPDATE test_source_sync SET synced_utc = '2000-01-01T00:00:00Z' WHERE id = 1;");
+    string_t *source = string_sprintf("%s/tests/expression/test_expression.sql", string_c_str(fixture.root));
+    file_t *file = source ? file_new(source) : NULL;
+    string_t *original = file ? file_read_all_text(file) : NULL;
+    const char *addition =
+        "\nINSERT OR IGNORE INTO expression_cases(name, operation, input, expected)\n"
+        "VALUES ('conditional_retry_case', 'evaluate', '8+9', '17');\n";
+    ok = ok && original && append_sql(source, addition) && append_sql(source, "INVALID SQL;\n") &&
+         conditional_sync(&fixture) == 1 &&
+         scalar(&fixture, "SELECT count(*) FROM expression_cases WHERE name = 'conditional_retry_case'") == 0 &&
+         scalar(&fixture, "SELECT synced_utc = '2000-01-01T00:00:00Z' FROM test_source_sync") == 1 &&
+         file_write_all_text(file, original) && append_sql(source, addition) && conditional_sync(&fixture) == 0 &&
+         scalar(&fixture, "SELECT count(*) FROM expression_cases WHERE name = 'conditional_retry_case'") == 1;
+    ok = ok && test_database_exec(fixture.database, "DROP TABLE test_source_sync; PRAGMA user_version = 4;") &&
+         conditional_sync(&fixture) == 0 && scalar(&fixture, "PRAGMA user_version") == 5 &&
+         scalar(&fixture, "SELECT count(*) FROM test_source_sync") == 1;
+    string_free(original);
+    file_free(file);
+    string_free(source);
+    fixture_close(&fixture);
+    TEST_ASSERT_TRUE(ok, "failed imports stay pending, retry without partial rows and upgrade older schema safely");
 }
 
 static void test_module_sources_are_discovered_atomically(void)
@@ -593,6 +698,281 @@ static void test_default_storage_survives_build_cleanup(void)
     TEST_ASSERT_TRUE(ok, "one database retains cases, statistics and reports through build cleanup; definitions stay intact");
 }
 
+static string_t *capture_stats(database_fixture_t *fixture, const char *leaf, const char *format,
+                                const char *extra, int *status)
+{
+    const char *path = NULL;
+    int saved = test_case_begin_stdout_capture(leaf, &path);
+    if (saved < 0) return NULL;
+    char *arguments[] = {"--database", (char *)string_c_str(fixture->path), "stats", (char *)format, (char *)extra};
+    *status = test_database_command(fixture->root, extra ? 5 : format ? 4 : 3, arguments);
+    bool restored = test_case_end_stdout_capture(saved);
+    file_t *file = restored && path ? file_new_cstr(path) : NULL;
+    string_t *output = file ? file_read_all_text(file) : NULL;
+    file_free(file);
+    return output;
+}
+
+/* Count visible columns independently, including Unicode text and excluding terminal colour/weight sequences. */
+static bool grid_aligned(const string_t *output, size_t limit)
+{
+    locale_t utf8 = newlocale(LC_CTYPE_MASK, "C.UTF-8", (locale_t)0);
+    locale_t previous = utf8 ? uselocale(utf8) : (locale_t)0;
+    if (!previous) { if (utf8) freelocale(utf8); return false; }
+    const char *p = string_c_str(output);
+    size_t columns = 0, expected = 0, lines = 0;
+    bool table = false, ok = true;
+    mbstate_t state = {0};
+    while (ok && *p) {
+        if (*p == '\033' && p[1] == '[') {
+            const char *end = p + 2 + strspn(p + 2, "0123456789;");
+            if (*end != 'm') { ok = false; break; }
+            p = end + 1;
+            continue;
+        }
+        wchar_t rune = 0;
+        size_t bytes = mbrtowc(&rune, p, MB_CUR_MAX, &state);
+        if (!bytes || bytes == (size_t)-1 || bytes == (size_t)-2) { ok = false; break; }
+        if (!columns) table = rune == L'╔' || rune == L'╠' || rune == L'╟' || rune == L'╚' || rune == L'║';
+        if (rune == L'\n') {
+            if (table) {
+                if (!expected) expected = columns;
+                ok = columns == expected && columns <= limit;
+                ++lines;
+            }
+            columns = 0;
+        } else {
+            int width = wcwidth(rune);
+            if (width < 0) ok = false;
+            else columns += (size_t)width;
+        }
+        p += bytes;
+    }
+    uselocale(previous); freelocale(utf8);
+    return ok && lines >= 5;
+}
+
+static void test_statistics_formats_and_reader_detection(void)
+{
+    database_fixture_t fixture = {0};
+    TEST_ASSERT_TRUE(fixture_open(&fixture, true), "prepare isolated report storage");
+    test_database_result_t record = result_record();
+    record.path = "group.escaping_|_漢字_e\xcc\x81_with_a_very_long_name_that_wraps_without_losing_its_end\t\n\033[31m";
+    bool ok = test_database_run_begin(fixture.database, "fixture", NULL, false) &&
+              test_database_run_record(fixture.database, &record) &&
+              test_database_run_finish(fixture.database, 0, 2.5) &&
+              test_database_run_begin(fixture.database, "memory fixture", NULL, true) &&
+              test_database_run_record(fixture.database, &record) &&
+              test_database_run_finish(fixture.database, 0, 2.5);
+    char *saved_path = getenv("PATH") ? strdup(getenv("PATH")) : NULL;
+    char *saved_columns = getenv("COLUMNS") ? strdup(getenv("COLUMNS")) : NULL;
+    char *saved_disabled = getenv("NO_COLOR") ? strdup(getenv("NO_COLOR")) : NULL;
+    char *saved_term = getenv("TERM") ? strdup(getenv("TERM")) : NULL;
+    char *saved_force = getenv("CLICOLOR_FORCE") ? strdup(getenv("CLICOLOR_FORCE")) : NULL;
+    ok = ok && !setenv("PATH", string_c_str(fixture.root), 1) && !setenv("COLUMNS", "200", 1) &&
+         !setenv("NO_COLOR", "1", 1);
+    int status = -1;
+    string_t *grid = ok ? capture_stats(&fixture, "stats-grid.txt", NULL, NULL, &status) : NULL;
+    ok = ok && status == 0 && grid && grid_aligned(grid, 200) && string_find(grid, "╤") >= 0 &&
+         string_find(grid, "╪") >= 0 && string_find(grid, "╧") >= 0 &&
+         string_find(grid, "Change %") >= 0 && string_find(grid, "Samples") >= 0 &&
+         string_find(grid, "end") >= 0 && string_find(grid, "漢字") >= 0 && string_find(grid, "\t") < 0 &&
+         string_find(grid, "\\x09\\x0a\\x1b[31m") >= 0;
+    string_free(grid);
+    ok = ok && !setenv("COLUMNS", "80", 1);
+    string_t *details = ok ? capture_stats(&fixture, "stats-narrow.txt", "--format=grid", NULL, &status) : NULL;
+    ok = ok && status == 0 && details && grid_aligned(details, 80) &&
+         string_find(details, "Last memory test (UTC)") >= 0 && string_find(details, "Timing outliers") >= 0 &&
+         string_find(details, "┼") >= 0;
+    string_free(details);
+    static const char *const readers[] = {"glow", "mdcat", "mdless"};
+    for (size_t i = 0; ok && i < sizeof readers / sizeof *readers; ++i) {
+        string_t *path = string_sprintf("%s/%s", string_c_str(fixture.root), readers[i]);
+        file_t *file = path ? file_new(path) : NULL;
+        ok = file && write_text(path, "Reader detection must never execute this file.\n") &&
+             !chmod(string_c_str(path), 0700);
+        grid = ok ? capture_stats(&fixture, "stats-reader.txt", NULL, NULL, &status) : NULL;
+        ok = ok && status == 0 && grid && grid_aligned(grid, 80) && string_find(grid, "╔") >= 0;
+        string_free(grid);
+        string_t *markdown = ok ? capture_stats(&fixture, "stats-override.txt", "--format=markdown", NULL, &status) : NULL;
+        ok = ok && status == 0 && markdown && string_find(markdown, "| **Test** | **Result** |") >= 0 &&
+             string_find(markdown, "escaping\\_\\|\\_漢字") >= 0 && string_find(markdown, "╔") < 0;
+        string_free(markdown);
+        ok = ok && !unsetenv("NO_COLOR") && !unsetenv("CLICOLOR_FORCE") && !setenv("TERM", "xterm", 1);
+        grid = ok ? capture_stats(&fixture, "stats-reader-colour.txt", NULL, NULL, &status) : NULL;
+        ok = ok && status == 0 && grid && string_find(grid, "\033[1;92mPASS\033[0m") >= 0 &&
+             string_find(grid, "**PASS**") < 0;
+        string_free(grid);
+        ok = ok && !setenv("CLICOLOR_FORCE", "1", 1);
+        markdown = ok ? capture_stats(&fixture, "stats-plain-export.txt", "--format=markdown", NULL, &status) : NULL;
+        ok = ok && status == 0 && markdown && string_find(markdown, "**PASS**") >= 0 &&
+             string_find(markdown, "\033") < 0;
+        string_free(markdown);
+        ok = ok && !setenv("NO_COLOR", "1", 1);
+        ok = file && file_delete(file) && ok;
+        file_free(file); string_free(path);
+    }
+    string_t *markdown = ok ? capture_stats(&fixture, "stats-details.txt", "--format=markdown", "--details", &status) : NULL;
+    ok = ok && status == 0 && markdown && string_find(markdown, "| **Metric** | **Value** |") >= 0 &&
+         string_find(markdown, "Last memory test (UTC)") >= 0 && string_find(markdown, "Last run (UTC)") >= 0;
+    string_free(markdown);
+    string_t *tsv = ok ? capture_stats(&fixture, "stats-tsv.txt", "--format=tsv", NULL, &status) : NULL;
+    ok = ok && status == 0 && tsv && string_find(tsv, "source\tpath\tlast_run_utc\tlast_outcome") == 0 &&
+         string_find(tsv, "\tlast_memory_test_utc\n") >= 0 && string_find(tsv, "Test statistics") < 0;
+    string_free(tsv);
+    string_t *empty = ok ? capture_stats(&fixture, "stats-empty.txt", "--format=markdown", "not-a-source", &status) : NULL;
+    ok = ok && status == 0 && empty && string_find(empty, "No recorded tests match") >= 0 &&
+         scalar(&fixture, "SELECT count(*) FROM test_run") == 2 &&
+         scalar(&fixture, "SELECT count(*) FROM test_result") == 2 &&
+         scalar(&fixture, "SELECT normal_count FROM test_case_metrics WHERE run_count > 0") == 1;
+    string_free(empty);
+    if (saved_path) { ok = !setenv("PATH", saved_path, 1) && ok; free(saved_path); }
+    else ok = !unsetenv("PATH") && ok;
+    if (saved_columns) { ok = !setenv("COLUMNS", saved_columns, 1) && ok; free(saved_columns); }
+    else ok = !unsetenv("COLUMNS") && ok;
+    if (saved_disabled) { ok = !setenv("NO_COLOR", saved_disabled, 1) && ok; free(saved_disabled); }
+    else ok = !unsetenv("NO_COLOR") && ok;
+    if (saved_term) { ok = !setenv("TERM", saved_term, 1) && ok; free(saved_term); }
+    else ok = !unsetenv("TERM") && ok;
+    if (saved_force) { ok = !setenv("CLICOLOR_FORCE", saved_force, 1) && ok; free(saved_force); }
+    else ok = !unsetenv("CLICOLOR_FORCE") && ok;
+    fixture_close(&fixture);
+    TEST_ASSERT_TRUE(ok, "installed readers retain the default grid; Markdown exports stay plain even with forced colour");
+}
+
+static void test_statistics_invalid_format_creates_no_database(void)
+{
+    database_fixture_t fixture = {0};
+    TEST_ASSERT_TRUE(fixture_open(&fixture, false), "prepare a checkout without test storage");
+    int status = -1;
+    string_t *output = capture_stats(&fixture, "stats-invalid.txt", "--format=html", NULL, &status);
+    file_t *file = file_new(fixture.path);
+    bool ok = output && status == 2 && file && !file_exists(file);
+    string_free(output); file_free(file); fixture_close(&fixture);
+    TEST_ASSERT_TRUE(ok, "invalid format options are rejected before any test database is created");
+}
+
+static void test_statistics_bold_headers_and_uppercase_outcomes(void)
+{
+    database_fixture_t fixture = {0};
+    TEST_ASSERT_TRUE(fixture_open(&fixture, true), "prepare isolated styled statistics");
+    static const struct { const char *path, *outcome; double previous_ms, elapsed_ms; } records[] = {
+        {"group.passing",     "pass", 3.125,  2.5},
+        {"group.failing",     "fail", 2,      2.5},
+        {"group.skipped",     "pass", 2.5,    2.5},
+        {"group.lower_limit", "pass", 10,     9.5},
+        {"group.upper_limit", "pass", 10,    10.5},
+        {"group.unknown",     "pass", 0,      2.5},
+    };
+    bool ok = true;
+    for (unsigned run = 0; ok && run < 2; ++run) {
+        ok = test_database_run_begin(fixture.database, "fixture", NULL, false);
+        double total_ms = 0;
+        for (size_t i = 0; ok && i < sizeof records / sizeof *records; ++i) {
+            test_database_result_t record = result_record();
+            record.path = records[i].path;
+            record.outcome = records[i].outcome;
+            record.elapsed_ms = run ? records[i].elapsed_ms : records[i].previous_ms;
+            total_ms += record.elapsed_ms;
+            ok = test_database_run_record(fixture.database, &record);
+        }
+        ok = ok && test_database_run_finish(fixture.database, 1, total_ms);
+    }
+    /* Skips do not accumulate timings; seed that supported display label in this presentation-only fixture. */
+    ok = ok && test_database_exec(fixture.database,
+        "UPDATE test_case_statistics SET last_outcome = 'skip' WHERE path = 'group.skipped';");
+    char *saved_force = getenv("CLICOLOR_FORCE") ? strdup(getenv("CLICOLOR_FORCE")) : NULL;
+    char *saved_disabled = getenv("NO_COLOR") ? strdup(getenv("NO_COLOR")) : NULL;
+    char *saved_term = getenv("TERM") ? strdup(getenv("TERM")) : NULL;
+    ok = ok && !unsetenv("CLICOLOR_FORCE") && !unsetenv("NO_COLOR") && !setenv("TERM", "xterm", 1);
+    int status = -1;
+    string_t *grid = ok ? capture_stats(&fixture, "stats-bold.txt", "--format=grid", NULL, &status) : NULL;
+    ok = ok && status == 0 && grid && string_find(grid, "\033[1mTest\033[0m") >= 0 &&
+         string_find(grid, "\033[1mResult\033[0m") >= 0 && string_find(grid, "\033[1;92mPASS\033[0m") >= 0 &&
+         string_find(grid, "\033[1;91mFAIL\033[0m") >= 0 && string_find(grid, "\033[1;93mSKIPPED\033[0m") >= 0 &&
+         string_find(grid, "\033[1;93mSource: tests/example.c\033[0m") >= 0 &&
+         string_find(grid, "\033[96mgroup.passing\033[0m") >= 0 &&
+         string_find(grid, "\033[1;96m2.8125\033[0m") >= 0 &&
+         string_find(grid, "\033[1;93m2.8125\033[0m") >= 0 &&
+         string_find(grid, "\033[1;92m-20 ▲\033[0m") >= 0 && string_find(grid, "\033[1;91m25 ▼\033[0m") >= 0 &&
+         string_find(grid, "\033[1;38;2;255;140;0m0 ▬\033[0m") >= 0 &&
+         string_find(grid, "\033[1;38;2;255;140;0m-5 ▬\033[0m") >= 0 &&
+         string_find(grid, "\033[1;38;2;255;140;0m5 ▬\033[0m") >= 0 &&
+         string_find(grid, "\033[1;38;2;255;140;0m-\033[0m") < 0 &&
+         grid_aligned(grid, 200);
+    if (!ok) fprintf(stderr, "Styled statistics status %d:\n%s\n", status, grid ? string_c_str(grid) : "no output");
+    string_free(grid);
+    grid = ok ? capture_stats(&fixture, "stats-bold-details.txt", "--format=grid", "--details", &status) : NULL;
+    ok = ok && status == 0 && grid && string_find(grid, "\033[1mMetric\033[0m") >= 0 &&
+         string_find(grid, "\033[1;93mtests/example.c\033[0m") >= 0 &&
+         string_find(grid, "\033[96mgroup.passing\033[0m") >= 0 &&
+         string_find(grid, "\033[1;96m2.8125\033[0m") >= 0 &&
+         string_find(grid, "\033[1;93m2.8125\033[0m") >= 0 &&
+         string_find(grid, "\033[1;92m-20 ▲\033[0m") >= 0 && string_find(grid, "\033[1;91m25 ▼\033[0m") >= 0 &&
+         string_find(grid, "\033[1;38;2;255;140;0m-5 ▬\033[0m") >= 0 &&
+         string_find(grid, "\033[1;38;2;255;140;0m5 ▬\033[0m") >= 0 &&
+         grid_aligned(grid, 200);
+    string_free(grid);
+    ok = ok && !setenv("CLICOLOR_FORCE", "1", 1);
+    string_t *markdown = ok ? capture_stats(&fixture, "stats-bold-md.txt", "--format=markdown", NULL, &status) : NULL;
+    ok = ok && status == 0 && markdown && string_find(markdown, "| **Test** | **Result** |") >= 0 &&
+         string_find(markdown, "**PASS**") >= 0 && string_find(markdown, "**FAIL**") >= 0 &&
+         string_find(markdown, "**SKIPPED**") >= 0 && string_find(markdown, "\033") < 0 &&
+         string_find(markdown, "▲") < 0 && string_find(markdown, "▼") < 0 && string_find(markdown, "▬") < 0 &&
+         string_find(markdown, "| -20 |") >= 0 && string_find(markdown, "| 25 |") >= 0;
+    string_free(markdown);
+    string_t *tsv = ok ? capture_stats(&fixture, "stats-raw-tsv.txt", "--format=tsv", NULL, &status) : NULL;
+    ok = ok && status == 0 && tsv && string_find(tsv, "\tpass\t") >= 0 && string_find(tsv, "\tfail\t") >= 0 &&
+         string_find(tsv, "\tskip\t") >= 0 && string_find(tsv, "\033") < 0 &&
+         string_find(tsv, "▲") < 0 && string_find(tsv, "▼") < 0 && string_find(tsv, "▬") < 0;
+    string_free(tsv);
+    ok = ok && !setenv("NO_COLOR", "1", 1);
+    grid = ok ? capture_stats(&fixture, "stats-no-colour.txt", "--format=grid", NULL, &status) : NULL;
+    ok = ok && status == 0 && grid && string_find(grid, "\033") < 0 && grid_aligned(grid, 200) &&
+         string_find(grid, "-20 ▲") >= 0 && string_find(grid, "25 ▼") >= 0 && string_find(grid, "0 ▬") >= 0;
+    string_free(grid);
+    ok = ok && !unsetenv("NO_COLOR") && !setenv("TERM", "dumb", 1);
+    grid = ok ? capture_stats(&fixture, "stats-dumb.txt", "--format=grid", NULL, &status) : NULL;
+    ok = ok && status == 0 && grid && string_find(grid, "\033") < 0 &&
+         scalar(&fixture, "SELECT count(*) FROM test_result WHERE outcome IN ('pass', 'fail', 'skip')") == 12;
+    string_free(grid);
+    if (saved_force) { ok = !setenv("CLICOLOR_FORCE", saved_force, 1) && ok; free(saved_force); }
+    else ok = !unsetenv("CLICOLOR_FORCE") && ok;
+    if (saved_disabled) { ok = !setenv("NO_COLOR", saved_disabled, 1) && ok; free(saved_disabled); }
+    else ok = !unsetenv("NO_COLOR") && ok;
+    if (saved_term) { ok = !setenv("TERM", saved_term, 1) && ok; free(saved_term); }
+    else ok = !unsetenv("TERM") && ok;
+    fixture_close(&fixture);
+    TEST_ASSERT_TRUE(ok, "bold respects terminal settings; displayed outcomes are uppercase and stored/TSV values unchanged");
+}
+
+/* README example from docs/testing.md: Markdown statistics retain aligned, scriptable column definitions. */
+static void test_readme_statistics_formats(void)
+{
+    database_fixture_t fixture = {0};
+    TEST_ASSERT_TRUE(fixture_open(&fixture, true), "create isolated README statistics");
+    test_database_result_t record = result_record();
+    bool ok = test_database_run_begin(fixture.database, "fixture", NULL, false) &&
+              test_database_run_record(fixture.database, &record) &&
+              test_database_run_finish(fixture.database, 0, 2.5);
+    int status = -1;
+    string_t *output = ok ? capture_stats(&fixture, "readme-stats.txt", "--format=markdown", NULL, &status) : NULL;
+    const char *example =
+        "| **Test** | **Result** | **Last ms** | **Change %** | **Fastest ms** | **Slowest ms** | "
+        "**Mean ms** | **Median ms** | **Samples** |\n"
+        "| :--- | :--- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |\n"
+        "| group.original | **PASS** | 2.5 | - | 2.5 | 2.5 | 2.5 | 2.5 | 1 |\n";
+    const char *root = getenv("MARS_ROOT");
+    string_t *path = string_sprintf("%s/docs/testing.md", root && *root ? root : ".");
+    file_t *file = path ? file_new(path) : NULL;
+    string_t *guide = file ? file_read_all_text(file) : NULL;
+    ok = ok && output && status == 0 && string_find(output, example) >= 0 && guide && string_find(guide, example) >= 0;
+    if (ok) fputs(example, stdout);
+    string_free(guide); file_free(file); string_free(path);
+    string_free(output); fixture_close(&fixture);
+    TEST_ASSERT_TRUE(ok, "README Markdown table is emitted by the real statistics command");
+}
+
 /* README example from docs/testing.md: a new row reuses an existing native checking operation. */
 static void test_readme_case_table(void)
 {
@@ -642,8 +1022,15 @@ int tests_main(void)
     TEST_RUN_CASE(test_fixture_and_unrelated_database_protection, "database,fixtures");
     TEST_RUN_CASE(test_case_rows_are_owned_and_not_deleted, "database,cases");
     TEST_RUN_CASE(test_help_creates_no_database, "database,lazy");
+    TEST_RUN_CASE(test_conditional_sync_never_creates_storage, "database,sync,lazy");
+    TEST_RUN_CASE(test_conditional_sync_tracks_contents, "database,sync,history");
+    TEST_RUN_CASE(test_conditional_sync_retries_failed_import, "database,sync,rollback");
     TEST_RUN_CASE(test_module_sources_are_discovered_atomically, "database,modules,discovery,rollback");
     TEST_RUN_CASE(test_default_storage_survives_build_cleanup, "database,paths,persistence");
+    TEST_RUN_CASE(test_statistics_formats_and_reader_detection, "database,statistics,formatting,unicode");
+    TEST_RUN_CASE(test_statistics_invalid_format_creates_no_database, "database,statistics,lazy");
+    TEST_RUN_CASE(test_statistics_bold_headers_and_uppercase_outcomes, "database,statistics,formatting,bold");
+    TEST_RUN_OUTPUT_TAGS(test_readme_statistics_formats, "README,database,statistics");
     TEST_RUN_OUTPUT_TAGS(test_readme_case_table, "README,database");
     return TEST_EXIT_CODE();
 }

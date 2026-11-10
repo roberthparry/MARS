@@ -374,6 +374,9 @@ static bool eclipse_catalogue_scale_fixture(const char *directory)
 
 static void test_lab_totality_large_catalogue(void)
 {
+    bool configured = test_lab_resource_settings();
+    TEST_ASSERT_TRUE(configured, "load the installed ephemeris configuration before eclipse catalogue tests");
+    if (!configured) return;
     const char *configured_home = getenv("MARS_HOME");
     ephemeris_home = configured_home ? string_new_with(configured_home) : NULL;
     bool ok = (!configured_home || ephemeris_home) && test_lab_isolated(eclipse_catalogue_scale_fixture);
@@ -384,6 +387,9 @@ static void test_lab_totality_large_catalogue(void)
 
 static void test_lab_eclipse_worker_geometry(void)
 {
+    bool configured = test_lab_resource_settings();
+    TEST_ASSERT_TRUE(configured, "load the installed ephemeris configuration before eclipse-worker tests");
+    if (!configured) return;
     const char *configured_home = getenv("MARS_HOME");
     ephemeris_home = configured_home ? string_new_with(configured_home) : NULL;
     bool ok = (!configured_home || ephemeris_home) && test_lab_isolated(eclipse_worker_fixture);

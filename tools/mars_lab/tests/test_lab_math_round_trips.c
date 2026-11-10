@@ -219,7 +219,7 @@ static void test_transform_symbolic_power_round_trips(void)
 static void test_transform_distribution_round_trips(void)
 {
     const char *cases[][2] = {
-        {"delta(t)", "δ(t)"}, {"delta(2*t-1)", "½·δ(t - 0.5)"},
+        {"delta(t)", "δ(t)"}, {"delta(2*t-1)", "½·δ(t - ½)"},
         {"Derivative(delta(t),3)", "Derivative(δ(t), 3)"},
         {"Derivative(delta(t),n)", "Derivative(δ(t), n)"},
         {"finite_part(1/abs(t))", "(1/|t| : finite part)"},

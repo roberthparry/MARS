@@ -18,10 +18,16 @@ const TeX_model_node_t *notation_build_equation(notation_build_t *build, const e
 {
     if (!equation)
         return NULL;
+    bool fractional = equ_fractional_coefficients(equation);
+    bool previous = fractional ? expr_set_number_fractional_local(true) : false;
     const TeX_model_node_t *sides[] = {
         notation_build_expr(build, equ_lhs(equation)), notation_build_expr(build, equ_rhs(equation))
     };
-    return notation_build_node(build, (TeX_node_view_t){.kind = TeX_NODE_EQUATION, .child_count = 2u}, sides);
+    const TeX_model_node_t *root =
+        notation_build_node(build, (TeX_node_view_t){.kind = TeX_NODE_EQUATION, .child_count = 2u}, sides);
+    if (fractional)
+        expr_set_number_fractional_local(previous);
+    return root;
 }
 
 /* Snapshot an equation independently of the caller's original object. */

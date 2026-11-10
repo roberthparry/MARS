@@ -68,7 +68,7 @@ static void test_inverse_rational_equation(void)
                                           "t", "evaluate", 40, &status, &raw);
     lab_math_check(status == 0, raw);
     const char *operand = lab_math_after(lab_math_text(solved, "solutions"), " = ");
-    lab_math_equal(operand, "5/(s·(s + 4) + 5)·(s + 10/s² + 3)");
+    lab_math_equal(operand, "5·(s + 10/s² + 3)/(s·(s + 4) + 5)");
     lab_math_contains(lab_math_text(solved, "solutions_TeX"), "\\times 1", false);
     lab_math_contains(lab_math_text(solved, "solutions_TeX"), "&= -", false);
     const json_t *simplified = lab_math_inverse_rational_fields(operand);

@@ -41,7 +41,7 @@ static bool test_headers_preprocess(const string_t *root, const string_t *input,
                                     const string_t *expected_error)
 {
     const char *const options[] = {
-        "cc", "-E", "-x", "c", "-D_GNU_SOURCE", "-I.", "-Iinclude", "-Isrc", "-Itests/include",
+        "cc", "-E", "-x", "c", "-D_GNU_SOURCE", "-I.", "-Iinclude", "-Isrc", "-Itests", "-Itests/include",
         "-Itools/mars_checks/include", "-Itools/mars_config/include", "-Itools/mars_lab/include",
         "-Itools/mars_lab/wasm/include",
         "-Itools/to_be_announced_lab/include", "-o", "/dev/null"
@@ -67,11 +67,12 @@ static bool test_headers_probe(const string_t *root, const string_t *temporary, 
 {
     string_t *path = checks_path(root, string_c_str(header));
     string_t *source = checks_read(path), *macro = NULL;
-    bool ok = source && checks_match(source, "^#if !defined\\((MARS_[A-Z_]+_INTERNAL_ACCESS)\\)", 1, &macro);
+    bool ok = source && checks_match(source, "^#if !defined\\((MARS_[A-Za-z_]+_INTERNAL_ACCESS)\\)", 1, &macro);
     string_t *probe = checks_path(temporary, "probe.c");
     string_t *allowed = macro ? string_sprintf("#define %S\n#include \"%S\"\n", macro, header) : NULL;
     string_t *denied = string_sprintf("#include \"%S\"\n", header);
-    string_t *diagnostic = macro ? string_sprintf("Private header requires %S.", macro) : NULL;
+    string_t *diagnostic = NULL;
+    ok = ok && checks_match(source, "^#error[[:space:]]+\"([^\"]*MARS_[^\"]+)\"", 1, &diagnostic);
     ok = ok && allowed && denied && diagnostic && checks_write(probe, allowed) &&
          test_headers_preprocess(root, probe, false, NULL);
     ok = ok && checks_write(probe, denied) && test_headers_preprocess(root, probe, false, diagnostic);

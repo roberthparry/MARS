@@ -1267,6 +1267,10 @@ static bool cfg_globe_countries(sqlite_t *db, const string_t *root, const string
 
 static bool cfg_globe_valid(sqlite_t *db)
 {
+    cfg_progress_t *progress = db ? cfg_progress_start("Checking globe database integrity") : NULL;
+    cfg_progress_explain(progress,
+        "Scanning SQLite tables and indexes. Large globe databases can take several minutes; "
+        "SQLite provides no intermediate item count.");
     sqlite_stmt_t *q = db ? sqlite_stmt_prepare(db, "PRAGMA integrity_check") : NULL;
     const char *result = q && sqlite_stmt_step(q) == SQLITE_STEP_ROW ? sqlite_stmt_column_text(q, 0) : NULL;
     bool ok = result && !strcmp(result, "ok");
@@ -1274,6 +1278,7 @@ static bool cfg_globe_valid(sqlite_t *db)
     globe_t *globe = ok ? globe_open_databases(db, db, NULL) : NULL;
     ok = ok && globe && globe_has_layer(globe, GLOBE_LAYER_SHORELINE);
     globe_close(globe);
+    cfg_progress_finish(progress, ok);
     return ok;
 }
 
@@ -1325,7 +1330,8 @@ static int cfg_globe_execute(const char *action, const char *explicit_key)
     bool install = action && !strcmp(action, "globe-install");
     bool check = action && !strcmp(action, "globe-check");
     bool update = action && !strcmp(action, "globe-update");
-    if (!install && !check && !update) {
+    bool reimport = action && !strcmp(action, "globe-reimport");
+    if (!install && !check && !update && !reimport) {
         fputs("Unknown globe operation; no files changed.\n", stderr);
         return 2;
     }
@@ -1345,7 +1351,19 @@ static int cfg_globe_execute(const char *action, const char *explicit_key)
     file_t *temporary = NULL;
     sqlite_t *db = NULL;
     root = string_new();
-    if (ok && update) {
+    if (ok && reimport) {
+        staging = exists ? cfg_database_stage(parent) : NULL;
+        cfg_progress_t *opening = staging ? cfg_progress_start("Opening globe database") : NULL;
+        cfg_progress_explain(opening,
+            "Opening the installed globe. SQLite first restores any interrupted transaction; "
+            "recovery can take several minutes and has no intermediate item count.");
+        db = staging ? cfg_database_open(expanded, key) : NULL;
+        cfg_progress_finish(opening, db != NULL);
+        ok = db && root && cfg_database_reimport_globe(db, root, staging, cfg_globe_refresh_all,
+                                                      CFG_GLOBE_DATA_REVISION);
+        if (ok) ok = cfg_database_pyramids(db, root);
+        sqlite_close(db);
+    } else if (ok && update) {
         /* Publish packaged layers together; credentials and rivers are untouched. */
         staging = exists ? cfg_database_stage(parent) : NULL;
         db = staging ? cfg_database_open(expanded, key) : NULL;
@@ -1391,7 +1409,8 @@ static int cfg_globe_execute(const char *action, const char *explicit_key)
         json_free(settings);
         ok = ok && body && cfg_database_publish(temporary, destination, staging, body);
     }
-    if (ok) puts(update ? "Globe shoreline, countries and textures updated; other layers and settings preserved. Restart MARS Lab."
+    if (ok) puts(reimport ? "Full globe reimport complete; river and prepared image-block tables retained. Restart MARS Lab."
+                        : update ? "Globe shoreline, countries and textures updated; other layers and settings preserved. Restart MARS Lab."
                         : install ? "Fresh globe database installed: shoreline, countries and textures imported. Restart MARS Lab."
                         : "Globe database integrity, shoreline and photographic textures verified.");
     else fputs("Globe database operation failed; check its path, key and packaged geographic sources.\n", stderr);

@@ -440,6 +440,8 @@ char *equ_to_TeX_body_wrapped(const equation_t *equation, size_t line_limit)
 {
     if (!equation)
         return NULL;
+    bool fractional = equ_fractional_coefficients(equation);
+    bool previous = fractional ? expr_set_number_fractional_local(true) : false;
     char *lhs = equ_side_TeX_body_dup(equ_lhs(equation), equ_lhs_display_TeX(equation), line_limit);
     char *rhs = equ_side_TeX_body_dup(equ_rhs(equation), equ_rhs_display_TeX(equation), line_limit);
     TeX_builder_t *builder = TeX_builder_new();
@@ -452,6 +454,8 @@ char *equ_to_TeX_body_wrapped(const equation_t *equation, size_t line_limit)
     TeX_builder_free(builder);
     free(rhs);
     free(lhs);
+    if (fractional)
+        expr_set_number_fractional_local(previous);
     return out;
 }
 
@@ -502,14 +506,20 @@ string_t *equ_to_text(const equation_t *equation, style_t style)
     if (!equation)
         return string_new_with("NULL");
 
+    bool fractional = equ_fractional_coefficients(equation);
+    bool previous = fractional ? expr_set_number_fractional_local(true) : false;
+    string_t *text;
     if (style == style_LATEX)
-        return equ_to_text_TeX(equation);
-    if (style == style_UNBOUND)
-        return equ_to_text_unbound(equation);
-    if (style == style_FUNCTION)
-        return equ_to_text_function(equation);
-
-    return equ_to_text_expression(equation);
+        text = equ_to_text_TeX(equation);
+    else if (style == style_UNBOUND)
+        text = equ_to_text_unbound(equation);
+    else if (style == style_FUNCTION)
+        text = equ_to_text_function(equation);
+    else
+        text = equ_to_text_expression(equation);
+    if (fractional)
+        expr_set_number_fractional_local(previous);
+    return text;
 }
 
 string_t *equ_vsprintf_text(const char *fmt, va_list ap)

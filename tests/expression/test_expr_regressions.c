@@ -3588,11 +3588,11 @@ static void test_real_scalar_over_square_root_combines_into_one_root(void)
         to_string_fail(__FILE__, __LINE__, 1, "real scalar over square root combines into one root",
                        scalar_text ? scalar_text : "(null)", "√(³⁄₁₁)");
 
-    if (str_eq(scaled_text, "x·√(³⁄₁₁)"))
-        to_string_pass("leading real scalar over square root combines into one root", scaled_text, "x·√(³⁄₁₁)");
+    if (str_eq(scaled_text, "√(³⁄₁₁)·x"))
+        to_string_pass("leading real scalar over square root combines into one root", scaled_text, "√(³⁄₁₁)·x");
     else
         to_string_fail(__FILE__, __LINE__, 1, "leading real scalar over square root combines into one root",
-                       scaled_text ? scaled_text : "(null)", "x·√(³⁄₁₁)");
+                       scaled_text ? scaled_text : "(null)", "√(³⁄₁₁)·x");
 
     free(scaled_text);
     free(scalar_text);
