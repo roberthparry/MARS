@@ -4212,6 +4212,7 @@
       "test_benchmarks_documentation": true,
       "test_benchmarks_documentation_supported_rows": true,
       "test_benchmarks_expression_coverage": true,
+      "test_benchmarks_fraction_inputs": true,
       "test_benchmarks_integer_inputs": true,
       "test_benchmarks_measurements": true,
       "test_benchmarks_progress_capture": true,

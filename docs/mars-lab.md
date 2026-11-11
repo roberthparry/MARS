@@ -1219,21 +1219,28 @@ the closest detail. Both source grids use the same bounded GPU and decoded-sourc
 without the additional grid continue using the original tiles. Source GeoTIFFs are preparation inputs,
 not runtime dependencies. `make release` imports a changed prepared manifest even when the managed-data
 revision is unchanged, retaining matching PNG rows and the other geographic layers.
-The prepared Sentinel-2 catalogue contains 5,291 regional images covering the UK,
+The prepared Sentinel-2 catalogue contains 5,358 regional images covering the UK,
 Ireland, Denmark, Netherlands, Italy and the requested Mediterranean and Atlantic
 islands, mainland Portugal and Spain, coastal Svalbard and Cape Peninsula. It also
 includes mainland France, New Zealand and its offshore islands, Finland and Åland,
 Sweden, Norway, Iceland, and the requested areas around Brisbane, Sydney, Melbourne, Perth,
 Mooloolaba, Maroochydore, Canberra, Cairns, Alice Springs and Gold Coast.
 Cyprus and the Cairo area have regional coverage at the same resolution as Spain,
-including broad approach images and overlapping detail tiles. Offshore pixels remain
-transparent; the existing sea photograph supplies their colour.
+including broad approach images and overlapping detail tiles. Egyptian coverage extends
+across the Nile Delta to the Mediterranean coast, from Alexandria through Rosetta and
+Damietta to Port Said; along the whole Suez Canal through Ismailia and the Bitter Lakes
+to Suez; and along a narrower Nile corridor south through Beni Suef to Minya.
+Egyptian overview and detail photographs share one offline RGB colour balance against
+the global NASA reference, reducing the bright desert mismatch. The manifest records
+the gains and original content digests. Transparency and geographic coverage are
+preserved; colour balancing does not recover highlights already clipped in the source preparation.
+Offshore pixels remain transparent; the existing sea photograph supplies their colour.
 Spain, Svalbard and most of this latest expansion use reduced-resolution 1800-square images;
 earlier regional coverage generally uses 3600-square images. Sydney's four tiles now use
 3600-square images rebuilt from the original Sentinel rasters, giving approximately
 10–13 metres per pixel instead of 20–26 metres. Remaining missing observations are
 transparent. `make release` imports the approximately
-39.0 GiB PNG package; only photographs
+39.2 GiB PNG package; only photographs
 needed for the current view are loaded, using the existing bounded caches.
 
 The fallback `lab_globe_photo_patch` planner wraps longitude at the date line and

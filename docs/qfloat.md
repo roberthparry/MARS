@@ -732,7 +732,7 @@ for separate investigations. See [the benchmark guide](benchmarks.md#persistent-
 for selection, interruption recovery and raw sample storage.
 
 <!-- MARS-BENCHMARKS:BEGIN -->
-Benchmark run **28**, 2026-11-11T13:11:05.705Z (UTC).
+Benchmark run **29**, 2026-11-11T21:56:14.598Z (UTC).
 
 Machine: Intel(R) N95.
 
@@ -755,133 +755,133 @@ Failures and timeouts remain visible. † marks a retained slowdown outlier.
 
 | Operation | Inputs | 106 bits |
 |---|---|---:|
-| E1 | 2.345678 | 8.6 µs |
-| Ei | 2.345678 | 9.3 µs |
-| Li | 2.345 | 10.7 µs |
-| abs | 0.7 | 3.0 ns |
-| acos | 0.7 | 1.6 µs |
-| acosec | 2.345 | 1.6 µs |
-| acosech | 0.7 | 3.6 µs |
-| acosh | 2.345 | 3.7 µs |
-| acot | 0.7 | 1.2 µs |
-| acoth | 2.345 | 3.1 µs |
-| add | 0.7, 0.7 | 6.2 ns |
-| appell_f1 | 0.5, 0.7, 0.8, 2.5, 0.2, 0.3 | 80.2 µs |
-| arccovercos | 0.5 | 1.5 µs |
-| arccoversin | 0.5 | 1.6 µs |
-| archacovercos | 0.5 | 26.9 ns |
-| archacoversin | 0.5 | 26.9 ns |
-| archavercos | 0.5 | 55.4 ns |
-| archaversin | 0.5 | 48.8 ns |
-| arcvercos | 0.5 | 1.6 µs |
-| arcversin | 0.5 | 1.6 µs |
-| asec | 2.345 | 1.7 µs |
-| asech | 0.7 | 3.5 µs |
-| asin | 0.7 | 1.5 µs |
-| asinh | 0.7 | 3.2 µs |
-| atan | 0.7 | 1.2 µs |
-| atan2 | 0.5, -0.75 | 1.2 µs |
-| atanh | 0.7 | 3.0 µs |
-| bessel_i | 2, 0.7 | 54.1 µs |
-| bessel_j | 2, 0.7 | 6.0 µs |
-| bessel_k | 2, 0.7 | 32.9 µs |
-| bessel_y | 2, 0.7 | 23.2 µs |
-| beta | 2.3, 4.5 | 4.6 µs |
-| beta_pdf | 0.5, 2.5, 3.5 | 30.9 µs |
-| binomial | 5, 2 | 31.1 µs |
-| chebyshev_t | 2, 0.7 | 42.6 ns |
-| chebyshev_u | 2, 0.7 | 42.7 ns |
-| circ | 0.7 | 17.1 ns |
-| clausen | 3, 0.7 | 365.4 µs |
-| clausen2 | 0.7 | 5.6 µs |
-| cos | 0.7 | 826.9 ns |
-| cosec | 0.7 | 868.4 ns |
-| cosech | 0.7 | 3.1 µs |
-| cosh | 0.7 | 3.2 µs |
-| cot | 0.7 | 1.6 µs |
-| coth | 0.7 | 6.6 µs |
-| covercos | 0.7 | 788.2 ns |
-| coversin | 0.7 | 803.8 ns |
-| cubrt | 0.7 | 4.8 µs |
-| digamma | 2.345 | 2.7 µs |
-| dilog | 0.7 | 12.5 µs |
-| div | 0.7, 0.7 | 31.0 ns |
-| erf | 0.7 | 3.9 µs |
-| erfc | 0.7 | 3.9 µs |
-| erfcinv | 0.5 | 238.7 µs |
-| erfinv | 0.5 | 216.3 µs |
-| exp | 1.23456789 | 1.8 µs |
-| floor | 0.7 | 22.3 ns |
-| gamma | 2.345 | 1.6 µs |
-| gammainc_P | 2.3, 1.4 | 12.2 µs |
-| gammainc_Q | 2.3, 1.4 | 11.6 µs |
-| gammainc_lower | 2.3, 1.4 | 14.7 µs |
-| gammainc_upper | 2.3, 1.4 | 14.8 µs |
-| gammainv | 9.5 | 101.3 µs |
-| hacovercos | 0.7 | 898.3 ns |
-| hacoversin | 0.7 | 926.0 ns |
-| harmonic_poly | 2, 0.7 | 109.2 ns |
-| havercos | 0.7 | 922.9 ns |
-| haversin | 0.7 | 985.4 ns |
-| hermite_h | 2, 0.7 | 53.9 ns |
-| hypergeometric_pFq | 0.7, 2.5, 0.3 | 3.7 µs |
-| hypot | 0.7, 1.2 | 435.1 ns |
-| lambert_w0 | 0.7 | 13.1 µs |
-| lambert_wm1 | -0.2 | 16.4 µs |
-| lauricella_f | 0.5, 0.3, 2.5 | 19.9 µs |
-| ldexp | 1.23456789, 3 | 9.6 ns |
-| legendre_chi | 2, 0.7 | 26.7 µs |
-| lerch_phi | 0.3, 2, 1.4 | 281.2 µs |
-| lg | 2.345678 | 2.8 µs |
-| lgamma | 2.345 | 5.9 µs |
-| ln | 2.345678 | 2.8 µs |
-| log | 2.345678 | 2.8 µs |
-| log10 | 2.345678 | 2.9 µs |
-| logbeta | 2.3, 4.5 | 26.7 µs |
-| logbeta_pdf | 0.5, 2.5, 3.5 | 28.2 µs |
-| lommel_s | 0.5, 0.7, 1.2 | 7.3 µs |
-| mul | 0.7, 0.7 | 7.0 ns |
-| mul_pow10 | 1.23456789, 3 | 43.9 ns |
-| neg | 0.7 | 2.0 ns |
-| normal_cdf | 0.7 | 3.4 µs |
-| normal_logpdf | 0.7 | 26.9 ns |
-| normal_pdf | 0.7 | 1.6 µs |
-| polygamma | 3, 2.345 | 4.5 µs |
-| polylog | 2, 0.7 | 13.8 µs |
-| polylog1 | 0.7 | 2.9 µs |
-| pow | 1.23456789, 3.5 | 4.2 µs |
-| pow10 | 3 | 25.7 ns |
-| pow_int | 1.23456789, 3 | 50.7 ns |
-| productlog | 0.7 | 14.5 µs |
-| qdigamma | 0.5, 2.3 | 24.0 µs |
-| rect | 0.7 | 16.1 ns |
-| root | 1.2345, 3 | 4.9 µs |
-| round | 0.7 | 34.3 ns |
-| roundn | 1.23456789, 3 | 6.0 µs |
-| rounds | 1.23456789, 3 | 16.4 µs |
-| sec | 0.7 | 807.3 ns |
-| sech | 0.7 | 3.2 µs |
-| sgn | 0.7 | 7.0 ns |
-| sin | 0.567 | 760.1 ns |
-| sinc | 0.7 | 827.9 ns |
-| sinh | 0.7 | 3.2 µs |
-| sqr | 0.7 | 4.6 ns |
-| sqrt | 1.23456789 | 328.7 ns |
-| step | 0.7 | 7.2 ns |
-| struve_h | 2, 0.7 | 80.0 µs |
-| struve_l | 2, 0.7 | 82.6 µs |
-| sub | 0.7, 0.7 | 7.0 ns |
-| tan | 0.7 | 1.8 µs |
-| tanh | 0.7 | 1.6 µs |
-| tetragamma | 2.345 | 3.0 µs |
-| tri | 0.7 | 12.6 ns |
-| trigamma | 2.345 | 2.6 µs |
-| vercos | 0.7 | 812.2 ns |
-| versin | 0.7 | 796.4 ns |
-| zatahp | 2.3, 1.4 | 318.9 µs |
-| zeta | 2.345 | 293.0 µs |
-| zetah | 2.3, 1.4 | 278.5 µs |
-| zetap | 2.345 | 282.7 µs |
+| E1 | 2.345678 | 11.7 µs |
+| Ei | 2.345678 | 11.0 µs |
+| Li | 2.345 | 18.7 µs † |
+| abs | 0.7 | 3.2 ns |
+| acos | 0.7 | 2.5 µs † |
+| acosec | 2.345 | 2.6 µs † |
+| acosech | 0.7 | 4.1 µs |
+| acosh | 2.345 | 4.5 µs |
+| acot | 0.7 | 1.9 µs † |
+| acoth | 2.345 | 4.3 µs |
+| add | 0.7, 0.7 | 9.5 ns |
+| appell_f1 | 0.5, 0.7, 0.8, 2.5, 0.2, 0.3 | 122.2 µs † |
+| arccovercos | 0.5 | 2.6 µs † |
+| arccoversin | 0.5 | 2.4 µs |
+| archacovercos | 0.5 | 36.3 ns |
+| archacoversin | 0.5 | 45.0 ns |
+| archavercos | 0.5 | 84.7 ns |
+| archaversin | 0.5 | 86.6 ns |
+| arcvercos | 0.5 | 2.4 µs † |
+| arcversin | 0.5 | 2.6 µs † |
+| asec | 2.345 | 2.6 µs † |
+| asech | 0.7 | 4.9 µs |
+| asin | 0.7 | 2.5 µs † |
+| asinh | 0.7 | 5.3 µs † |
+| atan | 0.7 | 1.8 µs |
+| atan2 | 0.5, -0.75 | 1.8 µs |
+| atanh | 0.7 | 4.7 µs † |
+| bessel_i | 2, 0.7 | 82.7 µs † |
+| bessel_j | 2, 0.7 | 9.9 µs † |
+| bessel_k | 2, 0.7 | 38.4 µs |
+| bessel_y | 2, 0.7 | 39.3 µs † |
+| beta | 2.3, 4.5 | 5.7 µs |
+| beta_pdf | 0.5, 2.5, 3.5 | 38.4 µs |
+| binomial | 5, 2 | 50.8 µs † |
+| chebyshev_t | 2, 0.7 | 56.2 ns |
+| chebyshev_u | 2, 0.7 | 56.2 ns |
+| circ | 0.7 | 19.4 ns |
+| clausen | 3, 0.7 | 402.4 µs |
+| clausen2 | 0.7 | 7.8 µs |
+| cos | 0.7 | 1.0 µs |
+| cosec | 0.7 | 1.0 µs |
+| cosech | 0.7 | 5.3 µs † |
+| cosh | 0.7 | 4.6 µs |
+| cot | 0.7 | 2.3 µs |
+| coth | 0.7 | 8.8 µs |
+| covercos | 0.7 | 1.2 µs |
+| coversin | 0.7 | 1.0 µs |
+| cubrt | 0.7 | 6.6 µs |
+| digamma | 2.345 | 3.8 µs |
+| dilog | 0.7 | 33.8 µs † |
+| div | 0.7, 0.7 | 59.0 ns |
+| erf | 0.7 | 5.4 µs |
+| erfc | 0.7 | 5.4 µs |
+| erfcinv | 0.5 | 257.4 µs |
+| erfinv | 0.5 | 326.0 µs † |
+| exp | 1.23456789 | 2.2 µs |
+| floor | 0.7 | 29.4 ns |
+| gamma | 2.345 | 2.4 µs † |
+| gammainc_P | 2.3, 1.4 | 18.8 µs † |
+| gammainc_Q | 2.3, 1.4 | 20.8 µs † |
+| gammainc_lower | 2.3, 1.4 | 18.9 µs |
+| gammainc_upper | 2.3, 1.4 | 22.4 µs † |
+| gammainv | 9.5 | 161.0 µs † |
+| hacovercos | 0.7 | 1.3 µs |
+| hacoversin | 0.7 | 1.3 µs |
+| harmonic_poly | 2, 0.7 | 149.7 ns |
+| havercos | 0.7 | 1.3 µs |
+| haversin | 0.7 | 1.4 µs |
+| hermite_h | 2, 0.7 | 64.5 ns |
+| hypergeometric_pFq | 0.7, 2.5, 0.3 | 5.0 µs |
+| hypot | 0.7, 1.2 | 617.5 ns |
+| lambert_w0 | 0.7 | 18.2 µs |
+| lambert_wm1 | -0.2 | 25.1 µs † |
+| lauricella_f | 0.5, 0.3, 2.5 | 25.7 µs |
+| ldexp | 1.23456789, 3 | 11.9 ns |
+| legendre_chi | 2, 0.7 | 35.7 µs |
+| lerch_phi | 0.3, 2, 1.4 | 472.5 µs † |
+| lg | 2.345678 | 5.1 µs † |
+| lgamma | 2.345 | 7.7 µs |
+| ln | 2.345678 | 3.3 µs |
+| log | 2.345678 | 4.4 µs † |
+| log10 | 2.345678 | 3.9 µs |
+| logbeta | 2.3, 4.5 | 37.4 µs |
+| logbeta_pdf | 0.5, 2.5, 3.5 | 35.9 µs |
+| lommel_s | 0.5, 0.7, 1.2 | 8.7 µs |
+| mul | 0.7, 0.7 | 8.7 ns |
+| mul_pow10 | 1.23456789, 3 | 49.6 ns |
+| neg | 0.7 | 2.9 ns |
+| normal_cdf | 0.7 | 4.1 µs |
+| normal_logpdf | 0.7 | 37.8 ns |
+| normal_pdf | 0.7 | 2.2 µs |
+| polygamma | 3, 2.345 | 11.7 µs † |
+| polylog | 2, 0.7 | 21.0 µs † |
+| polylog1 | 0.7 | 4.3 µs |
+| pow | 1.23456789, 3.5 | 7.3 µs † |
+| pow10 | 3 | 29.4 ns |
+| pow_int | 1.23456789, 3 | 57.0 ns |
+| productlog | 0.7 | 20.4 µs |
+| qdigamma | 0.5, 2.3 | 32.0 µs |
+| rect | 0.7 | 17.9 ns |
+| root | 1.2345, 3 | 6.2 µs |
+| round | 0.7 | 50.2 ns |
+| roundn | 1.23456789, 3 | 9.2 µs † |
+| rounds | 1.23456789, 3 | 23.7 µs |
+| sec | 0.7 | 1.3 µs † |
+| sech | 0.7 | 5.2 µs † |
+| sgn | 0.7 | 9.7 ns |
+| sin | 0.567 | 1.1 µs |
+| sinc | 0.7 | 1.7 µs † |
+| sinh | 0.7 | 3.7 µs |
+| sqr | 0.7 | 6.4 ns |
+| sqrt | 1.23456789 | 466.4 ns |
+| step | 0.7 | 11.3 ns |
+| struve_h | 2, 0.7 | 98.3 µs |
+| struve_l | 2, 0.7 | 99.6 µs |
+| sub | 0.7, 0.7 | 9.5 ns |
+| tan | 0.7 | 2.7 µs |
+| tanh | 0.7 | 2.0 µs |
+| tetragamma | 2.345 | 4.6 µs † |
+| tri | 0.7 | 19.4 ns |
+| trigamma | 2.345 | 3.6 µs |
+| vercos | 0.7 | 1.1 µs |
+| versin | 0.7 | 1.1 µs |
+| zatahp | 2.3, 1.4 | 401.6 µs |
+| zeta | 2.345 | 469.2 µs † |
+| zetah | 2.3, 1.4 | 417.4 µs |
+| zetap | 2.345 | 448.9 µs † |
 
 <!-- MARS-BENCHMARKS:END -->
 

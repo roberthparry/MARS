@@ -51,7 +51,7 @@ int checks_benchmarks(const string_t *root, int argc, char **argv)
              "  Example: make bench-db ARGS='stats --operation zeta --backend mpc --bits 4096' | less -R\n"
              "  Pipe the grid to less -R to retain colours; NO_COLOR disables them.\n"
              "bench-db run [OPTIONS]    Measure every selected operation and precision sequentially.\n"
-             "  --backend NAME               number-double, qfloat, qcomplex, mpfr, mpc or exact-integer\n"
+             "  --backend NAME               number-double, qfloat, qcomplex, mpfr, mpc, exact-integer or exact-fraction\n"
              "  --bits N                     Restrict the configured precision profiles.\n"
              "  --operation NAME             Select one canonical mathematical operation.\n"
              "  --samples N                  Timed batches per case, 3..101 (default 7).\n"

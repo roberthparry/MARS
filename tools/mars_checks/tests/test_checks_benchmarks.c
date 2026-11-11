@@ -69,6 +69,11 @@ static bool benchmark_test_fixture(const string_t *root)
         test_checks_write(root, "build/release/libmars.a", "isolated build fingerprint fixture");
     string_free(schema_path);
     string_free(schema);
+    schema_path = checks_path(repository, "bench/number/bench_number.sql");
+    schema = checks_read(schema_path);
+    ok = ok && schema && test_checks_write(root, "bench/number/bench_number.sql", string_c_str(schema));
+    string_free(schema_path);
+    string_free(schema);
     string_free(repository);
     return ok;
 }
@@ -102,13 +107,19 @@ static void test_benchmarks_catalogue(void)
     ok = ok && benchmark_test_command(root, sync, 1, 0, NULL);
     sqlite_t *db = benchmark_test_open(root);
     ok = db && benchmark_test_integer(db, "SELECT count(*) FROM benchmark_operation") >= 164 &&
-        benchmark_test_integer(db, "SELECT count(*) FROM benchmark_profile") == 16 &&
-        sqlite_exec_cstr(db, "INSERT INTO benchmark_operation VALUES ('retained_custom_case', 1, '2', 0, 0, 0)") && ok;
+        benchmark_test_integer(db, "SELECT count(*) FROM benchmark_profile") == 17 &&
+        benchmark_test_integer(db, "SELECT count(*) FROM benchmark_workload") == 45 &&
+        sqlite_exec_cstr(db,
+            "INSERT INTO benchmark_operation VALUES ('retained_custom_case', 1, '2', 0, 0, 0);\n"
+            "INSERT INTO benchmark_workload VALUES ('retained_custom_case', 'exact-fraction', '2/3');") && ok;
     sqlite_close(db);
     ok = ok && benchmark_test_command(root, sync, 1, 0, NULL);
     db = benchmark_test_open(root);
     ok = db && benchmark_test_integer(db,
-        "SELECT count(*) FROM benchmark_operation WHERE name = 'retained_custom_case'") == 1 && ok;
+        "SELECT count(*) FROM benchmark_operation WHERE name = 'retained_custom_case'") == 1 &&
+        benchmark_test_integer(db,
+            "SELECT count(*) FROM benchmark_workload\n"
+            "WHERE operation = 'retained_custom_case' AND backend = 'exact-fraction' AND arguments = '2/3'") == 1 && ok;
     sqlite_close(db);
     ok = test_checks_finish(root) && ok;
     TEST_ASSERT_TRUE(ok, "benchmark storage is explicit, profiles cover every documented precision, and sync preserves cases");
@@ -484,11 +495,13 @@ static void test_benchmarks_integer_inputs(void)
     ok = ok && benchmark_test_command(root, run, 7, 0, NULL);
     db = benchmark_test_open(root);
     ok = db && benchmark_test_integer(db,
-        "SELECT count(*) FROM benchmark_result WHERE outcome = 'pass'") == 26 &&
-        benchmark_test_integer(db, "SELECT count(*) FROM benchmark_sample") == 78 &&
+        "SELECT count(*) FROM benchmark_result WHERE outcome = 'pass'") == 35 &&
+        benchmark_test_integer(db, "SELECT count(*) FROM benchmark_sample") == 105 &&
         benchmark_test_integer(db,
             "SELECT count(*) FROM benchmark_result AS r JOIN benchmark_operation AS o ON o.name = r.operation\n"
-            "WHERE r.arguments <> o.arguments OR r.outcome IN ('fail', 'timeout', 'pending')") == 0 && ok;
+            "LEFT JOIN benchmark_workload AS w ON w.operation = r.operation AND w.backend = r.backend\n"
+            "WHERE r.arguments <> coalesce(w.arguments, o.arguments)\n"
+            "   OR r.outcome IN ('fail', 'timeout', 'pending')") == 0 && ok;
     sqlite_close(db);
     const char *report[] = {"report", "1"};
     ok = ok && benchmark_test_command(root, report, 2, 0, &out) &&
@@ -501,6 +514,73 @@ static void test_benchmarks_integer_inputs(void)
     string_free(out); string_free(wide_arguments);
     ok = test_checks_finish(root) && ok;
     TEST_ASSERT_TRUE(ok, "integer workloads retain multi-limb inputs, a non-trivial GCD and checked exact results");
+}
+
+static void test_benchmarks_fraction_inputs(void)
+{
+    string_t *root = test_checks_root(), *out = NULL;
+    const char *sync[] = {"sync"};
+    bool ok = benchmark_test_fixture(root) && benchmark_test_command(root, sync, 1, 0, NULL);
+    sqlite_t *db = benchmark_test_open(root);
+    sqlite_stmt_t *rows = db ? sqlite_stmt_prepare(db,
+        "SELECT arguments FROM benchmark_workload\n"
+        "WHERE backend = 'exact-fraction' ORDER BY operation") : NULL;
+    size_t saved = num_get_default_prec_bits(), count = 0;
+    ok = ok && rows && num_set_default_prec_bits(16384) == 0;
+    sqlite_step_result_t step = SQLITE_STEP_ERROR;
+    while (ok && (step = sqlite_stmt_step(rows)) == SQLITE_STEP_ROW) {
+        string_t *arguments = string_new_with(sqlite_stmt_column_text(rows, 0));
+        size_t parts_count = 0;
+        string_t **parts = arguments ? string_split(arguments, ",", &parts_count) : NULL;
+        number_t value = parts_count ? num_create_from_text(parts[0]) : NUM_NAN;
+        number_t numerator = {0}, denominator = {0};
+        ok = parts && num_is_exact(value) && !num_is_integer(value) &&
+             num_get_fraction_parts(value, &numerator, &denominator) &&
+             num_bit_length(numerator) == 1024 && num_bit_length(denominator) == 521;
+        num_destroy(&numerator); num_destroy(&denominator); num_destroy(&value);
+        if (ok && parts_count == 2) {
+            string_trim(parts[1]);
+            value = num_create_from_text(parts[1]);
+            if (num_is_integer(value)) {
+                number_t five = num_create_from_long(5);
+                ok = num_eq(value, five);
+                num_destroy(&five);
+            } else {
+                ok = num_get_fraction_parts(value, &numerator, &denominator) &&
+                     num_bit_length(numerator) == 384 && num_bit_length(denominator) == 896;
+            }
+            num_destroy(&numerator); num_destroy(&denominator); num_destroy(&value);
+        }
+        string_split_free(parts, parts_count); string_free(arguments);
+        ++count;
+    }
+    ok = ok && step == SQLITE_STEP_DONE && count == 10;
+    num_set_default_prec_bits(saved);
+    sqlite_stmt_finalize(rows); sqlite_close(db);
+    const char *run[] = {"run", "--backend", "exact-fraction", "--samples", "3", "--timeout", "3"};
+    ok = ok && benchmark_test_command(root, run, 7, 0, NULL);
+    db = benchmark_test_open(root);
+    ok = db && benchmark_test_integer(db,
+        "SELECT count(*) FROM benchmark_result WHERE outcome = 'pass'") == 10 &&
+        benchmark_test_integer(db, "SELECT count(*) FROM benchmark_sample") == 30 &&
+        benchmark_test_integer(db,
+            "SELECT count(*) FROM benchmark_result AS r\n"
+            "LEFT JOIN benchmark_workload AS w ON w.operation = r.operation AND w.backend = r.backend\n"
+            "WHERE r.outcome = 'pass' AND (r.arguments <> w.arguments OR r.bits <> 0 OR r.complex_mask <> 0)") == 0 && ok;
+    sqlite_close(db);
+    const char *stats[] = {"stats", "--backend", "exact-fraction", "--format=markdown"};
+    ok = ok && benchmark_test_command(root, stats, 4, 0, &out) &&
+         string_find(out, "number / unrestricted fraction — exact fractions") >= 0 &&
+         string_find(out, "width:80ch") >= 0;
+    string_free(out); out = NULL;
+    const char *report[] = {"report", "1"};
+    ok = ok && benchmark_test_command(root, report, 2, 0, &out) &&
+         string_find(out, "### number / unrestricted fraction\n") >= 0 &&
+         string_find(out, "| add |") >= 0 && string_find(out, "| div |") >= 0 &&
+         string_find(out, "| inv |") >= 0 && string_find(out, "| mul |") >= 0;
+    string_free(out);
+    ok = test_checks_finish(root) && ok;
+    TEST_ASSERT_TRUE(ok, "fraction arithmetic times large exact operands and reports the actual persisted workload");
 }
 
 static void test_benchmarks_measurements(void)
@@ -661,13 +741,13 @@ static void test_benchmarks_progress_terminal(void)
         string_find(text, "\033[1A") >= 0 && string_find(text, "\033[2K") >= 0 &&
         string_find(text, "\033[1;92mPASS") >= 0 && string_find(text, "\033[1;93m  SKIP") >= 0 &&
         string_find(text, "elapsed") >= 0 && string_find(text, "case") >= 0 && string_find(text, "3s limit") >= 0 &&
-        string_find(text, "Benchmarks complete: 16/16;") >= 0 && string_find(text, "PASS 15") >= 0 &&
-        string_find(text, "SKIP 1") >= 0 && string_find(text, "[1/16]") < 0 &&
+        string_find(text, "Benchmarks complete: 17/17;") >= 0 && string_find(text, "PASS 15") >= 0 &&
+        string_find(text, "SKIP 2") >= 0 && string_find(text, "[1/17]") < 0 &&
         string_find(text, "░") < 0 && string_find(text, "▒") < 0 && string_find(text, "▓") < 0;
     if (!ok && text) fprintf(stderr, "Benchmark terminal transcript: %s\n", string_c_str(text));
     string_free(text); text = NULL;
     ok = ok && benchmark_test_terminal(root, 55, false, &text) && string_find(text, "\033[1A") >= 0 &&
-        string_find(text, "\033[1;9") < 0 && string_find(text, "Benchmarks complete: 16/16;") >= 0;
+        string_find(text, "\033[1;9") < 0 && string_find(text, "Benchmarks complete: 17/17;") >= 0;
     string_free(text);
     ok = test_checks_finish(root) && ok;
     TEST_ASSERT_TRUE(ok, "terminal progress animates fractional bars and counters without per-case scrolling or forced colour");
@@ -798,10 +878,10 @@ static void test_benchmarks_documentation(void)
             ok = string_find(source, "### number / double precision\n") >= 0 &&
                 string_find(source, "### number / multi-precision floating point\n") >= 0 &&
                 string_find(source, "### number / multi-precision complex floating point\n") >= 0 &&
-                string_find(source, "### number / multi-precision integer\n") >= 0 &&
-                string_find(source, "### number / multi-precision fraction\n") >= 0 &&
+                string_find(source, "### number / unrestricted integer\n") >= 0 &&
+                string_find(source, "### number / unrestricted fraction\n") >= 0 &&
                 string_find(source, "GMP rational arithmetic (MPQ)") >= 0 &&
-                string_find(source, "no separate fraction measurements") >= 0 &&
+                string_find(source, "16,384-bit") >= 0 &&
                 string_find(source, "### `number-double`") < 0 && string_find(source, "### `mpfr`") < 0 &&
                 string_find(source, "### `mpc`") < 0 && string_find(source, "### `exact-integer`") < 0 &&
                 string_find(source, "17, <br/>5</span> | 1.0 µs |") >= 0 &&
@@ -899,7 +979,7 @@ static void test_benchmarks_retention_policy(void)
     sqlite_t *db = benchmark_test_open(root);
     ok = db && benchmark_test_integer(db,
         "SELECT count(*) FROM benchmark_retention WHERE max_mib=2 AND keep_runs=3 AND max_days=30 AND raw_runs=3") == 1 &&
-        benchmark_test_integer(db, "PRAGMA user_version") == 2 && ok;
+        benchmark_test_integer(db, "PRAGMA user_version") == 3 && ok;
     sqlite_close(db);
     ok = test_checks_finish(root) && ok;
     TEST_ASSERT_TRUE(ok,
@@ -1083,7 +1163,7 @@ static void test_benchmarks_retention_lock_and_migration(void)
     ok = ok && benchmark_test_command(root, configure, 3, 1, NULL) && benchmark_test_command(root, prune, 1, 1, NULL);
     file_free(lock);
     db = benchmark_test_open(root);
-    ok = db && benchmark_test_integer(db, "PRAGMA user_version") == 2 &&
+    ok = db && benchmark_test_integer(db, "PRAGMA user_version") == 3 &&
         benchmark_test_integer(db, "SELECT keep_runs FROM benchmark_retention") == 20 &&
         benchmark_test_integer(db, "SELECT count(*) FROM benchmark_result") == 8 &&
         benchmark_test_integer(db, "SELECT timing_outlier FROM benchmark_result WHERE operation='hypergeometric_pFq'") == 1 && ok;
@@ -1114,6 +1194,7 @@ void test_checks_benchmark_cases(void)
     TEST_RUN_IN_GROUP(test_benchmarks_expression_coverage, tests, "benchmark,expression,coverage");
     TEST_RUN_IN_GROUP(test_benchmarks_measurements, tests, "benchmark,timing");
     TEST_RUN_IN_GROUP(test_benchmarks_integer_inputs, tests, "benchmark,integer,timing");
+    TEST_RUN_IN_GROUP(test_benchmarks_fraction_inputs, tests, "benchmark,fraction,timing");
     TEST_RUN_IN_GROUP(test_benchmarks_documentation, tests, "benchmark,markdown");
     TEST_RUN_IN_GROUP(test_benchmarks_documentation_supported_rows, tests, "benchmark,markdown");
     TEST_RUN_IN_GROUP(test_benchmarks_stats, tests, "benchmark,statistics");

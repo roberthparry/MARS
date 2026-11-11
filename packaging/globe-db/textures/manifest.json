@@ -35677,9 +35677,9 @@
       "width": 3600
     },
     "regional/5242.png": {
-      "bytes": 3543017,
+      "bytes": 3582429,
       "height": 1800,
-      "sha256": "aa0c95fb3e0f5808529e5b3ce5e0fe0f805e79a665b9b6431a04f9239899a112",
+      "sha256": "97318b0adb2a617d52302825efa01644a2eb6c9a4bc13ddac23308de1baa904b",
       "width": 1800
     },
     "regional/5243.png": {
@@ -35707,21 +35707,21 @@
       "width": 1800
     },
     "regional/5247.png": {
-      "bytes": 3987101,
+      "bytes": 4348166,
       "height": 1800,
-      "sha256": "89d2259347b6b3ce7c36ece2e2f3ebab28f5b2b4a13a25cfc2274363c5920f1d",
+      "sha256": "040ff4b9ef736cbe8326a3b82130170b7c5697477008b189cafbc88408e15609",
       "width": 1800
     },
     "regional/5248.png": {
-      "bytes": 5116940,
+      "bytes": 5346273,
       "height": 1800,
-      "sha256": "785e5f87eeb502230e20648838a9343aacf9e5da760c974a562f6f45761733bd",
+      "sha256": "a05a4d2168dd18bc1c1ffd89f9f98440582c86bfe7cc04a01093e9991c4409f3",
       "width": 1800
     },
     "regional/5249.png": {
-      "bytes": 4040909,
+      "bytes": 4286600,
       "height": 1800,
-      "sha256": "32fe01b77367318b8d3cf53911e98dabdac7728b0487ec8a3f7c31ee2d5fe0c0",
+      "sha256": "195517e9da3574771a933fa9f3d27d9a601592028c4dfdc6746f3bfc53902982",
       "width": 1800
     },
     "regional/525.png": {
@@ -35731,39 +35731,39 @@
       "width": 3600
     },
     "regional/5250.png": {
-      "bytes": 4805621,
+      "bytes": 5164738,
       "height": 1800,
-      "sha256": "361cdcd0a08dd5df60d685a649069139010e9932d496ad7f7b4cdccd450a631f",
+      "sha256": "eba95470d360d6d93d94998c5222a9ecce8f42385d3151fd20f727fda1804990",
       "width": 1800
     },
     "regional/5251.png": {
-      "bytes": 6713025,
+      "bytes": 6639828,
       "height": 1800,
-      "sha256": "8d98034b0e3778023cad167342c9a5b6a60f00e3a12ba0d5b700706416a3e6a2",
+      "sha256": "cba2d016aa01c4cb4939a75e2c5d596741c3dbd8d7828332624027f898b3384b",
       "width": 1800
     },
     "regional/5252.png": {
-      "bytes": 5270105,
+      "bytes": 5578384,
       "height": 1800,
-      "sha256": "bbe74fdf3daf5ab4c352e6b5db082d67324d1b926a9d2f3a158f443799763da0",
+      "sha256": "62deabdbc4dec8912e7c9a67be7bcd40cb3a76e20eb3f7cf5b9ae0f2713dbc19",
       "width": 1800
     },
     "regional/5253.png": {
-      "bytes": 6963021,
+      "bytes": 6913319,
       "height": 1800,
-      "sha256": "e0e04a84591e2ec9cb157e54ebc3796653d237fdb2a28678a6d278dcc5fa7d55",
+      "sha256": "51b4ad367761d1432c7850877990896deb1440f15103295c6ca28e7e75a3ee89",
       "width": 1800
     },
     "regional/5254.png": {
-      "bytes": 7162326,
+      "bytes": 6981145,
       "height": 1800,
-      "sha256": "5b74b2fd5495d71345e91ea48a6a685fa13407d82699fce7394986b60b155fed",
+      "sha256": "2642e9bf9d309bc558ce97eacb0f529c1ee09bb4b19217a7cd051c9f2d962945",
       "width": 1800
     },
     "regional/5255.png": {
-      "bytes": 6421693,
+      "bytes": 6607943,
       "height": 1800,
-      "sha256": "9476a911612998a73d624877e08c0205510b00ff52806a983185c3566eb97fb1",
+      "sha256": "0109a298112ba247f66116396f0a90ce14649e625ec2ddfd4550852045b584c1",
       "width": 1800
     },
     "regional/5256.png": {
@@ -36000,6 +36000,60 @@
       "sha256": "f6e6d0de21024e246025f428315a73e64b1a33054864f40dc18a1ea59683d22d",
       "width": 1800
     },
+    "regional/5291.png": {
+      "bytes": 1966606,
+      "height": 1800,
+      "sha256": "c07b77220b6dcbe852c822ea775a421340877ae3aff8976f0be99f40d50bb998",
+      "width": 1800
+    },
+    "regional/5292.png": {
+      "bytes": 5213218,
+      "height": 1800,
+      "sha256": "128c09e4e4ed0339821d7e03161f1c4db1222c1a9bb92b38c6c65a347869aea0",
+      "width": 1800
+    },
+    "regional/5293.png": {
+      "bytes": 1794453,
+      "height": 1800,
+      "sha256": "61d1c3e2d6471a0e7d8f8c8804c59e9ef2a4636d0806a1fe966c8ed07d080742",
+      "width": 1800
+    },
+    "regional/5294.png": {
+      "bytes": 1006656,
+      "height": 1800,
+      "sha256": "80a7e0363352135a2860b40110504225fca835f5709fa3079759f7a03c50f993",
+      "width": 1800
+    },
+    "regional/5295.png": {
+      "bytes": 231014,
+      "height": 1800,
+      "sha256": "08bfd13140cc7284c50b42a1bbe19933e87f23602ba6f8df790badcb9e216440",
+      "width": 1800
+    },
+    "regional/5296.png": {
+      "bytes": 2644254,
+      "height": 1800,
+      "sha256": "73aa6a6f63e2c6197d87719d7ab583fd0a135c703b77f8c941c412cc7f3a313a",
+      "width": 1800
+    },
+    "regional/5297.png": {
+      "bytes": 3320292,
+      "height": 1800,
+      "sha256": "1edda446649c3a9a2dd35c423943acedc9edc3857f13dec7e9fd72e7f6607a3a",
+      "width": 1800
+    },
+    "regional/5298.png": {
+      "bytes": 2231498,
+      "height": 1800,
+      "sha256": "3c4a634fdcd9a4948cbe8063df6749e88fd95f103cc175c1d6d291b74b834ca5",
+      "width": 1800
+    },
+    "regional/5299.png": {
+      "bytes": 4210713,
+      "height": 1800,
+      "sha256": "789796c2283c2433a8c921b1cd6e8f9229f1676ef49461c2b3f24289878c9065",
+      "width": 1800
+    },
     "regional/53.png": {
       "bytes": 50568,
       "height": 3600,
@@ -36012,11 +36066,131 @@
       "sha256": "6b05fedff3c6c5ece9bc15e197d7e557910e4c4362756aab882067848fd8b812",
       "width": 3600
     },
+    "regional/5300.png": {
+      "bytes": 5927630,
+      "height": 1800,
+      "sha256": "119d80a4cd7fd621c5d9090564e51af6e64888b69aa3563d77451b50b44887e7",
+      "width": 1800
+    },
+    "regional/5301.png": {
+      "bytes": 3076516,
+      "height": 1800,
+      "sha256": "f39494ffce393d9fbc1e53e1592a41554426e55c6595e938349eae4c0645380e",
+      "width": 1800
+    },
+    "regional/5302.png": {
+      "bytes": 3256683,
+      "height": 1800,
+      "sha256": "55271d754ad5e27849683ceb4d3ed7d61afa661f615d78073fb8d47027f7a564",
+      "width": 1800
+    },
+    "regional/5303.png": {
+      "bytes": 5869467,
+      "height": 1800,
+      "sha256": "a31a98d8ff10997868badb8830bcb9dc900d8e2b96b4bae96c7886c07ea1d23e",
+      "width": 1800
+    },
+    "regional/5304.png": {
+      "bytes": 3392424,
+      "height": 1800,
+      "sha256": "fbd5dcaa80304ed9bc61a8dd9b2e65223da1e8a248b784d6ef2bca535ed9dbfb",
+      "width": 1800
+    },
+    "regional/5305.png": {
+      "bytes": 5762164,
+      "height": 1800,
+      "sha256": "a8653706456aca46e9518539ef8b0ec1f6127f162fdf8c6e51f802dfa77f461a",
+      "width": 1800
+    },
+    "regional/5306.png": {
+      "bytes": 4391255,
+      "height": 1800,
+      "sha256": "0c3dd3ce8de2010cfcfc1896b02fd5e859ceac1682cc6f31de0547d2a14729ec",
+      "width": 1800
+    },
+    "regional/5307.png": {
+      "bytes": 6402501,
+      "height": 1800,
+      "sha256": "77e6c9645e6dce37de7d9d13aeb1e2c6f54c17e58bc2816fbb6a69493065df61",
+      "width": 1800
+    },
+    "regional/5308.png": {
+      "bytes": 5412280,
+      "height": 1800,
+      "sha256": "e65ae290de9985b6b300d5fd99b2fd3918560444b4cb12bbeaeb5f62db8bc6f4",
+      "width": 1800
+    },
+    "regional/5309.png": {
+      "bytes": 4222978,
+      "height": 1800,
+      "sha256": "322fc0a2fb35ee693b79c96deb419a91287459b7a01b4de526b17c9dda7cf8a5",
+      "width": 1800
+    },
     "regional/531.png": {
       "bytes": 3088637,
       "height": 3600,
       "sha256": "9b91c71efd7d0d0644c517a4292e57d70dbf7deb7f6fa689bc52f8da093533ad",
       "width": 3600
+    },
+    "regional/5310.png": {
+      "bytes": 5346273,
+      "height": 1800,
+      "sha256": "a05a4d2168dd18bc1c1ffd89f9f98440582c86bfe7cc04a01093e9991c4409f3",
+      "width": 1800
+    },
+    "regional/5311.png": {
+      "bytes": 3919832,
+      "height": 1800,
+      "sha256": "cae9f6bdecac0d36cd3a623e11de25feb700af6e881b9ff268b66ed5f40b5f44",
+      "width": 1800
+    },
+    "regional/5312.png": {
+      "bytes": 1868235,
+      "height": 1800,
+      "sha256": "28c851af0170c7bb359c00b8ac2a2bc5793c49e144fb79148698e62641a37042",
+      "width": 1800
+    },
+    "regional/5313.png": {
+      "bytes": 4399099,
+      "height": 1800,
+      "sha256": "de417b599439747b95214ca5d34ebc0472b22a5928b393934719db01a800a874",
+      "width": 1800
+    },
+    "regional/5314.png": {
+      "bytes": 3929999,
+      "height": 1800,
+      "sha256": "feca25ff99a5b5ea1c9004d2d0bd577fb2797527e9a7fcab9d0e65538b33e6dd",
+      "width": 1800
+    },
+    "regional/5315.png": {
+      "bytes": 6981145,
+      "height": 1800,
+      "sha256": "2642e9bf9d309bc558ce97eacb0f529c1ee09bb4b19217a7cd051c9f2d962945",
+      "width": 1800
+    },
+    "regional/5316.png": {
+      "bytes": 4569388,
+      "height": 1800,
+      "sha256": "a382ab42a436da00c5fa5282c6a896fd3b5cae29de98a76121a1a2d5def306a4",
+      "width": 1800
+    },
+    "regional/5317.png": {
+      "bytes": 3931940,
+      "height": 1800,
+      "sha256": "55339b3d2477e0fb64fa2b90525fa3e21983f056457f7fa174574d0503933b1d",
+      "width": 1800
+    },
+    "regional/5318.png": {
+      "bytes": 2975223,
+      "height": 1800,
+      "sha256": "dfeaec802f0097b1e8639da0a951fdd757ae3470d0ae054f1fd639c75b11088f",
+      "width": 1800
+    },
+    "regional/5319.png": {
+      "bytes": 4623369,
+      "height": 1800,
+      "sha256": "9afc8ee02ec00c255d2ec0509cbb7b4b14598295960db2b63db15692b540093f",
+      "width": 1800
     },
     "regional/532.png": {
       "bytes": 2060045,
@@ -36024,11 +36198,131 @@
       "sha256": "4fe8b0e23ad27f2b17b4b0230e189c75805827b583852ca29ced72815b37bef2",
       "width": 3600
     },
+    "regional/5320.png": {
+      "bytes": 7153815,
+      "height": 1800,
+      "sha256": "cd3f7bfbd65d6e6f9941b7c7303aff05274803b0b0e1ff3fe37ae32ca1ffd6be",
+      "width": 1800
+    },
+    "regional/5321.png": {
+      "bytes": 6914135,
+      "height": 1800,
+      "sha256": "0c81543537790e799ac6e22e1e57433738c3364706227b70f2df3dfb626fcb52",
+      "width": 1800
+    },
+    "regional/5322.png": {
+      "bytes": 6696819,
+      "height": 1800,
+      "sha256": "0eb9a850f00551ec56bd0ad96e5a8c93e0c319dba4550a570c0e8c05afa3ca23",
+      "width": 1800
+    },
+    "regional/5323.png": {
+      "bytes": 7241685,
+      "height": 1800,
+      "sha256": "ebdb9063cf1e6ed44b2f7a0418dba69629924ea814ce4e87a181d61452474066",
+      "width": 1800
+    },
+    "regional/5324.png": {
+      "bytes": 7130145,
+      "height": 1800,
+      "sha256": "e3552e3dbb02c92f0a560ae96b4495cda3bb4d295ad846cda9639110831c73c2",
+      "width": 1800
+    },
+    "regional/5325.png": {
+      "bytes": 3164067,
+      "height": 1800,
+      "sha256": "1da4601b992fc4c45e09cfe0cb8cd640aeb7c9b1dca4875ea62044ccfda57bfb",
+      "width": 1800
+    },
+    "regional/5326.png": {
+      "bytes": 2507718,
+      "height": 1800,
+      "sha256": "88daf42bbcd8021a64ae7ba5c37f13de2bc566c4a4304a7d64458d1d368e3dbc",
+      "width": 1800
+    },
+    "regional/5327.png": {
+      "bytes": 7007861,
+      "height": 1800,
+      "sha256": "8e3ee40d006e0e06a72b5ef7a5528aab74dbee52fb56f29d082fb0fcdeeec912",
+      "width": 1800
+    },
+    "regional/5328.png": {
+      "bytes": 7401072,
+      "height": 1800,
+      "sha256": "4580a7d9837dd7a878cbaac64647f1355e9994c7761846a7571e00b632dbcf27",
+      "width": 1800
+    },
+    "regional/5329.png": {
+      "bytes": 6834535,
+      "height": 1800,
+      "sha256": "ee101dd5a1d37e787242f1ae6c9a8e1de0e5671c68ee9f723ad8693c9e2ff2b3",
+      "width": 1800
+    },
     "regional/533.png": {
       "bytes": 11529916,
       "height": 3600,
       "sha256": "906e26f0d3f37d90407bd132c50ab67a2ad49ddd2e27695e44fcaab43ff7edd3",
       "width": 3600
+    },
+    "regional/5330.png": {
+      "bytes": 6756866,
+      "height": 1800,
+      "sha256": "079b78b48253f530870392557f6686767c5e59a689232a145972799314a341d1",
+      "width": 1800
+    },
+    "regional/5331.png": {
+      "bytes": 6918947,
+      "height": 1800,
+      "sha256": "5b1eb4ce0fbbee09cd0163ed7b8a4c3f24433c4bfa599b83cb756d930926ea1b",
+      "width": 1800
+    },
+    "regional/5332.png": {
+      "bytes": 7089162,
+      "height": 1800,
+      "sha256": "3ac5c59befc3c420eae24d71dd437d015a2ef12ce91cb89f771eb173f8bbcf8b",
+      "width": 1800
+    },
+    "regional/5333.png": {
+      "bytes": 4671345,
+      "height": 1800,
+      "sha256": "78df7f036f84327062a463e5760c58c42eeb5570457eba457e56c63343d1af9e",
+      "width": 1800
+    },
+    "regional/5334.png": {
+      "bytes": 60242,
+      "height": 1800,
+      "sha256": "578b3cc4fa833ae7877c140f15c8e7929aa73d0a4508dcfed64c9a1b5add6814",
+      "width": 1800
+    },
+    "regional/5335.png": {
+      "bytes": 1757604,
+      "height": 1800,
+      "sha256": "a8f17773aac06927f0b5c50cd648e3a6032b37896f14d216040739e8ab2a6782",
+      "width": 1800
+    },
+    "regional/5336.png": {
+      "bytes": 5754741,
+      "height": 1800,
+      "sha256": "7697a56acd27807c9a8e146d781ea3ad7e7c1bb0324e7eb90f2676fac8e51d58",
+      "width": 1800
+    },
+    "regional/5337.png": {
+      "bytes": 7233976,
+      "height": 1800,
+      "sha256": "1472b5c14b9811c92cc11a607bacd82649fee9d3f369edb7e033a9b24512001d",
+      "width": 1800
+    },
+    "regional/5338.png": {
+      "bytes": 6915202,
+      "height": 1800,
+      "sha256": "ee977902a516672e4d65fa2e53f7a9d67aab8d732dd5a78ced0cd2f28da8c8e5",
+      "width": 1800
+    },
+    "regional/5339.png": {
+      "bytes": 6932445,
+      "height": 1800,
+      "sha256": "aea9212e2c404269c0a8177a9c77130dbd9ff27d94d902ab9e689a60fba6392d",
+      "width": 1800
     },
     "regional/534.png": {
       "bytes": 17035520,
@@ -36036,11 +36330,119 @@
       "sha256": "6489f17c333233f1a1a285b12d8f4353ee2e6daf08548e22c5d5f82480b6eae8",
       "width": 3600
     },
+    "regional/5340.png": {
+      "bytes": 4573082,
+      "height": 1800,
+      "sha256": "a3f4c5cc6af0d9de7a90d34df2a7a3c24a44b906072d4dbd528c222496ea1b05",
+      "width": 1800
+    },
+    "regional/5341.png": {
+      "bytes": 529239,
+      "height": 1800,
+      "sha256": "bc03e17506f809d1d8d08a71797d7c9ae1e7f0ce9944340b8cebb1b99dd77aad",
+      "width": 1800
+    },
+    "regional/5342.png": {
+      "bytes": 60242,
+      "height": 1800,
+      "sha256": "578b3cc4fa833ae7877c140f15c8e7929aa73d0a4508dcfed64c9a1b5add6814",
+      "width": 1800
+    },
+    "regional/5343.png": {
+      "bytes": 60242,
+      "height": 1800,
+      "sha256": "578b3cc4fa833ae7877c140f15c8e7929aa73d0a4508dcfed64c9a1b5add6814",
+      "width": 1800
+    },
+    "regional/5344.png": {
+      "bytes": 546011,
+      "height": 1800,
+      "sha256": "d61233e8a9b9b11b4b87b4653929fadf5c68f6c358a48c319c4a2031d18f624c",
+      "width": 1800
+    },
+    "regional/5345.png": {
+      "bytes": 2371461,
+      "height": 1800,
+      "sha256": "2e2079a85fa24c591f60fdb4465b7e0fbab3fc4bab5be09d7be9c9edfed29a34",
+      "width": 1800
+    },
+    "regional/5346.png": {
+      "bytes": 3544608,
+      "height": 1800,
+      "sha256": "8b707e2db430ec4600d284b5050d3ec0eb8beb18bd6621b435b6ab9e8489f00b",
+      "width": 1800
+    },
+    "regional/5347.png": {
+      "bytes": 1852840,
+      "height": 1800,
+      "sha256": "8ebbb9f7d964e9041bd141668b8665205f5407a32f3f5cb031f26c0b75c74b04",
+      "width": 1800
+    },
+    "regional/5348.png": {
+      "bytes": 333631,
+      "height": 1800,
+      "sha256": "88c9b4044893ca5c8479a4e6e718e2d6181741179b401dc88093f1a1628c6ebd",
+      "width": 1800
+    },
+    "regional/5349.png": {
+      "bytes": 60242,
+      "height": 1800,
+      "sha256": "578b3cc4fa833ae7877c140f15c8e7929aa73d0a4508dcfed64c9a1b5add6814",
+      "width": 1800
+    },
     "regional/535.png": {
       "bytes": 18574104,
       "height": 3600,
       "sha256": "adbb2f24f9afc11df706a2fb1d2d0384f5b2353b22f0cdc9c147d25d6374adb7",
       "width": 3600
+    },
+    "regional/5350.png": {
+      "bytes": 60242,
+      "height": 1800,
+      "sha256": "578b3cc4fa833ae7877c140f15c8e7929aa73d0a4508dcfed64c9a1b5add6814",
+      "width": 1800
+    },
+    "regional/5351.png": {
+      "bytes": 60242,
+      "height": 1800,
+      "sha256": "578b3cc4fa833ae7877c140f15c8e7929aa73d0a4508dcfed64c9a1b5add6814",
+      "width": 1800
+    },
+    "regional/5352.png": {
+      "bytes": 60242,
+      "height": 1800,
+      "sha256": "578b3cc4fa833ae7877c140f15c8e7929aa73d0a4508dcfed64c9a1b5add6814",
+      "width": 1800
+    },
+    "regional/5353.png": {
+      "bytes": 60242,
+      "height": 1800,
+      "sha256": "578b3cc4fa833ae7877c140f15c8e7929aa73d0a4508dcfed64c9a1b5add6814",
+      "width": 1800
+    },
+    "regional/5354.png": {
+      "bytes": 60242,
+      "height": 1800,
+      "sha256": "578b3cc4fa833ae7877c140f15c8e7929aa73d0a4508dcfed64c9a1b5add6814",
+      "width": 1800
+    },
+    "regional/5355.png": {
+      "bytes": 60242,
+      "height": 1800,
+      "sha256": "578b3cc4fa833ae7877c140f15c8e7929aa73d0a4508dcfed64c9a1b5add6814",
+      "width": 1800
+    },
+    "regional/5356.png": {
+      "bytes": 60242,
+      "height": 1800,
+      "sha256": "578b3cc4fa833ae7877c140f15c8e7929aa73d0a4508dcfed64c9a1b5add6814",
+      "width": 1800
+    },
+    "regional/5357.png": {
+      "bytes": 60242,
+      "height": 1800,
+      "sha256": "578b3cc4fa833ae7877c140f15c8e7929aa73d0a4508dcfed64c9a1b5add6814",
+      "width": 1800
     },
     "regional/536.png": {
       "bytes": 13657171,
@@ -39105,18 +39507,22 @@
   },
   "attribution": "NASA Earth Observatory; Reto Stoeckli, NASA Goddard Space Flight Center. Historical July 2004 reference imagery. NASA imagery reuse policy applies; no endorsement implied.",
   "coastal_mask": {
-    "masked_bytes": 39437876392,
+    "masked_bytes": 39681382649,
     "previous_catalogue": {
-      "masked_bytes": 39335623939,
+      "masked_bytes": 39437876392,
       "previous_catalogue": {
-        "masked_bytes": 36150397815,
+        "masked_bytes": 39335623939,
         "previous_catalogue": {
-          "masked_bytes": 35188355880,
+          "masked_bytes": 36150397815,
           "previous_catalogue": {
-            "masked_bytes": 22274594135,
-            "removed_pixels": 8190962335,
-            "shoreline_identity": "7092ec16da29f8e46c63affbebdbe5f19d3682ab0b1f7bdfc6324b7836ba3381",
-            "source_bytes": 30896850652,
+            "masked_bytes": 35188355880,
+            "previous_catalogue": {
+              "masked_bytes": 22274594135,
+              "removed_pixels": 8190962335,
+              "shoreline_identity": "7092ec16da29f8e46c63affbebdbe5f19d3682ab0b1f7bdfc6324b7836ba3381",
+              "source_bytes": 30896850652,
+              "version": 1
+            },
             "version": 1
           },
           "version": 1
@@ -116842,6 +117248,18 @@
         31.093333333333
       ],
       "coastal_mask_identity": "6c3ad6a691c43d452358da8f8dfbbc943aa42343c2fd4811a5fec6e507309b4e",
+      "colour_balance": {
+        "method": "Shared RGB gains from median matching bright opaque land in the Cairo overview to the global reference; one profile across Egyptian overviews and detail; nearest-byte rounding; alpha and transparent pixels unchanged. Existing clipped highlights are not reconstructed.",
+        "reference": "earth_surface_detail.png",
+        "reference_sha256": "cb96e65923a8a76c9224edfa2b73462c798460d4ea0c99682d95b3131888120d",
+        "rgb_gain": [
+          0.7255,
+          0.6723,
+          0.6554
+        ],
+        "source_sha256": "aa0c95fb3e0f5808529e5b3ce5e0fe0f805e79a665b9b6431a04f9239899a112",
+        "version": 1
+      },
       "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
       "name": "Cyprus and Cairo Sentinel tile 5242",
       "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; overlapping 1800-square tiles. DN 0..3000 scaled to 0..255 with exponent 0.7. Lossless RGBA PNG directly from source rasters; missing observations transparent. Offshore pixels cleared using the packaged coastline; inland waters retained; coastline alpha uses two-by-two coverage samples.",
@@ -116917,6 +117335,18 @@
         29.813333333333
       ],
       "coastal_mask_identity": "6c3ad6a691c43d452358da8f8dfbbc943aa42343c2fd4811a5fec6e507309b4e",
+      "colour_balance": {
+        "method": "Shared RGB gains from median matching bright opaque land in the Cairo overview to the global reference; one profile across Egyptian overviews and detail; nearest-byte rounding; alpha and transparent pixels unchanged. Existing clipped highlights are not reconstructed.",
+        "reference": "earth_surface_detail.png",
+        "reference_sha256": "cb96e65923a8a76c9224edfa2b73462c798460d4ea0c99682d95b3131888120d",
+        "rgb_gain": [
+          0.7255,
+          0.6723,
+          0.6554
+        ],
+        "source_sha256": "89d2259347b6b3ce7c36ece2e2f3ebab28f5b2b4a13a25cfc2274363c5920f1d",
+        "version": 1
+      },
       "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
       "name": "Cyprus and Cairo Sentinel tile 5247",
       "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; overlapping 1800-square tiles. DN 0..3000 scaled to 0..255 with exponent 0.7. Lossless RGBA PNG directly from source rasters; missing observations transparent. Offshore pixels cleared using the packaged coastline; inland waters retained; coastline alpha uses two-by-two coverage samples.",
@@ -116932,6 +117362,18 @@
         29.813333333333
       ],
       "coastal_mask_identity": "6c3ad6a691c43d452358da8f8dfbbc943aa42343c2fd4811a5fec6e507309b4e",
+      "colour_balance": {
+        "method": "Shared RGB gains from median matching bright opaque land in the Cairo overview to the global reference; one profile across Egyptian overviews and detail; nearest-byte rounding; alpha and transparent pixels unchanged. Existing clipped highlights are not reconstructed.",
+        "reference": "earth_surface_detail.png",
+        "reference_sha256": "cb96e65923a8a76c9224edfa2b73462c798460d4ea0c99682d95b3131888120d",
+        "rgb_gain": [
+          0.7255,
+          0.6723,
+          0.6554
+        ],
+        "source_sha256": "785e5f87eeb502230e20648838a9343aacf9e5da760c974a562f6f45761733bd",
+        "version": 1
+      },
       "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
       "name": "Cyprus and Cairo Sentinel tile 5248",
       "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; overlapping 1800-square tiles. DN 0..3000 scaled to 0..255 with exponent 0.7. Lossless RGBA PNG directly from source rasters; missing observations transparent. Offshore pixels cleared using the packaged coastline; inland waters retained; coastline alpha uses two-by-two coverage samples.",
@@ -116947,6 +117389,18 @@
         29.813333333333
       ],
       "coastal_mask_identity": "6c3ad6a691c43d452358da8f8dfbbc943aa42343c2fd4811a5fec6e507309b4e",
+      "colour_balance": {
+        "method": "Shared RGB gains from median matching bright opaque land in the Cairo overview to the global reference; one profile across Egyptian overviews and detail; nearest-byte rounding; alpha and transparent pixels unchanged. Existing clipped highlights are not reconstructed.",
+        "reference": "earth_surface_detail.png",
+        "reference_sha256": "cb96e65923a8a76c9224edfa2b73462c798460d4ea0c99682d95b3131888120d",
+        "rgb_gain": [
+          0.7255,
+          0.6723,
+          0.6554
+        ],
+        "source_sha256": "32fe01b77367318b8d3cf53911e98dabdac7728b0487ec8a3f7c31ee2d5fe0c0",
+        "version": 1
+      },
       "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
       "name": "Cyprus and Cairo Sentinel tile 5249",
       "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; overlapping 1800-square tiles. DN 0..3000 scaled to 0..255 with exponent 0.7. Lossless RGBA PNG directly from source rasters; missing observations transparent. Offshore pixels cleared using the packaged coastline; inland waters retained; coastline alpha uses two-by-two coverage samples.",
@@ -116962,6 +117416,18 @@
         30.133333333333
       ],
       "coastal_mask_identity": "6c3ad6a691c43d452358da8f8dfbbc943aa42343c2fd4811a5fec6e507309b4e",
+      "colour_balance": {
+        "method": "Shared RGB gains from median matching bright opaque land in the Cairo overview to the global reference; one profile across Egyptian overviews and detail; nearest-byte rounding; alpha and transparent pixels unchanged. Existing clipped highlights are not reconstructed.",
+        "reference": "earth_surface_detail.png",
+        "reference_sha256": "cb96e65923a8a76c9224edfa2b73462c798460d4ea0c99682d95b3131888120d",
+        "rgb_gain": [
+          0.7255,
+          0.6723,
+          0.6554
+        ],
+        "source_sha256": "361cdcd0a08dd5df60d685a649069139010e9932d496ad7f7b4cdccd450a631f",
+        "version": 1
+      },
       "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
       "name": "Cyprus and Cairo Sentinel tile 5250",
       "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; overlapping 1800-square tiles. DN 0..3000 scaled to 0..255 with exponent 0.7. Lossless RGBA PNG directly from source rasters; missing observations transparent. Offshore pixels cleared using the packaged coastline; inland waters retained; coastline alpha uses two-by-two coverage samples.",
@@ -116977,6 +117443,18 @@
         30.133333333333
       ],
       "coastal_mask_identity": "6c3ad6a691c43d452358da8f8dfbbc943aa42343c2fd4811a5fec6e507309b4e",
+      "colour_balance": {
+        "method": "Shared RGB gains from median matching bright opaque land in the Cairo overview to the global reference; one profile across Egyptian overviews and detail; nearest-byte rounding; alpha and transparent pixels unchanged. Existing clipped highlights are not reconstructed.",
+        "reference": "earth_surface_detail.png",
+        "reference_sha256": "cb96e65923a8a76c9224edfa2b73462c798460d4ea0c99682d95b3131888120d",
+        "rgb_gain": [
+          0.7255,
+          0.6723,
+          0.6554
+        ],
+        "source_sha256": "8d98034b0e3778023cad167342c9a5b6a60f00e3a12ba0d5b700706416a3e6a2",
+        "version": 1
+      },
       "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
       "name": "Cyprus and Cairo Sentinel tile 5251",
       "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; overlapping 1800-square tiles. DN 0..3000 scaled to 0..255 with exponent 0.7. Lossless RGBA PNG directly from source rasters; missing observations transparent. Offshore pixels cleared using the packaged coastline; inland waters retained; coastline alpha uses two-by-two coverage samples.",
@@ -116992,6 +117470,18 @@
         30.133333333333
       ],
       "coastal_mask_identity": "6c3ad6a691c43d452358da8f8dfbbc943aa42343c2fd4811a5fec6e507309b4e",
+      "colour_balance": {
+        "method": "Shared RGB gains from median matching bright opaque land in the Cairo overview to the global reference; one profile across Egyptian overviews and detail; nearest-byte rounding; alpha and transparent pixels unchanged. Existing clipped highlights are not reconstructed.",
+        "reference": "earth_surface_detail.png",
+        "reference_sha256": "cb96e65923a8a76c9224edfa2b73462c798460d4ea0c99682d95b3131888120d",
+        "rgb_gain": [
+          0.7255,
+          0.6723,
+          0.6554
+        ],
+        "source_sha256": "bbe74fdf3daf5ab4c352e6b5db082d67324d1b926a9d2f3a158f443799763da0",
+        "version": 1
+      },
       "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
       "name": "Cyprus and Cairo Sentinel tile 5252",
       "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; overlapping 1800-square tiles. DN 0..3000 scaled to 0..255 with exponent 0.7. Lossless RGBA PNG directly from source rasters; missing observations transparent. Offshore pixels cleared using the packaged coastline; inland waters retained; coastline alpha uses two-by-two coverage samples.",
@@ -117007,6 +117497,18 @@
         30.453333333333
       ],
       "coastal_mask_identity": "6c3ad6a691c43d452358da8f8dfbbc943aa42343c2fd4811a5fec6e507309b4e",
+      "colour_balance": {
+        "method": "Shared RGB gains from median matching bright opaque land in the Cairo overview to the global reference; one profile across Egyptian overviews and detail; nearest-byte rounding; alpha and transparent pixels unchanged. Existing clipped highlights are not reconstructed.",
+        "reference": "earth_surface_detail.png",
+        "reference_sha256": "cb96e65923a8a76c9224edfa2b73462c798460d4ea0c99682d95b3131888120d",
+        "rgb_gain": [
+          0.7255,
+          0.6723,
+          0.6554
+        ],
+        "source_sha256": "e0e04a84591e2ec9cb157e54ebc3796653d237fdb2a28678a6d278dcc5fa7d55",
+        "version": 1
+      },
       "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
       "name": "Cyprus and Cairo Sentinel tile 5253",
       "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; overlapping 1800-square tiles. DN 0..3000 scaled to 0..255 with exponent 0.7. Lossless RGBA PNG directly from source rasters; missing observations transparent. Offshore pixels cleared using the packaged coastline; inland waters retained; coastline alpha uses two-by-two coverage samples.",
@@ -117022,6 +117524,18 @@
         30.453333333333
       ],
       "coastal_mask_identity": "6c3ad6a691c43d452358da8f8dfbbc943aa42343c2fd4811a5fec6e507309b4e",
+      "colour_balance": {
+        "method": "Shared RGB gains from median matching bright opaque land in the Cairo overview to the global reference; one profile across Egyptian overviews and detail; nearest-byte rounding; alpha and transparent pixels unchanged. Existing clipped highlights are not reconstructed.",
+        "reference": "earth_surface_detail.png",
+        "reference_sha256": "cb96e65923a8a76c9224edfa2b73462c798460d4ea0c99682d95b3131888120d",
+        "rgb_gain": [
+          0.7255,
+          0.6723,
+          0.6554
+        ],
+        "source_sha256": "5b74b2fd5495d71345e91ea48a6a685fa13407d82699fce7394986b60b155fed",
+        "version": 1
+      },
       "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
       "name": "Cyprus and Cairo Sentinel tile 5254",
       "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; overlapping 1800-square tiles. DN 0..3000 scaled to 0..255 with exponent 0.7. Lossless RGBA PNG directly from source rasters; missing observations transparent. Offshore pixels cleared using the packaged coastline; inland waters retained; coastline alpha uses two-by-two coverage samples.",
@@ -117037,6 +117551,18 @@
         30.453333333333
       ],
       "coastal_mask_identity": "6c3ad6a691c43d452358da8f8dfbbc943aa42343c2fd4811a5fec6e507309b4e",
+      "colour_balance": {
+        "method": "Shared RGB gains from median matching bright opaque land in the Cairo overview to the global reference; one profile across Egyptian overviews and detail; nearest-byte rounding; alpha and transparent pixels unchanged. Existing clipped highlights are not reconstructed.",
+        "reference": "earth_surface_detail.png",
+        "reference_sha256": "cb96e65923a8a76c9224edfa2b73462c798460d4ea0c99682d95b3131888120d",
+        "rgb_gain": [
+          0.7255,
+          0.6723,
+          0.6554
+        ],
+        "source_sha256": "9476a911612998a73d624877e08c0205510b00ff52806a983185c3566eb97fb1",
+        "version": 1
+      },
       "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
       "name": "Cyprus and Cairo Sentinel tile 5255",
       "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; overlapping 1800-square tiles. DN 0..3000 scaled to 0..255 with exponent 0.7. Lossless RGBA PNG directly from source rasters; missing observations transparent. Offshore pixels cleared using the packaged coastline; inland waters retained; coastline alpha uses two-by-two coverage samples.",
@@ -117567,6 +118093,1815 @@
       "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; overlapping 1800-square tiles. DN 0..3000 scaled to 0..255 with exponent 0.7. Lossless RGBA PNG directly from source rasters; missing observations transparent. Offshore pixels cleared using the packaged coastline; inland waters retained; coastline alpha uses two-by-two coverage samples.",
       "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
       "valid_pixels": 250127
+    },
+    {
+      "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
+      "bounds": [
+        29.050000000000,
+        26.600000000000,
+        31.950000000000,
+        28.853333333333
+      ],
+      "coastal_mask_identity": "ea7cf464a830a60569b03ebe318dc6525b417fac998b8c4e9720f769220078ed",
+      "colour_balance": {
+        "method": "Shared RGB gains from median matching bright opaque land in the Cairo overview to the global reference; one profile across Egyptian overviews and detail; nearest-byte rounding; alpha and transparent pixels unchanged. Existing clipped highlights are not reconstructed.",
+        "reference": "earth_surface_detail.png",
+        "reference_sha256": "cb96e65923a8a76c9224edfa2b73462c798460d4ea0c99682d95b3131888120d",
+        "rgb_gain": [
+          0.7255,
+          0.6723,
+          0.6554
+        ],
+        "source_sha256": "0125559965cc9759a1e5382a2346461640d2949456d6ae2696b98faa260c8f6c",
+        "version": 1
+      },
+      "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
+      "name": "Nile Delta Suez and Nile Valley Sentinel tile 5291",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; overlapping 1800-square tiles. DN 0..3000 scaled to 0..255 with exponent 0.7. Lossless RGBA PNG directly from source rasters; missing observations transparent. Offshore pixels cleared using the packaged coastline; inland waters retained; coastline alpha uses two-by-two coverage samples.",
+      "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
+      "valid_pixels": 1280044
+    },
+    {
+      "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
+      "bounds": [
+        29.050000000000,
+        28.840000000000,
+        31.950000000000,
+        31.093333333333
+      ],
+      "coastal_mask_identity": "ea7cf464a830a60569b03ebe318dc6525b417fac998b8c4e9720f769220078ed",
+      "colour_balance": {
+        "method": "Shared RGB gains from median matching bright opaque land in the Cairo overview to the global reference; one profile across Egyptian overviews and detail; nearest-byte rounding; alpha and transparent pixels unchanged. Existing clipped highlights are not reconstructed.",
+        "reference": "earth_surface_detail.png",
+        "reference_sha256": "cb96e65923a8a76c9224edfa2b73462c798460d4ea0c99682d95b3131888120d",
+        "rgb_gain": [
+          0.7255,
+          0.6723,
+          0.6554
+        ],
+        "source_sha256": "d2b826dcbf1198823e2871ae85292061f6072711ca6e76062e3f141e737dfd2d",
+        "version": 1
+      },
+      "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
+      "name": "Nile Delta Suez and Nile Valley Sentinel tile 5292",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; overlapping 1800-square tiles. DN 0..3000 scaled to 0..255 with exponent 0.7. Lossless RGBA PNG directly from source rasters; missing observations transparent. Offshore pixels cleared using the packaged coastline; inland waters retained; coastline alpha uses two-by-two coverage samples.",
+      "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
+      "valid_pixels": 2753416
+    },
+    {
+      "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
+      "bounds": [
+        31.930000000000,
+        28.840000000000,
+        34.830000000000,
+        31.093333333333
+      ],
+      "coastal_mask_identity": "ea7cf464a830a60569b03ebe318dc6525b417fac998b8c4e9720f769220078ed",
+      "colour_balance": {
+        "method": "Shared RGB gains from median matching bright opaque land in the Cairo overview to the global reference; one profile across Egyptian overviews and detail; nearest-byte rounding; alpha and transparent pixels unchanged. Existing clipped highlights are not reconstructed.",
+        "reference": "earth_surface_detail.png",
+        "reference_sha256": "cb96e65923a8a76c9224edfa2b73462c798460d4ea0c99682d95b3131888120d",
+        "rgb_gain": [
+          0.7255,
+          0.6723,
+          0.6554
+        ],
+        "source_sha256": "4b0dbf1340705343c5ec23560ee0a1a173866093d79983e5b84643dbce11a641",
+        "version": 1
+      },
+      "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
+      "name": "Nile Delta Suez and Nile Valley Sentinel tile 5293",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; overlapping 1800-square tiles. DN 0..3000 scaled to 0..255 with exponent 0.7. Lossless RGBA PNG directly from source rasters; missing observations transparent. Offshore pixels cleared using the packaged coastline; inland waters retained; coastline alpha uses two-by-two coverage samples.",
+      "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
+      "valid_pixels": 991647
+    },
+    {
+      "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
+      "bounds": [
+        29.050000000000,
+        31.080000000000,
+        31.950000000000,
+        33.333333333333
+      ],
+      "coastal_mask_identity": "ea7cf464a830a60569b03ebe318dc6525b417fac998b8c4e9720f769220078ed",
+      "colour_balance": {
+        "method": "Shared RGB gains from median matching bright opaque land in the Cairo overview to the global reference; one profile across Egyptian overviews and detail; nearest-byte rounding; alpha and transparent pixels unchanged. Existing clipped highlights are not reconstructed.",
+        "reference": "earth_surface_detail.png",
+        "reference_sha256": "cb96e65923a8a76c9224edfa2b73462c798460d4ea0c99682d95b3131888120d",
+        "rgb_gain": [
+          0.7255,
+          0.6723,
+          0.6554
+        ],
+        "source_sha256": "19043f25b9203d576814945c9c97b2f69d135bf86f165836fc726677038629eb",
+        "version": 1
+      },
+      "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
+      "name": "Nile Delta Suez and Nile Valley Sentinel tile 5294",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; overlapping 1800-square tiles. DN 0..3000 scaled to 0..255 with exponent 0.7. Lossless RGBA PNG directly from source rasters; missing observations transparent. Offshore pixels cleared using the packaged coastline; inland waters retained; coastline alpha uses two-by-two coverage samples.",
+      "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
+      "valid_pixels": 397073
+    },
+    {
+      "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
+      "bounds": [
+        31.930000000000,
+        31.080000000000,
+        34.830000000000,
+        33.333333333333
+      ],
+      "coastal_mask_identity": "ea7cf464a830a60569b03ebe318dc6525b417fac998b8c4e9720f769220078ed",
+      "colour_balance": {
+        "method": "Shared RGB gains from median matching bright opaque land in the Cairo overview to the global reference; one profile across Egyptian overviews and detail; nearest-byte rounding; alpha and transparent pixels unchanged. Existing clipped highlights are not reconstructed.",
+        "reference": "earth_surface_detail.png",
+        "reference_sha256": "cb96e65923a8a76c9224edfa2b73462c798460d4ea0c99682d95b3131888120d",
+        "rgb_gain": [
+          0.7255,
+          0.6723,
+          0.6554
+        ],
+        "source_sha256": "45bce8175ac851a3bbe0dc6d9bd3635d90091694f9c4565262c20efdc0570790",
+        "version": 1
+      },
+      "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
+      "name": "Nile Delta Suez and Nile Valley Sentinel tile 5295",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; overlapping 1800-square tiles. DN 0..3000 scaled to 0..255 with exponent 0.7. Lossless RGBA PNG directly from source rasters; missing observations transparent. Offshore pixels cleared using the packaged coastline; inland waters retained; coastline alpha uses two-by-two coverage samples.",
+      "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
+      "valid_pixels": 64074
+    },
+    {
+      "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
+      "bounds": [
+        30.010000000000,
+        27.880000000000,
+        30.510000000000,
+        28.213333333333
+      ],
+      "coastal_mask_identity": "ea7cf464a830a60569b03ebe318dc6525b417fac998b8c4e9720f769220078ed",
+      "colour_balance": {
+        "method": "Shared RGB gains from median matching bright opaque land in the Cairo overview to the global reference; one profile across Egyptian overviews and detail; nearest-byte rounding; alpha and transparent pixels unchanged. Existing clipped highlights are not reconstructed.",
+        "reference": "earth_surface_detail.png",
+        "reference_sha256": "cb96e65923a8a76c9224edfa2b73462c798460d4ea0c99682d95b3131888120d",
+        "rgb_gain": [
+          0.7255,
+          0.6723,
+          0.6554
+        ],
+        "source_sha256": "1afbfea319d9a4548f5bf7eed0d2374cbc9b9127de9c0114143f1933ad5a9bc5",
+        "version": 1
+      },
+      "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
+      "name": "Nile Delta Suez and Nile Valley Sentinel tile 5296",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; overlapping 1800-square tiles. DN 0..3000 scaled to 0..255 with exponent 0.7. Lossless RGBA PNG directly from source rasters; missing observations transparent. Offshore pixels cleared using the packaged coastline; inland waters retained; coastline alpha uses two-by-two coverage samples.",
+      "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
+      "valid_pixels": 2097994
+    },
+    {
+      "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
+      "bounds": [
+        30.490000000000,
+        27.880000000000,
+        30.990000000000,
+        28.213333333333
+      ],
+      "coastal_mask_identity": "ea7cf464a830a60569b03ebe318dc6525b417fac998b8c4e9720f769220078ed",
+      "colour_balance": {
+        "method": "Shared RGB gains from median matching bright opaque land in the Cairo overview to the global reference; one profile across Egyptian overviews and detail; nearest-byte rounding; alpha and transparent pixels unchanged. Existing clipped highlights are not reconstructed.",
+        "reference": "earth_surface_detail.png",
+        "reference_sha256": "cb96e65923a8a76c9224edfa2b73462c798460d4ea0c99682d95b3131888120d",
+        "rgb_gain": [
+          0.7255,
+          0.6723,
+          0.6554
+        ],
+        "source_sha256": "4915a17e318d86a72702e7107a19292339aa62a6588814cce74f4a39a3442a86",
+        "version": 1
+      },
+      "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
+      "name": "Nile Delta Suez and Nile Valley Sentinel tile 5297",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; overlapping 1800-square tiles. DN 0..3000 scaled to 0..255 with exponent 0.7. Lossless RGBA PNG directly from source rasters; missing observations transparent. Offshore pixels cleared using the packaged coastline; inland waters retained; coastline alpha uses two-by-two coverage samples.",
+      "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
+      "valid_pixels": 2070851
+    },
+    {
+      "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
+      "bounds": [
+        30.970000000000,
+        27.880000000000,
+        31.470000000000,
+        28.213333333333
+      ],
+      "coastal_mask_identity": "ea7cf464a830a60569b03ebe318dc6525b417fac998b8c4e9720f769220078ed",
+      "colour_balance": {
+        "method": "Shared RGB gains from median matching bright opaque land in the Cairo overview to the global reference; one profile across Egyptian overviews and detail; nearest-byte rounding; alpha and transparent pixels unchanged. Existing clipped highlights are not reconstructed.",
+        "reference": "earth_surface_detail.png",
+        "reference_sha256": "cb96e65923a8a76c9224edfa2b73462c798460d4ea0c99682d95b3131888120d",
+        "rgb_gain": [
+          0.7255,
+          0.6723,
+          0.6554
+        ],
+        "source_sha256": "a809388f93cb875741e4de1fdeda17fbe3659723d7015d6f44c88f9c3be4d924",
+        "version": 1
+      },
+      "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
+      "name": "Nile Delta Suez and Nile Valley Sentinel tile 5298",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; overlapping 1800-square tiles. DN 0..3000 scaled to 0..255 with exponent 0.7. Lossless RGBA PNG directly from source rasters; missing observations transparent. Offshore pixels cleared using the packaged coastline; inland waters retained; coastline alpha uses two-by-two coverage samples.",
+      "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
+      "valid_pixels": 3240000
+    },
+    {
+      "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
+      "bounds": [
+        30.010000000000,
+        28.200000000000,
+        30.510000000000,
+        28.533333333333
+      ],
+      "coastal_mask_identity": "ea7cf464a830a60569b03ebe318dc6525b417fac998b8c4e9720f769220078ed",
+      "colour_balance": {
+        "method": "Shared RGB gains from median matching bright opaque land in the Cairo overview to the global reference; one profile across Egyptian overviews and detail; nearest-byte rounding; alpha and transparent pixels unchanged. Existing clipped highlights are not reconstructed.",
+        "reference": "earth_surface_detail.png",
+        "reference_sha256": "cb96e65923a8a76c9224edfa2b73462c798460d4ea0c99682d95b3131888120d",
+        "rgb_gain": [
+          0.7255,
+          0.6723,
+          0.6554
+        ],
+        "source_sha256": "3febc130091464043768493e62d33fa25901d10401a2f2a9d54de2cb2205ed64",
+        "version": 1
+      },
+      "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
+      "name": "Nile Delta Suez and Nile Valley Sentinel tile 5299",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; overlapping 1800-square tiles. DN 0..3000 scaled to 0..255 with exponent 0.7. Lossless RGBA PNG directly from source rasters; missing observations transparent. Offshore pixels cleared using the packaged coastline; inland waters retained; coastline alpha uses two-by-two coverage samples.",
+      "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
+      "valid_pixels": 3240000
+    },
+    {
+      "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
+      "bounds": [
+        30.490000000000,
+        28.200000000000,
+        30.990000000000,
+        28.533333333333
+      ],
+      "coastal_mask_identity": "ea7cf464a830a60569b03ebe318dc6525b417fac998b8c4e9720f769220078ed",
+      "colour_balance": {
+        "method": "Shared RGB gains from median matching bright opaque land in the Cairo overview to the global reference; one profile across Egyptian overviews and detail; nearest-byte rounding; alpha and transparent pixels unchanged. Existing clipped highlights are not reconstructed.",
+        "reference": "earth_surface_detail.png",
+        "reference_sha256": "cb96e65923a8a76c9224edfa2b73462c798460d4ea0c99682d95b3131888120d",
+        "rgb_gain": [
+          0.7255,
+          0.6723,
+          0.6554
+        ],
+        "source_sha256": "47ba242d872b1a0f08ae802d6b80c080767240261f2781bdb6154a5adf6fa74d",
+        "version": 1
+      },
+      "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
+      "name": "Nile Delta Suez and Nile Valley Sentinel tile 5300",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; overlapping 1800-square tiles. DN 0..3000 scaled to 0..255 with exponent 0.7. Lossless RGBA PNG directly from source rasters; missing observations transparent. Offshore pixels cleared using the packaged coastline; inland waters retained; coastline alpha uses two-by-two coverage samples.",
+      "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
+      "valid_pixels": 3239991
+    },
+    {
+      "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
+      "bounds": [
+        30.970000000000,
+        28.200000000000,
+        31.470000000000,
+        28.533333333333
+      ],
+      "coastal_mask_identity": "ea7cf464a830a60569b03ebe318dc6525b417fac998b8c4e9720f769220078ed",
+      "colour_balance": {
+        "method": "Shared RGB gains from median matching bright opaque land in the Cairo overview to the global reference; one profile across Egyptian overviews and detail; nearest-byte rounding; alpha and transparent pixels unchanged. Existing clipped highlights are not reconstructed.",
+        "reference": "earth_surface_detail.png",
+        "reference_sha256": "cb96e65923a8a76c9224edfa2b73462c798460d4ea0c99682d95b3131888120d",
+        "rgb_gain": [
+          0.7255,
+          0.6723,
+          0.6554
+        ],
+        "source_sha256": "58261d75e0980586c859f948651cdde8d8f1ecc05f7faed0ea0cc6f74512317e",
+        "version": 1
+      },
+      "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
+      "name": "Nile Delta Suez and Nile Valley Sentinel tile 5301",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; overlapping 1800-square tiles. DN 0..3000 scaled to 0..255 with exponent 0.7. Lossless RGBA PNG directly from source rasters; missing observations transparent. Offshore pixels cleared using the packaged coastline; inland waters retained; coastline alpha uses two-by-two coverage samples.",
+      "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
+      "valid_pixels": 3240000
+    },
+    {
+      "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
+      "bounds": [
+        30.010000000000,
+        28.520000000000,
+        30.510000000000,
+        28.853333333333
+      ],
+      "coastal_mask_identity": "ea7cf464a830a60569b03ebe318dc6525b417fac998b8c4e9720f769220078ed",
+      "colour_balance": {
+        "method": "Shared RGB gains from median matching bright opaque land in the Cairo overview to the global reference; one profile across Egyptian overviews and detail; nearest-byte rounding; alpha and transparent pixels unchanged. Existing clipped highlights are not reconstructed.",
+        "reference": "earth_surface_detail.png",
+        "reference_sha256": "cb96e65923a8a76c9224edfa2b73462c798460d4ea0c99682d95b3131888120d",
+        "rgb_gain": [
+          0.7255,
+          0.6723,
+          0.6554
+        ],
+        "source_sha256": "31f768cbb74d4886fec0ef30dcb5e7c3fca1bcc5cbc06de9707c2fb26749254d",
+        "version": 1
+      },
+      "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
+      "name": "Nile Delta Suez and Nile Valley Sentinel tile 5302",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; overlapping 1800-square tiles. DN 0..3000 scaled to 0..255 with exponent 0.7. Lossless RGBA PNG directly from source rasters; missing observations transparent. Offshore pixels cleared using the packaged coastline; inland waters retained; coastline alpha uses two-by-two coverage samples.",
+      "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
+      "valid_pixels": 3240000
+    },
+    {
+      "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
+      "bounds": [
+        30.490000000000,
+        28.520000000000,
+        30.990000000000,
+        28.853333333333
+      ],
+      "coastal_mask_identity": "ea7cf464a830a60569b03ebe318dc6525b417fac998b8c4e9720f769220078ed",
+      "colour_balance": {
+        "method": "Shared RGB gains from median matching bright opaque land in the Cairo overview to the global reference; one profile across Egyptian overviews and detail; nearest-byte rounding; alpha and transparent pixels unchanged. Existing clipped highlights are not reconstructed.",
+        "reference": "earth_surface_detail.png",
+        "reference_sha256": "cb96e65923a8a76c9224edfa2b73462c798460d4ea0c99682d95b3131888120d",
+        "rgb_gain": [
+          0.7255,
+          0.6723,
+          0.6554
+        ],
+        "source_sha256": "6881cf9ebdf0c1e30b18cb9b77474df7b546b76909ae36d3ad7e46886c84970c",
+        "version": 1
+      },
+      "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
+      "name": "Nile Delta Suez and Nile Valley Sentinel tile 5303",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; overlapping 1800-square tiles. DN 0..3000 scaled to 0..255 with exponent 0.7. Lossless RGBA PNG directly from source rasters; missing observations transparent. Offshore pixels cleared using the packaged coastline; inland waters retained; coastline alpha uses two-by-two coverage samples.",
+      "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
+      "valid_pixels": 3239999
+    },
+    {
+      "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
+      "bounds": [
+        30.970000000000,
+        28.520000000000,
+        31.470000000000,
+        28.853333333333
+      ],
+      "coastal_mask_identity": "ea7cf464a830a60569b03ebe318dc6525b417fac998b8c4e9720f769220078ed",
+      "colour_balance": {
+        "method": "Shared RGB gains from median matching bright opaque land in the Cairo overview to the global reference; one profile across Egyptian overviews and detail; nearest-byte rounding; alpha and transparent pixels unchanged. Existing clipped highlights are not reconstructed.",
+        "reference": "earth_surface_detail.png",
+        "reference_sha256": "cb96e65923a8a76c9224edfa2b73462c798460d4ea0c99682d95b3131888120d",
+        "rgb_gain": [
+          0.7255,
+          0.6723,
+          0.6554
+        ],
+        "source_sha256": "d52747ffe884b6f68c483b9f98dbb6e1f775464c39ea8956ad879fed02481b71",
+        "version": 1
+      },
+      "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
+      "name": "Nile Delta Suez and Nile Valley Sentinel tile 5304",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; overlapping 1800-square tiles. DN 0..3000 scaled to 0..255 with exponent 0.7. Lossless RGBA PNG directly from source rasters; missing observations transparent. Offshore pixels cleared using the packaged coastline; inland waters retained; coastline alpha uses two-by-two coverage samples.",
+      "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
+      "valid_pixels": 3240000
+    },
+    {
+      "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
+      "bounds": [
+        30.490000000000,
+        28.840000000000,
+        30.990000000000,
+        29.173333333333
+      ],
+      "coastal_mask_identity": "ea7cf464a830a60569b03ebe318dc6525b417fac998b8c4e9720f769220078ed",
+      "colour_balance": {
+        "method": "Shared RGB gains from median matching bright opaque land in the Cairo overview to the global reference; one profile across Egyptian overviews and detail; nearest-byte rounding; alpha and transparent pixels unchanged. Existing clipped highlights are not reconstructed.",
+        "reference": "earth_surface_detail.png",
+        "reference_sha256": "cb96e65923a8a76c9224edfa2b73462c798460d4ea0c99682d95b3131888120d",
+        "rgb_gain": [
+          0.7255,
+          0.6723,
+          0.6554
+        ],
+        "source_sha256": "4d240c2302635a175749ddd7ea74ed6ad7d0ff3b4428a1f9832f76f9893598b3",
+        "version": 1
+      },
+      "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
+      "name": "Nile Delta Suez and Nile Valley Sentinel tile 5305",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; overlapping 1800-square tiles. DN 0..3000 scaled to 0..255 with exponent 0.7. Lossless RGBA PNG directly from source rasters; missing observations transparent. Offshore pixels cleared using the packaged coastline; inland waters retained; coastline alpha uses two-by-two coverage samples.",
+      "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
+      "valid_pixels": 3239997
+    },
+    {
+      "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
+      "bounds": [
+        30.970000000000,
+        28.840000000000,
+        31.470000000000,
+        29.173333333333
+      ],
+      "coastal_mask_identity": "ea7cf464a830a60569b03ebe318dc6525b417fac998b8c4e9720f769220078ed",
+      "colour_balance": {
+        "method": "Shared RGB gains from median matching bright opaque land in the Cairo overview to the global reference; one profile across Egyptian overviews and detail; nearest-byte rounding; alpha and transparent pixels unchanged. Existing clipped highlights are not reconstructed.",
+        "reference": "earth_surface_detail.png",
+        "reference_sha256": "cb96e65923a8a76c9224edfa2b73462c798460d4ea0c99682d95b3131888120d",
+        "rgb_gain": [
+          0.7255,
+          0.6723,
+          0.6554
+        ],
+        "source_sha256": "f16a03c05cbfe7416706ba7c7652d74aa539d6f72310cab96b3b32fdca89a754",
+        "version": 1
+      },
+      "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
+      "name": "Nile Delta Suez and Nile Valley Sentinel tile 5306",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; overlapping 1800-square tiles. DN 0..3000 scaled to 0..255 with exponent 0.7. Lossless RGBA PNG directly from source rasters; missing observations transparent. Offshore pixels cleared using the packaged coastline; inland waters retained; coastline alpha uses two-by-two coverage samples.",
+      "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
+      "valid_pixels": 3239963
+    },
+    {
+      "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
+      "bounds": [
+        30.490000000000,
+        29.160000000000,
+        30.990000000000,
+        29.493333333333
+      ],
+      "coastal_mask_identity": "ea7cf464a830a60569b03ebe318dc6525b417fac998b8c4e9720f769220078ed",
+      "colour_balance": {
+        "method": "Shared RGB gains from median matching bright opaque land in the Cairo overview to the global reference; one profile across Egyptian overviews and detail; nearest-byte rounding; alpha and transparent pixels unchanged. Existing clipped highlights are not reconstructed.",
+        "reference": "earth_surface_detail.png",
+        "reference_sha256": "cb96e65923a8a76c9224edfa2b73462c798460d4ea0c99682d95b3131888120d",
+        "rgb_gain": [
+          0.7255,
+          0.6723,
+          0.6554
+        ],
+        "source_sha256": "4db4ce6d5ae2d367c185d4345c31f0ca00dce193694c418c48ff1e72a5bf2ae7",
+        "version": 1
+      },
+      "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
+      "name": "Nile Delta Suez and Nile Valley Sentinel tile 5307",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; overlapping 1800-square tiles. DN 0..3000 scaled to 0..255 with exponent 0.7. Lossless RGBA PNG directly from source rasters; missing observations transparent. Offshore pixels cleared using the packaged coastline; inland waters retained; coastline alpha uses two-by-two coverage samples.",
+      "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
+      "valid_pixels": 3240000
+    },
+    {
+      "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
+      "bounds": [
+        30.970000000000,
+        29.160000000000,
+        31.470000000000,
+        29.493333333333
+      ],
+      "coastal_mask_identity": "ea7cf464a830a60569b03ebe318dc6525b417fac998b8c4e9720f769220078ed",
+      "colour_balance": {
+        "method": "Shared RGB gains from median matching bright opaque land in the Cairo overview to the global reference; one profile across Egyptian overviews and detail; nearest-byte rounding; alpha and transparent pixels unchanged. Existing clipped highlights are not reconstructed.",
+        "reference": "earth_surface_detail.png",
+        "reference_sha256": "cb96e65923a8a76c9224edfa2b73462c798460d4ea0c99682d95b3131888120d",
+        "rgb_gain": [
+          0.7255,
+          0.6723,
+          0.6554
+        ],
+        "source_sha256": "eb81257082530b23c46cd708714b822aa3f1412d4f4089d590e95a700e1c9d79",
+        "version": 1
+      },
+      "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
+      "name": "Nile Delta Suez and Nile Valley Sentinel tile 5308",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; overlapping 1800-square tiles. DN 0..3000 scaled to 0..255 with exponent 0.7. Lossless RGBA PNG directly from source rasters; missing observations transparent. Offshore pixels cleared using the packaged coastline; inland waters retained; coastline alpha uses two-by-two coverage samples.",
+      "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
+      "valid_pixels": 3239997
+    },
+    {
+      "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
+      "bounds": [
+        31.450000000000,
+        29.160000000000,
+        31.950000000000,
+        29.493333333333
+      ],
+      "coastal_mask_identity": "ea7cf464a830a60569b03ebe318dc6525b417fac998b8c4e9720f769220078ed",
+      "colour_balance": {
+        "method": "Shared RGB gains from median matching bright opaque land in the Cairo overview to the global reference; one profile across Egyptian overviews and detail; nearest-byte rounding; alpha and transparent pixels unchanged. Existing clipped highlights are not reconstructed.",
+        "reference": "earth_surface_detail.png",
+        "reference_sha256": "cb96e65923a8a76c9224edfa2b73462c798460d4ea0c99682d95b3131888120d",
+        "rgb_gain": [
+          0.7255,
+          0.6723,
+          0.6554
+        ],
+        "source_sha256": "efdb2108593a70dff38d6f8806bd7bb3dcfa187ee65aeb019dad91c7a3b4a568",
+        "version": 1
+      },
+      "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
+      "name": "Nile Delta Suez and Nile Valley Sentinel tile 5309",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; overlapping 1800-square tiles. DN 0..3000 scaled to 0..255 with exponent 0.7. Lossless RGBA PNG directly from source rasters; missing observations transparent. Offshore pixels cleared using the packaged coastline; inland waters retained; coastline alpha uses two-by-two coverage samples.",
+      "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
+      "valid_pixels": 3240000
+    },
+    {
+      "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
+      "bounds": [
+        30.970000000000,
+        29.480000000000,
+        31.470000000000,
+        29.813333333333
+      ],
+      "coastal_mask_identity": "ea7cf464a830a60569b03ebe318dc6525b417fac998b8c4e9720f769220078ed",
+      "colour_balance": {
+        "method": "Shared RGB gains from median matching bright opaque land in the Cairo overview to the global reference; one profile across Egyptian overviews and detail; nearest-byte rounding; alpha and transparent pixels unchanged. Existing clipped highlights are not reconstructed.",
+        "reference": "earth_surface_detail.png",
+        "reference_sha256": "cb96e65923a8a76c9224edfa2b73462c798460d4ea0c99682d95b3131888120d",
+        "rgb_gain": [
+          0.7255,
+          0.6723,
+          0.6554
+        ],
+        "source_sha256": "785e5f87eeb502230e20648838a9343aacf9e5da760c974a562f6f45761733bd",
+        "version": 1
+      },
+      "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
+      "name": "Nile Delta Suez and Nile Valley Sentinel tile 5310",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; overlapping 1800-square tiles. DN 0..3000 scaled to 0..255 with exponent 0.7. Lossless RGBA PNG directly from source rasters; missing observations transparent. Offshore pixels cleared using the packaged coastline; inland waters retained; coastline alpha uses two-by-two coverage samples.",
+      "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
+      "valid_pixels": 3239937
+    },
+    {
+      "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
+      "bounds": [
+        31.930000000000,
+        29.480000000000,
+        32.430000000000,
+        29.813333333333
+      ],
+      "coastal_mask_identity": "ea7cf464a830a60569b03ebe318dc6525b417fac998b8c4e9720f769220078ed",
+      "colour_balance": {
+        "method": "Shared RGB gains from median matching bright opaque land in the Cairo overview to the global reference; one profile across Egyptian overviews and detail; nearest-byte rounding; alpha and transparent pixels unchanged. Existing clipped highlights are not reconstructed.",
+        "reference": "earth_surface_detail.png",
+        "reference_sha256": "cb96e65923a8a76c9224edfa2b73462c798460d4ea0c99682d95b3131888120d",
+        "rgb_gain": [
+          0.7255,
+          0.6723,
+          0.6554
+        ],
+        "source_sha256": "e746daf5eef3ae49cbe529efa13dc5996268656216241831f90234b1bf3cd3b6",
+        "version": 1
+      },
+      "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
+      "name": "Nile Delta Suez and Nile Valley Sentinel tile 5311",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; overlapping 1800-square tiles. DN 0..3000 scaled to 0..255 with exponent 0.7. Lossless RGBA PNG directly from source rasters; missing observations transparent. Offshore pixels cleared using the packaged coastline; inland waters retained; coastline alpha uses two-by-two coverage samples.",
+      "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
+      "valid_pixels": 2957265
+    },
+    {
+      "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
+      "bounds": [
+        32.410000000000,
+        29.480000000000,
+        32.910000000000,
+        29.813333333333
+      ],
+      "coastal_mask_identity": "ea7cf464a830a60569b03ebe318dc6525b417fac998b8c4e9720f769220078ed",
+      "colour_balance": {
+        "method": "Shared RGB gains from median matching bright opaque land in the Cairo overview to the global reference; one profile across Egyptian overviews and detail; nearest-byte rounding; alpha and transparent pixels unchanged. Existing clipped highlights are not reconstructed.",
+        "reference": "earth_surface_detail.png",
+        "reference_sha256": "cb96e65923a8a76c9224edfa2b73462c798460d4ea0c99682d95b3131888120d",
+        "rgb_gain": [
+          0.7255,
+          0.6723,
+          0.6554
+        ],
+        "source_sha256": "88203e61d34ac2a84f45124eab83ec95a93e4dd69d72ff3d9b8b82c19859f0cd",
+        "version": 1
+      },
+      "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
+      "name": "Nile Delta Suez and Nile Valley Sentinel tile 5312",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; overlapping 1800-square tiles. DN 0..3000 scaled to 0..255 with exponent 0.7. Lossless RGBA PNG directly from source rasters; missing observations transparent. Offshore pixels cleared using the packaged coastline; inland waters retained; coastline alpha uses two-by-two coverage samples.",
+      "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
+      "valid_pixels": 1449823
+    },
+    {
+      "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
+      "bounds": [
+        31.930000000000,
+        29.800000000000,
+        32.430000000000,
+        30.133333333333
+      ],
+      "coastal_mask_identity": "ea7cf464a830a60569b03ebe318dc6525b417fac998b8c4e9720f769220078ed",
+      "colour_balance": {
+        "method": "Shared RGB gains from median matching bright opaque land in the Cairo overview to the global reference; one profile across Egyptian overviews and detail; nearest-byte rounding; alpha and transparent pixels unchanged. Existing clipped highlights are not reconstructed.",
+        "reference": "earth_surface_detail.png",
+        "reference_sha256": "cb96e65923a8a76c9224edfa2b73462c798460d4ea0c99682d95b3131888120d",
+        "rgb_gain": [
+          0.7255,
+          0.6723,
+          0.6554
+        ],
+        "source_sha256": "4db9e2fb1de41e4cf6dd83e7ee1a9ba4cd427be78b8c50ab86709214a0c2b15c",
+        "version": 1
+      },
+      "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
+      "name": "Nile Delta Suez and Nile Valley Sentinel tile 5313",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; overlapping 1800-square tiles. DN 0..3000 scaled to 0..255 with exponent 0.7. Lossless RGBA PNG directly from source rasters; missing observations transparent. Offshore pixels cleared using the packaged coastline; inland waters retained; coastline alpha uses two-by-two coverage samples.",
+      "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
+      "valid_pixels": 3240000
+    },
+    {
+      "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
+      "bounds": [
+        32.410000000000,
+        29.800000000000,
+        32.910000000000,
+        30.133333333333
+      ],
+      "coastal_mask_identity": "ea7cf464a830a60569b03ebe318dc6525b417fac998b8c4e9720f769220078ed",
+      "colour_balance": {
+        "method": "Shared RGB gains from median matching bright opaque land in the Cairo overview to the global reference; one profile across Egyptian overviews and detail; nearest-byte rounding; alpha and transparent pixels unchanged. Existing clipped highlights are not reconstructed.",
+        "reference": "earth_surface_detail.png",
+        "reference_sha256": "cb96e65923a8a76c9224edfa2b73462c798460d4ea0c99682d95b3131888120d",
+        "rgb_gain": [
+          0.7255,
+          0.6723,
+          0.6554
+        ],
+        "source_sha256": "0ceec83b97eaed35126fca03e2e2ab2b6f76de97130a6e473bd11fa7b43dac2e",
+        "version": 1
+      },
+      "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
+      "name": "Nile Delta Suez and Nile Valley Sentinel tile 5314",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; overlapping 1800-square tiles. DN 0..3000 scaled to 0..255 with exponent 0.7. Lossless RGBA PNG directly from source rasters; missing observations transparent. Offshore pixels cleared using the packaged coastline; inland waters retained; coastline alpha uses two-by-two coverage samples.",
+      "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
+      "valid_pixels": 2848966
+    },
+    {
+      "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
+      "bounds": [
+        30.970000000000,
+        30.120000000000,
+        31.470000000000,
+        30.453333333333
+      ],
+      "coastal_mask_identity": "ea7cf464a830a60569b03ebe318dc6525b417fac998b8c4e9720f769220078ed",
+      "colour_balance": {
+        "method": "Shared RGB gains from median matching bright opaque land in the Cairo overview to the global reference; one profile across Egyptian overviews and detail; nearest-byte rounding; alpha and transparent pixels unchanged. Existing clipped highlights are not reconstructed.",
+        "reference": "earth_surface_detail.png",
+        "reference_sha256": "cb96e65923a8a76c9224edfa2b73462c798460d4ea0c99682d95b3131888120d",
+        "rgb_gain": [
+          0.7255,
+          0.6723,
+          0.6554
+        ],
+        "source_sha256": "5b74b2fd5495d71345e91ea48a6a685fa13407d82699fce7394986b60b155fed",
+        "version": 1
+      },
+      "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
+      "name": "Nile Delta Suez and Nile Valley Sentinel tile 5315",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; overlapping 1800-square tiles. DN 0..3000 scaled to 0..255 with exponent 0.7. Lossless RGBA PNG directly from source rasters; missing observations transparent. Offshore pixels cleared using the packaged coastline; inland waters retained; coastline alpha uses two-by-two coverage samples.",
+      "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
+      "valid_pixels": 3239997
+    },
+    {
+      "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
+      "bounds": [
+        31.930000000000,
+        30.120000000000,
+        32.430000000000,
+        30.453333333333
+      ],
+      "coastal_mask_identity": "ea7cf464a830a60569b03ebe318dc6525b417fac998b8c4e9720f769220078ed",
+      "colour_balance": {
+        "method": "Shared RGB gains from median matching bright opaque land in the Cairo overview to the global reference; one profile across Egyptian overviews and detail; nearest-byte rounding; alpha and transparent pixels unchanged. Existing clipped highlights are not reconstructed.",
+        "reference": "earth_surface_detail.png",
+        "reference_sha256": "cb96e65923a8a76c9224edfa2b73462c798460d4ea0c99682d95b3131888120d",
+        "rgb_gain": [
+          0.7255,
+          0.6723,
+          0.6554
+        ],
+        "source_sha256": "2d288598dfca2cf8a1ab1a8a0622435d03afeeea9f57cbd2976974f0fc9b9e8b",
+        "version": 1
+      },
+      "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
+      "name": "Nile Delta Suez and Nile Valley Sentinel tile 5316",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; overlapping 1800-square tiles. DN 0..3000 scaled to 0..255 with exponent 0.7. Lossless RGBA PNG directly from source rasters; missing observations transparent. Offshore pixels cleared using the packaged coastline; inland waters retained; coastline alpha uses two-by-two coverage samples.",
+      "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
+      "valid_pixels": 2985787
+    },
+    {
+      "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
+      "bounds": [
+        32.410000000000,
+        30.120000000000,
+        32.910000000000,
+        30.453333333333
+      ],
+      "coastal_mask_identity": "ea7cf464a830a60569b03ebe318dc6525b417fac998b8c4e9720f769220078ed",
+      "colour_balance": {
+        "method": "Shared RGB gains from median matching bright opaque land in the Cairo overview to the global reference; one profile across Egyptian overviews and detail; nearest-byte rounding; alpha and transparent pixels unchanged. Existing clipped highlights are not reconstructed.",
+        "reference": "earth_surface_detail.png",
+        "reference_sha256": "cb96e65923a8a76c9224edfa2b73462c798460d4ea0c99682d95b3131888120d",
+        "rgb_gain": [
+          0.7255,
+          0.6723,
+          0.6554
+        ],
+        "source_sha256": "5c41d63eb5a9e6ae34850df2b66b4b941fe0e126a787b9f8ab2a02d0e1e958eb",
+        "version": 1
+      },
+      "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
+      "name": "Nile Delta Suez and Nile Valley Sentinel tile 5317",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; overlapping 1800-square tiles. DN 0..3000 scaled to 0..255 with exponent 0.7. Lossless RGBA PNG directly from source rasters; missing observations transparent. Offshore pixels cleared using the packaged coastline; inland waters retained; coastline alpha uses two-by-two coverage samples.",
+      "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
+      "valid_pixels": 3075848
+    },
+    {
+      "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
+      "bounds": [
+        29.050000000000,
+        30.440000000000,
+        29.550000000000,
+        30.773333333333
+      ],
+      "coastal_mask_identity": "ea7cf464a830a60569b03ebe318dc6525b417fac998b8c4e9720f769220078ed",
+      "colour_balance": {
+        "method": "Shared RGB gains from median matching bright opaque land in the Cairo overview to the global reference; one profile across Egyptian overviews and detail; nearest-byte rounding; alpha and transparent pixels unchanged. Existing clipped highlights are not reconstructed.",
+        "reference": "earth_surface_detail.png",
+        "reference_sha256": "cb96e65923a8a76c9224edfa2b73462c798460d4ea0c99682d95b3131888120d",
+        "rgb_gain": [
+          0.7255,
+          0.6723,
+          0.6554
+        ],
+        "source_sha256": "530dece66a81a094edee9b8a0aa1fa2f7e463dde588359c9b880cacfed759750",
+        "version": 1
+      },
+      "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
+      "name": "Nile Delta Suez and Nile Valley Sentinel tile 5318",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; overlapping 1800-square tiles. DN 0..3000 scaled to 0..255 with exponent 0.7. Lossless RGBA PNG directly from source rasters; missing observations transparent. Offshore pixels cleared using the packaged coastline; inland waters retained; coastline alpha uses two-by-two coverage samples.",
+      "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
+      "valid_pixels": 3007795
+    },
+    {
+      "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
+      "bounds": [
+        29.530000000000,
+        30.440000000000,
+        30.030000000000,
+        30.773333333333
+      ],
+      "coastal_mask_identity": "ea7cf464a830a60569b03ebe318dc6525b417fac998b8c4e9720f769220078ed",
+      "colour_balance": {
+        "method": "Shared RGB gains from median matching bright opaque land in the Cairo overview to the global reference; one profile across Egyptian overviews and detail; nearest-byte rounding; alpha and transparent pixels unchanged. Existing clipped highlights are not reconstructed.",
+        "reference": "earth_surface_detail.png",
+        "reference_sha256": "cb96e65923a8a76c9224edfa2b73462c798460d4ea0c99682d95b3131888120d",
+        "rgb_gain": [
+          0.7255,
+          0.6723,
+          0.6554
+        ],
+        "source_sha256": "f6cea38f5ae171d8c3cb7a417f9fa70a412b469362c387fc569be3ddd3d05bee",
+        "version": 1
+      },
+      "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
+      "name": "Nile Delta Suez and Nile Valley Sentinel tile 5319",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; overlapping 1800-square tiles. DN 0..3000 scaled to 0..255 with exponent 0.7. Lossless RGBA PNG directly from source rasters; missing observations transparent. Offshore pixels cleared using the packaged coastline; inland waters retained; coastline alpha uses two-by-two coverage samples.",
+      "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
+      "valid_pixels": 3240000
+    },
+    {
+      "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
+      "bounds": [
+        30.010000000000,
+        30.440000000000,
+        30.510000000000,
+        30.773333333333
+      ],
+      "coastal_mask_identity": "ea7cf464a830a60569b03ebe318dc6525b417fac998b8c4e9720f769220078ed",
+      "colour_balance": {
+        "method": "Shared RGB gains from median matching bright opaque land in the Cairo overview to the global reference; one profile across Egyptian overviews and detail; nearest-byte rounding; alpha and transparent pixels unchanged. Existing clipped highlights are not reconstructed.",
+        "reference": "earth_surface_detail.png",
+        "reference_sha256": "cb96e65923a8a76c9224edfa2b73462c798460d4ea0c99682d95b3131888120d",
+        "rgb_gain": [
+          0.7255,
+          0.6723,
+          0.6554
+        ],
+        "source_sha256": "b5a197cd14a479f893a3e5bea12ec8c1ee2d8a294ff522a9a8bf3ee26440b568",
+        "version": 1
+      },
+      "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
+      "name": "Nile Delta Suez and Nile Valley Sentinel tile 5320",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; overlapping 1800-square tiles. DN 0..3000 scaled to 0..255 with exponent 0.7. Lossless RGBA PNG directly from source rasters; missing observations transparent. Offshore pixels cleared using the packaged coastline; inland waters retained; coastline alpha uses two-by-two coverage samples.",
+      "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
+      "valid_pixels": 3240000
+    },
+    {
+      "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
+      "bounds": [
+        30.490000000000,
+        30.440000000000,
+        30.990000000000,
+        30.773333333333
+      ],
+      "coastal_mask_identity": "ea7cf464a830a60569b03ebe318dc6525b417fac998b8c4e9720f769220078ed",
+      "colour_balance": {
+        "method": "Shared RGB gains from median matching bright opaque land in the Cairo overview to the global reference; one profile across Egyptian overviews and detail; nearest-byte rounding; alpha and transparent pixels unchanged. Existing clipped highlights are not reconstructed.",
+        "reference": "earth_surface_detail.png",
+        "reference_sha256": "cb96e65923a8a76c9224edfa2b73462c798460d4ea0c99682d95b3131888120d",
+        "rgb_gain": [
+          0.7255,
+          0.6723,
+          0.6554
+        ],
+        "source_sha256": "5c601aebdc4099c1da89a78a0ba12794f528be481ebc70f69c3403a50ce8a283",
+        "version": 1
+      },
+      "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
+      "name": "Nile Delta Suez and Nile Valley Sentinel tile 5321",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; overlapping 1800-square tiles. DN 0..3000 scaled to 0..255 with exponent 0.7. Lossless RGBA PNG directly from source rasters; missing observations transparent. Offshore pixels cleared using the packaged coastline; inland waters retained; coastline alpha uses two-by-two coverage samples.",
+      "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
+      "valid_pixels": 3240000
+    },
+    {
+      "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
+      "bounds": [
+        30.970000000000,
+        30.440000000000,
+        31.470000000000,
+        30.773333333333
+      ],
+      "coastal_mask_identity": "ea7cf464a830a60569b03ebe318dc6525b417fac998b8c4e9720f769220078ed",
+      "colour_balance": {
+        "method": "Shared RGB gains from median matching bright opaque land in the Cairo overview to the global reference; one profile across Egyptian overviews and detail; nearest-byte rounding; alpha and transparent pixels unchanged. Existing clipped highlights are not reconstructed.",
+        "reference": "earth_surface_detail.png",
+        "reference_sha256": "cb96e65923a8a76c9224edfa2b73462c798460d4ea0c99682d95b3131888120d",
+        "rgb_gain": [
+          0.7255,
+          0.6723,
+          0.6554
+        ],
+        "source_sha256": "d469aacc64f61bef78a20395c23f892370e08df50dd897cf98f235bb2a985a67",
+        "version": 1
+      },
+      "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
+      "name": "Nile Delta Suez and Nile Valley Sentinel tile 5322",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; overlapping 1800-square tiles. DN 0..3000 scaled to 0..255 with exponent 0.7. Lossless RGBA PNG directly from source rasters; missing observations transparent. Offshore pixels cleared using the packaged coastline; inland waters retained; coastline alpha uses two-by-two coverage samples.",
+      "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
+      "valid_pixels": 3239980
+    },
+    {
+      "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
+      "bounds": [
+        31.450000000000,
+        30.440000000000,
+        31.950000000000,
+        30.773333333333
+      ],
+      "coastal_mask_identity": "ea7cf464a830a60569b03ebe318dc6525b417fac998b8c4e9720f769220078ed",
+      "colour_balance": {
+        "method": "Shared RGB gains from median matching bright opaque land in the Cairo overview to the global reference; one profile across Egyptian overviews and detail; nearest-byte rounding; alpha and transparent pixels unchanged. Existing clipped highlights are not reconstructed.",
+        "reference": "earth_surface_detail.png",
+        "reference_sha256": "cb96e65923a8a76c9224edfa2b73462c798460d4ea0c99682d95b3131888120d",
+        "rgb_gain": [
+          0.7255,
+          0.6723,
+          0.6554
+        ],
+        "source_sha256": "fbf2295d6b12a0ba534ebe6d31fe044288c9e4559b54fdd12cdcb518b1f6229b",
+        "version": 1
+      },
+      "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
+      "name": "Nile Delta Suez and Nile Valley Sentinel tile 5323",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; overlapping 1800-square tiles. DN 0..3000 scaled to 0..255 with exponent 0.7. Lossless RGBA PNG directly from source rasters; missing observations transparent. Offshore pixels cleared using the packaged coastline; inland waters retained; coastline alpha uses two-by-two coverage samples.",
+      "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
+      "valid_pixels": 3240000
+    },
+    {
+      "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
+      "bounds": [
+        31.930000000000,
+        30.440000000000,
+        32.430000000000,
+        30.773333333333
+      ],
+      "coastal_mask_identity": "ea7cf464a830a60569b03ebe318dc6525b417fac998b8c4e9720f769220078ed",
+      "colour_balance": {
+        "method": "Shared RGB gains from median matching bright opaque land in the Cairo overview to the global reference; one profile across Egyptian overviews and detail; nearest-byte rounding; alpha and transparent pixels unchanged. Existing clipped highlights are not reconstructed.",
+        "reference": "earth_surface_detail.png",
+        "reference_sha256": "cb96e65923a8a76c9224edfa2b73462c798460d4ea0c99682d95b3131888120d",
+        "rgb_gain": [
+          0.7255,
+          0.6723,
+          0.6554
+        ],
+        "source_sha256": "9944b0414fcc26fb5ee54a74b988952eff768e8f6618f3ceee3bc2786c08d673",
+        "version": 1
+      },
+      "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
+      "name": "Nile Delta Suez and Nile Valley Sentinel tile 5324",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; overlapping 1800-square tiles. DN 0..3000 scaled to 0..255 with exponent 0.7. Lossless RGBA PNG directly from source rasters; missing observations transparent. Offshore pixels cleared using the packaged coastline; inland waters retained; coastline alpha uses two-by-two coverage samples.",
+      "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
+      "valid_pixels": 3182307
+    },
+    {
+      "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
+      "bounds": [
+        32.410000000000,
+        30.440000000000,
+        32.910000000000,
+        30.773333333333
+      ],
+      "coastal_mask_identity": "ea7cf464a830a60569b03ebe318dc6525b417fac998b8c4e9720f769220078ed",
+      "colour_balance": {
+        "method": "Shared RGB gains from median matching bright opaque land in the Cairo overview to the global reference; one profile across Egyptian overviews and detail; nearest-byte rounding; alpha and transparent pixels unchanged. Existing clipped highlights are not reconstructed.",
+        "reference": "earth_surface_detail.png",
+        "reference_sha256": "cb96e65923a8a76c9224edfa2b73462c798460d4ea0c99682d95b3131888120d",
+        "rgb_gain": [
+          0.7255,
+          0.6723,
+          0.6554
+        ],
+        "source_sha256": "ebd42560c1df72b5352c48f9aefbca8dcff3e3fb1d1605efe263baaebcdeddf4",
+        "version": 1
+      },
+      "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
+      "name": "Nile Delta Suez and Nile Valley Sentinel tile 5325",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; overlapping 1800-square tiles. DN 0..3000 scaled to 0..255 with exponent 0.7. Lossless RGBA PNG directly from source rasters; missing observations transparent. Offshore pixels cleared using the packaged coastline; inland waters retained; coastline alpha uses two-by-two coverage samples.",
+      "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
+      "valid_pixels": 3240000
+    },
+    {
+      "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
+      "bounds": [
+        29.050000000000,
+        30.760000000000,
+        29.550000000000,
+        31.093333333333
+      ],
+      "coastal_mask_identity": "ea7cf464a830a60569b03ebe318dc6525b417fac998b8c4e9720f769220078ed",
+      "colour_balance": {
+        "method": "Shared RGB gains from median matching bright opaque land in the Cairo overview to the global reference; one profile across Egyptian overviews and detail; nearest-byte rounding; alpha and transparent pixels unchanged. Existing clipped highlights are not reconstructed.",
+        "reference": "earth_surface_detail.png",
+        "reference_sha256": "cb96e65923a8a76c9224edfa2b73462c798460d4ea0c99682d95b3131888120d",
+        "rgb_gain": [
+          0.7255,
+          0.6723,
+          0.6554
+        ],
+        "source_sha256": "90abc6f38caeb44663f7a9c2a2c7cd43339596b1631cfa83a97d3b207c2707f9",
+        "version": 1
+      },
+      "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
+      "name": "Nile Delta Suez and Nile Valley Sentinel tile 5326",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; overlapping 1800-square tiles. DN 0..3000 scaled to 0..255 with exponent 0.7. Lossless RGBA PNG directly from source rasters; missing observations transparent. Offshore pixels cleared using the packaged coastline; inland waters retained; coastline alpha uses two-by-two coverage samples.",
+      "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
+      "valid_pixels": 1068039
+    },
+    {
+      "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
+      "bounds": [
+        29.530000000000,
+        30.760000000000,
+        30.030000000000,
+        31.093333333333
+      ],
+      "coastal_mask_identity": "ea7cf464a830a60569b03ebe318dc6525b417fac998b8c4e9720f769220078ed",
+      "colour_balance": {
+        "method": "Shared RGB gains from median matching bright opaque land in the Cairo overview to the global reference; one profile across Egyptian overviews and detail; nearest-byte rounding; alpha and transparent pixels unchanged. Existing clipped highlights are not reconstructed.",
+        "reference": "earth_surface_detail.png",
+        "reference_sha256": "cb96e65923a8a76c9224edfa2b73462c798460d4ea0c99682d95b3131888120d",
+        "rgb_gain": [
+          0.7255,
+          0.6723,
+          0.6554
+        ],
+        "source_sha256": "1a67f3981e4c5ff87b9cb601035ac9a858ac2fc7ad2c7a3e3f67844782479e71",
+        "version": 1
+      },
+      "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
+      "name": "Nile Delta Suez and Nile Valley Sentinel tile 5327",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; overlapping 1800-square tiles. DN 0..3000 scaled to 0..255 with exponent 0.7. Lossless RGBA PNG directly from source rasters; missing observations transparent. Offshore pixels cleared using the packaged coastline; inland waters retained; coastline alpha uses two-by-two coverage samples.",
+      "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
+      "valid_pixels": 2988835
+    },
+    {
+      "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
+      "bounds": [
+        30.010000000000,
+        30.760000000000,
+        30.510000000000,
+        31.093333333333
+      ],
+      "coastal_mask_identity": "ea7cf464a830a60569b03ebe318dc6525b417fac998b8c4e9720f769220078ed",
+      "colour_balance": {
+        "method": "Shared RGB gains from median matching bright opaque land in the Cairo overview to the global reference; one profile across Egyptian overviews and detail; nearest-byte rounding; alpha and transparent pixels unchanged. Existing clipped highlights are not reconstructed.",
+        "reference": "earth_surface_detail.png",
+        "reference_sha256": "cb96e65923a8a76c9224edfa2b73462c798460d4ea0c99682d95b3131888120d",
+        "rgb_gain": [
+          0.7255,
+          0.6723,
+          0.6554
+        ],
+        "source_sha256": "fef81ba00df576f8c96277e3ab64b5047fb213733f0389aa84170e54d31bf388",
+        "version": 1
+      },
+      "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
+      "name": "Nile Delta Suez and Nile Valley Sentinel tile 5328",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; overlapping 1800-square tiles. DN 0..3000 scaled to 0..255 with exponent 0.7. Lossless RGBA PNG directly from source rasters; missing observations transparent. Offshore pixels cleared using the packaged coastline; inland waters retained; coastline alpha uses two-by-two coverage samples.",
+      "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
+      "valid_pixels": 3240000
+    },
+    {
+      "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
+      "bounds": [
+        30.490000000000,
+        30.760000000000,
+        30.990000000000,
+        31.093333333333
+      ],
+      "coastal_mask_identity": "ea7cf464a830a60569b03ebe318dc6525b417fac998b8c4e9720f769220078ed",
+      "colour_balance": {
+        "method": "Shared RGB gains from median matching bright opaque land in the Cairo overview to the global reference; one profile across Egyptian overviews and detail; nearest-byte rounding; alpha and transparent pixels unchanged. Existing clipped highlights are not reconstructed.",
+        "reference": "earth_surface_detail.png",
+        "reference_sha256": "cb96e65923a8a76c9224edfa2b73462c798460d4ea0c99682d95b3131888120d",
+        "rgb_gain": [
+          0.7255,
+          0.6723,
+          0.6554
+        ],
+        "source_sha256": "ed6fbc09c5f2de394911af5d9aca5887bbfb00b3c8f8f6e3a06903ee8fceed58",
+        "version": 1
+      },
+      "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
+      "name": "Nile Delta Suez and Nile Valley Sentinel tile 5329",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; overlapping 1800-square tiles. DN 0..3000 scaled to 0..255 with exponent 0.7. Lossless RGBA PNG directly from source rasters; missing observations transparent. Offshore pixels cleared using the packaged coastline; inland waters retained; coastline alpha uses two-by-two coverage samples.",
+      "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
+      "valid_pixels": 3240000
+    },
+    {
+      "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
+      "bounds": [
+        30.970000000000,
+        30.760000000000,
+        31.470000000000,
+        31.093333333333
+      ],
+      "coastal_mask_identity": "ea7cf464a830a60569b03ebe318dc6525b417fac998b8c4e9720f769220078ed",
+      "colour_balance": {
+        "method": "Shared RGB gains from median matching bright opaque land in the Cairo overview to the global reference; one profile across Egyptian overviews and detail; nearest-byte rounding; alpha and transparent pixels unchanged. Existing clipped highlights are not reconstructed.",
+        "reference": "earth_surface_detail.png",
+        "reference_sha256": "cb96e65923a8a76c9224edfa2b73462c798460d4ea0c99682d95b3131888120d",
+        "rgb_gain": [
+          0.7255,
+          0.6723,
+          0.6554
+        ],
+        "source_sha256": "64e55307a064f59314b70df24a07def2f755742f90eb80f655898a6349534a3f",
+        "version": 1
+      },
+      "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
+      "name": "Nile Delta Suez and Nile Valley Sentinel tile 5330",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; overlapping 1800-square tiles. DN 0..3000 scaled to 0..255 with exponent 0.7. Lossless RGBA PNG directly from source rasters; missing observations transparent. Offshore pixels cleared using the packaged coastline; inland waters retained; coastline alpha uses two-by-two coverage samples.",
+      "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
+      "valid_pixels": 3239999
+    },
+    {
+      "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
+      "bounds": [
+        31.450000000000,
+        30.760000000000,
+        31.950000000000,
+        31.093333333333
+      ],
+      "coastal_mask_identity": "ea7cf464a830a60569b03ebe318dc6525b417fac998b8c4e9720f769220078ed",
+      "colour_balance": {
+        "method": "Shared RGB gains from median matching bright opaque land in the Cairo overview to the global reference; one profile across Egyptian overviews and detail; nearest-byte rounding; alpha and transparent pixels unchanged. Existing clipped highlights are not reconstructed.",
+        "reference": "earth_surface_detail.png",
+        "reference_sha256": "cb96e65923a8a76c9224edfa2b73462c798460d4ea0c99682d95b3131888120d",
+        "rgb_gain": [
+          0.7255,
+          0.6723,
+          0.6554
+        ],
+        "source_sha256": "925f3148889f49b38d6abe4a3b88c7e235f804cdb4fdc5f73a74bc8068ab221d",
+        "version": 1
+      },
+      "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
+      "name": "Nile Delta Suez and Nile Valley Sentinel tile 5331",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; overlapping 1800-square tiles. DN 0..3000 scaled to 0..255 with exponent 0.7. Lossless RGBA PNG directly from source rasters; missing observations transparent. Offshore pixels cleared using the packaged coastline; inland waters retained; coastline alpha uses two-by-two coverage samples.",
+      "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
+      "valid_pixels": 3239994
+    },
+    {
+      "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
+      "bounds": [
+        31.930000000000,
+        30.760000000000,
+        32.430000000000,
+        31.093333333333
+      ],
+      "coastal_mask_identity": "ea7cf464a830a60569b03ebe318dc6525b417fac998b8c4e9720f769220078ed",
+      "colour_balance": {
+        "method": "Shared RGB gains from median matching bright opaque land in the Cairo overview to the global reference; one profile across Egyptian overviews and detail; nearest-byte rounding; alpha and transparent pixels unchanged. Existing clipped highlights are not reconstructed.",
+        "reference": "earth_surface_detail.png",
+        "reference_sha256": "cb96e65923a8a76c9224edfa2b73462c798460d4ea0c99682d95b3131888120d",
+        "rgb_gain": [
+          0.7255,
+          0.6723,
+          0.6554
+        ],
+        "source_sha256": "3d46a97d8852ea2617635979a3db78c7d67babf960f08b50e98ecdf3340326c7",
+        "version": 1
+      },
+      "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
+      "name": "Nile Delta Suez and Nile Valley Sentinel tile 5332",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; overlapping 1800-square tiles. DN 0..3000 scaled to 0..255 with exponent 0.7. Lossless RGBA PNG directly from source rasters; missing observations transparent. Offshore pixels cleared using the packaged coastline; inland waters retained; coastline alpha uses two-by-two coverage samples.",
+      "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
+      "valid_pixels": 3214855
+    },
+    {
+      "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
+      "bounds": [
+        32.410000000000,
+        30.760000000000,
+        32.910000000000,
+        31.093333333333
+      ],
+      "coastal_mask_identity": "ea7cf464a830a60569b03ebe318dc6525b417fac998b8c4e9720f769220078ed",
+      "colour_balance": {
+        "method": "Shared RGB gains from median matching bright opaque land in the Cairo overview to the global reference; one profile across Egyptian overviews and detail; nearest-byte rounding; alpha and transparent pixels unchanged. Existing clipped highlights are not reconstructed.",
+        "reference": "earth_surface_detail.png",
+        "reference_sha256": "cb96e65923a8a76c9224edfa2b73462c798460d4ea0c99682d95b3131888120d",
+        "rgb_gain": [
+          0.7255,
+          0.6723,
+          0.6554
+        ],
+        "source_sha256": "180b2752cd8f81bedd992b7e1f014672b089ec996da44bd23af64afc5298c7b8",
+        "version": 1
+      },
+      "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
+      "name": "Nile Delta Suez and Nile Valley Sentinel tile 5333",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; overlapping 1800-square tiles. DN 0..3000 scaled to 0..255 with exponent 0.7. Lossless RGBA PNG directly from source rasters; missing observations transparent. Offshore pixels cleared using the packaged coastline; inland waters retained; coastline alpha uses two-by-two coverage samples.",
+      "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
+      "valid_pixels": 3013563
+    },
+    {
+      "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
+      "bounds": [
+        29.050000000000,
+        31.080000000000,
+        29.550000000000,
+        31.413333333333
+      ],
+      "coastal_mask_identity": "ea7cf464a830a60569b03ebe318dc6525b417fac998b8c4e9720f769220078ed",
+      "colour_balance": {
+        "method": "Shared RGB gains from median matching bright opaque land in the Cairo overview to the global reference; one profile across Egyptian overviews and detail; nearest-byte rounding; alpha and transparent pixels unchanged. Existing clipped highlights are not reconstructed.",
+        "reference": "earth_surface_detail.png",
+        "reference_sha256": "cb96e65923a8a76c9224edfa2b73462c798460d4ea0c99682d95b3131888120d",
+        "rgb_gain": [
+          0.7255,
+          0.6723,
+          0.6554
+        ],
+        "source_sha256": "8dc1ce29e437f1ef8faef28b81066bb8053b17fcf48a67b489c1e8b19642c1c7",
+        "version": 1
+      },
+      "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
+      "name": "Nile Delta Suez and Nile Valley Sentinel tile 5334",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; overlapping 1800-square tiles. DN 0..3000 scaled to 0..255 with exponent 0.7. Lossless RGBA PNG directly from source rasters; missing observations transparent. Offshore pixels cleared using the packaged coastline; inland waters retained; coastline alpha uses two-by-two coverage samples.",
+      "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
+      "valid_pixels": 0
+    },
+    {
+      "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
+      "bounds": [
+        29.530000000000,
+        31.080000000000,
+        30.030000000000,
+        31.413333333333
+      ],
+      "coastal_mask_identity": "ea7cf464a830a60569b03ebe318dc6525b417fac998b8c4e9720f769220078ed",
+      "colour_balance": {
+        "method": "Shared RGB gains from median matching bright opaque land in the Cairo overview to the global reference; one profile across Egyptian overviews and detail; nearest-byte rounding; alpha and transparent pixels unchanged. Existing clipped highlights are not reconstructed.",
+        "reference": "earth_surface_detail.png",
+        "reference_sha256": "cb96e65923a8a76c9224edfa2b73462c798460d4ea0c99682d95b3131888120d",
+        "rgb_gain": [
+          0.7255,
+          0.6723,
+          0.6554
+        ],
+        "source_sha256": "f29b983b9e2628417a00897b69245449ec5bdf165abbf7e5c19305c62f8ba6d4",
+        "version": 1
+      },
+      "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
+      "name": "Nile Delta Suez and Nile Valley Sentinel tile 5335",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; overlapping 1800-square tiles. DN 0..3000 scaled to 0..255 with exponent 0.7. Lossless RGBA PNG directly from source rasters; missing observations transparent. Offshore pixels cleared using the packaged coastline; inland waters retained; coastline alpha uses two-by-two coverage samples.",
+      "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
+      "valid_pixels": 660099
+    },
+    {
+      "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
+      "bounds": [
+        30.010000000000,
+        31.080000000000,
+        30.510000000000,
+        31.413333333333
+      ],
+      "coastal_mask_identity": "ea7cf464a830a60569b03ebe318dc6525b417fac998b8c4e9720f769220078ed",
+      "colour_balance": {
+        "method": "Shared RGB gains from median matching bright opaque land in the Cairo overview to the global reference; one profile across Egyptian overviews and detail; nearest-byte rounding; alpha and transparent pixels unchanged. Existing clipped highlights are not reconstructed.",
+        "reference": "earth_surface_detail.png",
+        "reference_sha256": "cb96e65923a8a76c9224edfa2b73462c798460d4ea0c99682d95b3131888120d",
+        "rgb_gain": [
+          0.7255,
+          0.6723,
+          0.6554
+        ],
+        "source_sha256": "a3065f697e8c696959f45ef696e682d004fed0a51741fd334257da98fa1acef2",
+        "version": 1
+      },
+      "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
+      "name": "Nile Delta Suez and Nile Valley Sentinel tile 5336",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; overlapping 1800-square tiles. DN 0..3000 scaled to 0..255 with exponent 0.7. Lossless RGBA PNG directly from source rasters; missing observations transparent. Offshore pixels cleared using the packaged coastline; inland waters retained; coastline alpha uses two-by-two coverage samples.",
+      "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
+      "valid_pixels": 2535311
+    },
+    {
+      "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
+      "bounds": [
+        30.490000000000,
+        31.080000000000,
+        30.990000000000,
+        31.413333333333
+      ],
+      "coastal_mask_identity": "ea7cf464a830a60569b03ebe318dc6525b417fac998b8c4e9720f769220078ed",
+      "colour_balance": {
+        "method": "Shared RGB gains from median matching bright opaque land in the Cairo overview to the global reference; one profile across Egyptian overviews and detail; nearest-byte rounding; alpha and transparent pixels unchanged. Existing clipped highlights are not reconstructed.",
+        "reference": "earth_surface_detail.png",
+        "reference_sha256": "cb96e65923a8a76c9224edfa2b73462c798460d4ea0c99682d95b3131888120d",
+        "rgb_gain": [
+          0.7255,
+          0.6723,
+          0.6554
+        ],
+        "source_sha256": "ff93a09ae4f91c3f4162399289e9dab0b23f30d3f1bae19af0b36b0592d93a9e",
+        "version": 1
+      },
+      "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
+      "name": "Nile Delta Suez and Nile Valley Sentinel tile 5337",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; overlapping 1800-square tiles. DN 0..3000 scaled to 0..255 with exponent 0.7. Lossless RGBA PNG directly from source rasters; missing observations transparent. Offshore pixels cleared using the packaged coastline; inland waters retained; coastline alpha uses two-by-two coverage samples.",
+      "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
+      "valid_pixels": 3239998
+    },
+    {
+      "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
+      "bounds": [
+        30.970000000000,
+        31.080000000000,
+        31.470000000000,
+        31.413333333333
+      ],
+      "coastal_mask_identity": "ea7cf464a830a60569b03ebe318dc6525b417fac998b8c4e9720f769220078ed",
+      "colour_balance": {
+        "method": "Shared RGB gains from median matching bright opaque land in the Cairo overview to the global reference; one profile across Egyptian overviews and detail; nearest-byte rounding; alpha and transparent pixels unchanged. Existing clipped highlights are not reconstructed.",
+        "reference": "earth_surface_detail.png",
+        "reference_sha256": "cb96e65923a8a76c9224edfa2b73462c798460d4ea0c99682d95b3131888120d",
+        "rgb_gain": [
+          0.7255,
+          0.6723,
+          0.6554
+        ],
+        "source_sha256": "91433521485e7428b9d2cd855a59e47f9e10e1d0bcc51617a635fe988f347a4e",
+        "version": 1
+      },
+      "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
+      "name": "Nile Delta Suez and Nile Valley Sentinel tile 5338",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; overlapping 1800-square tiles. DN 0..3000 scaled to 0..255 with exponent 0.7. Lossless RGBA PNG directly from source rasters; missing observations transparent. Offshore pixels cleared using the packaged coastline; inland waters retained; coastline alpha uses two-by-two coverage samples.",
+      "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
+      "valid_pixels": 3240000
+    },
+    {
+      "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
+      "bounds": [
+        31.450000000000,
+        31.080000000000,
+        31.950000000000,
+        31.413333333333
+      ],
+      "coastal_mask_identity": "ea7cf464a830a60569b03ebe318dc6525b417fac998b8c4e9720f769220078ed",
+      "colour_balance": {
+        "method": "Shared RGB gains from median matching bright opaque land in the Cairo overview to the global reference; one profile across Egyptian overviews and detail; nearest-byte rounding; alpha and transparent pixels unchanged. Existing clipped highlights are not reconstructed.",
+        "reference": "earth_surface_detail.png",
+        "reference_sha256": "cb96e65923a8a76c9224edfa2b73462c798460d4ea0c99682d95b3131888120d",
+        "rgb_gain": [
+          0.7255,
+          0.6723,
+          0.6554
+        ],
+        "source_sha256": "103ca2463f7a07d0d050fa989bc0639713292e0b6adc00134e997bf587e6eb94",
+        "version": 1
+      },
+      "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
+      "name": "Nile Delta Suez and Nile Valley Sentinel tile 5339",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; overlapping 1800-square tiles. DN 0..3000 scaled to 0..255 with exponent 0.7. Lossless RGBA PNG directly from source rasters; missing observations transparent. Offshore pixels cleared using the packaged coastline; inland waters retained; coastline alpha uses two-by-two coverage samples.",
+      "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
+      "valid_pixels": 3239972
+    },
+    {
+      "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
+      "bounds": [
+        31.930000000000,
+        31.080000000000,
+        32.430000000000,
+        31.413333333333
+      ],
+      "coastal_mask_identity": "ea7cf464a830a60569b03ebe318dc6525b417fac998b8c4e9720f769220078ed",
+      "colour_balance": {
+        "method": "Shared RGB gains from median matching bright opaque land in the Cairo overview to the global reference; one profile across Egyptian overviews and detail; nearest-byte rounding; alpha and transparent pixels unchanged. Existing clipped highlights are not reconstructed.",
+        "reference": "earth_surface_detail.png",
+        "reference_sha256": "cb96e65923a8a76c9224edfa2b73462c798460d4ea0c99682d95b3131888120d",
+        "rgb_gain": [
+          0.7255,
+          0.6723,
+          0.6554
+        ],
+        "source_sha256": "e41607ecf1eb55ee119e8c69ded413c0381b0d51cb7e2fcc24cb567517f068d0",
+        "version": 1
+      },
+      "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
+      "name": "Nile Delta Suez and Nile Valley Sentinel tile 5340",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; overlapping 1800-square tiles. DN 0..3000 scaled to 0..255 with exponent 0.7. Lossless RGBA PNG directly from source rasters; missing observations transparent. Offshore pixels cleared using the packaged coastline; inland waters retained; coastline alpha uses two-by-two coverage samples.",
+      "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
+      "valid_pixels": 2219887
+    },
+    {
+      "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
+      "bounds": [
+        32.410000000000,
+        31.080000000000,
+        32.910000000000,
+        31.413333333333
+      ],
+      "coastal_mask_identity": "ea7cf464a830a60569b03ebe318dc6525b417fac998b8c4e9720f769220078ed",
+      "colour_balance": {
+        "method": "Shared RGB gains from median matching bright opaque land in the Cairo overview to the global reference; one profile across Egyptian overviews and detail; nearest-byte rounding; alpha and transparent pixels unchanged. Existing clipped highlights are not reconstructed.",
+        "reference": "earth_surface_detail.png",
+        "reference_sha256": "cb96e65923a8a76c9224edfa2b73462c798460d4ea0c99682d95b3131888120d",
+        "rgb_gain": [
+          0.7255,
+          0.6723,
+          0.6554
+        ],
+        "source_sha256": "6c229cc4481ffffdd787d446c68c87f28a2cd6bfd90eb41c5b114f2103e4a67f",
+        "version": 1
+      },
+      "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
+      "name": "Nile Delta Suez and Nile Valley Sentinel tile 5341",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; overlapping 1800-square tiles. DN 0..3000 scaled to 0..255 with exponent 0.7. Lossless RGBA PNG directly from source rasters; missing observations transparent. Offshore pixels cleared using the packaged coastline; inland waters retained; coastline alpha uses two-by-two coverage samples.",
+      "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
+      "valid_pixels": 191626
+    },
+    {
+      "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
+      "bounds": [
+        29.050000000000,
+        31.400000000000,
+        29.550000000000,
+        31.733333333333
+      ],
+      "coastal_mask_identity": "ea7cf464a830a60569b03ebe318dc6525b417fac998b8c4e9720f769220078ed",
+      "colour_balance": {
+        "method": "Shared RGB gains from median matching bright opaque land in the Cairo overview to the global reference; one profile across Egyptian overviews and detail; nearest-byte rounding; alpha and transparent pixels unchanged. Existing clipped highlights are not reconstructed.",
+        "reference": "earth_surface_detail.png",
+        "reference_sha256": "cb96e65923a8a76c9224edfa2b73462c798460d4ea0c99682d95b3131888120d",
+        "rgb_gain": [
+          0.7255,
+          0.6723,
+          0.6554
+        ],
+        "source_sha256": "8dc1ce29e437f1ef8faef28b81066bb8053b17fcf48a67b489c1e8b19642c1c7",
+        "version": 1
+      },
+      "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
+      "name": "Nile Delta Suez and Nile Valley Sentinel tile 5342",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; overlapping 1800-square tiles. DN 0..3000 scaled to 0..255 with exponent 0.7. Lossless RGBA PNG directly from source rasters; missing observations transparent. Offshore pixels cleared using the packaged coastline; inland waters retained; coastline alpha uses two-by-two coverage samples.",
+      "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
+      "valid_pixels": 0
+    },
+    {
+      "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
+      "bounds": [
+        29.530000000000,
+        31.400000000000,
+        30.030000000000,
+        31.733333333333
+      ],
+      "coastal_mask_identity": "ea7cf464a830a60569b03ebe318dc6525b417fac998b8c4e9720f769220078ed",
+      "colour_balance": {
+        "method": "Shared RGB gains from median matching bright opaque land in the Cairo overview to the global reference; one profile across Egyptian overviews and detail; nearest-byte rounding; alpha and transparent pixels unchanged. Existing clipped highlights are not reconstructed.",
+        "reference": "earth_surface_detail.png",
+        "reference_sha256": "cb96e65923a8a76c9224edfa2b73462c798460d4ea0c99682d95b3131888120d",
+        "rgb_gain": [
+          0.7255,
+          0.6723,
+          0.6554
+        ],
+        "source_sha256": "8dc1ce29e437f1ef8faef28b81066bb8053b17fcf48a67b489c1e8b19642c1c7",
+        "version": 1
+      },
+      "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
+      "name": "Nile Delta Suez and Nile Valley Sentinel tile 5343",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; overlapping 1800-square tiles. DN 0..3000 scaled to 0..255 with exponent 0.7. Lossless RGBA PNG directly from source rasters; missing observations transparent. Offshore pixels cleared using the packaged coastline; inland waters retained; coastline alpha uses two-by-two coverage samples.",
+      "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
+      "valid_pixels": 0
+    },
+    {
+      "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
+      "bounds": [
+        30.010000000000,
+        31.400000000000,
+        30.510000000000,
+        31.733333333333
+      ],
+      "coastal_mask_identity": "ea7cf464a830a60569b03ebe318dc6525b417fac998b8c4e9720f769220078ed",
+      "colour_balance": {
+        "method": "Shared RGB gains from median matching bright opaque land in the Cairo overview to the global reference; one profile across Egyptian overviews and detail; nearest-byte rounding; alpha and transparent pixels unchanged. Existing clipped highlights are not reconstructed.",
+        "reference": "earth_surface_detail.png",
+        "reference_sha256": "cb96e65923a8a76c9224edfa2b73462c798460d4ea0c99682d95b3131888120d",
+        "rgb_gain": [
+          0.7255,
+          0.6723,
+          0.6554
+        ],
+        "source_sha256": "8fea21915624cffc357e96fe96f52ed8006074e313607a72d858a0dccbb5ccae",
+        "version": 1
+      },
+      "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
+      "name": "Nile Delta Suez and Nile Valley Sentinel tile 5344",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; overlapping 1800-square tiles. DN 0..3000 scaled to 0..255 with exponent 0.7. Lossless RGBA PNG directly from source rasters; missing observations transparent. Offshore pixels cleared using the packaged coastline; inland waters retained; coastline alpha uses two-by-two coverage samples.",
+      "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
+      "valid_pixels": 196700
+    },
+    {
+      "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
+      "bounds": [
+        30.490000000000,
+        31.400000000000,
+        30.990000000000,
+        31.733333333333
+      ],
+      "coastal_mask_identity": "ea7cf464a830a60569b03ebe318dc6525b417fac998b8c4e9720f769220078ed",
+      "colour_balance": {
+        "method": "Shared RGB gains from median matching bright opaque land in the Cairo overview to the global reference; one profile across Egyptian overviews and detail; nearest-byte rounding; alpha and transparent pixels unchanged. Existing clipped highlights are not reconstructed.",
+        "reference": "earth_surface_detail.png",
+        "reference_sha256": "cb96e65923a8a76c9224edfa2b73462c798460d4ea0c99682d95b3131888120d",
+        "rgb_gain": [
+          0.7255,
+          0.6723,
+          0.6554
+        ],
+        "source_sha256": "6866b56dd647f4d88fe56fc2c9dd4f37ff2f904edf1e7d81b58483675a8cefcc",
+        "version": 1
+      },
+      "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
+      "name": "Nile Delta Suez and Nile Valley Sentinel tile 5345",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; overlapping 1800-square tiles. DN 0..3000 scaled to 0..255 with exponent 0.7. Lossless RGBA PNG directly from source rasters; missing observations transparent. Offshore pixels cleared using the packaged coastline; inland waters retained; coastline alpha uses two-by-two coverage samples.",
+      "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
+      "valid_pixels": 1125343
+    },
+    {
+      "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
+      "bounds": [
+        30.970000000000,
+        31.400000000000,
+        31.470000000000,
+        31.733333333333
+      ],
+      "coastal_mask_identity": "ea7cf464a830a60569b03ebe318dc6525b417fac998b8c4e9720f769220078ed",
+      "colour_balance": {
+        "method": "Shared RGB gains from median matching bright opaque land in the Cairo overview to the global reference; one profile across Egyptian overviews and detail; nearest-byte rounding; alpha and transparent pixels unchanged. Existing clipped highlights are not reconstructed.",
+        "reference": "earth_surface_detail.png",
+        "reference_sha256": "cb96e65923a8a76c9224edfa2b73462c798460d4ea0c99682d95b3131888120d",
+        "rgb_gain": [
+          0.7255,
+          0.6723,
+          0.6554
+        ],
+        "source_sha256": "de747301a1780f31c4d83c55f7a610fb49acfbb522f23157f8498814bc108875",
+        "version": 1
+      },
+      "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
+      "name": "Nile Delta Suez and Nile Valley Sentinel tile 5346",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; overlapping 1800-square tiles. DN 0..3000 scaled to 0..255 with exponent 0.7. Lossless RGBA PNG directly from source rasters; missing observations transparent. Offshore pixels cleared using the packaged coastline; inland waters retained; coastline alpha uses two-by-two coverage samples.",
+      "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
+      "valid_pixels": 1552745
+    },
+    {
+      "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
+      "bounds": [
+        31.450000000000,
+        31.400000000000,
+        31.950000000000,
+        31.733333333333
+      ],
+      "coastal_mask_identity": "ea7cf464a830a60569b03ebe318dc6525b417fac998b8c4e9720f769220078ed",
+      "colour_balance": {
+        "method": "Shared RGB gains from median matching bright opaque land in the Cairo overview to the global reference; one profile across Egyptian overviews and detail; nearest-byte rounding; alpha and transparent pixels unchanged. Existing clipped highlights are not reconstructed.",
+        "reference": "earth_surface_detail.png",
+        "reference_sha256": "cb96e65923a8a76c9224edfa2b73462c798460d4ea0c99682d95b3131888120d",
+        "rgb_gain": [
+          0.7255,
+          0.6723,
+          0.6554
+        ],
+        "source_sha256": "1565d4a6aa65ffbc01e0faedeb8cb78601699b61484f00c4ad31b57c368babc3",
+        "version": 1
+      },
+      "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
+      "name": "Nile Delta Suez and Nile Valley Sentinel tile 5347",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; overlapping 1800-square tiles. DN 0..3000 scaled to 0..255 with exponent 0.7. Lossless RGBA PNG directly from source rasters; missing observations transparent. Offshore pixels cleared using the packaged coastline; inland waters retained; coastline alpha uses two-by-two coverage samples.",
+      "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
+      "valid_pixels": 762393
+    },
+    {
+      "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
+      "bounds": [
+        31.930000000000,
+        31.400000000000,
+        32.430000000000,
+        31.733333333333
+      ],
+      "coastal_mask_identity": "ea7cf464a830a60569b03ebe318dc6525b417fac998b8c4e9720f769220078ed",
+      "colour_balance": {
+        "method": "Shared RGB gains from median matching bright opaque land in the Cairo overview to the global reference; one profile across Egyptian overviews and detail; nearest-byte rounding; alpha and transparent pixels unchanged. Existing clipped highlights are not reconstructed.",
+        "reference": "earth_surface_detail.png",
+        "reference_sha256": "cb96e65923a8a76c9224edfa2b73462c798460d4ea0c99682d95b3131888120d",
+        "rgb_gain": [
+          0.7255,
+          0.6723,
+          0.6554
+        ],
+        "source_sha256": "a83fe751ffc67cbe0ff8e049bf0b7c718ce916b99ab3f2e8efa3f836e371b170",
+        "version": 1
+      },
+      "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
+      "name": "Nile Delta Suez and Nile Valley Sentinel tile 5348",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; overlapping 1800-square tiles. DN 0..3000 scaled to 0..255 with exponent 0.7. Lossless RGBA PNG directly from source rasters; missing observations transparent. Offshore pixels cleared using the packaged coastline; inland waters retained; coastline alpha uses two-by-two coverage samples.",
+      "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
+      "valid_pixels": 107323
+    },
+    {
+      "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
+      "bounds": [
+        32.410000000000,
+        31.400000000000,
+        32.910000000000,
+        31.733333333333
+      ],
+      "coastal_mask_identity": "ea7cf464a830a60569b03ebe318dc6525b417fac998b8c4e9720f769220078ed",
+      "colour_balance": {
+        "method": "Shared RGB gains from median matching bright opaque land in the Cairo overview to the global reference; one profile across Egyptian overviews and detail; nearest-byte rounding; alpha and transparent pixels unchanged. Existing clipped highlights are not reconstructed.",
+        "reference": "earth_surface_detail.png",
+        "reference_sha256": "cb96e65923a8a76c9224edfa2b73462c798460d4ea0c99682d95b3131888120d",
+        "rgb_gain": [
+          0.7255,
+          0.6723,
+          0.6554
+        ],
+        "source_sha256": "8dc1ce29e437f1ef8faef28b81066bb8053b17fcf48a67b489c1e8b19642c1c7",
+        "version": 1
+      },
+      "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
+      "name": "Nile Delta Suez and Nile Valley Sentinel tile 5349",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; overlapping 1800-square tiles. DN 0..3000 scaled to 0..255 with exponent 0.7. Lossless RGBA PNG directly from source rasters; missing observations transparent. Offshore pixels cleared using the packaged coastline; inland waters retained; coastline alpha uses two-by-two coverage samples.",
+      "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
+      "valid_pixels": 0
+    },
+    {
+      "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
+      "bounds": [
+        29.050000000000,
+        31.720000000000,
+        29.550000000000,
+        32.053333333333
+      ],
+      "coastal_mask_identity": "ea7cf464a830a60569b03ebe318dc6525b417fac998b8c4e9720f769220078ed",
+      "colour_balance": {
+        "method": "Shared RGB gains from median matching bright opaque land in the Cairo overview to the global reference; one profile across Egyptian overviews and detail; nearest-byte rounding; alpha and transparent pixels unchanged. Existing clipped highlights are not reconstructed.",
+        "reference": "earth_surface_detail.png",
+        "reference_sha256": "cb96e65923a8a76c9224edfa2b73462c798460d4ea0c99682d95b3131888120d",
+        "rgb_gain": [
+          0.7255,
+          0.6723,
+          0.6554
+        ],
+        "source_sha256": "8dc1ce29e437f1ef8faef28b81066bb8053b17fcf48a67b489c1e8b19642c1c7",
+        "version": 1
+      },
+      "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
+      "name": "Nile Delta Suez and Nile Valley Sentinel tile 5350",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; overlapping 1800-square tiles. DN 0..3000 scaled to 0..255 with exponent 0.7. Lossless RGBA PNG directly from source rasters; missing observations transparent. Offshore pixels cleared using the packaged coastline; inland waters retained; coastline alpha uses two-by-two coverage samples.",
+      "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
+      "valid_pixels": 0
+    },
+    {
+      "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
+      "bounds": [
+        29.530000000000,
+        31.720000000000,
+        30.030000000000,
+        32.053333333333
+      ],
+      "coastal_mask_identity": "ea7cf464a830a60569b03ebe318dc6525b417fac998b8c4e9720f769220078ed",
+      "colour_balance": {
+        "method": "Shared RGB gains from median matching bright opaque land in the Cairo overview to the global reference; one profile across Egyptian overviews and detail; nearest-byte rounding; alpha and transparent pixels unchanged. Existing clipped highlights are not reconstructed.",
+        "reference": "earth_surface_detail.png",
+        "reference_sha256": "cb96e65923a8a76c9224edfa2b73462c798460d4ea0c99682d95b3131888120d",
+        "rgb_gain": [
+          0.7255,
+          0.6723,
+          0.6554
+        ],
+        "source_sha256": "8dc1ce29e437f1ef8faef28b81066bb8053b17fcf48a67b489c1e8b19642c1c7",
+        "version": 1
+      },
+      "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
+      "name": "Nile Delta Suez and Nile Valley Sentinel tile 5351",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; overlapping 1800-square tiles. DN 0..3000 scaled to 0..255 with exponent 0.7. Lossless RGBA PNG directly from source rasters; missing observations transparent. Offshore pixels cleared using the packaged coastline; inland waters retained; coastline alpha uses two-by-two coverage samples.",
+      "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
+      "valid_pixels": 0
+    },
+    {
+      "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
+      "bounds": [
+        30.010000000000,
+        31.720000000000,
+        30.510000000000,
+        32.053333333333
+      ],
+      "coastal_mask_identity": "ea7cf464a830a60569b03ebe318dc6525b417fac998b8c4e9720f769220078ed",
+      "colour_balance": {
+        "method": "Shared RGB gains from median matching bright opaque land in the Cairo overview to the global reference; one profile across Egyptian overviews and detail; nearest-byte rounding; alpha and transparent pixels unchanged. Existing clipped highlights are not reconstructed.",
+        "reference": "earth_surface_detail.png",
+        "reference_sha256": "cb96e65923a8a76c9224edfa2b73462c798460d4ea0c99682d95b3131888120d",
+        "rgb_gain": [
+          0.7255,
+          0.6723,
+          0.6554
+        ],
+        "source_sha256": "8dc1ce29e437f1ef8faef28b81066bb8053b17fcf48a67b489c1e8b19642c1c7",
+        "version": 1
+      },
+      "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
+      "name": "Nile Delta Suez and Nile Valley Sentinel tile 5352",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; overlapping 1800-square tiles. DN 0..3000 scaled to 0..255 with exponent 0.7. Lossless RGBA PNG directly from source rasters; missing observations transparent. Offshore pixels cleared using the packaged coastline; inland waters retained; coastline alpha uses two-by-two coverage samples.",
+      "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
+      "valid_pixels": 0
+    },
+    {
+      "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
+      "bounds": [
+        30.490000000000,
+        31.720000000000,
+        30.990000000000,
+        32.053333333333
+      ],
+      "coastal_mask_identity": "ea7cf464a830a60569b03ebe318dc6525b417fac998b8c4e9720f769220078ed",
+      "colour_balance": {
+        "method": "Shared RGB gains from median matching bright opaque land in the Cairo overview to the global reference; one profile across Egyptian overviews and detail; nearest-byte rounding; alpha and transparent pixels unchanged. Existing clipped highlights are not reconstructed.",
+        "reference": "earth_surface_detail.png",
+        "reference_sha256": "cb96e65923a8a76c9224edfa2b73462c798460d4ea0c99682d95b3131888120d",
+        "rgb_gain": [
+          0.7255,
+          0.6723,
+          0.6554
+        ],
+        "source_sha256": "8dc1ce29e437f1ef8faef28b81066bb8053b17fcf48a67b489c1e8b19642c1c7",
+        "version": 1
+      },
+      "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
+      "name": "Nile Delta Suez and Nile Valley Sentinel tile 5353",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; overlapping 1800-square tiles. DN 0..3000 scaled to 0..255 with exponent 0.7. Lossless RGBA PNG directly from source rasters; missing observations transparent. Offshore pixels cleared using the packaged coastline; inland waters retained; coastline alpha uses two-by-two coverage samples.",
+      "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
+      "valid_pixels": 0
+    },
+    {
+      "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
+      "bounds": [
+        30.970000000000,
+        31.720000000000,
+        31.470000000000,
+        32.053333333333
+      ],
+      "coastal_mask_identity": "ea7cf464a830a60569b03ebe318dc6525b417fac998b8c4e9720f769220078ed",
+      "colour_balance": {
+        "method": "Shared RGB gains from median matching bright opaque land in the Cairo overview to the global reference; one profile across Egyptian overviews and detail; nearest-byte rounding; alpha and transparent pixels unchanged. Existing clipped highlights are not reconstructed.",
+        "reference": "earth_surface_detail.png",
+        "reference_sha256": "cb96e65923a8a76c9224edfa2b73462c798460d4ea0c99682d95b3131888120d",
+        "rgb_gain": [
+          0.7255,
+          0.6723,
+          0.6554
+        ],
+        "source_sha256": "8dc1ce29e437f1ef8faef28b81066bb8053b17fcf48a67b489c1e8b19642c1c7",
+        "version": 1
+      },
+      "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
+      "name": "Nile Delta Suez and Nile Valley Sentinel tile 5354",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; overlapping 1800-square tiles. DN 0..3000 scaled to 0..255 with exponent 0.7. Lossless RGBA PNG directly from source rasters; missing observations transparent. Offshore pixels cleared using the packaged coastline; inland waters retained; coastline alpha uses two-by-two coverage samples.",
+      "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
+      "valid_pixels": 0
+    },
+    {
+      "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
+      "bounds": [
+        31.450000000000,
+        31.720000000000,
+        31.950000000000,
+        32.053333333333
+      ],
+      "coastal_mask_identity": "ea7cf464a830a60569b03ebe318dc6525b417fac998b8c4e9720f769220078ed",
+      "colour_balance": {
+        "method": "Shared RGB gains from median matching bright opaque land in the Cairo overview to the global reference; one profile across Egyptian overviews and detail; nearest-byte rounding; alpha and transparent pixels unchanged. Existing clipped highlights are not reconstructed.",
+        "reference": "earth_surface_detail.png",
+        "reference_sha256": "cb96e65923a8a76c9224edfa2b73462c798460d4ea0c99682d95b3131888120d",
+        "rgb_gain": [
+          0.7255,
+          0.6723,
+          0.6554
+        ],
+        "source_sha256": "8dc1ce29e437f1ef8faef28b81066bb8053b17fcf48a67b489c1e8b19642c1c7",
+        "version": 1
+      },
+      "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
+      "name": "Nile Delta Suez and Nile Valley Sentinel tile 5355",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; overlapping 1800-square tiles. DN 0..3000 scaled to 0..255 with exponent 0.7. Lossless RGBA PNG directly from source rasters; missing observations transparent. Offshore pixels cleared using the packaged coastline; inland waters retained; coastline alpha uses two-by-two coverage samples.",
+      "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
+      "valid_pixels": 0
+    },
+    {
+      "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
+      "bounds": [
+        31.930000000000,
+        31.720000000000,
+        32.430000000000,
+        32.053333333333
+      ],
+      "coastal_mask_identity": "ea7cf464a830a60569b03ebe318dc6525b417fac998b8c4e9720f769220078ed",
+      "colour_balance": {
+        "method": "Shared RGB gains from median matching bright opaque land in the Cairo overview to the global reference; one profile across Egyptian overviews and detail; nearest-byte rounding; alpha and transparent pixels unchanged. Existing clipped highlights are not reconstructed.",
+        "reference": "earth_surface_detail.png",
+        "reference_sha256": "cb96e65923a8a76c9224edfa2b73462c798460d4ea0c99682d95b3131888120d",
+        "rgb_gain": [
+          0.7255,
+          0.6723,
+          0.6554
+        ],
+        "source_sha256": "8dc1ce29e437f1ef8faef28b81066bb8053b17fcf48a67b489c1e8b19642c1c7",
+        "version": 1
+      },
+      "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
+      "name": "Nile Delta Suez and Nile Valley Sentinel tile 5356",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; overlapping 1800-square tiles. DN 0..3000 scaled to 0..255 with exponent 0.7. Lossless RGBA PNG directly from source rasters; missing observations transparent. Offshore pixels cleared using the packaged coastline; inland waters retained; coastline alpha uses two-by-two coverage samples.",
+      "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
+      "valid_pixels": 0
+    },
+    {
+      "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
+      "bounds": [
+        32.410000000000,
+        31.720000000000,
+        32.910000000000,
+        32.053333333333
+      ],
+      "coastal_mask_identity": "ea7cf464a830a60569b03ebe318dc6525b417fac998b8c4e9720f769220078ed",
+      "colour_balance": {
+        "method": "Shared RGB gains from median matching bright opaque land in the Cairo overview to the global reference; one profile across Egyptian overviews and detail; nearest-byte rounding; alpha and transparent pixels unchanged. Existing clipped highlights are not reconstructed.",
+        "reference": "earth_surface_detail.png",
+        "reference_sha256": "cb96e65923a8a76c9224edfa2b73462c798460d4ea0c99682d95b3131888120d",
+        "rgb_gain": [
+          0.7255,
+          0.6723,
+          0.6554
+        ],
+        "source_sha256": "8dc1ce29e437f1ef8faef28b81066bb8053b17fcf48a67b489c1e8b19642c1c7",
+        "version": 1
+      },
+      "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
+      "name": "Nile Delta Suez and Nile Valley Sentinel tile 5357",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; overlapping 1800-square tiles. DN 0..3000 scaled to 0..255 with exponent 0.7. Lossless RGBA PNG directly from source rasters; missing observations transparent. Offshore pixels cleared using the packaged coastline; inland waters retained; coastline alpha uses two-by-two coverage samples.",
+      "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
+      "valid_pixels": 0
     }
   ],
   "source_sha256": "d225f1f35a6448a4d1d8f6de6e48f3433e470085b70a35800e64f384f269a7b0",

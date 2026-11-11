@@ -1,6 +1,6 @@
 -- Persistent benchmark definitions and observations; created only by explicit benchmark commands.
 PRAGMA application_id = 1296126546;
-PRAGMA user_version = 2;
+PRAGMA user_version = 3;
 
 CREATE TABLE IF NOT EXISTS benchmark_operation (
     name TEXT PRIMARY KEY,
@@ -17,9 +17,17 @@ CREATE TABLE IF NOT EXISTS benchmark_profile (
     PRIMARY KEY (backend, bits)
 ) WITHOUT ROWID;
 INSERT OR IGNORE INTO benchmark_profile VALUES
-    ('number-double', 53), ('qfloat', 106), ('qcomplex', 106), ('exact-integer', 0),
+    ('number-double', 53), ('qfloat', 106), ('qcomplex', 106), ('exact-integer', 0), ('exact-fraction', 0),
     ('mpfr', 256), ('mpfr', 512), ('mpfr', 768), ('mpfr', 1024), ('mpfr', 2048), ('mpfr', 4096),
     ('mpc', 256), ('mpc', 512), ('mpc', 768), ('mpc', 1024), ('mpc', 2048), ('mpc', 4096);
+
+-- Exact arithmetic has different operands from floating-point measurements of the same operation.
+CREATE TABLE IF NOT EXISTS benchmark_workload (
+    operation TEXT NOT NULL REFERENCES benchmark_operation(name),
+    backend TEXT NOT NULL CHECK (backend IN ('exact-integer', 'exact-fraction')),
+    arguments TEXT NOT NULL,
+    PRIMARY KEY (operation, backend)
+) WITHOUT ROWID;
 
 CREATE TABLE IF NOT EXISTS benchmark_run (
     id INTEGER PRIMARY KEY,

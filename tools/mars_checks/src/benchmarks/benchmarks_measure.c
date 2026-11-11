@@ -29,6 +29,8 @@ typedef struct {
     qfloat_t real[6];
     qcomplex_t complex_values[6];
     volatile double sink;
+    bool exact;
+    bool integer;
 } benchmark_state_t;
 
 static bool benchmark_now(uint64_t *value)
@@ -75,8 +77,8 @@ static bool benchmark_batch_number(benchmark_state_t *state, unsigned iterations
     bool ok = true;
     for (unsigned i = 0; i < iterations; ++i) {
         ok = num_is_finite(output[i]) && ok;
-        if (op->integer_only)
-            ok = num_is_exact(output[i]) && num_is_integer(output[i]) && ok;
+        if (state->exact)
+            ok = num_is_exact(output[i]) && num_is_integer(output[i]) == state->integer && ok;
         num_destroy(output + i);
     }
     *duration = end - start;
@@ -159,17 +161,24 @@ static bool benchmark_batch(benchmark_state_t *state, unsigned iterations, uint6
     return true;
 }
 
-static bool benchmark_prepare(benchmark_state_t *state, const char *backend, unsigned bits)
+static bool benchmark_prepare(benchmark_state_t *state, const char *backend, unsigned bits, const char *operands)
 {
     const benchmark_operation_t *op = state->operation;
-    for (unsigned i = 0; i < op->arity; ++i) {
-        if (!strcmp(backend, "exact-integer")) {
-            state->number[i] = num_create_from_string(op->arguments[i]);
+    string_t *text = operands ? string_new_with(operands) : NULL;
+    size_t count = 0;
+    string_t **parts = text ? string_split(text, ",", &count) : NULL;
+    bool ok = !operands || (parts && count == op->arity);
+    for (unsigned i = 0; ok && i < op->arity; ++i) {
+        if (parts) string_trim(parts[i]);
+        const char *argument = parts ? string_c_str(parts[i]) : op->arguments[i];
+        if (state->exact) {
+            state->number[i] = num_create_from_string(argument);
             if (!num_is_finite(state->number[i]) || !num_is_exact(state->number[i]) ||
-                !num_is_integer(state->number[i])) return false;
+                (state->integer && !num_is_integer(state->number[i])) ||
+                (!state->integer && !i && num_is_integer(state->number[i]))) ok = false;
             continue;
         }
-        state->real[i] = qf_from_string(op->arguments[i]);
+        state->real[i] = qf_from_string(argument);
         bool has_imaginary = (op->complex_mask & (1u << i)) != 0;
         qfloat_t imaginary = has_imaginary ? qf_from_string(benchmark_imaginary_literal) : QF_ZERO;
         state->complex_values[i] = qc_make(state->real[i], imaginary);
@@ -178,23 +187,25 @@ static bool benchmark_prepare(benchmark_state_t *state, const char *backend, uns
         } else if (!strcmp(backend, "mpfr") || !strcmp(backend, "mpc")) {
             bool complex_value = !strcmp(backend, "mpc") &&
                                  ((op->complex_mask & (1u << i)) || !op->complex_mask);
-            string_t *literal = benchmark_argument_literal(op->arguments[i], complex_value, has_imaginary);
+            string_t *literal = benchmark_argument_literal(argument, complex_value, has_imaginary);
             number_t parsed = num_create_from_text(literal), zero = num_new_with_prec_bits(bits);
             state->number[i] = num_add(parsed, zero);
             num_destroy(&parsed);
             num_destroy(&zero);
             string_free(literal);
-            if (!num_is_finite(state->number[i])) return false;
+            if (!num_is_finite(state->number[i])) ok = false;
         }
     }
-    return true;
+    string_split_free(parts, count);
+    string_free(text);
+    return ok;
 }
 
 /* Measure one operation without touching persistent benchmark or test storage. */
 int benchmark_measure(const string_t *root, int argc, char **argv)
 {
     (void)root;
-    if (argc != 4) return 2;
+    if (argc != 4 && argc != 5) return 2;
     const benchmark_operation_t *op = benchmark_operation(argv[0]);
     char *end = NULL;
     unsigned bits = (unsigned)strtoul(argv[2], &end, 10);
@@ -203,19 +214,20 @@ int benchmark_measure(const string_t *root, int argc, char **argv)
     if (!end || *end || samples < 3 || samples > 101) return 2;
     const char *backend = argv[1];
     bool real = !strcmp(backend, "qfloat"), complex_backend = !strcmp(backend, "qcomplex");
-    bool exact = !strcmp(backend, "exact-integer");
+    bool exact = benchmark_backend_exact(backend), integer = !strcmp(backend, "exact-integer");
     bool number = !strcmp(backend, "number-double") || !strcmp(backend, "mpfr") || !strcmp(backend, "mpc") || exact;
     if (!real && !complex_backend && !number) return 2;
-    if (op->integer_only != exact) return 3;
+    if ((op->integer_only && !integer) || (exact && !op->integer_only && argc != 5)) return 3;
     if ((!bits && !exact) || (exact && bits)) return 2;
     if (real && !benchmark_operation_supported(op, false)) return 3;
     if (complex_backend && !benchmark_operation_supported(op, true)) return 3;
     if ((real || complex_backend) && bits != 106) return 2;
     if (!strcmp(backend, "number-double") && bits != 53) return 2;
     struct timespec resolution;
-    if (clock_getres(CLOCK_MONOTONIC, &resolution) || num_set_default_prec_bits(bits ? bits : 256)) return 1;
-    benchmark_state_t state = {.operation = op};
-    bool ok = benchmark_prepare(&state, backend, bits);
+    /* Keep these bounded exact workloads below the library's rational rounding threshold. */
+    if (clock_getres(CLOCK_MONOTONIC, &resolution) || num_set_default_prec_bits(bits ? bits : 16384)) return 1;
+    benchmark_state_t state = {.operation = op, .exact = exact, .integer = integer};
+    bool ok = benchmark_prepare(&state, backend, bits, argc == 5 ? argv[4] : NULL);
     bool (*chunk)(benchmark_state_t *, unsigned, uint64_t *) =
         real ? benchmark_batch_real : complex_backend ? benchmark_batch_complex : benchmark_batch_number;
     unsigned iterations = 1;

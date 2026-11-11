@@ -129,10 +129,12 @@ static long benchmark_start(sqlite_t *db, const benchmark_options_t *options,
     sqlite_stmt_finalize(id);
     insert = run ? sqlite_stmt_prepare(db,
         "INSERT INTO benchmark_result(run_id, operation, backend, bits, arguments, complex_mask, sequence) "
-        "SELECT ?1, o.name, p.backend, p.bits, o.arguments, o.complex_mask, "
+        "SELECT ?1, o.name, p.backend, p.bits, coalesce(w.arguments, o.arguments),\n"
+        "       CASE WHEN w.operation IS NULL THEN o.complex_mask ELSE 0 END,\n"
         "row_number() OVER (ORDER BY CASE p.backend WHEN 'number-double' THEN 0 WHEN 'qfloat' THEN 1 "
         "WHEN 'qcomplex' THEN 2 WHEN 'mpfr' THEN 3 ELSE 4 END, p.bits, o.name) "
-        "FROM benchmark_operation AS o CROSS JOIN benchmark_profile AS p "
+        "FROM benchmark_operation AS o CROSS JOIN benchmark_profile AS p\n"
+        "LEFT JOIN benchmark_workload AS w ON w.operation = o.name AND w.backend = p.backend\n"
         "WHERE (?2 = '' OR o.name = ?2) AND (?3 = '' OR p.backend = ?3) AND (?4 = 0 OR p.bits = ?4)") : NULL;
     ok = ok && run && insert && sqlite_stmt_bind_int64(insert, 1, run) &&
         sqlite_stmt_bind_text(insert, 2, options->operation) && sqlite_stmt_bind_text(insert, 3, options->backend) &&
@@ -310,8 +312,12 @@ int benchmark_run(const string_t *root, sqlite_t *db, int argc, char **argv)
     while (ok && !checks_process_interrupt_signal()) {
         if (!benchmark_retention_checkpoint(db, run)) { ok = false; break; }
         sqlite_stmt_t *pending = sqlite_stmt_prepare(db,
-            "SELECT operation, backend, bits FROM benchmark_result WHERE run_id = ?1 AND outcome = 'pending' "
-            "ORDER BY sequence LIMIT 1");
+            "SELECT r.operation, r.backend, r.bits, r.arguments,\n"
+            "       w.operation IS NOT NULL AND w.arguments = r.arguments\n"
+            "FROM benchmark_result AS r\n"
+            "LEFT JOIN benchmark_workload AS w ON w.operation = r.operation AND w.backend = r.backend\n"
+            "WHERE r.run_id = ?1 AND r.outcome = 'pending'\n"
+            "ORDER BY r.sequence LIMIT 1");
         ok = pending && sqlite_stmt_bind_int64(pending, 1, run);
         sqlite_step_result_t step = ok ? sqlite_stmt_step(pending) : SQLITE_STEP_ERROR;
         if (step != SQLITE_STEP_ROW) {
@@ -322,6 +328,11 @@ int benchmark_run(const string_t *root, sqlite_t *db, int argc, char **argv)
         string_t *operation = checks_text(sqlite_stmt_column_text(pending, 0));
         string_t *backend = checks_text(sqlite_stmt_column_text(pending, 1));
         int bits = sqlite_stmt_column_int(pending, 2);
+        string_t *operands = checks_text(sqlite_stmt_column_text(pending, 3));
+        bool supported = sqlite_stmt_column_int(pending, 4) != 0;
+        const benchmark_operation_t *native = benchmark_operation(string_c_str(operation));
+        supported = !benchmark_backend_exact(string_c_str(backend)) || supported ||
+                    (native && native->integer_only && checks_equal(backend, "exact-integer"));
         sqlite_stmt_finalize(pending);
         checks_strings_t *arguments = checks_strings_new();
         checks_strings_add(arguments, string_clone(self));
@@ -331,12 +342,13 @@ int benchmark_run(const string_t *root, sqlite_t *db, int argc, char **argv)
         checks_strings_add(arguments, string_clone(backend));
         checks_strings_add(arguments, string_sprintf("%d", bits));
         checks_strings_add(arguments, string_sprintf("%u", samples));
+        checks_strings_add(arguments, operands);
         benchmark_progress_case(progress, string_c_str(operation), string_c_str(backend), bits);
         string_t *output = NULL, *errors = NULL;
-        int status = -1;
+        int status = supported ? -1 : 3;
         errno = 0;
-        bool ran = checks_process_run_observed(arguments, root, timeout, &output, &errors, &status,
-                                               benchmark_progress_observe, progress);
+        bool ran = !supported || checks_process_run_observed(arguments, root, timeout, &output, &errors, &status,
+                                                              benchmark_progress_observe, progress);
         const char *outcome = ran && status == 0 ? "pass" : ran && status == 3 ? "unsupported" :
                               errno == ETIMEDOUT ? "timeout" : "fail";
         if (!checks_process_interrupt_signal()) {

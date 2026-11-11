@@ -352,9 +352,9 @@ static bool benchmark_stats_print(const array_t *rows, const benchmark_stats_opt
         if (!tsv && (!backend || strcmp(backend, next) || bits != row->bits)) {
             if (backend && !markdown && !panels) benchmark_stats_rule(widths, FIELD_COUNT, "╚", "═", "╧", "╝");
             if (colour) fputs("\033[1;93m", stdout);
-            printf("\n%sBackend: %s — ", markdown ? "## " : "", next);
+            printf("\n%sBackend: %s — ", markdown ? "## " : "", benchmark_backend_title(next));
             if (row->bits) printf("%d bits", row->bits);
-            else fputs("exact integers", stdout);
+            else fputs(!strcmp(next, "exact-fraction") ? "exact fractions" : "exact integers", stdout);
             if (colour) fputs("\033[0m", stdout);
             puts("\n");
             backend = next;
@@ -381,7 +381,7 @@ static bool benchmark_stats_print(const array_t *rows, const benchmark_stats_opt
                 if (markdown && j == RESULT) fputs("**", stdout);
                 if (tsv) fputs(string_c_str(row->cells[j]), stdout);
                 else if (j == ARGUMENTS) {
-                    string_t *inputs = benchmark_arguments_markdown(row->cells[j], !strcmp(next, "exact-integer"));
+                    string_t *inputs = benchmark_arguments_markdown(row->cells[j], benchmark_backend_exact(next));
                     ok = inputs && fputs(string_c_str(inputs), stdout) != EOF && ok;
                     string_free(inputs);
                 } else benchmark_stats_markdown(string_c_str(row->cells[j]));

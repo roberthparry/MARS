@@ -322,8 +322,9 @@ coverage bounds, processing details and output checksums are retained in the
 complete manifest imported into the globe database.
 Preparation for mainland France, Brisbane, Sydney, Melbourne, Perth, the Sunshine Coast
 (Mooloolaba and Maroochydore), Canberra, Cairns, Alice Springs and the Gold Coast,
-New Zealand, Finland (including Åland), Sweden, mainland Norway, Cyprus and the Cairo
-area uses the same quarterly source mosaics, reduced-resolution settings as Spain and lossless coastal
+New Zealand, Finland (including Åland), Sweden, mainland Norway, Cyprus, Cairo, the Nile Delta,
+the Suez Canal and the Nile corridor south to Minya uses the same quarterly source mosaics,
+reduced-resolution settings as Spain and lossless coastal
 transparency. Source footprints and completed output checksums are retained in resumable checkpoints;
 the validated catalogue records each photograph's provenance before installation.
 

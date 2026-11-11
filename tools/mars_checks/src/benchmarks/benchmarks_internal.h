@@ -110,8 +110,23 @@ typedef struct {
     benchmark_function_t complex_fn; /**< Direct qcomplex entry point, or zero when unavailable. */
     const char *arguments[6]; /**< Domain-appropriate real operand literals, parsed outside timing. */
     unsigned complex_mask; /**< Bits marking operands which receive a non-zero imaginary part. */
-    bool integer_only; /**< True selects the exact-integer profile instead of inexact floating representations. */
+    bool integer_only; /**< Integer-specific API, restricted to the unrestricted integer profile. */
 } benchmark_operation_t;
+
+/**
+ * @brief Identify an unrestricted integer or fraction benchmark profile.
+ * @param[in] backend Borrowed profile identifier, valid throughout the call; NULL is accepted.
+ * @return True for exact-integer or exact-fraction, otherwise false. No allocation or ownership transfer occurs.
+ */
+bool benchmark_backend_exact(const char *backend);
+
+/**
+ * @brief Return the descriptive name of an unrestricted arithmetic profile.
+ * @param[in] backend Borrowed non-NULL profile identifier, retained by the caller.
+ * @return Static text for exact profiles, or backend itself for another profile. Do not free the returned pointer;
+ * an unchanged identifier remains valid only for the lifetime of the caller's string. No allocation occurs.
+ */
+const char *benchmark_backend_title(const char *backend);
 
 /**
  * @brief Static description of the timing protocol, including warm-up and batching parameters.
@@ -147,16 +162,16 @@ string_t *benchmark_argument_literal(const char *real, bool complex_value, bool 
 string_t *benchmark_arguments_text(const char *arguments, const char *backend, unsigned complex_mask);
 
 /**
- * @brief Format an Inputs cell for Markdown with a bounded display width and optional integer-argument layout.
+ * @brief Format an Inputs cell for Markdown with a bounded display width and optional exact-argument layout.
  * @param[in] inputs Borrowed display text, valid throughout the call; never changed or evaluated.
- * @param integer_layout True uses an 80-character width and starts each comma-separated integer operand on a new
+ * @param[in] exact_layout True uses an 80-character width and starts each comma-separated integer or fraction on a new
  * line; false retains the ordinary 40-character width and inline argument separators.
  * @return Owned Markdown released with string_free(), or NULL for null input or allocation failure.
  * Wrapped cells use an inline span and explicit line breaks, including when a reader strips inline styles.
  * Escaping preserves literal text and UTF-8 boundaries. Stored operands, numerical values and other exports
  * are unaffected; this function has no shared mutable state.
  */
-string_t *benchmark_arguments_markdown(const string_t *inputs, bool integer_layout);
+string_t *benchmark_arguments_markdown(const string_t *inputs, bool exact_layout);
 
 /**
  * @brief Find an operation by exact canonical name using binary search.
@@ -183,8 +198,10 @@ bool benchmark_operation_supported(const benchmark_operation_t *operation, bool 
 /**
  * @brief Measure one catalogue case in an isolated worker and print machine-readable samples.
  * @param[in] root Borrowed repository root; storage is not created or changed.
- * @param[in] argc Number of literal worker arguments.
- * @param[in] argv Borrowed arguments: operation, backend, bits and sample count.
+ * @param[in] argc Four arguments, or five when saved operand literals are supplied.
+ * @param[in] argv Borrowed arguments: operation, backend, bits, sample count and optional comma-separated operands.
+ * Saved operands are parsed before timing and remain caller-owned. Exact fractions use a 16,384-bit rational
+ * size budget; both exact profiles reject inexact results rather than timing an unnoticed floating conversion.
  * @return Zero after finite results and all timings were written; one on invalid mathematics or clock failure;
  * two on invalid arguments, or three for an unavailable backend. No mathematical result or operand escapes this call.
  */
@@ -285,7 +302,7 @@ benchmark_progress_t *benchmark_progress_new(const benchmark_progress_counts_t *
  * @param[in,out] progress Borrowed display; NULL is ignored.
  * @param[in] operation Borrowed canonical operation name, copied into a bounded display label.
  * @param[in] backend Borrowed backend name, copied into a bounded display label.
- * @param[in] bits Requested precision; zero denotes exact-integer arithmetic.
+ * @param[in] bits Requested precision; zero denotes unrestricted integer or fraction arithmetic.
  * @return No value. Control characters in labels cannot enter terminal output.
  */
 void benchmark_progress_case(benchmark_progress_t *progress, const char *operation, const char *backend, int bits);

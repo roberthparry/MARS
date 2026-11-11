@@ -21,7 +21,7 @@ static bool benchmark_store_schema(sqlite_t *db, const string_t *root)
     sqlite_stmt_finalize(version);
     if (!ok || (id && id != 1296126546)) return false;
     version = sqlite_stmt_prepare(db, "PRAGMA user_version");
-    ok = version && sqlite_stmt_step(version) == SQLITE_STEP_ROW && sqlite_stmt_column_int(version, 0) <= 2;
+    ok = version && sqlite_stmt_step(version) == SQLITE_STEP_ROW && sqlite_stmt_column_int(version, 0) <= 3;
     sqlite_stmt_finalize(version);
     if (!ok) return false;
     string_t *path = checks_path(root, "bench/benchmarks.sql"), *source = checks_read(path);
@@ -34,9 +34,13 @@ static bool benchmark_store_schema(sqlite_t *db, const string_t *root)
         "ON CONFLICT(name) DO UPDATE SET arity = excluded.arity, arguments = excluded.arguments, "
         "complex_mask = excluded.complex_mask, qfloat_supported = excluded.qfloat_supported, "
         "qcomplex_supported = excluded.qcomplex_supported") : NULL;
+    sqlite_stmt_t *workload = ok ? sqlite_stmt_prepare(db,
+        "INSERT INTO benchmark_workload(operation, backend, arguments)\n"
+        "VALUES (?1, 'exact-integer', ?2)\n"
+        "ON CONFLICT(operation, backend) DO UPDATE SET arguments = excluded.arguments") : NULL;
     size_t count = 0;
     const benchmark_operation_t *operations = benchmark_operations(&count);
-    ok = ok && insert;
+    ok = ok && insert && workload;
     /* Every authored operation must be visited exactly once during catalogue synchronisation. */
     for (size_t i = 0; ok && i < count; ++i) {
         const benchmark_operation_t *op = operations + i;
@@ -53,9 +57,21 @@ static bool benchmark_store_schema(sqlite_t *db, const string_t *root)
              sqlite_stmt_bind_int(insert, 6, benchmark_operation_supported(op, true)) &&
              sqlite_stmt_step(insert) == SQLITE_STEP_DONE;
         sqlite_stmt_reset(insert);
+        if (ok && op->integer_only) {
+            ok = sqlite_stmt_bind_text(workload, 1, op->name) &&
+                 sqlite_stmt_bind_text(workload, 2, string_c_str(arguments)) &&
+                 sqlite_stmt_step(workload) == SQLITE_STEP_DONE;
+            sqlite_stmt_reset(workload);
+        }
         string_free(arguments);
     }
     sqlite_stmt_finalize(insert);
+    sqlite_stmt_finalize(workload);
+    path = checks_path(root, "bench/number/bench_number.sql");
+    source = ok ? checks_read(path) : NULL;
+    ok = ok && source && sqlite_exec(db, source);
+    string_free(source);
+    string_free(path);
     if (ok) ok = sqlite_exec_cstr(db, "COMMIT");
     if (!ok) (void)sqlite_exec_cstr(db, "ROLLBACK");
     return ok;

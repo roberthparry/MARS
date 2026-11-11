@@ -15,6 +15,20 @@
 
 const char benchmark_imaginary_literal[] = "0.125";
 
+/* Recognise the two exact profiles without inspecting their mathematical operands. */
+bool benchmark_backend_exact(const char *backend)
+{
+    return backend && (!strcmp(backend, "exact-integer") || !strcmp(backend, "exact-fraction"));
+}
+
+/* Keep saved backend identifiers stable while displaying the requested descriptive names. */
+const char *benchmark_backend_title(const char *backend)
+{
+    if (!strcmp(backend, "exact-integer")) return "number / unrestricted integer";
+    if (!strcmp(backend, "exact-fraction")) return "number / unrestricted fraction";
+    return backend;
+}
+
 /* Spell one worker operand without changing its authored real component. */
 string_t *benchmark_argument_literal(const char *real, bool complex_value, bool imaginary)
 {
@@ -49,12 +63,12 @@ string_t *benchmark_arguments_text(const char *arguments, const char *backend, u
 }
 
 /* Bound long Markdown input cells while preserving every literal character. */
-string_t *benchmark_arguments_markdown(const string_t *inputs, bool integer_layout)
+string_t *benchmark_arguments_markdown(const string_t *inputs, bool exact_layout)
 {
     string_cursor_t *cursor = inputs ? string_cursor_new(inputs) : NULL;
     string_t *out = cursor ? string_new() : NULL;
-    size_t width = integer_layout ? 80 : 40;
-    bool wrapped = inputs && (string_length(inputs) > width || (integer_layout && string_find(inputs, ",") >= 0));
+    size_t width = exact_layout ? 80 : 40;
+    bool wrapped = inputs && (string_length(inputs) > width || (exact_layout && string_find(inputs, ",") >= 0));
     bool ok = cursor && out;
     if (ok && wrapped)
         ok = string_append_format(out, "<span style=\"display:inline-block;width:%zuch;max-width:100%;"
@@ -62,7 +76,7 @@ string_t *benchmark_arguments_markdown(const string_t *inputs, bool integer_layo
     size_t column = 0;
     while (ok && !string_cursor_done(cursor)) {
         unsigned value = rune_value(string_cursor_peek(cursor));
-        if (integer_layout && value == ',') {
+        if (exact_layout && value == ',') {
             ok = string_append_cstr(out, ",") >= 0;
             string_cursor_next(cursor);
             while (ok && !string_cursor_done(cursor) && rune_value(string_cursor_peek(cursor)) == ' ') {

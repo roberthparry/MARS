@@ -42,8 +42,9 @@ static bool benchmark_backend_table(sqlite_t *db, long run, const char *backend,
     sqlite_stmt_finalize(profiles);
     if (!ok || step != SQLITE_STEP_DONE) return false;
     if (!columns) return true;
-    if (heading) string_append_format(text, "\n### %s\n\n| Operation | Inputs |", heading);
-    else string_append_format(text, "\n### `%s`\n\n| Operation | Inputs |", backend);
+    if (heading && *heading) string_append_format(text, "\n### %s\n\n", heading);
+    else if (!heading) string_append_format(text, "\n### `%s`\n\n", backend);
+    string_append_cstr(text, "| Operation | Inputs |");
     for (unsigned i = 0; i < columns; ++i) {
         if (bits[i]) string_append_format(text, " %d bits |", bits[i]);
         else string_append_cstr(text, " Exact |");
@@ -67,7 +68,7 @@ static bool benchmark_backend_table(sqlite_t *db, long run, const char *backend,
         const char *arguments = sqlite_stmt_column_text(rows, 1);
         unsigned mask = (unsigned)sqlite_stmt_column_int(rows, 2);
         string_t *literal = benchmark_arguments_text(arguments, backend, mask);
-        string_t *inputs = benchmark_arguments_markdown(literal, !strcmp(backend, "exact-integer"));
+        string_t *inputs = benchmark_arguments_markdown(literal, benchmark_backend_exact(backend));
         string_free(literal);
         ok = inputs != NULL;
         if (ok) string_append_format(text, "| %s | %s |", name, string_c_str(inputs));
@@ -123,26 +124,27 @@ static string_t *benchmark_document(sqlite_t *db, long run, const char *module)
         {"qcomplex", NULL},
         {"mpfr", "number / multi-precision floating point"},
         {"mpc", "number / multi-precision complex floating point"},
-        {"exact-integer", "number / multi-precision integer"}
+        {"exact-integer", "number / unrestricted integer"},
+        {"exact-fraction", "number / unrestricted fraction"}
     };
     bool number_module = !strcmp(module, "number");
     for (size_t i = 0; ok && i < sizeof backends / sizeof *backends; ++i) {
         bool selected = !strcmp(module, "all") || (number_module && backends[i].number_heading) ||
             !strcmp(module, backends[i].key);
-        if (selected) ok = benchmark_backend_table(db, run, backends[i].key,
-                                                 number_module ? backends[i].number_heading : NULL, out);
-    }
-    if (ok && number_module) {
-        string_append_cstr(out,
-            "\n### number / multi-precision fraction\n\n"
-            "`number_t` represents exact fractions using GMP rational arithmetic (MPQ). Addition, subtraction,\n"
-            "multiplication, division and integer powers retain exact rational results within the configured\n"
-            "size budget. Their cost depends on numerator and denominator sizes and fraction reduction,\n"
-            "rather than floating-point precision alone. General transcendental functions usually require\n"
-            "inexact real or complex results.\n\n"
-            "The current benchmark run has no separate fraction measurements. A meaningful fraction table\n"
-            "would specify numerator and denominator bit lengths and distinguish exact arithmetic from\n"
-            "conversion to floating point; the floating-point tables above do not measure that workload.\n");
+        const char *heading = number_module ? backends[i].number_heading :
+                              benchmark_backend_exact(backends[i].key) ? benchmark_backend_title(backends[i].key) : NULL;
+        if (selected && number_module && !strcmp(backends[i].key, "exact-fraction")) {
+            string_append_cstr(out,
+                "\n### number / unrestricted fraction\n\n"
+                "`number_t` uses exact GMP rational arithmetic (MPQ). The operands below have large integer\n"
+                "numerators and denominators; parsing and canonical reduction precede timing. Every result\n"
+                "is checked to remain an exact fraction. Arithmetic cost depends on operand sizes and\n"
+                "cancellation, rather than a floating-point precision. These workloads use a 16,384-bit\n"
+                "rational size budget so intermediate results remain exact; general transcendental\n"
+                "functions usually require inexact real or complex results.\n\n");
+            heading = "";
+        }
+        if (selected) ok = benchmark_backend_table(db, run, backends[i].key, heading, out);
     }
     if (!ok) { string_free(out); return NULL; }
     return out;
