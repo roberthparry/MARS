@@ -299,6 +299,54 @@ unsigned lab_workspace_history_revision(lab_mode_t mode);
 int lab_workspace_history_read(lab_mode_t mode, unsigned side, unsigned index);
 
 /**
+ * @brief Return the active entry's chronological position without changing history.
+ * @param mode Worksheet index from zero to LAB_MODE_COUNT minus one.
+ * @return Zero-based position, or -1 for an invalid mode. No snapshot ownership transfers.
+ */
+int lab_workspace_history_current(lab_mode_t mode);
+
+/**
+ * @brief Copy an entry in chronological order to the shared output buffer.
+ * @param mode Valid worksheet mode.
+ * @param position Zero-based position, including the current worksheet between Back and Forward entries.
+ * @return Copied byte count, zero for an uncommitted current worksheet, or -1 for invalid input.
+ * Read lab_workspace_output() before another native buffer operation; the bytes remain native-owned.
+ */
+int lab_workspace_history_item(lab_mode_t mode, unsigned position);
+
+/**
+ * @brief Move one entry to another chronological position while retaining the active worksheet's identity.
+ * @param mode Valid worksheet mode.
+ * @param from Existing zero-based position.
+ * @param to Desired zero-based position after the move.
+ * @return True on success, including an unchanged position; false for invalid indices or a stack-capacity limit.
+ * No snapshot is decoded, copied or evicted. A bounded descriptor rotation updates order and persistence revision.
+ * Failed edits leave the complete history unchanged. Call only on the owning browser thread.
+ */
+bool lab_workspace_history_move(lab_mode_t mode, unsigned from, unsigned to);
+
+/**
+ * @brief Remove a history entry and reclaim its snapshot bytes.
+ * @param mode Valid worksheet mode.
+ * @param position Existing zero-based chronological position.
+ * @return True on removal; false for invalid input or the sole remaining current worksheet.
+ * Removing the current entry promotes its successor, or predecessor at the end. The host must restore the
+ * promoted snapshot before evaluating it. Other entries and modes are preserved; the persistence revision advances.
+ */
+bool lab_workspace_history_remove(lab_mode_t mode, unsigned position);
+
+/**
+ * @brief Select a chronological entry after preserving the staged live worksheet in its existing position.
+ * @param mode Valid worksheet mode.
+ * @param position Desired zero-based chronological position.
+ * @param length Current snapshot length in staging slot zero, from one to lab_workspace_capacity().
+ * @return Selected snapshot byte count in lab_workspace_output(), or -1 for invalid input or insufficient capacity.
+ * Failure leaves history intact. No history is evicted to perform this edit. The host owns subsequent restoration
+ * and evaluation; consume the native-owned output before another buffer operation on the owning browser thread.
+ */
+int lab_workspace_history_select(lab_mode_t mode, unsigned position, unsigned length);
+
+/**
  * @brief Atomically replace one mode's committed state and two history stacks from staged bytes.
  * @param mode Valid worksheet mode.
  * @param back Number of oldest-first backward records, at most 128.

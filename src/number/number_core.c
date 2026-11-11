@@ -4,6 +4,7 @@
  *
  * Constructs, clones and destroys number_t values and implements common queries and operations.
  * Representation-specific work is routed through the backend tables so callers use one scalar interface.
+ * Active temporary scopes index payload ownership directly, with dictionary_t for collisions and larger live sets.
  *
  * This belongs to number_t's shared scalar layer. Preserve exactness, precision policy and the distinction between
  * borrowed aliases and independently owned numeric values.
@@ -19,6 +20,7 @@
 #include <complex.h>
 
 #include "number-t.h"
+#include "dictionary-t.h"
 #include "string-t.h"
 #define MARS_NUMBER_INTERNAL_ACCESS
 #include "number_internal.h"
@@ -139,6 +141,13 @@ typedef struct number_scope_state_t {
     number_scope_arena_block_t *arena_blocks;
 } number_scope_state_t;
 
+typedef struct {
+    number_scope_record_t *record;
+    number_scope_block_t *block;
+} number_scope_owner_t;
+
+enum { NUMBER_SCOPE_OWNER_SLOTS = 256 };
+
 typedef struct _num_scope_t {
     number_scope_state_t *state;
     struct _num_scope_t *previous;
@@ -146,6 +155,8 @@ typedef struct _num_scope_t {
 } num_scope_t;
 
 static num_scope_t *number_scope_current = NULL;
+static number_scope_owner_t number_scope_fast_owners[NUMBER_SCOPE_OWNER_SLOTS];
+static dictionary_t *number_scope_owners;
 static size_t number_scope_suspend_depth = 0u;
 static bool number_value_is_immortal(const number_t *number);
 void number_destroy_none(number_t *number);
@@ -705,9 +716,59 @@ static void number_scope_trim_block(number_scope_block_t *block)
         block->used--;
 }
 
+static size_t number_scope_owner_hash(const void *key)
+{
+    const number_scope_record_t *record = key;
+    uintptr_t address = (uintptr_t)record->payload;
+    return (size_t)((address >> 4) ^ (address >> 17) ^ (uintptr_t)record->kind);
+}
+
+static int number_scope_owner_compare(const void *a, const void *b)
+{
+    const number_scope_record_t *left = a, *right = b;
+    if (left->kind != right->kind)
+        return (left->kind > right->kind) - (left->kind < right->kind);
+    uintptr_t first = (uintptr_t)left->payload, second = (uintptr_t)right->payload;
+    return (first > second) - (first < second);
+}
+
+static bool number_scope_owner_get(const number_scope_record_t *key, number_scope_owner_t *owner)
+{
+    const number_scope_owner_t *slot = &number_scope_fast_owners[number_scope_owner_hash(key) &
+                                                               (NUMBER_SCOPE_OWNER_SLOTS - 1)];
+    if (slot->record && !number_scope_owner_compare(key, slot->record)) {
+        *owner = *slot;
+        return true;
+    }
+    return dictionary_get(number_scope_owners, key, owner);
+}
+
+static bool number_scope_owner_set(const number_scope_record_t *key, const number_scope_owner_t *owner)
+{
+    number_scope_owner_t *slot = &number_scope_fast_owners[number_scope_owner_hash(key) &
+                                                         (NUMBER_SCOPE_OWNER_SLOTS - 1)];
+    if (!slot->record) {
+        *slot = *owner;
+        return true;
+    }
+    if (!number_scope_owners)
+        number_scope_owners = dictionary_create(sizeof(number_scope_record_t), sizeof(number_scope_owner_t),
+            number_scope_owner_hash, number_scope_owner_compare, NULL, NULL, NULL, NULL, NULL);
+    return number_scope_owners && dictionary_set(number_scope_owners, key, owner);
+}
+
+static void number_scope_owner_remove(const number_scope_record_t *key)
+{
+    number_scope_owner_t *slot = &number_scope_fast_owners[number_scope_owner_hash(key) &
+                                                         (NUMBER_SCOPE_OWNER_SLOTS - 1)];
+    if (slot->record && !number_scope_owner_compare(key, slot->record))
+        *slot = (number_scope_owner_t){0};
+    else
+        dictionary_remove(number_scope_owners, key);
+}
+
 void number_scope_register_value(const number_t *number)
 {
-    num_scope_t *scope;
     number_scope_state_t *state;
     number_scope_block_t *block;
     number_scope_record_t *record;
@@ -719,24 +780,11 @@ void number_scope_register_value(const number_t *number)
     kind = number_kind_value(number);
     payload = number_scope_payload_pointer(number);
 
-    /* Some conversion paths return an already-scoped payload. Registering it
-     * again would leave a second owner behind after num_scope_detach(). */
-    for (scope = number_scope_current; scope; scope = scope->previous) {
-        number_scope_state_t *existing_state = number_scope_state_get(scope);
-        number_scope_block_t *existing_block = existing_state ? existing_state->records : NULL;
-
-        while (existing_block) {
-            size_t i = existing_block->used;
-
-            while (i-- > 0u) {
-                const number_scope_record_t *existing = &existing_block->records[i];
-
-                if (existing->kind == kind && existing->payload == payload)
-                    return;
-            }
-            existing_block = existing_block->next;
-        }
-    }
+    /* One index covers the active scope chain, so a shallow alias never gains a second owner. */
+    number_scope_record_t key = {.kind = kind, .payload = payload};
+    number_scope_owner_t owner;
+    if (number_scope_owner_get(&key, &owner))
+        return;
 
     state = number_scope_state_ensure(number_scope_current);
     if (!state)
@@ -749,14 +797,20 @@ void number_scope_register_value(const number_t *number)
         block->next = state->records;
         state->records = block;
     }
-    record = &block->records[block->used++];
+    record = &block->records[block->used];
     record->kind = kind;
     record->payload = payload;
+    owner = (number_scope_owner_t){.record = record, .block = block};
+    if (number_scope_owner_set(&key, &owner))
+        ++block->used;
+    else {
+        record->kind = NUMBER_INVALID;
+        record->payload = NULL;
+    }
 }
 
 int number_scope_unregister_value(const number_t *number)
 {
-    num_scope_t *scope;
     number_kind_t kind;
     void *payload;
 
@@ -767,27 +821,14 @@ int number_scope_unregister_value(const number_t *number)
     if (!payload)
         return 0;
 
-    for (scope = number_scope_current; scope; scope = scope->previous) {
-        number_scope_state_t *state = number_scope_state_get(scope);
-        number_scope_block_t *block = state ? state->records : NULL;
-
-        while (block) {
-            size_t i = block->used;
-
-            while (i-- > 0u) {
-                number_scope_record_t *record = &block->records[i];
-
-                if (record->payload == NULL)
-                    continue;
-                if (record->kind == kind && record->payload == payload) {
-                    record->kind = NUMBER_INVALID;
-                    record->payload = NULL;
-                    number_scope_trim_block(block);
-                    return 1;
-                }
-            }
-            block = block->next;
-        }
+    number_scope_record_t key = {.kind = kind, .payload = payload};
+    number_scope_owner_t owner;
+    if (number_scope_owner_get(&key, &owner)) {
+        number_scope_owner_remove(&key);
+        owner.record->kind = NUMBER_INVALID;
+        owner.record->payload = NULL;
+        number_scope_trim_block(owner.block);
+        return 1;
     }
     return 0;
 }
@@ -2787,6 +2828,7 @@ void num_destroy_slow(number_t *number)
     number_impl(number)->kind = NUMBER_INVALID;
 }
 
+/* Enter a temporary scope in the shared ownership index's active scope chain. */
 num_scope_t *num_scope_enter(void)
 {
     num_scope_t *scope = (num_scope_t *)calloc(1, sizeof(*scope));
@@ -2800,6 +2842,7 @@ num_scope_t *num_scope_enter(void)
     return scope;
 }
 
+/* Release remaining payloads once and discard the index when the outermost scope exits. */
 void num_scope_leave(num_scope_t **scope_ptr)
 {
     num_scope_t *scope;
@@ -2822,8 +2865,10 @@ void num_scope_leave(num_scope_t **scope_ptr)
         while (i-- > 0) {
             number_scope_record_t *record = &block->records[i];
 
-            if (record->payload != NULL)
+            if (record->payload != NULL) {
+                number_scope_owner_remove(record);
                 number_scope_destroy_record(record);
+            }
         }
         if (state && state->records == block)
             state->records = next;
@@ -2840,6 +2885,10 @@ void num_scope_leave(num_scope_t **scope_ptr)
     free(state);
 
     number_scope_current = scope->previous;
+    if (!number_scope_current) {
+        dictionary_destroy(number_scope_owners);
+        number_scope_owners = NULL;
+    }
     scope->state = NULL;
     scope->previous = NULL;
     scope->active = 0;

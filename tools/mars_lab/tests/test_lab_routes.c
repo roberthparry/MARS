@@ -468,10 +468,11 @@ static bool route_contracts(const char *directory)
 }
 
 /* Host is deliberately protected by the HTTP module; send hostile headers only through this bounded socket fixture. */
-static bool hostile_request(const char *host, const char *origin)
+static bool hostile_request(const char *host, const char *origin, bool navigation)
 {
     lab_server_t *server = lab_svr_new(NULL, 0, 5000);
     string_t *wire =
+        navigation ? string_sprintf("GET / HTTP/1.1\r\nHost: %s\r\nAccept: text/html\r\nConnection: close\r\n\r\n", host) :
         origin ? string_sprintf("POST /eval HTTP/1.1\r\nHost: %s\r\nOrigin: %s\r\nContent-Type: application/json\r\n"
                                 "Content-Length: 2\r\nConnection: close\r\n\r\n{}",
                                 host, origin)
@@ -538,7 +539,8 @@ static bool hostile_request(const char *host, const char *origin)
                        : NULL;
     ok = ok && eof && child > 0 && waited == child && WIFEXITED(status) && !WEXITSTATUS(status) &&
          string_starts_with(reply, "HTTP/1.1 403 ") &&
-         string_find(reply, "content-type: application/x-protobuf\r\n") >= 0 &&
+         string_find(reply, navigation ? "content-type: text/plain; charset=utf-8\r\n" :
+                                        "content-type: application/x-protobuf\r\n") >= 0 &&
          string_find(reply, "cache-control: no-store\r\n") >= 0 &&
          string_find(reply, "x-content-type-options: nosniff\r\n") >= 0;
     if (!ok)
@@ -575,7 +577,7 @@ static bool route_rejections(const char *directory)
     bool ok = true;
     for (size_t i = 0; i < sizeof(cases) / sizeof(*cases); ++i) {
         if (cases[i].host) {
-            ok = hostile_request(cases[i].host, cases[i].origin) && ok;
+            ok = hostile_request(cases[i].host, cases[i].origin, false) && ok;
             continue;
         }
         http_response_t *response =
@@ -591,7 +593,7 @@ static bool route_rejections(const char *directory)
         json_free(result);
         http_response_free(response);
     }
-    return ok;
+    return hostile_request("example.invalid", NULL, true) && ok;
 }
 
 static void test_lab_http_contracts(void)

@@ -22,7 +22,7 @@ typedef struct _lab_plot_prepared_t {
     expr_t *curves[16]; /**< Owned expressions for the first count entries. */
     string_t *labels[16]; /**< Owned labels for the first count entries. */
     size_t count; /**< Number of populated curve and label entries, from one to sixteen. */
-    bool family; /**< True when curves are representative solution-family members. */
+    bool family; /**< ODE mode: representative curves. Equation mode: affine integer families with parameter labels. */
 } lab_plot_prepared_t;
 
 /**
@@ -44,7 +44,7 @@ lab_plot_prepared_t *lab_worker_plot_prepared_read(int argc, char **argv);
  * @param[in] curves Borrowed array of @p count native expressions, serialised without changing their bindings.
  * @param[in] labels Optional borrowed array of @p count labels; NULL emits empty labels.
  * @param count Number of curves, from one to sixteen.
- * @param family Whether the curves are representative members of a solution family.
+ * @param family ODE mode: representative solution curves. Equation mode: integer-family graphs with parameter labels.
  * @param[in] numeric Optional borrowed labelled numerical-result records, copied without recalculation or rounding.
  * @param[in] roots Optional borrowed array of @p root_count finite numerical roots for a complex-plane diagram.
  * @param root_count Number of roots, at most 256; zero retains ordinary curve plotting.
@@ -64,7 +64,7 @@ void lab_worker_plot_prepared_emit(const char *const keys[4], const char *title,
  * @param[in] curves Borrowed array of @p count native expressions.
  * @param[in] labels Optional borrowed array of @p count labels.
  * @param count Number of curves, from one to sixteen.
- * @param family Whether the curves represent a solution family.
+ * @param family ODE mode: representative solution curves. Equation mode: integer-family graphs with parameter labels.
  * @param[in] numeric Optional borrowed labelled numerical results to retain unchanged.
  * @param[in] roots Optional borrowed array of @p root_count finite numerical roots; no ownership transfers.
  * @param root_count Number of roots, at most 256; zero retains ordinary curve plotting.

@@ -61,7 +61,7 @@ static bool lab_worker_control_run(void *argument)
     return call->result == 0;
 }
 
-/* Enter once, before listener startup, and preserve the first observed stopping reason. */
+/* Enter once per job and preserve the first observed stopping reason. */
 int lab_worker_dispatch_controlled(int argc, char **argv)
 {
     computation_options_t options = {.cancelled = lab_worker_cancel_poll};

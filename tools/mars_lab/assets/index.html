@@ -234,11 +234,13 @@ __HOLIDAY_JURISDICTION_OPTIONS__
           <div class="almanac-globe-toolbar">
             <strong>Observer globe</strong>
             <span class="workspace-history" id="almanacGlobeHistory"></span>
-            <button type="button" class="secondary" data-globe-action="grid" aria-label="Latitude and longitude lines" aria-pressed="false">Lat/long: off</button>
-            <button type="button" class="secondary" data-globe-action="borders" aria-label="Indicative country land borders" aria-pressed="false">Borders: off</button>
-            <button type="button" class="secondary" data-globe-action="out" aria-label="Zoom globe out">−</button>
-            <button type="button" class="secondary" data-globe-action="in" aria-label="Zoom globe in">+</button>
-            <button type="button" class="secondary" data-globe-action="centre">Centre on observer</button>
+            <div class="almanac-globe-view-controls">
+              <button type="button" class="secondary" data-globe-action="grid" aria-label="Latitude and longitude lines" aria-pressed="false">Lat/long: off</button>
+              <button type="button" class="secondary" data-globe-action="borders" aria-label="Indicative country land borders" aria-pressed="false">Borders: off</button>
+              <button type="button" class="secondary" data-globe-action="out" aria-label="Zoom globe out">−</button>
+              <button type="button" class="secondary" data-globe-action="in" aria-label="Zoom globe in">+</button>
+              <button type="button" class="secondary" data-globe-action="centre">Centre on observer</button>
+            </div>
           </div>
           <div class="almanac-globe-view">
             <canvas id="almanacGlobeCanvas" tabindex="0" aria-label="Globe: drag or use arrow keys to rotate; plus and minus to zoom; click or press Enter to select"></canvas>
@@ -335,6 +337,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
           <span class="workspace-history" id="workspaceHistoryHome">
             <button class="secondary" id="back">Back</button>
             <button class="secondary" id="forward">Forward</button>
+            <button class="secondary" id="historyEdit" type="button" aria-haspopup="dialog" aria-controls="historyEditor">History</button>
           </span>
           <button class="secondary" id="help" aria-controls="helpPane" aria-expanded="false">Help</button>
           <button class="secondary" id="goalSeek">Goal seek</button>
@@ -513,7 +516,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         <div class="help-card" data-help-modes="expression,equation,diffequation,matrix,integrator,datetime,almanac">
           <h3>Your Worksheet And Cards</h3>
           <ul>
-            <li><code>Back</code> and <code>Forward</code> navigate the current mode's worksheet history. Switching modes does not discard your other worksheets; edits and controls are saved between sessions.</li>
+            <li><code>Back</code> and <code>Forward</code> navigate the current mode's worksheet history. New evaluations are inserted after the current entry, preserving later entries. <code>History</code> opens the list to visit, move or remove entries. Switching modes does not discard your other worksheets; edits and controls are saved between sessions.</li>
             <li><code>Copy</code> on the editor copies its input; each result card has its own copy action. Mathematical display can differ from reusable source notation.</li>
             <li>Use a card's zoom controls where available, or <code>Expand</code> for a long result. Expanding a shortened mathematical result reveals its full source; copying does not truncate it.</li>
             <li>Hold Ctrl and use the mouse wheel over a plot to zoom, or use the −/+ buttons. For 2-D plots this changes coordinate ranges and requests fresh samples; Reset restores the pre-zoom ranges. For explicit 3-D surfaces in Auto height, wheel, pinch and the Zoom slider change the horizontal region while native sampling refits its height after you pause or release. Manual height, Fit all and implicit surfaces instead scale all three coordinate spans equally about the volume centre. Equal coordinate units and fitting inside the chart are preserved in both cases. Reset restores the original ranges. Hovering over a curve shows coordinate guides and a marker.</li>
@@ -541,6 +544,10 @@ __HOLIDAY_JURISDICTION_OPTIONS__
             <li><code>Value</code> is separate: it appears when a numerical answer exists. Simplification can make a value independent of an unset symbol; for example, <code>sin(x)^2 + cos(x)^2</code> has value <code>1</code>.</li>
             <li>Entering binding values normally changes Value, not the symbolic algebra in the other cards. For integral transforms, supplied constant parameters are specialised consistently and any remaining domain conditions are retained.</li>
           </ul>
+        </div>
+        <div class="help-card" data-help-modes="expression,equation,diffequation,matrix,integrator">
+          <h3>Clausen Functions</h3>
+          <p><code>clausen(x)</code> and <code>clausen2(x)</code> are aliases: both mean the order-two function Cl₂(x), as does <code>Cl(2,x)</code>. Use <code>Cl(n,x)</code> or <code>cl(n,x)</code> to choose a positive integer order; <code>Cl(3,x)</code> is the distinct order-three function. Angles are in radians.</p>
         </div>
         <div class="help-card" data-help-modes="expression">
           <h3>Plotting A Function</h3>
@@ -981,6 +988,17 @@ __HOLIDAY_JURISDICTION_OPTIONS__
     </section>
   </main>
 
+  <dialog class="history-editor" id="historyEditor" aria-labelledby="historyEditorTitle">
+    <div class="history-editor-heading">
+      <h2 id="historyEditorTitle">Worksheet history</h2>
+      <button class="secondary" id="historyEditorClose" type="button">Close</button>
+    </div>
+    <p>Select a worksheet to open it. “Current” marks the worksheet you are viewing.
+      Use Earlier and Later to reorder entries, or Remove to delete one. Changes are saved automatically.
+      New evaluations are inserted after the current entry; later entries are kept.</p>
+    <p id="historyEditorStatus" role="status"></p>
+    <ol id="historyEditorEntries"></ol>
+  </dialog>
   <script defer src="/js/app.js"></script>
 </body>
 </html>

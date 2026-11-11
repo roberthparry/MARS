@@ -10,6 +10,7 @@
 
 #include "lab_forms.h"
 #include "test_harness.h"
+#include "test_database.h"
 #include "test_lab_support.h"
 
 static json_t *lab_forms_test_request(const char *literal, unsigned *status)
@@ -67,6 +68,27 @@ static void test_lab_forms_integrator_references(void)
          lab_forms_test_flag(json_array_get(test_lab_member(result, "rows"), 0), "referenced", true);
     json_free(result);
     TEST_ASSERT_TRUE(ok, "native references ignore unused binding declarations and retain rows during incomplete edits");
+}
+
+static void lab_forms_budget_row(const void *argument)
+{
+    const test_database_case_t *row = argument;
+    unsigned status = 0;
+    json_t *result = lab_forms_test_request(string_c_str(row->input), &status);
+    bool valid = !strcmp(string_c_str(row->expected), "true");
+    bool ok = status == 200 && test_lab_ok(result, true) &&
+              lab_forms_test_flag(result, "references_valid", valid);
+    const json_t *rows = test_lab_member(result, "rows");
+    if (!valid)
+        for (size_t i = 0; i < json_array_size(rows); ++i)
+            ok = ok && lab_forms_test_flag(json_array_get(rows, i), "referenced", true);
+    json_free(result);
+    TEST_ASSERT_TRUE(ok, "expensive mathematics cannot block form metadata or remove unconfirmed rows");
+}
+
+static void test_lab_forms_calculation_budget(void)
+{
+    test_run_database_cases(__FILE__, __LINE__, "mars_lab.form_budget", NULL, lab_forms_budget_row);
 }
 
 static void test_lab_forms_integrator_structured(void)
@@ -207,6 +229,7 @@ void test_lab_forms_cases(void)
 {
     TEST_RUN_IN_GROUP(test_lab_forms_integrator_text, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_forms_integrator_references, tests, NULL);
+    TEST_RUN_IN_GROUP(test_lab_forms_calculation_budget, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_forms_integrator_structured, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_forms_time, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_forms_town, tests, NULL);

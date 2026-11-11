@@ -597,8 +597,13 @@ test-db-sync-if-needed: $(CHECKS_BIN)
 	@"$(CHECKS_BIN)" test-db sync-if-needed
 
 .PHONY: bench-db
+ifneq ($(filter help,$(MAKECMDGOALS)),)
+bench-db:
+	@:
+else
 bench-db: $(CHECKS_BIN)
 	@"$(CHECKS_BIN)" bench-db $(if $(strip $(ARGS)),$(ARGS),status)
+endif
 
 test: check-public-distribution $(TEST_BINS)
 	@rc=0; "$(CHECKS_BIN)" source-policy || rc=1; for t in $(TEST_BINS); do \
@@ -863,6 +868,32 @@ uninstall-to-be-announced-lab:
 # ------------------------------------------------------------
 # Help
 # ------------------------------------------------------------
+define BENCH_DB_HELP
+@printf '\n%s\n' "Benchmark database — make bench-db ARGS='COMMAND OPTIONS'"
+@printf '  %-30s %s\n' "run" "Measure functions sequentially; create a machine-specific saved run"
+@printf '  %-30s %s\n' "stats" "Display the latest run; pipe to less -R to retain colours"
+@printf '  %-30s %s\n' "sync / status" "Synchronise definitions / list saved runs"
+@printf '  %-30s %s\n' "report [RUN] / update-docs [RUN]" "Print Markdown / refresh marked documentation tables"
+@printf '  %-30s %s\n' "retention / prune" "Show or change retention limits / apply saved limits"
+@echo "  run and stats: --operation NAME, --backend NAME, --bits N."
+@echo "    Backends: number-double, qfloat, qcomplex, mpfr, mpc, exact-integer."
+@echo "    Precision profiles: 53 (double), 106 (qfloat/qcomplex), 256/512/768/1024/2048/4096 (mpfr/mpc)."
+@echo "  run: --samples N (3..101, default 7), --timeout SECONDS (1..300, default 15), --resume RUN, --verbose."
+@echo "  stats: --run RUN, --summary (default), --details, --format=grid|markdown|tsv."
+@echo "    Unsupported cases are hidden; --include-skipped includes them in any output format."
+@echo "  retention: --max-mib N (1..4096, default 32), --keep-runs N (1..1000, default 20)."
+@echo "    --max-days N (1..3650, default 90), --raw-runs N (0..keep-runs, default 5)."
+@echo "  Storage: bench/benchmarks.db; created only by explicit benchmark commands and preserved by make clean."
+@echo "  Measure one function: make bench-db ARGS='run --operation zeta'"
+@echo "  Inspect one function: make bench-db ARGS='stats --operation zeta' | less -R"
+@echo "  Narrow a saved run: make bench-db ARGS='stats --run 12 --operation zeta --backend mpc --bits 4096' | less -R"
+@echo "  Complete reference: make bench-db ARGS='help'; focused help without a build: make help bench-db."
+endef
+
+ifneq ($(filter bench-db,$(MAKECMDGOALS)),)
+help:
+	$(BENCH_DB_HELP)
+else
 help:
 	@printf '\n%s\n' "Build and cleanup"
 	@printf '  %-40s %s\n' "make debug" "Build debug binaries and tests"
@@ -919,9 +950,7 @@ help:
 	@printf '  %-40s %s\n' "make memtest" "Run all tests under valgrind"
 	@printf '  %-40s %s\n' "make memtest_<name>" "Build and run a single test under valgrind"
 	@printf '  %-40s %s\n' "make bench_<name>" "Build and run a benchmark (e.g. make bench_integrator)"
-	@printf '  %-40s %s\n' "make bench-db ARGS='run'" "Run persistent mathematical benchmarks sequentially"
-	@printf '  %-40s %s\n' "make bench-db ARGS='stats' | less -R" "Browse coloured benchmark timings and comparisons"
-	@printf '  %-40s %s\n' "make bench-db ARGS='help'" "Benchmark filters, run history and Markdown table refresh"
+	$(BENCH_DB_HELP)
 	@printf '\n%s\n' "Dependencies"
 	@printf '  %-40s %s\n' "make check-deps" "Check development libraries and native TypeScript compilers"
 	@printf '  %-40s %s\n' "make check-native-deps" "Check development libraries without browser build tools"
@@ -949,6 +978,7 @@ help:
 	@printf '  %-40s %s\n' "make uninstall-to-be-announced-lab" "Remove the user desktop launcher for To-Be-Announced Lab"
 	@echo ""
 	@echo "Builds and tests default to release; add DEBUG=1 for debug (e.g. make DEBUG=1 test_expression)."
+endif
 
 # ------------------------------------------------------------
 # Clean

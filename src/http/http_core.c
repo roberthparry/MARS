@@ -84,6 +84,7 @@ void http_client_free(http_client_t *client)
     array_destroy(client->certificate);
     http_secret_free(client->private_key);
     string_free(client->key_password);
+    string_free(client->unix_socket);
     string_free(client->message);
     free(client);
     http_global_release();
@@ -101,6 +102,28 @@ bool http_client_set_limits(http_client_t *client, const http_limits_t *limits)
     if (!client->limits.max_body_bytes) client->limits.max_body_bytes = 16u * 1024u * 1024u;
     if (!client->limits.max_header_bytes) client->limits.max_header_bytes = 64u * 1024u;
     if (!client->limits.max_upload_bytes) client->limits.max_upload_bytes = 16u * 1024u * 1024u;
+    return true;
+}
+
+/* Change the transport atomically, without reusing a connection to the previous socket. */
+bool http_client_set_unix_socket(http_client_t *client, const string_t *path)
+{
+    if (!client || client->active || (path && (!string_byte_length(path) || string_byte_length(path) > 4096 ||
+        string_c_str(path)[0] != '/' || strlen(string_c_str(path)) != string_byte_length(path))))
+        return false;
+    const curl_version_info_data *version = curl_version_info(CURLVERSION_NOW);
+    if (path && (!version || !(version->features & CURL_VERSION_UNIX_SOCKETS)))
+        return false;
+    string_t *copy = path ? string_clone(path) : NULL;
+    CURL *fresh = !path || copy ? curl_easy_init() : NULL;
+    if (!fresh) {
+        string_free(copy);
+        return false;
+    }
+    curl_easy_cleanup(client->easy);
+    string_free(client->unix_socket);
+    client->easy = fresh;
+    client->unix_socket = copy;
     return true;
 }
 

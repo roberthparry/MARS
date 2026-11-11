@@ -1385,8 +1385,17 @@ expr_t *deriv_ceil(expr_t *expr)
 
 expr_t *deriv_not_differentiable(expr_t *expr)
 {
-    (void)expr;
-    return expr_new_const(NUM_NAN);
+    expr_t *left = expr && expr->a ? expr_get_dx_internal(expr->a) : NULL;
+    expr_t *right = expr && expr->b ? expr_get_dx_internal(expr->b) : NULL;
+    expr_t *a = left ? expr_simplify(left) : NULL;
+    expr_t *b = right ? expr_simplify(right) : NULL;
+    bool independent = a && expr_is_const(a) && num_is_zero(a->c) &&
+                       (!expr->b || (b && expr_is_const(b) && num_is_zero(b->c)));
+    expr_free(b);
+    expr_free(a);
+    expr_free(right);
+    expr_free(left);
+    return expr_new_const(independent ? NUM_ZERO : NUM_NAN);
 }
 
 expr_t *deriv_asin(expr_t *expr)

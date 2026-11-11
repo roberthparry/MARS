@@ -24,6 +24,7 @@
 #include "sqlite-t.h"
 #include "string-t.h"
 #include "mars_settings.h"
+#include "lab_process.h"
 
 #include "test_lab_support.h"
 
@@ -204,6 +205,7 @@ bool test_lab_isolated(bool (*callback)(const char *directory))
     if (!root)
         return false;
     const char *directory = file_path(root);
+    fflush(NULL);
     pid_t child = fork();
     if (!child) {
         char *working_directory = getcwd(NULL, 0);
@@ -218,8 +220,10 @@ bool test_lab_isolated(bool (*callback)(const char *directory))
         string_free(asset);
         free(working_directory);
         bool passed = ready && callback(directory);
+        lab_proc_workers_stop();
         /* Release this process's inherited handle; only the parent removes the directory. */
         file_free(root);
+        fflush(NULL);
         _exit(passed ? 0 : 1);
     }
     int status = 0;

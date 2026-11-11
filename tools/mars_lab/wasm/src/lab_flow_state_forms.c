@@ -71,11 +71,11 @@ static jsref lab_flow_state_forms_payload(frame_jsref frame, jsref rows, jsref e
 }
 
 /**
- * @brief Discard forward history during worksheet clearing.
- * @param frame Borrowed clear-workflow frame advanced past history removal to stage 6.
- * @return Scoped plan calling the forward-history clear service.
+ * @brief Clear the worksheet projection while retaining both sides of its history.
+ * @param frame Borrowed clear-workflow frame advanced to the reset operation.
+ * @return Scoped projection-reset plan, with no history removal.
  */
-static jsref lab_flow_state_clear_state_clear_forward(frame_jsref frame);
+static jsref lab_flow_state_clear_begin_projection(frame_jsref frame);
 
 /**
  * @brief Capture the cleared worksheet under the owning request.
@@ -110,12 +110,12 @@ static jsref lab_flow_state_clear_push_history(frame_jsref frame)
     if (lab_dom_truth(lab_dom_get(lab_dom_get(frame, "history"), "text")))
         return lab_flow_call(frame, 5, "pushHistory", 0, 0, 1, lab_dom_get(frame, "history"));
     /* Continue for an empty worksheet. */
-    return lab_flow_state_clear_state_clear_forward(frame);
+    return lab_flow_state_clear_begin_projection(frame);
 }
 
-static jsref lab_flow_state_clear_state_clear_forward(frame_jsref frame)
+static jsref lab_flow_state_clear_begin_projection(frame_jsref frame)
 {
-    return lab_flow_state_forms_next(frame, 6, "stateClearForward");
+    return lab_flow_call(frame, 7, "stateClearProjection", "reset", 0, 0);
 }
 
 static jsref lab_flow_state_clear_state_clear_projection(frame_jsref frame)
@@ -197,7 +197,7 @@ static jsref lab_flow_state_clear(frame_jsref frame)
         [2]  = lab_flow_state_clear_complete,
         [3]  = lab_flow_state_clear_state_current_history,
         [4]  = lab_flow_state_clear_push_history,
-        [5]  = lab_flow_state_clear_state_clear_forward,
+        [5]  = lab_flow_state_clear_begin_projection,
         [6]  = lab_flow_state_clear_state_clear_projection,
         [7]  = lab_flow_state_clear_state_blank_bounds,
         [8]  = lab_flow_state_clear_state_capture_request,

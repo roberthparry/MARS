@@ -351,6 +351,40 @@ static void test_lab_equation_solution_pages(void)
                      "limited zeta cards retain worksheet precision and continue without repeating earlier pages");
 }
 
+/* A retained protocol tag distinguishes prepared-family replay from a fresh symbolic solve. */
+static bool tag_integer_preparation(const char *const *arguments)
+{
+    string_t *path = lab_proc_worker_path("mars_lab");
+    string_t *key = path ? lab_proc_plot_key(arguments, NULL, path, true) : NULL;
+    string_t *prepared = key ? lab_proc_plot_cache_get(key, true) : NULL;
+    json_t *record = prepared ? json_from_text(prepared) : NULL;
+    const string_t *kind = json_string_value(json_array_get(record, 6));
+    const json_t *results = json_array_get(record, 7);
+    const string_t *numeric = json_string_value(json_array_get(results, 0));
+    string_t *marked_text = numeric ? string_sprintf("%Splot_integer_fixture retained\n", numeric) : NULL;
+    json_t *marked_value = marked_text ? json_new_string(marked_text) : NULL;
+    json_t *marked_results = json_new_array(), *marked = json_new_array();
+    bool ok = kind && !strcmp(string_c_str(kind), "1") && marked_value && marked_results && marked &&
+              json_array_append(marked_results, marked_value) &&
+              json_array_append(marked_results, json_array_get(results, 1));
+    for (size_t i = 0; ok && i < json_array_size(record); ++i)
+        ok = json_array_append(marked, i == 7 ? marked_results : json_array_get(record, i));
+    string_t *text = ok ? json_to_string(marked) : NULL;
+    if (text)
+        lab_proc_plot_cache_put(key, text, true);
+    ok = ok && text;
+    string_free(text);
+    json_free(marked);
+    json_free(marked_results);
+    json_free(marked_value);
+    string_free(marked_text);
+    json_free(record);
+    string_free(prepared);
+    string_free(key);
+    string_free(path);
+    return ok;
+}
+
 static bool complex_solution_checks(const char *directory)
 {
     (void)directory;
@@ -359,9 +393,9 @@ static bool complex_solution_checks(const char *directory)
     unsetenv("MARS_LAB_PLOT_CACHE");
     unsetenv("MARS_LAB_WORK_LIMIT");
     lab_proc_plot_cache_init();
-    const char *sources[] = {"z^2+1=0", "(z^2+1)*(z^2-1)=0", "z^2=4"};
-    const size_t counts[] = {2, 4, 0};
-    for (size_t i = 0; i < 3; ++i) {
+    const char *sources[] = {"z^2+1=0", "(z^2+1)*(z^2-1)=0", "z^2=4", "i^z=2"};
+    const size_t counts[] = {2, 4, 0, 11};
+    for (size_t i = 0; i < sizeof sources / sizeof *sources; ++i) {
         const char *equation[] = {"equation_lab", sources[i], "78", NULL};
         const char *plot[] = {"mars_lab", sources[i], "z", "78", "plot", "", "", "auto", "", "",
                               "curve", "", "", "", "315", "30", "0", "full", "equation", NULL};
@@ -374,17 +408,30 @@ static bool complex_solution_checks(const char *directory)
             ok = ok && drawn && strstr(string_c_str(drawn), "data-root-plane=\"true\"") &&
                  occurrences(drawn, "<circle ") == counts[i] &&
                  strstr(string_c_str(drawn), "Re(z)") && strstr(string_c_str(drawn), "Im(z)");
+            if (i == 3)
+                ok = ok && tag_integer_preparation(plot);
             /* The same verified points are clipped to a new viewport; no lines or fabricated samples appear. */
             plot[5] = "-0.5";
             plot[6] = "0.5";
             plot[7] = "manual";
-            plot[8] = "0.5";
-            plot[9] = "1.5";
+            plot[8] = i == 3 ? "-1" : "0.5";
+            plot[9] = i == 3 ? "0" : "1.5";
             string_t *zoomed = run(plot, 30000, NULL);
             ok = ok && zoomed && occurrences(zoomed, "<circle ") == 1 &&
                  strstr(string_c_str(zoomed), "data-x-min=\"-0.5\"") &&
-                 strstr(string_c_str(zoomed), "data-y-min=\"0.5\"");
+                 strstr(string_c_str(zoomed), i == 3 ? "data-y-min=\"-1\"" : "data-y-min=\"0.5\"");
+            if (i == 3)
+                ok = ok && zoomed && strstr(string_c_str(zoomed), "plot_integer_fixture retained\n");
             string_free(zoomed);
+            if (i == 3) {
+                plot[5] = "36";
+                plot[6] = "44";
+                string_t *distant = run(plot, 30000, NULL);
+                ok = ok && distant && occurrences(distant, "<circle ") == 3 &&
+                     strstr(string_c_str(distant), "n = 9;") && strstr(string_c_str(distant), "n = 11;") &&
+                     strstr(string_c_str(distant), "plot_integer_fixture retained\n");
+                string_free(distant);
+            }
             /* A standalone uncached plot follows the same native root path. */
             plot[5] = plot[6] = plot[8] = plot[9] = "";
             plot[7] = "auto";

@@ -11,6 +11,7 @@
 #include <ctype.h>
 #include <math.h>
 
+#include "computation-t.h"
 #include "expression-t.h"
 #include "number-t.h"
 #include "string-t.h"
@@ -306,14 +307,43 @@ static string_t *lab_forms_expression_body(const string_t *source)
     return body;
 }
 
+/** @brief Temporary native parse outputs owned by one form-reference inspection. */
+typedef struct {
+    const string_t *source;
+    expr_t *expression;
+    expr_bindings_t *bindings;
+} lab_forms_reference_t;
+
+static bool lab_forms_parse_references(void *argument)
+{
+    lab_forms_reference_t *references = argument;
+    references->expression = expr_from_text(references->source, &references->bindings);
+    return references->expression != NULL;
+}
+
+/* Metadata may conservatively retain rows; it must never wait for an expensive calculation. */
+static bool lab_forms_references(lab_forms_reference_t *references)
+{
+    if (!references->source)
+        return false;
+    if (!string_byte_length(references->source))
+        return true;
+    computation_t *inherited = computation_current();
+    computation_options_t options = {.work_limit = 4096, .timeout_ms = 25};
+    computation_t *control = inherited ? inherited : computation_new(&options);
+    bool ok = control && computation_run(control, lab_forms_parse_references, references);
+    if (!inherited)
+        computation_free(control);
+    return ok;
+}
+
 static bool lab_forms_integrator(const json_t *payload, json_t *result, size_t *budget)
 {
     json_t *rows = lab_forms_rows(payload, budget);
     string_t *expression = lab_forms_text(payload, "expression", "", budget);
     string_t *body = expression ? lab_forms_expression_body(expression) : NULL;
-    expr_bindings_t *bindings = NULL;
-    expr_t *parsed = body && string_byte_length(body) ? expr_from_text(body, &bindings) : NULL;
-    bool valid = body && (!string_byte_length(body) || parsed);
+    lab_forms_reference_t references = {.source = body};
+    bool valid = lab_forms_references(&references);
     string_t *text = string_new();
     bool ok = rows && expression && text;
     for (size_t i = 0; ok && i < json_array_size(rows); ++i) {
@@ -322,7 +352,7 @@ static bool lab_forms_integrator(const json_t *payload, json_t *result, size_t *
         const string_t *lower = json_string_value(lab_forms_get(row, "lo"));
         const string_t *upper = json_string_value(lab_forms_get(row, "hi"));
         bool free_row = lab_forms_equal(json_string_value(lab_forms_get(row, "kind")), "free");
-        bool referenced = !valid || (bindings && expr_bindings_get_text(bindings, name));
+        bool referenced = !valid || (references.bindings && expr_bindings_get_text(references.bindings, name));
         string_t *line = free_row ? string_sprintf("free %S", name) :
                          string_byte_length(upper) ? (string_byte_length(lower) ?
                          string_sprintf("%S = %S .. %S", name, lower, upper) : string_sprintf("%S = %S", name, upper)) :
@@ -335,8 +365,8 @@ static bool lab_forms_integrator(const json_t *payload, json_t *result, size_t *
     ok = ok && lab_forms_put(result, "text", json_new_string(text)) &&
          lab_forms_put(result, "references_valid", json_new_bool(valid));
     bool attached = lab_forms_put(result, "rows", rows);
-    expr_free(parsed);
-    expr_bindings_free(bindings);
+    expr_free(references.expression);
+    expr_bindings_free(references.bindings);
     string_free(body);
     string_free(expression);
     string_free(text);

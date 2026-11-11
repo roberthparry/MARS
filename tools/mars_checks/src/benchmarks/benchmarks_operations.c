@@ -352,6 +352,30 @@ static number_t benchmark_n_gcdext(number_t a, number_t b)
     return num_create_from_double(NAN);
 }
 
+/* A dense 1,024-bit dividend; its GCD with the 512-bit divisor is 2 * (2^127 - 1). */
+static const char benchmark_integer_wide[] =
+    "9712853409152031141207811585727780469484705121206232579607434236969009533618825972019189714991570566"
+    "4060543226969142780725822337496727884659619483452400511633617514882293623272276764857474830401626415"
+    "8410359714586574421333707776078034640711011583851241862299950730454274489182279598930822829198639823"
+    "07657776";
+
+/* A dense 512-bit operand, also used as the modular exponent. */
+static const char benchmark_integer_divisor[] =
+    "1249884604836704592637071660260998283972164142922295912537646258267486940344399697264862869904768683"
+    "9582654905384579341977328653591547736951147466435189662";
+
+/* The 521-bit Mersenne prime 2^521 - 1. */
+static const char benchmark_integer_prime[] =
+    "6864797660130609714981900799081393217269435300143305409394463459185543183397656052122559640661454554"
+    "977296311391480858037121987999716643812574028291115057151";
+
+/* The 1,215-bit smooth composite 2^512 * 3^256 * 5^128; factorisation remains bounded. */
+static const char benchmark_integer_smooth[] =
+    "5477211901915463633986786204116344879097448413145986152068732780920991433983601252275954799541486775"
+    "7111260059673826001181827972337081337753357883356580370650813156906229997603304130218983321574299265"
+    "3063887339218309467131548996199881113600000000000000000000000000000000000000000000000000000000000000"
+    "000000000000000000000000000000000000000000000000000000000000000000";
+
 static const benchmark_operation_t operations[] = {
     {"E1", 1,
      {.n1 = num_E1},
@@ -493,16 +517,16 @@ static const benchmark_operation_t operations[] = {
      {.r2 = qf_binomial}, {.c2 = qc_binomial},
      {"5", "2"}, 3, false},
     {"bit_and", 2,
-     {.n2 = num_bit_and}, {0}, {0}, {"17", "5"}, 0, true},
+     {.n2 = num_bit_and}, {0}, {0}, {benchmark_integer_wide, benchmark_integer_divisor}, 0, true},
     {"bit_length", 1,
      {.n1 = benchmark_n_bit_length}, {0}, {0},
-     {"17"}, 0, true},
+     {benchmark_integer_wide}, 0, true},
     {"bit_not", 1,
-     {.n1 = num_bit_not}, {0}, {0}, {"17"}, 0, true},
+     {.n1 = num_bit_not}, {0}, {0}, {benchmark_integer_wide}, 0, true},
     {"bit_or", 2,
-     {.n2 = num_bit_or}, {0}, {0}, {"17", "5"}, 0, true},
+     {.n2 = num_bit_or}, {0}, {0}, {benchmark_integer_wide, benchmark_integer_divisor}, 0, true},
     {"bit_xor", 2,
-     {.n2 = num_bit_xor}, {0}, {0}, {"17", "5"}, 0, true},
+     {.n2 = num_bit_xor}, {0}, {0}, {benchmark_integer_wide, benchmark_integer_divisor}, 0, true},
     {"ceil", 1,
      {.n1 = num_ceil}, {0}, {0}, {"0.7"}, 1, false},
     {"chebyshev_t", 2,
@@ -527,7 +551,7 @@ static const benchmark_operation_t operations[] = {
      {"0.7"}, 1, false},
     {"clear_bit", 2,
      {.n2 = benchmark_n_clear_bit}, {0}, {0},
-     {"17", "3"}, 0, true},
+     {benchmark_integer_wide, "701"}, 0, true},
     {"conj", 1,
      {.n1 = num_conj}, {0}, {.c1 = qc_conj}, {"0.7"}, 1, false},
     {"cos", 1,
@@ -580,7 +604,7 @@ static const benchmark_operation_t operations[] = {
      {"0.7", "0.7"}, 3, false},
     {"divmod", 2,
      {.n2 = benchmark_n_divmod}, {0}, {0},
-     {"17", "5"}, 0, true},
+     {benchmark_integer_wide, benchmark_integer_divisor}, 0, true},
     {"erf", 1,
      {.n1 = num_erf},
      {.r1 = qf_erf}, {.c1 = qc_erf},
@@ -602,12 +626,12 @@ static const benchmark_operation_t operations[] = {
      {.r1 = qf_exp}, {.c1 = qc_exp},
      {"1.23456789"}, 1, false},
     {"factorial", 1,
-     {.n1 = benchmark_n_factorial}, {0}, {0}, {"17"}, 0, true},
+     {.n1 = benchmark_n_factorial}, {0}, {0}, {"5000"}, 0, true},
     {"factors", 1,
      {.n1 = benchmark_n_factors}, {0}, {0},
-     {"17"}, 0, true},
+     {benchmark_integer_smooth}, 0, true},
     {"fibonacci", 1,
-     {.n1 = benchmark_n_fibonacci}, {0}, {0}, {"17"}, 0, true},
+     {.n1 = benchmark_n_fibonacci}, {0}, {0}, {"10000"}, 0, true},
     {"floor", 1,
      {.n1 = num_floor},
      {.r1 = qf_floor}, {.c1 = qc_floor},
@@ -637,10 +661,10 @@ static const benchmark_operation_t operations[] = {
      {.r1 = qf_gammainv}, {.c1 = qc_gammainv},
      {"9.5"}, 1, false},
     {"gcd", 2,
-     {.n2 = num_gcd}, {0}, {0}, {"17", "5"}, 0, true},
+     {.n2 = num_gcd}, {0}, {0}, {benchmark_integer_wide, benchmark_integer_divisor}, 0, true},
     {"gcdext", 2,
      {.n2 = benchmark_n_gcdext}, {0}, {0},
-     {"17", "5"}, 0, true},
+     {benchmark_integer_wide, benchmark_integer_divisor}, 0, true},
     {"hacovercos", 1,
      {.n1 = num_hacovercos},
      {.r1 = qf_hacovercos}, {.c1 = qc_hacovercos},
@@ -679,9 +703,9 @@ static const benchmark_operation_t operations[] = {
      {.n1 = num_inv}, {0}, {.c1 = benchmark_c_inv}, {"0.7"}, 1, false},
     {"is_prime", 1,
      {.n1 = benchmark_n_is_prime}, {0}, {0},
-     {"17"}, 0, true},
+     {benchmark_integer_prime}, 0, true},
     {"isqrt", 1,
-     {.n1 = num_isqrt}, {0}, {0}, {"17"}, 0, true},
+     {.n1 = num_isqrt}, {0}, {0}, {benchmark_integer_wide}, 0, true},
     {"lambert_w0", 1,
      {.n1 = num_lambert_w0},
      {.r1 = qf_lambert_w0}, {.c1 = qc_productlog},
@@ -697,7 +721,7 @@ static const benchmark_operation_t operations[] = {
      {.r3 = benchmark_r_lauricella_f}, {.c3 = benchmark_c_lauricella_f},
      {"0.5", "0.3", "2.5"}, 7, false},
     {"lcm", 2,
-     {.n2 = num_lcm}, {0}, {0}, {"17", "5"}, 0, true},
+     {.n2 = num_lcm}, {0}, {0}, {benchmark_integer_wide, benchmark_integer_divisor}, 0, true},
     {"ldexp", 2,
      {.n2 = benchmark_n_ldexp},
      {.r2 = benchmark_r_ldexp}, {.c2 = benchmark_c_ldexp},
@@ -741,9 +765,9 @@ static const benchmark_operation_t operations[] = {
     {"lommel_s", 3,
      {.n3 = num_lommel_s}, {.r3 = qf_lommel_s}, {.c3 = qc_lommel_s}, {"0.5", "0.7", "1.2"}, 7, false},
     {"mod", 2,
-     {.n2 = num_mod}, {0}, {0}, {"17", "5"}, 0, true},
+     {.n2 = num_mod}, {0}, {0}, {benchmark_integer_wide, benchmark_integer_divisor}, 0, true},
     {"modinv", 2,
-     {.n2 = num_modinv}, {0}, {0}, {"17", "5"}, 0, true},
+     {.n2 = num_modinv}, {0}, {0}, {benchmark_integer_wide, benchmark_integer_prime}, 0, true},
     {"mul", 2,
      {.n2 = num_mul},
      {.r2 = qf_mul}, {.c2 = qc_mul},
@@ -758,7 +782,7 @@ static const benchmark_operation_t operations[] = {
      {.r1 = qf_neg}, {.c1 = qc_neg},
      {"0.7"}, 1, false},
     {"next_prime", 1,
-     {.n1 = num_next_prime}, {0}, {0}, {"17"}, 0, true},
+     {.n1 = num_next_prime}, {0}, {0}, {benchmark_integer_divisor}, 0, true},
     {"normal_cdf", 1,
      {.n1 = num_normal_cdf},
      {.r1 = qf_normal_cdf}, {.c1 = qc_normal_cdf},
@@ -772,7 +796,7 @@ static const benchmark_operation_t operations[] = {
      {.r1 = qf_normal_pdf}, {.c1 = qc_normal_pdf},
      {"0.7"}, 1, false},
     {"partition", 1,
-     {.n1 = num_partition}, {0}, {0}, {"17"}, 0, true},
+     {.n1 = num_partition}, {0}, {0}, {"5000"}, 0, true},
     {"polygamma", 2,
      {.n2 = benchmark_n_polygamma},
      {.r2 = benchmark_r_polygamma}, {.c2 = benchmark_c_polygamma},
@@ -794,16 +818,17 @@ static const benchmark_operation_t operations[] = {
     {"pow_int", 2,
      {.n2 = benchmark_n_pow_int}, {.r2 = benchmark_r_pow_int}, {0}, {"1.23456789", "3"}, 1, false},
     {"powmod", 3,
-     {.n3 = num_powmod}, {0}, {0}, {"7", "5", "13"}, 0, true},
+     {.n3 = num_powmod}, {0}, {0},
+     {benchmark_integer_wide, benchmark_integer_divisor, benchmark_integer_prime}, 0, true},
     {"prev_prime", 1,
-     {.n1 = num_prev_prime}, {0}, {0}, {"17"}, 0, true},
+     {.n1 = num_prev_prime}, {0}, {0}, {benchmark_integer_divisor}, 0, true},
     {"productlog", 1,
      {.n1 = num_productlog},
      {.r1 = qf_productlog}, {.c1 = qc_productlog},
      {"0.7"}, 1, false},
     {"prove_prime", 1,
      {.n1 = benchmark_n_prove_prime}, {0}, {0},
-     {"17"}, 0, true},
+     {benchmark_integer_prime}, 0, true},
     {"qdigamma", 2,
      {.n2 = num_qdigamma},
      {.r2 = qf_qdigamma}, {.c2 = qc_qdigamma},
@@ -840,17 +865,17 @@ static const benchmark_operation_t operations[] = {
      {"0.7"}, 1, false},
     {"set_bit", 2,
      {.n2 = benchmark_n_set_bit}, {0}, {0},
-     {"17", "3"}, 0, true},
+     {benchmark_integer_wide, "700"}, 0, true},
     {"sgn", 1,
      {.n1 = num_sgn},
      {.r1 = qf_sgn}, {.c1 = qc_sgn},
      {"0.7"}, 0, false},
     {"shl", 2,
      {.n2 = benchmark_n_shl}, {0}, {0},
-     {"17", "3"}, 0, true},
+     {benchmark_integer_wide, "257"}, 0, true},
     {"shr", 2,
      {.n2 = benchmark_n_shr}, {0}, {0},
-     {"17", "3"}, 0, true},
+     {benchmark_integer_wide, "257"}, 0, true},
     {"sin", 1,
      {.n1 = num_sin},
      {.r1 = qf_sin}, {.c1 = qc_sin},
@@ -901,7 +926,7 @@ static const benchmark_operation_t operations[] = {
      {"0.7"}, 1, false},
     {"test_bit", 2,
      {.n2 = benchmark_n_test_bit}, {0}, {0},
-     {"17", "3"}, 0, true},
+     {benchmark_integer_wide, "701"}, 0, true},
     {"tetragamma", 1,
      {.n1 = num_tetragamma},
      {.r1 = qf_tetragamma}, {.c1 = qc_tetragamma},

@@ -957,7 +957,10 @@ static jsref lab_flow_state_navigation_state_navigate(struct lab_flow_state_navi
 {
     if (!lab_dom_truth(lab_dom_get(ctx->frame, "current")))
         return lab_flow_done(0);
-    return lab_flow_call(ctx->frame, 3, "stateNavigate", "restored", 0, 1, lab_dom_get(ctx->frame, "direction"));
+    if (!lab_dom_property_present(ctx->frame, "position"))
+        return lab_flow_call(ctx->frame, 3, "stateNavigate", "restored", 0, 1, lab_dom_get(ctx->frame, "direction"));
+    return lab_flow_call(ctx->frame, 3, "stateNavigate", "restored", 0, 3, lab_dom_get(ctx->frame, "direction"),
+                         lab_dom_get(ctx->frame, "position"), lab_dom_get(ctx->frame, "remove"));
 }
 
 static jsref lab_flow_state_navigation_state_history_buttons(struct lab_flow_state_navigation_context *ctx)

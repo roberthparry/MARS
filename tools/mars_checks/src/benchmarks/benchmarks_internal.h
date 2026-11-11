@@ -147,6 +147,18 @@ string_t *benchmark_argument_literal(const char *real, bool complex_value, bool 
 string_t *benchmark_arguments_text(const char *arguments, const char *backend, unsigned complex_mask);
 
 /**
+ * @brief Format an Inputs cell for Markdown with a bounded display width and optional integer-argument layout.
+ * @param[in] inputs Borrowed display text, valid throughout the call; never changed or evaluated.
+ * @param integer_layout True uses an 80-character width and starts each comma-separated integer operand on a new
+ * line; false retains the ordinary 40-character width and inline argument separators.
+ * @return Owned Markdown released with string_free(), or NULL for null input or allocation failure.
+ * Wrapped cells use an inline span and explicit line breaks, including when a reader strips inline styles.
+ * Escaping preserves literal text and UTF-8 boundaries. Stored operands, numerical values and other exports
+ * are unaffected; this function has no shared mutable state.
+ */
+string_t *benchmark_arguments_markdown(const string_t *inputs, bool integer_layout);
+
+/**
  * @brief Find an operation by exact canonical name using binary search.
  * @param[in] name Borrowed non-null identifier.
  * @return Borrowed static definition, or NULL for an unknown name; never release it.
@@ -238,7 +250,8 @@ int benchmark_report(const string_t *root, sqlite_t *db, long run, bool update);
  * @param[in,out] db Borrowed open benchmark connection; observations and definitions are never changed.
  * @param[in] argc Number of literal filtering and presentation options.
  * @param[in] argv Borrowed options: --run, --backend, --bits, --operation, --details, --summary or
- * --format=grid|markdown|tsv. Actual operands appear in every view; --details adds diagnostic metadata.
+ * --format=grid|markdown|tsv and --include-skipped. Actual operands appear in every view;
+ * --details adds diagnostic metadata. Unsupported cases are omitted unless --include-skipped is supplied.
  * @return Zero after writing the selected rows, one on missing storage, allocation or output failure, or two on
  * invalid options. All temporary snapshots are released before return; no mathematical operation is executed.
  * @note Colours are confined to grid output and respect NO_COLOR. Pipe the grid through less -R for coloured paging.

@@ -5,7 +5,9 @@
  * Removes one outer operation at a time and delegates the smaller equation to the normal solver pipeline.
  * Principal square roots are squared only after checking the target's principal-root range. Positive constant
  * exponential bases use a logarithmic inverse; exact integer exponents are certified by exact exponentiation.
- * Uncertified exponents retain their symbolic logarithmic quotient. No input binding is changed here.
+ * Uncertified exponents retain their symbolic logarithmic quotient. Negative or complex constant bases retain
+ * the complete integer logarithmic family, with exact principal phases on the real and imaginary axes.
+ * No input binding is changed here.
  */
 #include <math.h>
 #include <stdlib.h>
@@ -79,7 +81,91 @@ static expr_t *inverse_power_target(const expr_t *base, const expr_t *target, bo
     return inverse;
 }
 
-static int inverse_side(const expr_t *left, const expr_t *right, const expr_t *variable,
+/* Preserve exact principal phases on both axes without evaluating pi to a decimal approximation. */
+static expr_t *inverse_principal_log(const expr_t *source, expr_t **unit_phase)
+{
+    number_t value = expr_eval(source);
+    number_t real = num_real_part(value), imaginary = num_imag_part(value);
+    bool negative_real = num_is_finite(value) && num_is_zero(imaginary) && num_sign(real) < 0;
+    bool imaginary_axis = num_is_finite(value) && num_is_zero(real) && !num_is_zero(imaginary);
+    expr_t *result = NULL;
+    if (negative_real || imaginary_axis) {
+        expr_t *magnitude = negative_real ? expr_neg(source) : expr_abs(source);
+        expr_t *logarithm = magnitude ? expr_log(magnitude) : NULL;
+        expr_t *pi = expr_new_named_const(NUM_PI, "@pi");
+        expr_t *unit = expr_new_named_const(NUM_I, "i");
+        number_t ratio = imaginary_axis && num_sign(imaginary) < 0 ? num_neg(NUM_HALF)
+                            : num_clone(imaginary_axis ? NUM_HALF : NUM_ONE);
+        expr_t *scale = expr_new_const(ratio);
+        num_destroy(&ratio);
+        expr_t *phase = pi && scale ? expr_mul(pi, scale) : NULL;
+        expr_t *rotation = phase && unit ? expr_mul(unit, phase) : NULL;
+        result = logarithm && rotation ? expr_simplify_owned(expr_add(logarithm, rotation)) : NULL;
+        if (result && unit_phase) {
+            number_t absolute = num_abs(value);
+            if (num_eq(absolute, NUM_ONE)) {
+                *unit_phase = expr_clone(phase);
+                if (!*unit_phase) {
+                    expr_free(result);
+                    result = NULL;
+                }
+            }
+            num_destroy(&absolute);
+        }
+        expr_free(rotation);
+        expr_free(phase);
+        expr_free(scale);
+        expr_free(unit);
+        expr_free(pi);
+        expr_free(logarithm);
+        expr_free(magnitude);
+    } else
+        result = expr_log(source);
+    num_destroy(&imaginary);
+    num_destroy(&real);
+    num_destroy(&value);
+    return result;
+}
+
+/* Invert exp(z Log(a)) as an affine integer family; Log(a) itself stays on its principal branch. */
+static expr_t *inverse_complex_power_target(const expr_t *base, const expr_t *target, const char *branch)
+{
+    expr_t *phase = NULL;
+    expr_t *logarithm = inverse_principal_log(base, &phase);
+    expr_t *target_logarithm = inverse_principal_log(target, NULL);
+    expr_t *pi = expr_new_named_const(NUM_PI, "@pi");
+    expr_t *unit = expr_new_named_const(NUM_I, "i");
+    expr_t *two = expr_const_long(2);
+    expr_t *two_pi = two && pi ? expr_mul(two, pi) : NULL;
+    expr_t *rotation = two_pi && unit ? expr_mul(two_pi, unit) : NULL;
+    /* For Log(a) = i theta, divide by i exactly before simplifying the real period and imaginary centre. */
+    expr_t *rotated = target_logarithm && unit ? expr_mul(unit, target_logarithm) : NULL;
+    expr_t *period = phase && two_pi ? expr_simplify_owned(expr_div(two_pi, phase))
+                       : (rotation && logarithm ? expr_simplify_owned(expr_div(rotation, logarithm)) : NULL);
+    expr_t *centre = phase && rotated ? expr_simplify_owned(expr_div(rotated, phase))
+                       : (target_logarithm && logarithm
+                              ? expr_simplify_owned(expr_div(target_logarithm, logarithm)) : NULL);
+    expr_t *index = expr_new_named_var(NUM_NAN, branch);
+    expr_t *offset = period && index ? expr_mul(period, index) : NULL;
+    expr_t *result = centre && offset
+                         ? expr_simplify_owned(phase ? expr_sub(offset, centre) : expr_add(offset, centre)) : NULL;
+    expr_free(offset);
+    expr_free(index);
+    expr_free(centre);
+    expr_free(period);
+    expr_free(rotated);
+    expr_free(rotation);
+    expr_free(two_pi);
+    expr_free(two);
+    expr_free(unit);
+    expr_free(pi);
+    expr_free(target_logarithm);
+    expr_free(logarithm);
+    expr_free(phase);
+    return result;
+}
+
+static int inverse_side(const expr_t *left, const expr_t *right, const expr_t *variable, const char *branch,
                          equation_solutions_t *solutions)
 {
     if (!inverse_uses_variable(left, variable) || inverse_uses_variable(right, variable))
@@ -97,12 +183,24 @@ static int inverse_side(const expr_t *left, const expr_t *right, const expr_t *v
         target = expr_simplify_owned(expr_pow_long(right, 2));
     } else if (expr_match_pow_expr(left, &base, &inner) && !inverse_uses_variable(base, variable)) {
         bool applicable = false, empty = false;
-        target = inverse_power_target(base, right, &applicable, &empty);
+        number_t value = expr_eval(base), target_value = expr_eval(right);
+        bool complex_base = num_is_finite(value) && !num_is_zero(value) &&
+                            (!num_is_real(value) || num_sign(value) < 0);
+        if (complex_base) {
+            applicable = true;
+            empty = num_is_zero(target_value);
+            if (!empty)
+                target = inverse_complex_power_target(base, right, branch);
+        } else
+            target = inverse_power_target(base, right, &applicable, &empty);
+        num_destroy(&target_value);
+        num_destroy(&value);
         if (!applicable) return 1;
         if (empty) { solutions->status = EQUATION_SOLVE_NO_SOLUTIONS; return 0; }
     } else
         return 1;
-    equation_t *reduced = target ? equ_new(inner, target) : NULL;
+    /* Nested inversions must reserve any branch parameters introduced by the outer inverse. */
+    equation_t *reduced = target ? equ_new_with_inferred_bindings(inner, target) : NULL;
     int status = reduced ? equ_solve_for_into(reduced, variable, solutions) : -1;
     equ_free(reduced);
     expr_free(target);
@@ -113,6 +211,7 @@ static int inverse_side(const expr_t *left, const expr_t *right, const expr_t *v
 int equ_try_solve_unary_inverse(const equation_t *equation, const expr_t *variable, equation_solutions_t *solutions)
 {
     if (!equation || !variable || !solutions) return -1;
-    int status = inverse_side(equ_lhs(equation), equ_rhs(equation), variable, solutions);
-    return status == 1 ? inverse_side(equ_rhs(equation), equ_lhs(equation), variable, solutions) : status;
+    const char *branch = equ_branch_parameter_name(equation);
+    int status = inverse_side(equ_lhs(equation), equ_rhs(equation), variable, branch, solutions);
+    return status == 1 ? inverse_side(equ_rhs(equation), equ_lhs(equation), variable, branch, solutions) : status;
 }

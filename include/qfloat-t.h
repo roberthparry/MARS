@@ -1236,6 +1236,8 @@ qfloat_t qf_dilog(qfloat_t x);
  * Even orders use sum sin(k theta)/k^order; odd orders use sum cos(k theta)/k^order.
  * Cl₁(theta) = -log(2 |sin(theta/2)|). Evaluation uses real arithmetic throughout.
  * For order >= 2, the derivative is (-1)^order Cl_(order-1).
+ * Order two is equivalent to qf_clausen2(theta). The C API requires an explicit order;
+ * in expression input, clausen(theta) instead aliases clausen2(theta), and Cl(n,theta) selects an order.
  *
  * @param order Positive integer order.
  * @param theta Real angle in radians.
@@ -1245,6 +1247,9 @@ qfloat_t qf_clausen(unsigned long order, qfloat_t theta);
 
 /**
  * @brief Evaluate Cl₂(theta) = sum sin(k theta)/k² using real arithmetic.
+ *
+ * Equivalent to qf_clausen(2, theta). The expression parser accepts both clausen(theta)
+ * and clausen2(theta) for this order, and Cl(n,theta) for the general family.
  * @param theta Real angle in radians.
  * @return The odd, 2π-periodic Clausen function, or NaN for non-finite input.
  */

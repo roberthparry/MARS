@@ -23,6 +23,22 @@ bool test_lab_resource_settings(void);
 /** Register bounded native solver plot cache regressions and timings. */
 void test_lab_plot_cache_cases(void);
 
+/** @brief Register database-backed native integer-family viewport cases; creates no storage or fixtures itself. */
+void test_lab_integer_plot_cases(void);
+
+/**
+ * @brief Register database-backed numerical callable request regressions.
+ * @return No value; the sequential harness owns each request fixture and records failures.
+ */
+void test_lab_numeric_cases(void);
+
+/**
+ * @brief Register sequential resident-worker reuse, isolation, crash recovery and resource-bound regressions.
+ * @return No value; each lifecycle case owns an isolated process service, stopped before its fixture exits.
+ * No worker identities or resources are retained by the caller.
+ */
+void test_lab_worker_session_cases(void);
+
 /** Register native eclipse worker geometry and orientation regressions. */
 void test_lab_eclipse_worker_cases(void);
 

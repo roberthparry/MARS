@@ -675,7 +675,7 @@ static jsref lab_state_sync_keyboard_state_history_buttons(frame_jsref frame)
 {
     if (!lab_dom_truth(lab_dom_get(frame, "ready")))
         return lab_state_sync_next(frame, 5, "stateHistoryButtons");
-    return lab_state_sync_next(frame, 2, "stateClearForward");
+    return lab_flow_call(frame, 3, "stateModeIndex", "index", 0, 0);
 }
 
 static jsref lab_state_sync_keyboard_state_mode_index(frame_jsref frame)

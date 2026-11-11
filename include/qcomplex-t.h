@@ -522,6 +522,8 @@ qcomplex_t qc_dilog(qcomplex_t z);                         /**< dilogarithm Li�
  * Nonreal points on Re z = 2kπ are excluded and return NaN. In the central
  * strip Cl₁(z) = -log(2 sin(z/2)) and Cl_order'(z) = (-1)^order Cl_(order-1)(z).
  * Real inputs use the real periodic function, including its endpoint limits.
+ * Order two is equivalent to qc_clausen2(z). The C API requires an explicit order;
+ * in expression input, clausen(z) instead aliases clausen2(z), and Cl(n,z) selects an order.
  *
  * @param order Positive integer order.
  * @param z Complex angle in radians.
@@ -531,6 +533,9 @@ qcomplex_t qc_clausen(unsigned long order, qcomplex_t z);
 
 /**
  * @brief Evaluate Cl₂ on the branch and domain documented by qc_clausen().
+ *
+ * Equivalent to qc_clausen(2, z). The expression parser accepts both clausen(z)
+ * and clausen2(z) for this order, and Cl(n,z) for the general family.
  * @param z Complex angle in radians.
  * @return The holomorphic Clausen function, agreeing with qf_clausen2() on the real axis.
  */

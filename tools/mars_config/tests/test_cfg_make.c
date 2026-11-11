@@ -241,6 +241,17 @@ static bool test_cfg_make_help_fixture(const char *directory)
         string_free(rejected);
     }
     string_free(output);
+    output = NULL;
+    const char *focused[] = {"make", "--no-print-directory", "-j1", "CHECKS_BIN=/not-built/checks",
+                             "help", "bench-db", "ARGS=run --operation zeta", NULL};
+    ok = ok && lab_proc_run(focused, MARS_CONFIG_ROOT_DIR, 30000, 262144, &output, &status) &&
+         status == 0 && output && string_find(output, "Benchmark database") >= 0 &&
+         string_find(output, "--operation NAME") >= 0 && string_find(output, "--backend NAME") >= 0 &&
+         string_find(output, "--bits N") >= 0 && string_find(output, "--run RUN") >= 0 &&
+         string_find(output, "--samples N") >= 0 && string_find(output, "--max-mib N") >= 0 &&
+         string_find(output, "Build and cleanup") < 0 && string_find(output, "MARS Lab") < 0 &&
+         string_find(output, "/not-built/checks") < 0;
+    string_free(output);
     return ok;
 }
 

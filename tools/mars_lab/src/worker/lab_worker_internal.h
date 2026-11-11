@@ -2,8 +2,8 @@
  * @file lab_worker_internal.h
  * @brief Calculation entry points linked into the MARS Lab executable.
  *
- * Private to the worker module and its dispatcher. Each entry point runs once
- * in a fresh child process; callers must use lab_process.h for bounded execution.
+ * Private to the worker module and its dispatcher. Each entry point runs sequentially
+ * in a bounded resident calculation process; callers must use lab_process.h for supervised execution.
  * These routines may initialise process-wide mathematical state and are not
  * re-entrant services for the listener or request processes.
  */
@@ -84,12 +84,46 @@ int lab_worker_integrand_plot(int argc, char **argv);
  * @param precision Decimal precision for the unchanged numerical-result text.
  * @param[out] roots Required destination for an owned numerical array, or NULL when no finite non-real roots exist.
  * @param[out] root_count Required destination for the number of populated roots, at most 256.
+ * @param[out] families Required zero-initialised sixteen-entry array receiving owned affine integer-family graphs.
+ * @param[out] parameters Required zero-initialised sixteen-entry array receiving owned integer-parameter names.
+ * @param[out] family_count Required output receiving the populated family count, or zero for ordinary plots.
  * @return Owned labelled result text, released with string_free(), or NULL on allocation failure. Destroy each
- * returned root with num_destroy() and release its array with free(). No input ownership transfers.
+ * returned root with num_destroy() and release its array with free(). Release each returned family with expr_free()
+ * and its parameter name with string_free(). No input ownership transfers.
  * This operation performs a solve and must not be used when a completed replay record is available.
  */
 string_t *lab_worker_equation_plot_solutions(const equation_t *equation, int precision,
-                                             number_t **roots, size_t *root_count);
+                                             number_t **roots, size_t *root_count, expr_t **families,
+                                             string_t **parameters, size_t *family_count);
+
+/**
+ * @brief Read finite complex coefficients of a structurally affine integer family without sampling its index.
+ * @param[in] family Borrowed native graph; neither its variable values nor its ownership are changed.
+ * @param[in] parameter Borrowed name of the family's integer variable.
+ * @param[in,out] origin Required initialised number receiving the owned constant coefficient on success.
+ * @param[in,out] step Required initialised number receiving the owned non-zero linear coefficient on success.
+ * @return True for a finite affine family; false for unresolved coefficients, non-affine graphs or failure.
+ * Destroy output values with num_destroy(). No pointers are retained; use only inside an isolated worker.
+ */
+bool lab_worker_integer_family(const expr_t *family, const string_t *parameter, number_t *origin, number_t *step);
+
+/**
+ * @brief Draw the viewport's integer members of up to sixteen affine families as discrete complex-plane points.
+ * @param[in] families Borrowed array of native affine expressions; unchanged and retained only for the call.
+ * @param[in] parameters Borrowed array of integer-variable names, one for each family.
+ * @param count Number of families, from one to sixteen.
+ * @param[in] axis Borrowed equation-variable name for real and imaginary axis labels.
+ * @param[in] title Borrowed plain-text equation heading, or NULL for an empty heading.
+ * @param[in] TeX Borrowed native mathematical heading, or NULL to omit it.
+ * @param[in] argv Borrowed validated solver-plot arguments specifying the real and imaginary viewport limits.
+ * @return Zero after emitting SVG and a caption, or one for invalid bounds, unsupported families or failure.
+ * The integer interval is obtained directly from both coordinate limits; no unbounded search is performed.
+ * Views above 256 points show labelled representative integer members with a zoom-in notice. Numerical precision
+ * limits integer indices to ±4503599627370495; a caption identifies a reached limit without claiming an empty set.
+ * Precision is restored before return. Worksheet formulae and values remain unchanged; all work is native to the worker.
+ */
+int lab_worker_plot_integer_families(const expr_t *const *families, string_t *const *parameters, size_t count,
+                                     const char *axis, const char *title, const char *TeX, char **argv);
 
 /**
  * @brief Render finite equation roots as unconnected points in their complex coordinate plane.

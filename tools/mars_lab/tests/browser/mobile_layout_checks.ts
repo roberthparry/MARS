@@ -117,6 +117,16 @@ window.checkLabMobileLayout = async function checkLabMobileLayout(state: string,
                       `${width}px: ${name} outside viewport (${box.left}, ${box.right}; ${viewport})`);
             }
             check(doc.documentElement.scrollWidth <= viewport + 1, `${width}px: page scrolls sideways`);
+            const toolbar = doc.querySelector<HTMLElement>('.almanac-globe-toolbar');
+            if (toolbar && visible(toolbar)) {
+                const title = toolbar.querySelector('strong')!.getBoundingClientRect();
+                const controls = toolbar.querySelector('.almanac-globe-view-controls')!;
+                inside(toolbar, 'globe toolbar');
+                check(controls.getBoundingClientRect().top >= title.bottom,
+                      `${width}px: globe view controls have their own row below the title and navigation`);
+                for (const button of toolbar.querySelectorAll('button'))
+                    inside(button, 'globe control ' + button.textContent);
+            }
             for (const row of doc.querySelectorAll<HTMLElement>('.almanac-summary-row')) {
                 if (!visible(row))
                     continue;

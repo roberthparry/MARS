@@ -74,9 +74,23 @@ static bool lab_svr_value(const websrv_request_t *request, websrv_response_t *re
     return ok;
 }
 
+/* Keep page failures readable in browsers while retaining typed protocol errors for API clients. */
 bool lab_svr_message(const websrv_request_t *request, websrv_response_t *response, unsigned status,
                             const char *text)
 {
+    const string_t *accept = lab_svr_request_header(request, "Accept");
+    bool page = websrv_request_method(request) == HTTP_GET &&
+                ((accept && string_find(accept, "text/html") >= 0) ||
+                 lab_svr_equal(websrv_request_path(request), "/") ||
+                 lab_svr_equal(websrv_request_path(request), "/index.html"));
+    if (page) {
+        string_t *message = string_new_with(text);
+        bool sent = message && websrv_response_status(response, status) &&
+                    lab_svr_header(response, "Content-Type", "text/plain; charset=utf-8") &&
+                    websrv_response_text(response, message);
+        string_free(message);
+        return sent;
+    }
     json_t *json = json_new_object(), *ok = json_new_bool(false);
     string_t *key = string_new_with("ok"), *error_key = string_new_with("error"), *error = string_new_with(text);
     json_t *value = error ? json_new_string(error) : NULL;

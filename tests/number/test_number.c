@@ -49,6 +49,8 @@ int tests_main(void)
     TEST_RUN_IN_GROUP(run_number_formatting_tests, tests, "number,formatting");
 
     TEST_SECTION("Special Functions");
+    TEST_RUN_IN_GROUP(run_number_cache_tests, tests, "number,cache,precision,thread");
+    TEST_RUN_IN_GROUP(run_number_appell_alias_tests, tests, "number,appell,precision,alias");
     TEST_RUN_IN_GROUP(run_number_benchmark_regressions, tests, "number,special-functions,precision");
     TEST_RUN_IN_GROUP(run_number_special_function_tests, tests, "number,special-functions");
     TEST_RUN_IN_GROUP(run_number_bessel_k_ownership_tests, tests, "number,bessel-k,scope,ownership");

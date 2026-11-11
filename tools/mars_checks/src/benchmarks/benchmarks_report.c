@@ -66,7 +66,9 @@ static bool benchmark_backend_table(sqlite_t *db, long run, const char *backend,
         const char *name = sqlite_stmt_column_text(rows, 0);
         const char *arguments = sqlite_stmt_column_text(rows, 1);
         unsigned mask = (unsigned)sqlite_stmt_column_int(rows, 2);
-        string_t *inputs = benchmark_arguments_text(arguments, backend, mask);
+        string_t *literal = benchmark_arguments_text(arguments, backend, mask);
+        string_t *inputs = benchmark_arguments_markdown(literal, !strcmp(backend, "exact-integer"));
+        string_free(literal);
         ok = inputs != NULL;
         if (ok) string_append_format(text, "| %s | %s |", name, string_c_str(inputs));
         string_free(inputs);
@@ -97,12 +99,12 @@ static bool benchmark_backend_table(sqlite_t *db, long run, const char *backend,
 static string_t *benchmark_document(sqlite_t *db, long run, const char *module)
 {
     sqlite_stmt_t *info = sqlite_stmt_prepare(db,
-        "SELECT started_utc, machine, cpu, system, compiler, build_flags, requested_samples, clock "
+        "SELECT started_utc, cpu, system, compiler, build_flags, requested_samples, clock "
         "FROM benchmark_run WHERE id = ?1 AND status = 'complete'");
     bool ok = info && sqlite_stmt_bind_int64(info, 1, run) && sqlite_stmt_step(info) == SQLITE_STEP_ROW;
     string_t *out = ok ? string_new() : NULL;
     if (out) {
-        string_append_format(out, "\nBenchmark run **%ld**, %s (UTC).\n\nMachine: %s; %s.\n\nSystem: %s.\n\n"
+        string_append_format(out, "\nBenchmark run **%ld**, %s (UTC).\n\nMachine: %s.\n\nSystem: %s.\n\n"
             "Compiler: %s; build flags: %s.\n\nMedian per call from %d timed batches.\n\nTiming method: %s.\n\n"
             "Argument parsing, output validation, disposal and database writes are outside timing.\n"
             "Inputs show the actual operands, including +0.125i for permitted complex arguments; integer orders remain real.\n"
@@ -111,8 +113,8 @@ static string_t *benchmark_document(sqlite_t *db, long run, const char *module)
             "Operations and precision columns with only unsupported results are omitted; — denotes an unsupported cell.\n"
             "Failures and timeouts remain visible. † marks a retained slowdown outlier.\n",
             run, sqlite_stmt_column_text(info, 0), sqlite_stmt_column_text(info, 1), sqlite_stmt_column_text(info, 2),
-            sqlite_stmt_column_text(info, 3), sqlite_stmt_column_text(info, 4), sqlite_stmt_column_text(info, 5),
-            sqlite_stmt_column_int(info, 6), sqlite_stmt_column_text(info, 7));
+            sqlite_stmt_column_text(info, 3), sqlite_stmt_column_text(info, 4),
+            sqlite_stmt_column_int(info, 5), sqlite_stmt_column_text(info, 6));
     }
     sqlite_stmt_finalize(info);
     static const struct { const char *key, *number_heading; } backends[] = {

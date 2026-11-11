@@ -269,6 +269,33 @@ window.labWorkspaceChecks = async function labWorkspaceChecks() {
         native.lab_workspace_navigate(1, 0, native.lab_workspace_capacity() + 1, 1) === -1 && pop(1, 0) === 'equation',
         'invalid navigation mutated history');
 
+    for (let mode = 0; mode < 7; ++mode) {
+        native.lab_workspace_history_clear(mode, 0);
+        native.lab_workspace_history_clear(mode, 1);
+        native.lab_workspace_commit(mode, stage('C'));
+        push(mode, 0, 'A'); push(mode, 0, 'B'); push(mode, 1, 'E'); push(mode, 1, 'D');
+        const timeline = (): string => Array.from({length: native.lab_workspace_history_count(mode, 0) +
+            native.lab_workspace_history_count(mode, 1) + 1}, (_, i) => read(native.lab_workspace_history_item(mode, i))).join(',');
+        check(timeline() === 'A,B,C,D,E', 'chronological timeline includes the active item');
+        const revision = native.lab_workspace_history_revision(mode);
+        check(native.lab_workspace_history_move(mode, 4, 0) && timeline() === 'E,A,B,C,D' &&
+            native.lab_workspace_history_current(mode) === 3, 'move across the cursor preserves active identity');
+        check(native.lab_workspace_history_move(mode, 3, 1) && timeline() === 'E,C,A,B,D' &&
+            native.lab_workspace_history_current(mode) === 1, 'move the active item without changing its bytes');
+        check(native.lab_workspace_history_remove(mode, 0) && timeline() === 'C,A,B,D', 'remove a preceding entry');
+        check(native.lab_workspace_history_remove(mode, 0) && timeline() === 'A,B,D', 'remove current promotes its successor');
+        check(read(native.lab_workspace_history_select(mode, 2, stage('A edited'))) === 'D' &&
+            timeline() === 'A edited,B,D', 'opening an entry retains unsaved edits at the existing position');
+        check(native.lab_workspace_history_remove(mode, 2) && timeline() === 'A edited,B' &&
+            native.lab_workspace_history_current(mode) === 1, 'removing the final current item promotes its predecessor');
+        check(!native.lab_workspace_history_move(mode, 99, 0) && !native.lab_workspace_history_remove(mode, 99) &&
+            native.lab_workspace_history_select(mode, 99, stage('bad')) === -1 && timeline() === 'A edited,B',
+            'invalid edits leave history unchanged');
+        check(native.lab_workspace_history_revision(mode) > revision, 'edits advance the persistence revision');
+        native.lab_workspace_history_clear(mode, 0);
+        native.lab_workspace_history_clear(mode, 1);
+        check(!native.lab_workspace_history_remove(mode, 0), 'retain the sole open worksheet');
+    }
     for (let i = 0; i < 140; ++i) push(2, 0, `entry-${i}`);
     check(native.lab_workspace_history_count(2, 0) === 128, 'entry bound not enforced');
     for (let i = 139; i >= 12; --i) check(pop(2, 0) === `entry-${i}`, 'bounded LIFO order');

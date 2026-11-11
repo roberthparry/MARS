@@ -448,6 +448,12 @@ probabilities without subtracting nearly equal quantities.
 
 **Clausen functions**
 
+`qf_clausen(order, theta)` selects a positive integer order;
+`qf_clausen2(theta)` is exactly `qf_clausen(2, theta)`. These C names differ
+from the [expression parser's spellings](expression.md#clausen-functions):
+MARS Lab accepts both `clausen(theta)` and `clausen2(theta)` for order two,
+and `Cl(n,theta)` for an explicit order.
+
 The Clausen functions take angles in radians and are `2*pi`-periodic. For a
 positive integer order, even orders use the sine Fourier series and odd orders
 use the cosine Fourier series:
@@ -726,9 +732,9 @@ for separate investigations. See [the benchmark guide](benchmarks.md#persistent-
 for selection, interruption recovery and raw sample storage.
 
 <!-- MARS-BENCHMARKS:BEGIN -->
-Benchmark run **11**, 2026-11-10T10:25:23.939Z (UTC).
+Benchmark run **28**, 2026-11-11T13:11:05.705Z (UTC).
 
-Machine: ophelia; Intel(R) N95.
+Machine: Intel(R) N95.
 
 System: Linux 7.0.0-27-generic x86_64.
 
@@ -736,7 +742,7 @@ Compiler: 15.2.0; build flags: gcc -Wall -Wextra -Werror -O2 -fPIC -D_GNU_SOURCE
 
 Median per call from 7 timed batches.
 
-Timing method: CLOCK_MONOTONIC; warmup=20ms; target_batch=250us; max_batch=512.
+Timing method: CLOCK_MONOTONIC; warmup=100ms; target_batch=5ms; max_batch=1048576; storage_chunk=512.
 
 Argument parsing, output validation, disposal and database writes are outside timing.
 Inputs show the actual operands, including +0.125i for permitted complex arguments; integer orders remain real.
@@ -749,133 +755,133 @@ Failures and timeouts remain visible. † marks a retained slowdown outlier.
 
 | Operation | Inputs | 106 bits |
 |---|---|---:|
-| E1 | 2.345678 | 6.7 µs |
-| Ei | 2.345678 | 8.5 µs |
-| Li | 2.345 | 8.2 µs |
-| abs | 0.7 | 2.1 ns |
-| acos | 0.7 | 1.9 µs |
-| acosec | 2.345 | 1.5 µs |
-| acosech | 0.7 | 3.0 µs |
-| acosh | 2.345 | 3.2 µs |
+| E1 | 2.345678 | 8.6 µs |
+| Ei | 2.345678 | 9.3 µs |
+| Li | 2.345 | 10.7 µs |
+| abs | 0.7 | 3.0 ns |
+| acos | 0.7 | 1.6 µs |
+| acosec | 2.345 | 1.6 µs |
+| acosech | 0.7 | 3.6 µs |
+| acosh | 2.345 | 3.7 µs |
 | acot | 0.7 | 1.2 µs |
-| acoth | 2.345 | 2.7 µs |
-| add | 0.7, 0.7 | 5.7 ns |
-| appell_f1 | 0.5, 0.7, 0.8, 2.5, 0.2, 0.3 | 72.4 µs |
+| acoth | 2.345 | 3.1 µs |
+| add | 0.7, 0.7 | 6.2 ns |
+| appell_f1 | 0.5, 0.7, 0.8, 2.5, 0.2, 0.3 | 80.2 µs |
 | arccovercos | 0.5 | 1.5 µs |
-| arccoversin | 0.5 | 1.5 µs |
-| archacovercos | 0.5 | 44.9 ns |
-| archacoversin | 0.5 | 29.5 ns |
-| archavercos | 0.5 | 46.6 ns |
-| archaversin | 0.5 | 46.9 ns |
-| arcvercos | 0.5 | 1.5 µs |
-| arcversin | 0.5 | 1.5 µs |
+| arccoversin | 0.5 | 1.6 µs |
+| archacovercos | 0.5 | 26.9 ns |
+| archacoversin | 0.5 | 26.9 ns |
+| archavercos | 0.5 | 55.4 ns |
+| archaversin | 0.5 | 48.8 ns |
+| arcvercos | 0.5 | 1.6 µs |
+| arcversin | 0.5 | 1.6 µs |
 | asec | 2.345 | 1.7 µs |
-| asech | 0.7 | 3.3 µs |
+| asech | 0.7 | 3.5 µs |
 | asin | 0.7 | 1.5 µs |
-| asinh | 0.7 | 2.9 µs |
-| atan | 0.7 | 1.1 µs |
-| atan2 | 0.5, -0.75 | 1.5 µs |
-| atanh | 0.7 | 3.5 µs |
-| bessel_i | 2, 0.7 | 46.2 µs |
-| bessel_j | 2, 0.7 | 5.5 µs |
-| bessel_k | 2, 0.7 | 178.4 µs |
-| bessel_y | 2, 0.7 | 21.6 µs |
-| beta | 2.3, 4.5 | 4.3 µs |
-| beta_pdf | 0.5, 2.5, 3.5 | 27.0 µs |
-| binomial | 5, 2 | 26.1 µs |
-| chebyshev_t | 2, 0.7 | 33.1 ns |
-| chebyshev_u | 2, 0.7 | 33.6 ns |
-| circ | 0.7 | 12.1 ns |
-| clausen | 3, 0.7 | 266.6 µs |
-| clausen2 | 0.7 | 4.6 µs |
-| cos | 0.7 | 747.3 ns |
-| cosec | 0.7 | 793.0 ns |
-| cosech | 0.7 | 2.9 µs |
-| cosh | 0.7 | 2.9 µs |
+| asinh | 0.7 | 3.2 µs |
+| atan | 0.7 | 1.2 µs |
+| atan2 | 0.5, -0.75 | 1.2 µs |
+| atanh | 0.7 | 3.0 µs |
+| bessel_i | 2, 0.7 | 54.1 µs |
+| bessel_j | 2, 0.7 | 6.0 µs |
+| bessel_k | 2, 0.7 | 32.9 µs |
+| bessel_y | 2, 0.7 | 23.2 µs |
+| beta | 2.3, 4.5 | 4.6 µs |
+| beta_pdf | 0.5, 2.5, 3.5 | 30.9 µs |
+| binomial | 5, 2 | 31.1 µs |
+| chebyshev_t | 2, 0.7 | 42.6 ns |
+| chebyshev_u | 2, 0.7 | 42.7 ns |
+| circ | 0.7 | 17.1 ns |
+| clausen | 3, 0.7 | 365.4 µs |
+| clausen2 | 0.7 | 5.6 µs |
+| cos | 0.7 | 826.9 ns |
+| cosec | 0.7 | 868.4 ns |
+| cosech | 0.7 | 3.1 µs |
+| cosh | 0.7 | 3.2 µs |
 | cot | 0.7 | 1.6 µs |
-| coth | 0.7 | 5.8 µs |
-| covercos | 0.7 | 766.3 ns |
-| coversin | 0.7 | 760.2 ns |
-| cubrt | 0.7 | 4.0 µs |
+| coth | 0.7 | 6.6 µs |
+| covercos | 0.7 | 788.2 ns |
+| coversin | 0.7 | 803.8 ns |
+| cubrt | 0.7 | 4.8 µs |
 | digamma | 2.345 | 2.7 µs |
-| dilog | 0.7 | 12.3 µs |
-| div | 0.7, 0.7 | 27.7 ns |
-| erf | 0.7 | 3.3 µs |
-| erfc | 0.7 | 7.0 µs † |
-| erfcinv | 0.5 | 238.9 µs |
-| erfinv | 0.5 | 187.7 µs |
-| exp | 1.23456789 | 1.4 µs |
-| floor | 0.7 | 20.3 ns |
-| gamma | 2.345 | 1.4 µs |
-| gammainc_P | 2.3, 1.4 | 13.8 µs |
-| gammainc_Q | 2.3, 1.4 | 10.9 µs |
-| gammainc_lower | 2.3, 1.4 | 12.4 µs |
-| gammainc_upper | 2.3, 1.4 | 12.3 µs |
-| gammainv | 9.5 | 86.7 µs |
-| hacovercos | 0.7 | 777.8 ns |
-| hacoversin | 0.7 | 779.7 ns |
-| harmonic_poly | 2, 0.7 | 96.2 ns |
-| havercos | 0.7 | 781.0 ns |
-| haversin | 0.7 | 783.0 ns |
-| hermite_h | 2, 0.7 | 42.7 ns |
-| hypergeometric_pFq | 0.7, 2.5, 0.3 | 3.4 µs |
-| hypot | 0.7, 1.2 | 394.5 ns |
-| lambert_w0 | 0.7 | 12.3 µs |
-| lambert_wm1 | -0.2 | 15.0 µs |
-| lauricella_f | 0.5, 0.3, 2.5 | 34.6 µs † |
-| ldexp | 1.23456789, 3 | 8.4 ns |
-| legendre_chi | 2, 0.7 | 25.7 µs |
-| lerch_phi | 0.3, 2, 1.4 | 305.7 µs |
-| lg | 2.345678 | 3.3 µs |
-| lgamma | 2.345 | 4.7 µs |
-| ln | 2.345678 | 2.5 µs |
-| log | 2.345678 | 2.6 µs |
-| log10 | 2.345678 | 2.6 µs |
-| logbeta | 2.3, 4.5 | 23.8 µs |
-| logbeta_pdf | 0.5, 2.5, 3.5 | 25.6 µs |
-| lommel_s | 0.5, 0.7, 1.2 | 6.1 µs |
-| mul | 0.7, 0.7 | 6.3 ns |
-| mul_pow10 | 1.23456789, 3 | 36.1 ns |
-| neg | 0.7 | 1.7 ns |
-| normal_cdf | 0.7 | 3.1 µs |
-| normal_logpdf | 0.7 | 24.6 ns |
-| normal_pdf | 0.7 | 1.5 µs |
-| polygamma | 3, 2.345 | 4.2 µs |
-| polylog | 2, 0.7 | 14.2 µs |
-| polylog1 | 0.7 | 3.2 µs |
-| pow | 1.23456789, 3.5 | 5.0 µs |
-| pow10 | 3 | 23.0 ns |
-| pow_int | 1.23456789, 3 | 46.3 ns |
-| productlog | 0.7 | 14.4 µs |
-| qdigamma | 0.5, 2.3 | 27.4 µs |
-| rect | 0.7 | 15.3 ns |
-| root | 1.2345, 3 | 4.6 µs |
-| round | 0.7 | 31.0 ns |
-| roundn | 1.23456789, 3 | 4.5 µs |
-| rounds | 1.23456789, 3 | 13.3 µs |
-| sec | 0.7 | 1.3 µs † |
-| sech | 0.7 | 3.7 µs |
-| sgn | 0.7 | 8.0 ns |
-| sin | 0.567 | 746.2 ns |
-| sinc | 0.7 | 817.2 ns |
-| sinh | 0.7 | 3.0 µs |
-| sqr | 0.7 | 4.1 ns |
-| sqrt | 1.23456789 | 300.0 ns |
-| step | 0.7 | 7.1 ns |
-| struve_h | 2, 0.7 | 70.6 µs |
-| struve_l | 2, 0.7 | 82.3 µs |
-| sub | 0.7, 0.7 | 7.5 ns |
-| tan | 0.7 | 1.6 µs |
-| tanh | 0.7 | 1.5 µs |
-| tetragamma | 2.345 | 2.7 µs |
-| tri | 0.7 | 10.7 ns |
-| trigamma | 2.345 | 2.8 µs |
-| vercos | 0.7 | 1.1 µs |
-| versin | 0.7 | 960.1 ns |
-| zatahp | 2.3, 1.4 | 271.7 µs |
-| zeta | 2.345 | 326.6 µs |
-| zetah | 2.3, 1.4 | 267.1 µs |
-| zetap | 2.345 | 265.6 µs |
+| dilog | 0.7 | 12.5 µs |
+| div | 0.7, 0.7 | 31.0 ns |
+| erf | 0.7 | 3.9 µs |
+| erfc | 0.7 | 3.9 µs |
+| erfcinv | 0.5 | 238.7 µs |
+| erfinv | 0.5 | 216.3 µs |
+| exp | 1.23456789 | 1.8 µs |
+| floor | 0.7 | 22.3 ns |
+| gamma | 2.345 | 1.6 µs |
+| gammainc_P | 2.3, 1.4 | 12.2 µs |
+| gammainc_Q | 2.3, 1.4 | 11.6 µs |
+| gammainc_lower | 2.3, 1.4 | 14.7 µs |
+| gammainc_upper | 2.3, 1.4 | 14.8 µs |
+| gammainv | 9.5 | 101.3 µs |
+| hacovercos | 0.7 | 898.3 ns |
+| hacoversin | 0.7 | 926.0 ns |
+| harmonic_poly | 2, 0.7 | 109.2 ns |
+| havercos | 0.7 | 922.9 ns |
+| haversin | 0.7 | 985.4 ns |
+| hermite_h | 2, 0.7 | 53.9 ns |
+| hypergeometric_pFq | 0.7, 2.5, 0.3 | 3.7 µs |
+| hypot | 0.7, 1.2 | 435.1 ns |
+| lambert_w0 | 0.7 | 13.1 µs |
+| lambert_wm1 | -0.2 | 16.4 µs |
+| lauricella_f | 0.5, 0.3, 2.5 | 19.9 µs |
+| ldexp | 1.23456789, 3 | 9.6 ns |
+| legendre_chi | 2, 0.7 | 26.7 µs |
+| lerch_phi | 0.3, 2, 1.4 | 281.2 µs |
+| lg | 2.345678 | 2.8 µs |
+| lgamma | 2.345 | 5.9 µs |
+| ln | 2.345678 | 2.8 µs |
+| log | 2.345678 | 2.8 µs |
+| log10 | 2.345678 | 2.9 µs |
+| logbeta | 2.3, 4.5 | 26.7 µs |
+| logbeta_pdf | 0.5, 2.5, 3.5 | 28.2 µs |
+| lommel_s | 0.5, 0.7, 1.2 | 7.3 µs |
+| mul | 0.7, 0.7 | 7.0 ns |
+| mul_pow10 | 1.23456789, 3 | 43.9 ns |
+| neg | 0.7 | 2.0 ns |
+| normal_cdf | 0.7 | 3.4 µs |
+| normal_logpdf | 0.7 | 26.9 ns |
+| normal_pdf | 0.7 | 1.6 µs |
+| polygamma | 3, 2.345 | 4.5 µs |
+| polylog | 2, 0.7 | 13.8 µs |
+| polylog1 | 0.7 | 2.9 µs |
+| pow | 1.23456789, 3.5 | 4.2 µs |
+| pow10 | 3 | 25.7 ns |
+| pow_int | 1.23456789, 3 | 50.7 ns |
+| productlog | 0.7 | 14.5 µs |
+| qdigamma | 0.5, 2.3 | 24.0 µs |
+| rect | 0.7 | 16.1 ns |
+| root | 1.2345, 3 | 4.9 µs |
+| round | 0.7 | 34.3 ns |
+| roundn | 1.23456789, 3 | 6.0 µs |
+| rounds | 1.23456789, 3 | 16.4 µs |
+| sec | 0.7 | 807.3 ns |
+| sech | 0.7 | 3.2 µs |
+| sgn | 0.7 | 7.0 ns |
+| sin | 0.567 | 760.1 ns |
+| sinc | 0.7 | 827.9 ns |
+| sinh | 0.7 | 3.2 µs |
+| sqr | 0.7 | 4.6 ns |
+| sqrt | 1.23456789 | 328.7 ns |
+| step | 0.7 | 7.2 ns |
+| struve_h | 2, 0.7 | 80.0 µs |
+| struve_l | 2, 0.7 | 82.6 µs |
+| sub | 0.7, 0.7 | 7.0 ns |
+| tan | 0.7 | 1.8 µs |
+| tanh | 0.7 | 1.6 µs |
+| tetragamma | 2.345 | 3.0 µs |
+| tri | 0.7 | 12.6 ns |
+| trigamma | 2.345 | 2.6 µs |
+| vercos | 0.7 | 812.2 ns |
+| versin | 0.7 | 796.4 ns |
+| zatahp | 2.3, 1.4 | 318.9 µs |
+| zeta | 2.345 | 293.0 µs |
+| zetah | 2.3, 1.4 | 278.5 µs |
+| zetap | 2.345 | 282.7 µs |
 
 <!-- MARS-BENCHMARKS:END -->
 

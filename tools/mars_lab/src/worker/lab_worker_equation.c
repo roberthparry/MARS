@@ -672,23 +672,6 @@ cleanup:
     return text;
 }
 
-static bool text_has_identifier(const char *text, const char *identifier)
-{
-    size_t length;
-
-    if (!text || !identifier || !*identifier)
-        return false;
-    length = strlen(identifier);
-    for (const char *match = strstr(text, identifier); match; match = strstr(match + length, identifier)) {
-        unsigned char before = match == text ? 0u : (unsigned char)match[-1];
-        unsigned char after = (unsigned char)match[length];
-
-        if ((!before || (!isalnum(before) && before != '_')) && (!after || (!isalnum(after) && after != '_')))
-            return true;
-    }
-    return false;
-}
-
 static bool bindings_have_name(const expr_bindings_t *bindings, const char *name)
 {
     size_t count = expr_bindings_count(bindings);
@@ -704,21 +687,23 @@ static const char *solutions_integer_branch_parameter(const equation_solutions_t
 {
     static const char *const preferences[] = {"n", "m", "k", "l", "j", "r"};
     size_t count = equ_solutions_count(solutions);
-
-    for (size_t preference = 0u; preference < sizeof(preferences) / sizeof(preferences[0]); ++preference) {
-        if (bindings_have_name(bindings, preferences[preference]))
-            continue;
-        for (size_t i = 0u; i < count; ++i) {
-            const equation_t *solution = ordered_solution_at(solutions, order, i);
-            char *rhs_text = expr_text_dup(equ_rhs(solution), style_UNBOUND);
-            bool uses_parameter = text_has_identifier(rhs_text, preferences[preference]);
-
-            free(rhs_text);
-            if (uses_parameter)
-                return preferences[preference];
+    size_t preferred = sizeof preferences / sizeof *preferences;
+    bool available[sizeof preferences / sizeof *preferences];
+    for (size_t i = 0; i < preferred; ++i)
+        available[i] = !bindings_have_name(bindings, preferences[i]);
+    /* Build each expression's symbol dictionary once: compact forms such as 4n are still dependencies. */
+    for (size_t i = 0; preferred && i < count; ++i) {
+        const equation_t *solution = ordered_solution_at(solutions, order, i);
+        expr_bindings_t *symbols = expr_bindings_from_expr_internal(equ_rhs(solution));
+        for (size_t j = 0; j < preferred; ++j) {
+            if (available[j] && expr_bindings_get(symbols, preferences[j])) {
+                preferred = j;
+                break;
+            }
         }
+        expr_bindings_free(symbols);
     }
-    return NULL;
+    return preferred < sizeof preferences / sizeof *preferences ? preferences[preferred] : NULL;
 }
 
 /* Abbreviate large exact solution sets with one dependency-ordered set of native definitions. */
@@ -1093,6 +1078,39 @@ static number_t *solution_plot_roots(const equation_solutions_t *solutions, expr
     return roots;
 }
 
+/* Retain the solved affine graphs, rather than choosing a single integer member for later viewport requests. */
+static size_t solution_plot_families(const equation_solutions_t *solutions, expr_bindings_t *bindings,
+                                     const size_t *order, expr_t **families, string_t **parameters)
+{
+    size_t count = equ_solutions_count(solutions), filled = 0;
+    const char *branch = solutions_integer_branch_parameter(solutions, bindings, order);
+    if (!branch || !count || count > 16)
+        return 0;
+    for (size_t i = 0; i < count; ++i) {
+        const equation_t *solution = ordered_solution_at(solutions, order, i);
+        equation_t *display = solution_with_bound_constants(solution, bindings);
+        families[i] = expr_clone(equ_rhs(display ? display : solution));
+        parameters[i] = string_new_with(branch);
+        ++filled;
+        number_t origin = NUM_NAN, step = NUM_NAN;
+        bool ok = families[i] && parameters[i] &&
+                  lab_worker_integer_family(families[i], parameters[i], &origin, &step);
+        num_destroy(&step);
+        num_destroy(&origin);
+        equ_free(display);
+        if (!ok) {
+            for (size_t j = 0; j < filled; ++j) {
+                expr_free(families[j]);
+                string_free(parameters[j]);
+                families[j] = NULL;
+                parameters[j] = NULL;
+            }
+            return 0;
+        }
+    }
+    return filled;
+}
+
 /* Retain the finished solve before automatic plotting; numerical roots must not be recomputed just for a chart. */
 static void prepare_equation_plot(const equation_t *equation, const equation_solutions_t *solutions,
                                   const char *input, const char *precision_text, int precision)
@@ -1118,8 +1136,20 @@ static void prepare_equation_plot(const equation_t *equation, const equation_sol
     char *TeX = equ_to_TeX_body_wrapped(equation, 110);
     size_t root_count = 0;
     number_t *roots = solution_plot_roots(solutions, bindings, order, &root_count);
-    if (numeric && TeX)
-        lab_worker_plot_prepared_emit(keys, input, TeX, curves, NULL, 2, false, numeric, roots, root_count);
+    expr_t *families[16] = {0};
+    string_t *parameters[16] = {0};
+    size_t family_count = solution_plot_families(solutions, bindings, order, families, parameters);
+    if (numeric && TeX) {
+        if (family_count)
+            lab_worker_plot_prepared_emit(keys, input, TeX, (const expr_t *const *)families, parameters,
+                                           family_count, true, numeric, NULL, 0);
+        else
+            lab_worker_plot_prepared_emit(keys, input, TeX, curves, NULL, 2, false, numeric, roots, root_count);
+    }
+    for (size_t i = 0; i < family_count; ++i) {
+        expr_free(families[i]);
+        string_free(parameters[i]);
+    }
     for (size_t i = 0; i < root_count; ++i)
         num_destroy(&roots[i]);
     free(roots);
@@ -1130,8 +1160,10 @@ static void prepare_equation_plot(const equation_t *equation, const equation_sol
 
 /* Retain worksheet-precision numerical solutions for reuse while only the viewport changes. */
 string_t *lab_worker_equation_plot_solutions(const equation_t *equation, int precision,
-                                             number_t **roots, size_t *root_count)
+                                             number_t **roots, size_t *root_count, expr_t **families,
+                                             string_t **parameters, size_t *family_count)
 {
+    *family_count = 0;
     equation_solutions_t *solutions = equ_derive_solutions_with_context(equation, NULL);
     expr_bindings_t *bindings = equ_bindings(equation);
     string_t *text;
@@ -1139,6 +1171,7 @@ string_t *lab_worker_equation_plot_solutions(const equation_t *equation, int pre
         size_t *order = ordered_solution_indices(solutions, bindings);
         text = solution_numerics(solutions, bindings, order, precision, "plot_solutions ");
         *roots = solution_plot_roots(solutions, bindings, order, root_count);
+        *family_count = solution_plot_families(solutions, bindings, order, families, parameters);
         free(order);
     } else {
         *roots = NULL;

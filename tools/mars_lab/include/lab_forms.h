@@ -35,7 +35,10 @@ bool lab_forms_town_presentation(json_t *town);
  * @return Owned response released with json_free; NULL means allocation failure.
  * @details integrator accepts text or rows and optional expression, returning
  * rows with referenced flags, text, and references_valid. Incomplete expressions
- * retain all rows conservatively. time accepts text and returns text. town accepts
+ * retain all rows conservatively. Reference inspection has a 4096-unit work budget and a 25 ms
+ * cooperative deadline; if interrupted, references_valid is false and all rows are retained.
+ * An existing computation_run() scope supplies its own limits instead of being replaced.
+ * time accepts text and returns text. town accepts
  * value and optional candidates (legacy key strings), returning decoded town,
  * display detail, candidate_details and matching candidate index (-1 if absent). Input text is
  * bounded to 64 KiB in aggregate per action, rows to 256 and candidates to 4096.

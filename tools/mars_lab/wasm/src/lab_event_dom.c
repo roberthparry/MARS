@@ -63,7 +63,6 @@ static void lab_event_run(lab_event_action_t action, event_jsref event, jsref pl
         lab_event_emit(calls, "resetPlotPreview", 0, 0, 0);
     }
     if (lab_workspace_mode() == LAB_MODE_EXPRESSION) {
-        lab_event_emit(calls, "clearForwardHistory", 0, 0, 0);
         lab_event_emit(calls, "clearGoalSeekRequest", 0, 0, 0);
         lab_event_emit(calls, "hideTargetEntry", 0, 0, 0);
     }

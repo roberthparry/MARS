@@ -294,9 +294,14 @@ static string_t *surface_svg(const char *source, const char *first, const char *
         string_free(svg);
         plot_free(plot);
         plot = plot_new(&options);
-        grid_free(grid);
-        grid = grid_sample(source, first, second, bounds, side, bits);
-        ok = plot && grid && grid_gaps(grid, source, first, second) &&
+        bool gaps = true;
+        /* Dropping oversized refinement retains the already validated full-size grid. */
+        if (side != grid->side) {
+            grid_free(grid);
+            grid = grid_sample(source, first, second, bounds, side, bits);
+            gaps = grid && grid_gaps(grid, source, first, second);
+        }
+        ok = plot && grid && gaps &&
              plot_set_surface(plot, grid->x, grid->side, grid->y, grid->side, grid->z) &&
              plot_set_view(plot, azimuth, elevation) && plot_set_roll(plot, roll);
         if (ok && manual)

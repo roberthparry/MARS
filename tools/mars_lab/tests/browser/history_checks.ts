@@ -66,6 +66,171 @@ window.checkLabHistoryPersistence = async (): Promise<void> => {
             check(buffer.readSnapshot(forward)!.text === snapshots[record.mode].text, 'restored Forward returns to the current entry');
             owner.install(record);
         }
+        // Insert between retained neighbours, then exercise actual timeline buttons and persisted edits.
+        const historyText = (position: number): string => buffer.readSnapshot(native.lab_workspace_history_item(0, position))!.text;
+        const editedState = (text: string): Uint8Array<ArrayBuffer> => labWire.encode({state: {...snapshots[0], text}});
+        const editingRecord: SavedHistoryRecord = {mode: 0, epoch: '', revision: 0,
+            history: {version: 1, current: editedState('3+4'), back: [editedState('2+3')], forward: [editedState('4+5')]}};
+        const settle = async (condition: () => boolean, message: string): Promise<void> => {
+            const done = (): boolean => !worksheetHistoryEditor.pending && condition();
+            for (let i = 0; i < 500 && !done(); ++i) await LabTestBrowser.wait(10);
+            check(done(), message + ': ' + JSON.stringify({current: native.lab_workspace_history_current(0),
+                editor: WorksheetBindings.editor.currentExpressionText(),
+                status: document.getElementById('historyEditorStatus')?.textContent,
+                pending: worksheetHistoryEditor.pending}));
+        };
+        const historyButton = (position: number, action: string): HTMLButtonElement =>
+            document.querySelector<HTMLButtonElement>(`#historyEditorEntries [data-history-position="${position}"] [data-history-action="${action}"]`)!;
+        try {
+            worksheetHistoryEditor.start();
+            owner.install(editingRecord);
+            WorksheetWorkspace.mode.setMode('expression', {force: true});
+            await WorksheetPersistence.navigation.restore(buffer.readSnapshot(native.lab_workspace_history_read(0, 2, 0)));
+            WorksheetBindings.controller.setExpressionEditor('5+6');
+            await WorksheetRequests.evaluation.evaluateExpression();
+            check(native.lab_workspace_history_count(0, 0) === 2 && native.lab_workspace_history_count(0, 1) === 1 &&
+                historyText(0) === '2+3' && historyText(1) === '3+4' && historyText(2) === '5+6' && historyText(3) === '4+5',
+                'a new evaluation is inserted after the current worksheet without losing Forward');
+            document.getElementById('historyEdit')!.click();
+            check((document.getElementById('historyEditor') as HTMLDialogElement).open &&
+                document.querySelectorAll('#historyEditorEntries li').length === 4,
+                'history editor shows the native timeline: ' + JSON.stringify({
+                    open: (document.getElementById('historyEditor') as HTMLDialogElement).open,
+                    rows: document.querySelectorAll('#historyEditorEntries li').length,
+                    status: document.getElementById('status')?.textContent,
+                    persistence: document.getElementById('historyPersistenceStatus')?.textContent}));
+            for (const [position, text] of ['2+3', '3+4', '5+6', '4+5'].entries()) {
+                const open = historyButton(position, 'open'), row = open.closest('li')!;
+                check(open.textContent === text && open.innerHTML === text &&
+                    (open.getAttribute('title') || open.dataset.marsTooltipTitle) === text &&
+                    open.getAttribute('aria-label') === 'Open worksheet: ' + text,
+                    'worksheet formula is rendered as visible, accessible DOM text: ' + JSON.stringify({
+                        position, text, content: open.textContent, html: open.innerHTML,
+                        title: open.getAttribute('title'), accessible: open.getAttribute('aria-label')}));
+                check(row.classList.contains('history-entry') && open.classList.contains('history-entry-open') &&
+                    open.classList.contains('secondary') && !!row.querySelector('.history-entry-actions') &&
+                    getComputedStyle(row).display === 'flex' && open.getBoundingClientRect().width > 100,
+                    'native DOM setters apply history row and button styling');
+                check(historyButton(position, 'earlier').innerHTML === '↑ Earlier' &&
+                    historyButton(position, 'later').innerHTML === '↓ Later' &&
+                    historyButton(position, 'remove').innerHTML === 'Remove', 'all history actions have visible labels');
+                check(historyButton(position, 'earlier').matches(':disabled') === (position === 0) &&
+                    historyButton(position, 'later').matches(':disabled') === (position === 3) &&
+                    !historyButton(position, 'remove').matches(':disabled'),
+                    'unavailable moves are disabled through the browser DOM');
+            }
+            check(document.querySelector('#historyEditorEntries [aria-current="step"] .history-current')?.innerHTML === 'Current',
+                'the current worksheet has a visible marker');
+            const preview = document.createElement('ol');
+            labDOM.call('lab_workspace_dom_history_row', preview, {text: ''}, 0, 0, 1);
+            check(preview.querySelector('.history-entry-open')?.innerHTML === 'Empty worksheet' &&
+                [...preview.querySelectorAll<HTMLButtonElement>('.history-entry-actions button')].every(b => b.matches(':disabled')),
+                'a sole empty worksheet has a readable placeholder and disabled move/remove controls');
+            preview.replaceChildren();
+            const authored = '<img src=x onerror=alert(1)>\n  + x';
+            labDOM.call('lab_workspace_dom_history_row', preview, {text: authored}, 0, 0, 1);
+            check(preview.querySelector('.history-entry-open')?.textContent === authored.replace(/\s+/g, ' ') &&
+                !preview.querySelector('img'), 'authored worksheet text stays literal and cannot insert markup');
+            const place = {mode: 'almanac', text: 'Raw navigation worksheet summary', almanac: {
+                date: '2026-10-30', time: '10:22:22', jurisdiction: 'GB-ENG',
+                town: 'Shrewsbury (GeoNames 2637891)|52.7077|-2.7541|75', latitude: '52.7077', longitude: '-2.7541'
+            }};
+            const savedPlace = JSON.stringify(place);
+            preview.replaceChildren();
+            labDOM.call('lab_workspace_dom_history_row', preview, place, 0, 0, 1);
+            const placeButton = preview.querySelector<HTMLButtonElement>('[data-history-location]')!;
+            check(placeButton.textContent?.includes('Shrewsbury') && placeButton.textContent.includes('England') &&
+                !placeButton.textContent.includes('GeoNames') && !placeButton.textContent.includes('Raw navigation') &&
+                placeButton.querySelector('.history-entry-place-detail')?.textContent === '2026-10-30 10:22:22 GMT',
+                'existing calendar history shows town, country and GMT without exposing the raw summary or catalogue IDs');
+            const flagURI = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciLz4=';
+            labDOM.call('lab_workspace_dom_history_country', placeButton, {name: 'England', flag: flagURI});
+            check(placeButton.querySelector<HTMLImageElement>('img')?.getAttribute('src') === flagURI &&
+                !placeButton.querySelector<HTMLImageElement>('img')?.hidden && JSON.stringify(place) === savedPlace,
+                'database artwork appears without modifying the saved worksheet');
+            preview.replaceChildren();
+            labDOM.call('lab_workspace_dom_history_row', preview, {...place, almanac: {...place.almanac,
+                jurisdiction: '', town: ''}}, 0, 0, 1);
+            const customButton = preview.querySelector<HTMLButtonElement>('[data-history-location]')!;
+            labDOM.call('lab_workspace_dom_history_country', customButton, {country: 'South Africa',
+                country_flag: 'https://invalid.example/flag.svg'});
+            check(customButton.textContent?.includes('South Africa') && customButton.textContent.includes('52° 42.46′ N') &&
+                customButton.textContent.includes('2° 45.25′ W') &&
+                customButton.querySelector<HTMLImageElement>('img')?.hidden,
+                'coordinate-only entries accept resolved country text but reject remote artwork');
+            preview.replaceChildren();
+            labDOM.call('lab_workspace_dom_history_row', preview, {mode: 'datetime', text: 'Calendar summary',
+                datetime: {...place.almanac, jurisdiction: 'FR', town: 'Brest|-|0|0'}}, 0, 0, 1);
+            labDOM.call('lab_workspace_dom_history_country', preview.querySelector('.history-entry-open'),
+                {name: 'France', flag: flagURI});
+            check(preview.querySelector('.history-entry-open')?.textContent?.includes('Brest') &&
+                preview.querySelector('.history-entry-country')?.textContent?.includes('France') &&
+                preview.querySelector('.history-entry-place-detail')?.textContent === '2026-10-30',
+                'DateTime history uses the same saved place presentation without inventing a GMT time: ' + preview.textContent);
+            const townSelect = document.getElementById('almanacTown') as HTMLSelectElement;
+            const selectedTown = townSelect.value, pendingTown = document.createElement('option');
+            pendingTown.value = 'History-only town (GeoNames 1234)|0|90|0';
+            townSelect.append(pendingTown);
+            try {
+                townSelect.value = pendingTown.value;
+                const notice = document.createElement('div');
+                const start = [...labDOM.call('lab_globe_centre', 0, 0) as number[], 100];
+                const middle = [...labDOM.call('lab_globe_centre', 0, 45) as number[], 100];
+                const target = [...labDOM.call('lab_globe_centre', 0, 90) as number[], 100];
+                labDOM.call('lab_globe_travel_notice', notice, start, target);
+                check(notice.textContent === 'Travelling to History-only town · 10008 km remaining',
+                    'journeys use the saved town name without waiting for the town cache');
+                labDOM.call('lab_globe_travel_notice', notice, middle, target);
+                check(notice.textContent === 'Travelling to History-only town · 5004 km remaining',
+                    'remaining journey distance decreases with the camera position');
+                labDOM.call('lab_globe_travel_notice', notice, target, target);
+                check(notice.textContent === 'Orienting view at History-only town',
+                    'arrival orientation does not report the original distance as remaining travel');
+            } finally { townSelect.value = selectedTown; pendingTown.remove(); }
+            historyButton(3, 'earlier').click();
+            await settle(() => historyText(2) === '4+5', 'move a forward entry across the current worksheet');
+            await LabTestBrowser.wait(20);
+            check(native.lab_workspace_history_current(0) === 3 && historyText(3) === '5+6', 'moving keeps the active worksheet');
+            historyButton(2, 'remove').click();
+            await settle(() => native.lab_workspace_history_current(0) === 2, 'remove an archived entry');
+            await LabTestBrowser.wait(20);
+            historyButton(2, 'remove').click();
+            await settle(() => document.getElementById('historyEditorStatus')!.textContent === 'Entry removed.' &&
+                native.lab_workspace_history_current(0) === 1 && historyText(1) === '3+4' &&
+                WorksheetBindings.editor.currentExpressionText() === '3+4', 'remove current and restore its predecessor');
+            check(WorksheetBindings.editor.currentExpressionText() === '3+4', 'promoted worksheet is restored into the editor');
+            const editedClient = id(), captured = owner.capture(0)!;
+            const savedEdit = await call({action: 'save', client: editedClient, mode: 0, epoch: '', revision: 0, history: captured});
+            const loadedEdit = (await call({action: 'load', client: editedClient})).body.records as SavedHistoryRecord[];
+            check(savedEdit.status === 200 && loadedEdit.length === 1, 'edited history persists through the server');
+            owner.install(loadedEdit[0]);
+            check(historyText(0) === '2+3' && historyText(1) === '3+4', 'saved removal and ordering survive reinstallation');
+            worksheetHistoryEditor.refresh();
+            historyButton(0, 'open').click();
+            await settle(() => native.lab_workspace_history_current(0) === 0 &&
+                WorksheetBindings.editor.currentExpressionText() === '2+3', 'open an arbitrary saved entry');
+            check(!(document.getElementById('historyEditor') as HTMLDialogElement).open, 'opening an entry returns to the worksheet');
+            const editedHistory = owner.capture(0)!;
+            owner.install({mode: 0, epoch: '', revision: 0, history: {version: 1, current: editedState('2+3'),
+                back: Array.from({length: 45}, (_, i) => editedState(`${i}+1`)), forward: [editedState('4+5')]}});
+            const scrollBeforeHistory = window.scrollY;
+            document.getElementById('historyEdit')!.click();
+            const dialog = document.getElementById('historyEditor') as HTMLDialogElement;
+            const list = document.getElementById('historyEditorEntries')!;
+            const heading = dialog.querySelector<HTMLElement>('.history-editor-heading')!;
+            list.scrollTop = list.scrollHeight;
+            await new Promise(requestAnimationFrame);
+            const dialogBox = dialog.getBoundingClientRect(), headingBox = heading.getBoundingClientRect();
+            check(list.scrollTop > 0 && dialog.scrollTop === 0 && headingBox.top >= dialogBox.top &&
+                headingBox.bottom <= dialogBox.bottom && headingBox.top >= 0,
+                'long history scrolls its entries while the heading and Close button remain visible');
+            document.getElementById('historyEditorClose')!.click();
+            check(Math.abs(window.scrollY - scrollBeforeHistory) < 1, 'closing history preserves the page scroll position');
+            owner.install({mode: 0, epoch: '', revision: 0, history: editedHistory});
+        } finally {
+            (document.getElementById('historyEditor') as HTMLDialogElement).close();
+            owner.install(records[0]);
+        }
         // Exercise the real navigation/restoration/evaluation pipeline, not only the native stack API.
         const matchMedia = window.matchMedia, historyFetch = window.fetch, scroll = window.scrollY;
         const globe = Reflect.get(MarsAlmanacGlobe, 'instance') as {
@@ -87,6 +252,29 @@ window.checkLabHistoryPersistence = async (): Promise<void> => {
             document.getElementById('almanacGlobe')!.scrollIntoView({block: 'center'});
             for (let i = 0; i < 100 && !globe.started; ++i) await new Promise(resolve => setTimeout(resolve, 25));
             check(globe.started, 'the visible globe starts before exercising background calculation');
+            const savedObserver: WorksheetSnapshot = {...snapshots[6], almanac: {
+                ...snapshots[6].almanac as Record<string, string>, jurisdiction: 'GB-ENG',
+                town: 'Shrewsbury|52.7077|-2.7541|75', latitude: '52.7077', longitude: '-2.7541',
+                date: '2026-10-30', time: '10:22:22'
+            }};
+            owner.install({mode: 6, epoch: '', revision: 0, history: {version: 1,
+                current: labWire.encode({state: savedObserver}), back: [], forward: []}});
+            await WorksheetPersistence.navigation.restore(savedObserver);
+            await window.checkLabMobileLayout('Almanac history controls');
+            labDOM.call('lab_flag_cache_clear');
+            document.getElementById('historyEdit')!.click();
+            const savedPlaceButton = document.querySelector<HTMLButtonElement>('#historyEditorEntries [data-history-location]')!;
+            check(savedPlaceButton.textContent?.includes('Shrewsbury') && savedPlaceButton.textContent.includes('England'),
+                'calendar history is readable immediately while flag artwork loads asynchronously');
+            await settle(() => {
+                const flag = savedPlaceButton.querySelector<HTMLImageElement>('.history-entry-flag');
+                return !!flag && !flag.hidden && flag.complete && flag.naturalWidth > 0;
+            }, 'the history flag loads and decodes through the shared country metadata service');
+            check(WorksheetContext.almanacLatitude.value === '52.7077' &&
+                WorksheetContext.almanacLongitude.value === '-2.7541' &&
+                native.lab_workspace_history_count(6, 0) === 0 && native.lab_workspace_history_count(6, 1) === 0,
+                'loading history names and flags does not move the observer or add history entries');
+            document.getElementById('historyEditorClose')!.click();
             const edinburgh = locationState(55.9533, -3.1883);
             const santiago = locationState(-33.4489, -70.6693, 58.3019, -134.4197);
             owner.install({mode: 6, epoch: '', revision: 0, history: {version: 1,

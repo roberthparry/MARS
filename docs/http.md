@@ -453,6 +453,18 @@ Set transfer deadlines and resource limits.
 
 Returns: True on success; false for invalid input. Previous settings remain on failure.
 
+### `http_client_set_unix_socket`
+
+`bool http_client_set_unix_socket(http_client_t *client, const string_t *path);`
+
+Send requests through a local Unix-domain socket instead of TCP. The client copies
+the absolute socket pathname; pass `NULL` to restore TCP. Changing the transport
+clears existing connections. The request's HTTP/HTTPS URL still determines its
+Host header and TLS hostname; certificate verification remains enabled. The same
+setting applies to WebSocket connections. Invalid paths, active clients,
+unsupported libcurl builds and allocation failures leave the old setting intact.
+This supports local daemon APIs without launching their command-line clients.
+
 ### `http_client_set_ca_file`
 
 Load a custom PEM trust bundle through the file module.

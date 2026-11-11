@@ -2554,6 +2554,81 @@ static void test_equation_compact_symmetric_surds(void)
     }
 }
 
+static void test_equation_complex_power_family_row(const void *data)
+{
+    const test_database_case_t *row = data;
+    size_t saved_precision = num_get_default_prec_bits();
+    num_set_default_prec_digits(row->precision);
+    equation_t *problem = equ_from_string(string_c_str(row->input));
+    equation_t *expected = equ_from_string(string_c_str(row->expected));
+    const char *branch = equ_binding(problem, "n") ? "m" : "n";
+    expr_t *coordinate = equ_binding(problem, "x");
+    number_t initial = expr_get_val(coordinate);
+    equation_solutions_t *solutions = equ_derive_solutions(problem);
+    number_t retained = expr_get_val(coordinate);
+    const equation_t *solution = equ_solutions_at(solutions, 0);
+    equation_t *family = solution ? equ_new_with_inferred_bindings(equ_lhs(solution), equ_rhs(solution)) : NULL;
+    expr_t *index = equ_binding(family, branch), *expected_index = equ_binding(expected, branch);
+    string_t *plain = family ? equ_to_text(family, style_UNBOUND) : NULL;
+    string_t *TeX = family ? equ_to_text(family, style_LATEX) : NULL;
+    bool ok = problem && expected && solutions && equ_solutions_count(solutions) == 1 && index && expected_index &&
+              ((num_is_nan(initial) && num_is_nan(retained)) || num_eq(initial, retained)) &&
+              plain && TeX && string_find(plain, "ln") >= 0 && string_find(TeX, "\\ln") >= 0;
+    number_t tolerance = num_create_from_string("1e-60");
+    /* Distinct negative and positive indices must satisfy both the closed form and the original equation. */
+    static const long indices[] = {-3, -1, 0, 1, 4};
+    for (size_t i = 0; ok && i < sizeof indices / sizeof *indices; ++i) {
+        expr_bindings_t *parameters = equ_bindings(expected);
+        for (size_t j = 0; j < expr_bindings_count(parameters); ++j) {
+            const char *name = expr_bindings_name_at(parameters, j);
+            if (!strcmp(name, "x"))
+                continue;
+            expr_t *actual_parameter = equ_binding(family, name);
+            number_t value = num_create_from_long(indices[i] + (long)j);
+            ok = ok && actual_parameter;
+            expr_set_val(actual_parameter, value);
+            expr_set_val(expr_bindings_expr_at(parameters, j), value);
+            num_destroy(&value);
+        }
+        number_t actual = expr_eval(equ_rhs(family)), wanted = expr_eval(equ_rhs(expected));
+        number_t difference = num_sub(actual, wanted), error = num_abs(difference);
+        expr_set_val(coordinate, actual);
+        number_t left = expr_eval(equ_lhs(problem)), right = expr_eval(equ_rhs(problem));
+        number_t residual = num_sub(left, right), magnitude = num_abs(residual);
+        ok = ok && num_is_finite(actual) && num_is_finite(error) && num_lt(error, tolerance) &&
+             num_is_finite(magnitude) && num_lt(magnitude, tolerance);
+        if (!ok)
+            printf("%s: branch %ld failed; family %s\n", string_c_str(row->name), indices[i],
+                   plain ? string_c_str(plain) : "unavailable");
+        num_destroy(&magnitude);
+        num_destroy(&residual);
+        num_destroy(&right);
+        num_destroy(&left);
+        num_destroy(&error);
+        num_destroy(&difference);
+        num_destroy(&wanted);
+        num_destroy(&actual);
+    }
+    expr_set_val(coordinate, initial);
+    num_destroy(&tolerance);
+    string_free(TeX);
+    string_free(plain);
+    equ_free(family);
+    equ_solutions_free(solutions);
+    num_destroy(&retained);
+    num_destroy(&initial);
+    equ_free(expected);
+    equ_free(problem);
+    num_set_default_prec_bits(saved_precision);
+    TEST_ASSERT_TRUE(ok, "the entire integer branch family satisfies its exact closed form and original equation");
+}
+
+static void test_equation_complex_power_families(void)
+{
+    test_run_database_cases(__FILE__, __LINE__, "equation.complex_power_families", NULL,
+                            test_equation_complex_power_family_row);
+}
+
 static void test_equation_inverts_roots_and_constant_powers(void)
 {
     static const struct {
@@ -2646,6 +2721,23 @@ static void example_equation_root_inverse(void)
     equ_solutions_free(solutions);
     equ_free(equation);
     ASSERT_EQ_INT(status, EXIT_SUCCESS);
+}
+
+/* README example: construct the complete exact integer family instead of one numerical seed's root. */
+static void example_equation_complex_power_family(void)
+{
+    equation_t *equation = equ_from_string("i^x = 2");
+    equation_solutions_t *solutions = equ_derive_solutions(equation);
+    const equation_t *solution = equ_solutions_at(solutions, 0);
+    string_t *text = solution ? equ_to_text(solution, style_UNBOUND) : NULL;
+    int status = text && puts(string_c_str(text)) != EOF && puts("n is any integer.") != EOF
+                     ? EXIT_SUCCESS : EXIT_FAILURE;
+    bool correct = text && !strcmp(string_c_str(text), "x = 4n - 2i·ln(2)/π");
+    string_free(text);
+    equ_solutions_free(solutions);
+    equ_free(equation);
+    ASSERT_EQ_INT(status, EXIT_SUCCESS);
+    ASSERT_TRUE(correct);
 }
 
 static void test_equation_relation_separators_accepted_row(const void *data)
@@ -2789,6 +2881,7 @@ int tests_main(void)
 {
     TEST_SECTION("Equation Basics");
     TEST_RUN_IN_GROUP(test_equation_database_cases, tests, "equation,database-cases");
+    TEST_RUN_IN_GROUP(test_equation_complex_power_families, tests, NULL);
     TEST_RUN_IN_GROUP(test_equation_inverts_roots_and_constant_powers, tests, NULL);
     TEST_RUN_IN_GROUP(test_equation_preserves_principal_root_domain, tests, NULL);
     TEST_RUN_IN_GROUP(test_equation_relation_separators, tests, NULL);
@@ -2803,6 +2896,7 @@ int tests_main(void)
     TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_equation_kepler, readme_examples, "equation,readme,output");
     TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_equation_output_form, readme_examples, "equation,readme,output");
     TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_equation_root_inverse, readme_examples, "equation,readme,output");
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_equation_complex_power_family, readme_examples, "equation,readme,output");
 
     return TEST_EXIT_CODE();
 }

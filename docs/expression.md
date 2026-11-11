@@ -71,8 +71,11 @@ Native plotting workers can additionally use the controlled internal
 interface. This bounded plan snapshots finite real constants and accepts up to
 three double-precision coordinates. Addition, subtraction, multiplication,
 division, negation, absolute value, squares, sine, cosine, exponential, natural
-and common logarithms, and inverse cosine have guarded fast
-implementations. Unsupported operations, non-finite intermediates, large trig
+and common logarithms, and inverse cosine have guarded fast implementations.
+General powers use the positive real branch; square, cube and constant
+positive-integer-order roots are also supported for positive radicands.
+Non-positive bases or radicands, variable or unsupported root orders,
+unsupported operations, non-finite intermediates, large trig
 arguments and excessive propagated round-off request ordinary native evaluation.
 Coordinate conversion and operation round-off are included in the guards. These
 are numerical heuristics, not certified interval arithmetic.
@@ -638,7 +641,7 @@ Both representations preserve the same algebra and copied-expression inverses.
 For example, `@L{acosh(t)}` has the following unbound Expression output:
 
 ```text
-(K₀(s) + 0.5iπ·(1 - I₀(s) + 𝐋₀(s)))/s where (Re(s) > 0)
+(K₀(s) + ½iπ·(1 - I₀(s) + 𝐋₀(s)))/s where (Re(s) > 0)
 ```
 
 Real and complex targets in the stated half-plane are supported
@@ -740,7 +743,8 @@ the Fourier rules and the precise integration bounds.
 
 `factorial`, `fibonacci`, `partition`, `isqrt`, `gcd`, `lcm`, `mod`, `modinv`, `is_prime`,
 `next_prime`, `prev_prime`, `bit_and`, `bit_or`, `bit_xor`, `bit_not`, `shl`,
-`shr` and `factors` do not acquire a continuous-time definition merely by
+`shr`, `factors`, `powmod`, `bit_length`, `set_bit`, `clear_bit`, `test_bit`,
+`prove_prime`, `divmod` and `gcdext` do not acquire a continuous-time definition merely by
 putting `t` in their argument. A specified step interpolation, analytic
 continuation or impulse train would define a different transform problem.
 Finite `new_finite_summation_range` and `new_finite_product_range` operations
@@ -2816,6 +2820,12 @@ differentiation.
 
 `expr_clausen2(argument)` constructs the order-two Clausen function;
 `expr_clausen(order, argument)` constructs a fixed positive integer order.
+In MARS Lab input, **`clausen(x)` and `clausen2(x)` are aliases for
+the same order-two function, Cl₂(x)**. Use `Cl(n,x)` or `cl(n,x)` to
+choose another order: `Cl(2,x)` is equivalent to those aliases, whereas
+`Cl(3,x)` is the distinct order-three function. The C API always requires
+an explicit order for `expr_clausen`; its name alone does not select order two.
+
 Arguments are angles in radians. Even orders use the real sine Fourier
 series and odd orders the cosine Fourier series; numerical evaluation uses
 the real or holomorphic semantics of [the number API](number.md#clausen-functions).
@@ -2858,6 +2868,14 @@ decide whether derivative controls should be shown.
 - `expr_t *expr_lcm(const expr_t *a, const expr_t *b)` — least common multiple
 - `expr_t *expr_mod(const expr_t *a, const expr_t *b)` — exact integer remainder
 - `expr_t *expr_modinv(const expr_t *a, const expr_t *b)` — modular inverse
+- `expr_t *expr_powmod(const expr_t *base, const expr_t *exponent, const expr_t *modulus)` — exact modular exponentiation
+- `expr_t *expr_bit_length(const expr_t *value)` — bit length of the absolute integer magnitude
+- `expr_t *expr_set_bit(const expr_t *value, const expr_t *index)` — set a zero-based bit
+- `expr_t *expr_clear_bit(const expr_t *value, const expr_t *index)` — clear a zero-based bit
+- `expr_t *expr_test_bit(const expr_t *value, const expr_t *index)` — test a bit, returning zero or one
+- `expr_t *expr_prove_prime(const expr_t *value)` — proven prime (one), composite (zero), or unproved (minus one)
+- `expr_t *expr_divmod(const expr_t *value, const expr_t *divisor, const expr_t *component)` — quotient (zero) or remainder (one)
+- `expr_t *expr_gcdext(const expr_t *a, const expr_t *b, const expr_t *component)` — GCD (zero) or Bézout coefficients (one and two)
 - `expr_t *expr_is_prime(const expr_t *n)` — primality predicate as a numeric value
 - `expr_t *expr_next_prime(const expr_t *n)` — next prime
 - `expr_t *expr_prev_prime(const expr_t *n)` — previous prime
@@ -2869,6 +2887,98 @@ decide whether derivative controls should be shown.
 - `expr_t *expr_shr(const expr_t *a, const expr_t *bits)` — right shift
 - `expr_t *expr_factors(const expr_t *n)` — factorise an exact integer and return
   an expression DAG whose constant bindings hold the prime factors
+
+These functions are available directly in MARS Lab Expression mode.
+`powmod(base,exponent,modulus)` keeps arbitrary-width exact integers throughout,
+without constructing the unreduced power. Its exponent must be non-negative and
+its modulus positive. Bit indices must be non-negative exact integers
+representable by `size_t`. Invalid numerical arguments produce `NAN`. These
+discrete operations have no continuous derivative with respect to their operands.
+A call independent of the differentiation variable is treated as a constant;
+variable-dependent discrete differentiation returns `NAN`. Finite sums evaluate
+their integer arguments at each index, and constant calls can be integrated.
+
+Multi-result C routines use an explicit scalar component selector in expressions.
+`divmod(a,b,0)` selects the truncated quotient and `divmod(a,b,1)` its remainder.
+The components of `gcdext(a,b,k)` are `g`, `s` and `t` for `k=0,1,2`, satisfying
+`a*s+b*t=g`. Likewise, `sincos(x,0)` and `sincos(x,1)` select sine and cosine;
+`sinhcosh(x,0)` and `sinhcosh(x,1)` select their hyperbolic counterparts. The
+paired trigonometric selectors must be literal zero or one.
+
+Numerical API spellings also include `add`, `sub`, `mul`, `div`, `neg`, `inv`,
+`sqr`, `add_long`, `mul_long`, `pow_int`, `pow10`, `ldexp`, `mul_pow10`, `arg`,
+`bit_and`, `bit_or`, `bit_xor`, `bit_not`, `polylog1` and `tetragamma`.
+Convenience spellings lower to ordinary symbolic operations; for instance,
+`tetragamma(x)` uses `polygamma(2,x)`, and `ldexp(x,n)` uses `x*2^n`.
+`clausen(angle)` retains its order-two meaning, whilst `clausen(order,angle)`
+selects the general integral order. Numerical calls also work inside bindings,
+retaining their source for recomputation when precision increases.
+
+```c
+#include <stdio.h>
+#include <stdlib.h>
+
+#include "expression-t.h"
+
+int main(void)
+{
+    const char *sources[] = {"powmod(4,13,497)", "bit_length(2^1024)", "test_bit(set_bit(0,701),701)",
+                             "divmod(17,5,0)", "divmod(17,5,1)", "gcdext(30,21,0)"};
+    for (size_t i = 0; i < sizeof sources / sizeof *sources; ++i) {
+        expr_t *expression = expr_from_string(sources[i], NULL);
+        number_t value = expression ? expr_eval(expression) : NUM_NAN;
+        string_t *text = num_to_string(value);
+        int printed = text ? printf("%s = %s\n", sources[i], string_c_str(text)) : -1;
+        bool ok = expression && text && !num_is_nan(value) && printed >= 0;
+        string_free(text);
+        num_destroy(&value);
+        expr_free(expression);
+        if (!ok)
+            return EXIT_FAILURE;
+    }
+    return EXIT_SUCCESS;
+}
+```
+
+Output:
+
+```text
+powmod(4,13,497) = 445
+bit_length(2^1024) = 1025
+test_bit(set_bit(0,701),701) = 1
+divmod(17,5,0) = 3
+divmod(17,5,1) = 2
+gcdext(30,21,0) = 3
+```
+
+Factorisation has no fixed operand bit-length cutoff. The prime factors remain
+named constant bindings so later simplification preserves their product rather
+than multiplying it back into the original integer. Runtime depends on the
+factor structure. For example, this 1,215-bit integer factors as
+$2^{512}3^{256}5^{128}$:
+
+```c
+#include <stdio.h>
+#include <stdlib.h>
+
+#include "expression-t.h"
+
+int main(void)
+{
+    expr_t *expression = expr_from_string("factors(2^512*3^256*5^128)", NULL);
+    string_t *text = expression ? expr_to_text(expression, style_EXPRESSION) : NULL;
+    int status = text && puts(string_c_str(text)) != EOF ? EXIT_SUCCESS : EXIT_FAILURE;
+    string_free(text);
+    expr_free(expression);
+    return status;
+}
+```
+
+Output:
+
+```text
+{ a₀⁵¹²·a₁²⁵⁶·a₂¹²⁸ | ; a₀ = 2, a₁ = 3, a₂ = 5 }
+```
 
 ### Lifetime Management
 

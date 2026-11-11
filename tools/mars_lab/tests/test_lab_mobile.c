@@ -11,9 +11,11 @@
 #define _POSIX_C_SOURCE 200809L
 #include <stdint.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "lab_mobile.h"
 #include "test_harness.h"
+#include "test_database.h"
 #include "test_lab_support.h"
 
 static bool empty_qr(const char *input)
@@ -127,7 +129,7 @@ static void test_lab_mobile_qr_geometry(void)
 static bool local_only_metadata(const char *header)
 {
     string_t *host = header ? string_new_with(header) : NULL;
-    json_t *details = header && !host ? NULL : lab_mobile_details(host, 8765);
+    json_t *details = header && !host ? NULL : lab_mobile_details_from_status(host, 8765, NULL, NULL);
     const string_t *title = json_string_value(test_lab_member(details, "title"));
     const string_t *hint = json_string_value(test_lab_member(details, "hint"));
     const string_t *url = json_string_value(test_lab_member(details, "url"));
@@ -148,7 +150,7 @@ static bool local_only_metadata(const char *header)
 
 static bool loopback_metadata(const char *directory)
 {
-    /* An empty executable search directory is an additional guard against invoking a live Tailscale CLI. */
+    /* Snapshot-only checks never contact the live Tailscale daemon. */
     if (setenv("PATH", directory, 1))
         return false;
     const char *binds[] = {NULL, "127.0.0.1", "::1"};
@@ -197,6 +199,39 @@ static void test_lab_mobile_invalid_hosts(void)
                      "malformed and unverified hosts remain local-only even under a wildcard bind");
 }
 
+static void lab_mobile_tailnet_row(const void *argument)
+{
+    const test_database_case_t *row = argument;
+    json_t *input = test_lab_json(string_c_str(row->input));
+    string_t *host = string_new_with(test_lab_text(input, "host"));
+    const json_t *status = test_lab_member(input, "status"), *serve = test_lab_member(input, "serve");
+    const char *previous_bind = getenv("MARS_LAB_BIND_HOST");
+    string_t *saved_bind = previous_bind ? string_new_with(previous_bind) : NULL;
+    bool configured = (!previous_bind || saved_bind) && !setenv("MARS_LAB_BIND_HOST", "127.0.0.1", 1);
+    json_t *details = configured ? lab_mobile_details_from_status(host, 8765, status, serve) : NULL;
+    bool tailscale = false;
+    bool ok = details && json_bool_value(test_lab_member(details, "tailscale"), &tailscale);
+    const char *expected = string_c_str(row->expected);
+    ok = ok && (!strcmp(expected, "reject") ? !tailscale : tailscale &&
+         !strcmp(test_lab_text(details, "url"), expected) &&
+         !strcmp(test_lab_text(details, "title"), "Tailscale access") && *test_lab_text(details, "qr"));
+    bool allowed = false;
+    bool has_allowed = json_bool_value(test_lab_member(input, "allowed"), &allowed);
+    ok = ok && (!has_allowed || lab_mobile_host_allowed_from_status(host, status, serve) == allowed);
+    json_free(details);
+    json_free(input);
+    string_free(host);
+    ok = (saved_bind ? !setenv("MARS_LAB_BIND_HOST", string_c_str(saved_bind), 1) :
+                       !unsetenv("MARS_LAB_BIND_HOST")) && ok;
+    string_free(saved_bind);
+    TEST_ASSERT_TRUE(ok, "private Tailscale metadata verifies identity, chooses HTTPS and rejects Funnel or spoofed hosts");
+}
+
+static void test_lab_mobile_tailnet(void)
+{
+    test_run_database_cases(__FILE__, __LINE__, "mars_lab.mobile_tailnet", NULL, lab_mobile_tailnet_row);
+}
+
 /* Register mobile regressions alongside the other sequential native Lab helpers. */
 void test_lab_mobile_cases(void)
 {
@@ -205,4 +240,5 @@ void test_lab_mobile_cases(void)
     TEST_RUN_IN_GROUP(test_lab_mobile_qr_geometry, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_mobile_loopback, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_mobile_invalid_hosts, tests, NULL);
+    TEST_RUN_IN_GROUP(test_lab_mobile_tailnet, tests, NULL);
 }

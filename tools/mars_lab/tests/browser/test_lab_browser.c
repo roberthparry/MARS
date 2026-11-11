@@ -122,7 +122,11 @@ static bool lab_browser_prepare(const char *directory)
                     string_replace(html, "</head>", string_c_str(injection)) == 0;
     bool written = replaced && page && file_write_all_text(page, html);
     bool configured = written && !setenv("MARS_LAB_ASSET_FILE", file_path(page), 1);
-    json_t *initial = test_lab_json("{\"expression\":\"2+3\",\"expression_updated_at\":1,\"lab_mode\":\"expression\"}");
+    /* Restoring default bounds must not factor a difficult retained expression before revealing Almanac. */
+    bool startup_check = getenv("MARS_LAB_STARTUP_CHECKS") && !strcmp(getenv("MARS_LAB_STARTUP_CHECKS"), "1");
+    json_t *initial = test_lab_json(startup_check
+        ? "{\"expression\":\"factors(1000000016000000063)\",\"expression_updated_at\":1,\"lab_mode\":\"expression\"}"
+        : "{\"expression\":\"2+3\",\"expression_updated_at\":1,\"lab_mode\":\"expression\"}");
     bool saved = configured && initial && lab_state_save(initial);
     bool ok = configured && saved;
     if (!ok)

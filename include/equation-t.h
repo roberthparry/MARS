@@ -174,6 +174,9 @@ void equ_solutions_free(equation_solutions_t *solutions);
  * For multiple variable bindings, automatic numerical fallback requires a finite
  * starting value for every variable; an unseeded implicit family is not replaced
  * by an arbitrary sampled point. An empty unproved result remains undetermined.
+ * Isolated negative or non-real constant-base exponentials return their complete
+ * integer logarithmic branch family, even when a numerical starting value exists.
+ * The base's logarithm is principal; the inverse family's integer remains symbolic.
  * An unseeded real affine zeta equation uses a bounded multi-start search;
  * consult equ_solutions_search_note() for its bounds and limitations, and
  * equ_solutions_family_note() for any separate exact family.

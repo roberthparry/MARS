@@ -603,6 +603,20 @@ static void example_readme_examples(void)
     TEST_ASSERT_TRUE(run_README_md_example() == 0, "README examples run");
 }
 
+/* README example: preserve the prime-factor product of an integer wider than 1,024 bits. */
+static void example_exact_factorisation(void)
+{
+    expr_t *expression = expr_from_string("factors(2^512*3^256*5^128)", NULL);
+    string_t *text = expression ? expr_to_text(expression, style_EXPRESSION) : NULL;
+    TEST_ASSERT_TRUE(text != NULL, "README exact factorisation succeeds");
+    if (text) {
+        TEST_ASSERT_STR_EQ(string_c_str(text), "{ a₀⁵¹²·a₁²⁵⁶·a₂¹²⁸ | ; a₀ = 2, a₁ = 3, a₂ = 5 }");
+        TEST_ASSERT_TRUE(puts(string_c_str(text)) != EOF, "README exact factorisation output");
+    }
+    string_free(text);
+    expr_free(expression);
+}
+
 static void example_round(void)
 {
     /* README example: nearest-integer rounding in docs/expression.md. */
@@ -652,6 +666,52 @@ static bool real_sample_controlled(void *argument)
     real_sample_control_t *context = argument;
     double result;
     return expr_real_sample_eval(context->sample, &context->point, &result);
+}
+
+static void real_sample_database_row(const void *data)
+{
+    const test_database_case_t *row = data;
+    expr_bindings_t *bindings = NULL;
+    expr_t *expression = expr_from_string(string_c_str(row->input), &bindings);
+    const char *names[] = {"x", "y", "z"};
+    expr_t *axes[3];
+    bool detached[3];
+    double coordinates[3];
+    for (unsigned i = 0; i < 3; ++i) {
+        axes[i] = expr_bindings_get(bindings, names[i]);
+        detached[i] = !axes[i];
+        if (detached[i])
+            axes[i] = expr_new_named_var(NUM_ZERO, names[i]);
+        number_t value = expr_get_val(axes[i]);
+        coordinates[i] = num_to_double(value);
+        num_destroy(&value);
+    }
+    const expr_t *inputs[] = {axes[0], axes[1], axes[2]};
+    expr_real_sample_t *sample = expr_real_sample_new(expression, inputs, 3);
+    number_t expected = expression ? expr_eval(expression) : NUM_NAN;
+    double result = 12345;
+    bool accepted = expr_real_sample_eval(sample, coordinates, &result);
+    bool wanted = !strcmp(string_c_str(row->expected), "accept");
+    bool ok = expression && accepted == wanted;
+    if (wanted)
+        ok = ok && num_is_real(expected) && num_is_finite(expected) &&
+             fabs(result - num_to_double(expected)) <= 1e-12 * fmax(1, fabs(result));
+    else
+        ok = ok && result == 12345;
+    number_t unchanged = expression ? expr_eval(expression) : NUM_NAN;
+    ok = ok && ((num_is_nan(expected) && num_is_nan(unchanged)) || num_eq(expected, unchanged));
+    if (!ok)
+        fprintf(stderr, "sample %s: plan=%s accepted=%d value=%.17g expected=%.17g\n",
+                string_c_str(row->name), sample ? "yes" : "no", accepted, result, num_to_double(expected));
+    num_destroy(&unchanged);
+    num_destroy(&expected);
+    expr_real_sample_free(sample);
+    expr_free(expression);
+    expr_bindings_free(bindings);
+    for (unsigned i = 0; i < 3; ++i)
+        if (detached[i])
+            expr_free(axes[i]);
+    TEST_ASSERT_TRUE(ok, "real powers and principal roots agree with native evaluation or request safe fallback");
 }
 
 static void test_expr_real_sample(void)
@@ -727,6 +787,8 @@ static void test_expr_real_sample(void)
     expr_real_sample_free(context.sample);
     expr_free(expression);
     expr_bindings_free(bindings);
+    test_run_database_cases(__FILE__, __LINE__, "expression.real_sample", "tests.test_expr_real_sample",
+                            real_sample_database_row);
 }
 
 static void test_expression_database_row(const void *data)
@@ -757,6 +819,7 @@ int tests_main(void)
     /* ---------------- Arithmetic ---------------- */
     TEST_SECTION("Arithmetic");
     TEST_RUN_IN_GROUP(test_expression_database_cases, tests, "expression,database-cases");
+    TEST_RUN_IN_GROUP(test_expr_numeric_callables, tests, "expression,numeric-callables");
     TEST_RUN_IN_GROUP(test_arithmetic, tests, NULL);
 
     /* ---------------- _d variants ---------------- */
@@ -808,11 +871,13 @@ int tests_main(void)
     TEST_RUN_IN_GROUP(test_orthogonal_polynomials, tests, NULL);
 
     TEST_SECTION("README Output Examples");
+    TEST_RUN_IN_GROUP(example_expression_integer_callables, readme_examples, "readme,expression,integer");
     TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_readme_examples, readme_examples, "expression,readme,output");
     TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_signal_readme_examples, readme_examples, "signal,readme,output");
     TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_orthopoly_readme_examples, readme_examples, "orthopoly,readme,output");
     TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_indexed_roots, readme_examples, "expression,readme,output");
     TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_round, readme_examples, "expression,readme,round");
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_exact_factorisation, readme_examples, "expression,readme,factors");
 
     return TESTS_EXIT_CODE();
 }

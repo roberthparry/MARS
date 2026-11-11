@@ -656,7 +656,8 @@ void emit_func(const expr_t *f, sbuf_t *b, int parent_prec)
             emit_func_lommel_s(f, b);
             return;
         }
-        if (expr_is_op(f, &ops_lerch_phi) && f->a && expr_is_op(f->a, &ops_lerch_phi_pack)) {
+        if ((expr_is_op(f, &ops_lerch_phi) && f->a && expr_is_op(f->a, &ops_lerch_phi_pack)) ||
+            (f->a && expr_is_op(f->a, &ops_integer_pack))) {
             emit_function_builtin_name(b, f->ops);
             sbuf_putc(b, '(');
             emit_func(f->a->a, b, 0);

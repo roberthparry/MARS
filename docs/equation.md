@@ -171,6 +171,15 @@ A proposed integer exponent is accepted only after exact exponentiation verifies
 it; otherwise the logarithmic quotient is retained. Other complex logarithmic
 branches are not enumerated by this principal inverse.
 
+Negative and non-real constant bases use their principal complex logarithm while
+retaining every exponential inverse branch. For `a^f(x) = b`, with finite non-zero
+`a` and `b`, this gives `f(x) = (ln(b) + 2πin)/Log(a)`, where `n` is any integer.
+The exponent is then isolated by the ordinary symbolic solver. Real and imaginary
+unit-axis phases remain exact, so `i^x = 2` gives `x = 4n - 2i·ln(2)/π` instead of
+one numerical root. A supplied starting value does not restrict this family.
+The integer parameter is chosen to avoid the original binding names. A zero
+target is proved impossible for these non-zero bases.
+
 For example, this complete programme needs no starting value for `x`:
 
 ```c
@@ -197,6 +206,36 @@ Output:
 
 ```text
 x = 4
+```
+
+The same API returns a whole complex exponential family symbolically:
+
+```c
+#include <stdio.h>
+#include <stdlib.h>
+
+#include "equation-t.h"
+
+int main(void)
+{
+    equation_t *equation = equ_from_string("i^x = 2");
+    equation_solutions_t *solutions = equ_derive_solutions(equation);
+    const equation_t *solution = equ_solutions_at(solutions, 0);
+    string_t *text = solution ? equ_to_text(solution, style_UNBOUND) : NULL;
+    int status = text && puts(string_c_str(text)) != EOF && puts("n is any integer.") != EOF
+                     ? EXIT_SUCCESS : EXIT_FAILURE;
+    string_free(text);
+    equ_solutions_free(solutions);
+    equ_free(equation);
+    return status;
+}
+```
+
+Output:
+
+```text
+x = 4n - 2i·ln(2)/π
+n is any integer.
 ```
 
 Open consecutive power series with a symbolic exponent are recognised natively

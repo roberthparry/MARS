@@ -20,7 +20,8 @@
 #define MARS_BENCHMARKS_INTERNAL_ACCESS
 #include "benchmarks_internal.h"
 
-const char benchmark_protocol[] = "CLOCK_MONOTONIC; warmup=20ms; target_batch=250us; max_batch=512";
+const char benchmark_protocol[] =
+    "CLOCK_MONOTONIC; warmup=100ms; target_batch=5ms; max_batch=1048576; storage_chunk=512";
 
 typedef struct {
     const benchmark_operation_t *operation;
@@ -74,6 +75,8 @@ static bool benchmark_batch_number(benchmark_state_t *state, unsigned iterations
     bool ok = true;
     for (unsigned i = 0; i < iterations; ++i) {
         ok = num_is_finite(output[i]) && ok;
+        if (op->integer_only)
+            ok = num_is_exact(output[i]) && num_is_integer(output[i]) && ok;
         num_destroy(output + i);
     }
     *duration = end - start;
@@ -140,17 +143,37 @@ static bool benchmark_batch_complex(benchmark_state_t *state, unsigned iteration
     return ok;
 }
 
+/* Sum checked chunks without timing result disposal or allowing calibration to enlarge live output storage. */
+static bool benchmark_batch(benchmark_state_t *state, unsigned iterations, uint64_t *duration,
+                             bool (*chunk)(benchmark_state_t *, unsigned, uint64_t *))
+{
+    *duration = 0;
+    for (unsigned completed = 0; completed < iterations;) {
+        unsigned count = iterations - completed;
+        if (count > 512u) count = 512u;
+        uint64_t elapsed = 0;
+        if (!chunk(state, count, &elapsed) || elapsed > UINT64_MAX - *duration) return false;
+        *duration += elapsed;
+        completed += count;
+    }
+    return true;
+}
+
 static bool benchmark_prepare(benchmark_state_t *state, const char *backend, unsigned bits)
 {
     const benchmark_operation_t *op = state->operation;
     for (unsigned i = 0; i < op->arity; ++i) {
+        if (!strcmp(backend, "exact-integer")) {
+            state->number[i] = num_create_from_string(op->arguments[i]);
+            if (!num_is_finite(state->number[i]) || !num_is_exact(state->number[i]) ||
+                !num_is_integer(state->number[i])) return false;
+            continue;
+        }
         state->real[i] = qf_from_string(op->arguments[i]);
         bool has_imaginary = (op->complex_mask & (1u << i)) != 0;
         qfloat_t imaginary = has_imaginary ? qf_from_string(benchmark_imaginary_literal) : QF_ZERO;
         state->complex_values[i] = qc_make(state->real[i], imaginary);
-        if (!strcmp(backend, "exact-integer")) {
-            state->number[i] = num_create_from_string(op->arguments[i]);
-        } else if (!strcmp(backend, "number-double")) {
+        if (!strcmp(backend, "number-double")) {
             state->number[i] = num_create_from_double(qf_to_double(state->real[i]));
         } else if (!strcmp(backend, "mpfr") || !strcmp(backend, "mpc")) {
             bool complex_value = !strcmp(backend, "mpc") &&
@@ -193,23 +216,23 @@ int benchmark_measure(const string_t *root, int argc, char **argv)
     if (clock_getres(CLOCK_MONOTONIC, &resolution) || num_set_default_prec_bits(bits ? bits : 256)) return 1;
     benchmark_state_t state = {.operation = op};
     bool ok = benchmark_prepare(&state, backend, bits);
-    bool (*batch)(benchmark_state_t *, unsigned, uint64_t *) =
+    bool (*chunk)(benchmark_state_t *, unsigned, uint64_t *) =
         real ? benchmark_batch_real : complex_backend ? benchmark_batch_complex : benchmark_batch_number;
     unsigned iterations = 1;
     uint64_t duration = 0;
     uint64_t warm_start = 0, warm_end = 0;
     ok = benchmark_now(&warm_start) && ok;
     do {
-        if (ok) ok = batch(&state, 1, &duration) && benchmark_now(&warm_end);
-    } while (ok && warm_end >= warm_start && warm_end - warm_start < 20000000);
-    if (ok) ok = batch(&state, 1, &duration);
-    while (ok && duration < 250000 && iterations < 512) {
+        if (ok) ok = benchmark_batch(&state, 1, &duration, chunk) && benchmark_now(&warm_end);
+    } while (ok && warm_end >= warm_start && warm_end - warm_start < 100000000);
+    if (ok) ok = benchmark_batch(&state, 1, &duration, chunk);
+    while (ok && duration < 5000000 && iterations < 1048576u) {
         iterations *= 2;
-        ok = batch(&state, iterations, &duration);
+        ok = benchmark_batch(&state, iterations, &duration, chunk);
     }
     double values[101];
     for (unsigned i = 0; ok && i < samples; ++i) {
-        ok = batch(&state, iterations, &duration);
+        ok = benchmark_batch(&state, iterations, &duration, chunk);
         values[i] = (double)duration / iterations;
     }
     for (unsigned i = 0; i < op->arity; ++i) num_destroy(state.number + i);

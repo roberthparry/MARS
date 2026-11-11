@@ -692,6 +692,15 @@ number_t num_mod(const number_t number, const number_t modulus);
 int num_divmod(const number_t number, const number_t divisor, number_t *quotient, number_t *remainder);
 int num_gcdext(const number_t a, const number_t b, number_t *gcd_out, number_t *x_out, number_t *y_out);
 
+/**
+ * @brief Compute exact modular exponentiation without constructing the unreduced power.
+ * @param[in] base Borrowed exact integer base; not changed or consumed.
+ * @param[in] exponent Borrowed non-negative exact integer exponent; not changed or consumed.
+ * @param[in] modulus Borrowed positive exact integer modulus; not changed or consumed.
+ * @return Owned exact integer residue, released with num_destroy(), or NUM_NAN for invalid inputs or allocation
+ * failure. Arbitrary-width integers are retained without conversion to floating point; modulus one returns zero.
+ * Evaluation uses the calling thread's number scope and does not modify global precision.
+ */
 number_t num_powmod(const number_t base, const number_t exponent, const number_t modulus);
 number_t num_modinv(const number_t number, const number_t modulus);
 
@@ -699,7 +708,21 @@ bool num_is_prime(const number_t number);
 number_primality_t num_prove_prime(const number_t number);
 number_t num_next_prime(const number_t number);
 number_t num_prev_prime(const number_t number);
+
+/**
+ * @brief Factorise a positive exact integer, honouring the current computation control.
+ * @param[in] number Borrowed exact integer; its value is not changed or consumed.
+ * @return Owned complete factorisation, released with num_factors_free(), or NULL for invalid input,
+ * allocation failure, cancellation, an exhausted work budget or a deadline. One returns an empty factor list.
+ * No partial factorisation is returned. Uncontrolled calls have no fixed work or operand bit-length limit;
+ * runtime depends on the prime factors. A scoped computation_run() can bound trial division and factor removal.
+ */
 number_factors_t *num_factors(const number_t number);
+
+/**
+ * @brief Release a factorisation and every independently owned prime value it contains.
+ * @param[in] factors Owned factorisation to consume; NULL is accepted. Do not use its items afterwards.
+ */
 void num_factors_free(number_factors_t *factors);
 
 size_t num_bit_length(const number_t number);
@@ -966,17 +989,22 @@ number_t num_dilog(const number_t number);
  * For nonreal angles the principal polylogarithm difference (even order) or sum (odd order)
  * defines the holomorphic branch described by qc_clausen(). Nonreal points on Re z = 2kπ
  * are excluded. For order >= 2 the derivative is (-1)^order Cl_(order-1).
+ * The C API requires an explicit order; num_clausen2(theta) selects order two.
+ * In expression input, clausen(theta) aliases clausen2(theta); use Cl(n,theta) for an explicit order.
  *
  * @param order Positive integer order.
  * @param theta Real or complex angle in radians.
- * @return An owning number containing Cl_order(theta), or NaN outside the domain.
+ * @return An owning number containing Cl_order(theta), or NaN outside the domain; release with num_destroy().
  */
 number_t num_clausen(unsigned long order, const number_t theta);
 
 /**
  * @brief Evaluate Cl₂ with the real or holomorphic semantics of num_clausen().
+ *
+ * Equivalent to num_clausen(2, theta). Both clausen(theta) and clausen2(theta)
+ * select this order in expression input; the general family is written Cl(n,theta).
  * @param theta Real or complex angle in radians.
- * @return An owning number containing Cl₂(theta).
+ * @return An owning number containing Cl₂(theta), or NaN outside the domain; release with num_destroy().
  */
 number_t num_clausen2(const number_t theta);
 

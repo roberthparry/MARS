@@ -198,7 +198,7 @@ static void test_laplace_circular_readme(void)
     /* README examples: docs/expression.md, principal acosh and inverse circular Laplace pairs. */
     const json_t *forward = lab_math_laplace_circular_fields("@L{acosh(t)}", "s");
     lab_math_equal(lab_math_text(forward, "unbound"),
-                   "(K₀(s) + 0.5iπ·(1 - I₀(s) + 𝐋₀(s)))/s where (Re(s) > 0)");
+                   "(K₀(s) + ½iπ·(1 - I₀(s) + 𝐋₀(s)))/s where (Re(s) > 0)");
     const double complex documented[] = {0.421024438240708 + 0.697712084144029 * I,
                                          0.873084242650868 + 0.421024438240708 * I,
                                          0.697712084144029 - 0.421024438240708 * I};

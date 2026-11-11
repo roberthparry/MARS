@@ -118,10 +118,10 @@ void lab_globe_marker_pixels(jsref point, double zoom, double size)
         marker_pixels(x, y);
 }
 
-/* Format rounded minutes without host arithmetic or a WASI formatting dependency. */
-void lab_globe_coordinate(double value, jsref positive, jsref negative)
+/* Share rounded geographic text with other native display consumers. */
+jsref lab_globe_coordinate_text(double value, jsref positive, jsref negative)
 {
-    if (!isfinite(value) || fabs(value) > 540) { lab_dom_return(lab_dom_string("")); return; }
+    if (!isfinite(value) || fabs(value) > 540) return lab_dom_string("");
     unsigned hundredths = (unsigned)floor(fabs(value) * 6000 + 0.5), minutes = hundredths % 6000;
     jsref text = lab_dom_format(hundredths / 6000, "", "°");
     if (minutes) {
@@ -129,5 +129,11 @@ void lab_globe_coordinate(double value, jsref positive, jsref negative)
         text = lab_dom_join(text, lab_dom_format(minutes / 100, " ", fraction), "′");
     }
     if (value) text = lab_dom_join(lab_dom_join(text, 0, " "), value < 0 ? negative : positive, "");
-    lab_dom_return(text);
+    return text;
+}
+
+/* Publish the same native coordinate notation through the browser bridge. */
+void lab_globe_coordinate(double value, jsref positive, jsref negative)
+{
+    lab_dom_return(lab_globe_coordinate_text(value, positive, negative));
 }

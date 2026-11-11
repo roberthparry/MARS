@@ -556,6 +556,10 @@ static void test_process_worker_control(void)
 
 int tests_main(void)
 {
+    if (!lab_proc_workers_start(0, 0)) {
+        perror("Native Lab calculation service");
+        return 1;
+    }
     TEST_SECTION("Native MARS Lab child processes");
     TEST_RUN_IN_GROUP(test_process_worker_paths, tests, NULL);
     TEST_RUN_IN_GROUP(test_process_builtin_workers, tests, NULL);
@@ -575,8 +579,11 @@ int tests_main(void)
     TEST_RUN_IN_GROUP(test_process_cancellation, tests, NULL);
     TEST_RUN_IN_GROUP(test_process_cooperative_stop, tests, NULL);
     TEST_RUN_IN_GROUP(test_process_worker_control, tests, NULL);
+    test_lab_worker_session_cases();
     TEST_SECTION("Native MARS Lab integration");
     test_lab_plot_cache_cases();
+    test_lab_integer_plot_cases();
+    test_lab_numeric_cases();
     test_lab_evaluation_cases();
     test_lab_render_job_cases();
     test_lab_diagnostic_cases();
@@ -605,5 +612,6 @@ int tests_main(void)
     test_lab_wasm_build_readme_cases();
     test_lab_plot_readme_cases();
     test_lab_river_surface_readme_cases();
+    lab_proc_workers_stop();
     return TEST_EXIT_CODE();
 }

@@ -3,8 +3,8 @@
  * @brief Native private-network discovery, verified tailnet hosts and mobile metadata.
  *
  * Interface enumeration verifies numeric hosts without trusting DNS or Host text.
- * Tailscale status and Serve configuration are inspected through the bounded Lab
- * process runner. QR geometry is delegated to the independent lab_mobile_qr.c
+ * Tailscale status and Serve configuration are inspected through its bounded local
+ * Unix-socket HTTP API. QR geometry is delegated to the independent lab_mobile_qr.c
  * encoder; this unit is responsible only for choosing and verifying access URLs.
  */
 #define _DEFAULT_SOURCE
@@ -16,8 +16,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "http-t.h"
 #include "lab_mobile.h"
-#include "lab_process.h"
 
 static const json_t *lab_mobile_member(const json_t *object, const char *name)
 {
@@ -91,13 +91,21 @@ fail:
 
 static json_t *lab_mobile_tailscale_json(bool serve)
 {
-    const char *const status_args[] = {"tailscale", "status", "--json", NULL};
-    const char *const serve_args[] = {"tailscale", "serve", "status", "--json", NULL};
-    string_t *output = NULL;
-    int status = -1;
-    bool ok = lab_proc_run(serve ? serve_args : status_args, NULL, 1500, 1048576, &output, &status);
-    json_t *result = ok && status == 0 && output ? json_from_text(output) : NULL;
-    string_free(output);
+    string_t *socket = string_new_with("/var/run/tailscale/tailscaled.sock");
+    string_t *url = string_new_with(serve ? "http://local-tailscaled.sock/localapi/v0/serve-config"
+                                         : "http://local-tailscaled.sock/localapi/v0/status");
+    http_client_t *client = http_client_new();
+    http_limits_t limits = {.connect_timeout_ms = 300, .total_timeout_ms = 1500, .max_body_bytes = 1048576};
+    http_request_t *request = url ? http_request_new(HTTP_GET, url) : NULL;
+    bool ok = client && request && socket && http_client_set_limits(client, &limits) &&
+              http_client_set_unix_socket(client, socket);
+    http_response_t *response = ok ? http_client_send(client, request) : NULL;
+    json_t *result = http_response_ok(response) ? http_response_json(response) : NULL;
+    http_response_free(response);
+    http_request_free(request);
+    http_client_free(client);
+    string_free(socket);
+    string_free(url);
     if (json_type(result) != JSON_OBJECT) {
         json_free(result);
         return NULL;
@@ -132,38 +140,46 @@ static bool lab_mobile_funnel_disabled(const json_t *value, unsigned depth)
     return true;
 }
 
-static json_t *lab_mobile_verified_serve(const string_t *host)
+static bool lab_mobile_verified_serve(const string_t *host, const json_t *status, const json_t *serve,
+                                      string_t **own)
 {
-    if (!host || !string_ends_with(host, ".ts.net"))
-        return NULL;
-    json_t *status = lab_mobile_tailscale_json(false), *serve = NULL;
     const string_t *backend = json_string_value(lab_mobile_member(status, "BackendState"));
     const json_t *self = lab_mobile_member(status, "Self");
     const string_t *dns = json_string_value(lab_mobile_member(self, "DNSName"));
     string_t *own_host = dns ? lab_mobile_host_name(dns) : NULL;
     bool online = false;
-    if (backend && string_view_equals_literal(string_view_all(backend), "Running") &&
+    bool valid = backend && string_view_equals_literal(string_view_all(backend), "Running") &&
         json_bool_value(lab_mobile_member(self, "Online"), &online) && online && own_host &&
-        !string_compare(host, own_host)) {
-        serve = lab_mobile_tailscale_json(true);
-        if (serve && !lab_mobile_funnel_disabled(serve, 0)) {
-            json_free(serve);
-            serve = NULL;
-        }
+        string_ends_with(own_host, ".ts.net") && (!host || !string_compare(host, own_host)) &&
+        json_type(serve) == JSON_OBJECT && lab_mobile_funnel_disabled(serve, 0);
+    if (valid && own) {
+        *own = own_host;
+        own_host = NULL;
     }
     string_free(own_host);
-    json_free(status);
-    return serve;
+    return valid;
 }
 
-/* Augment the server allowlist with only this node's verified private tailnet DNS name. */
+/* Authorise only the local node identified by a trusted daemon snapshot. */
+bool lab_mobile_host_allowed_from_status(const string_t *host_header, const json_t *status, const json_t *serve)
+{
+    string_t *host = lab_mobile_host_name(host_header);
+    bool allowed = host && string_ends_with(host, ".ts.net") && lab_mobile_verified_serve(host, status, serve, NULL);
+    string_free(host);
+    return allowed;
+}
+
+/* Read the private daemon directly, without inheriting Go runtime allocation requirements. */
 bool lab_mobile_host_allowed(const string_t *host_header)
 {
     string_t *host = lab_mobile_host_name(host_header);
-    json_t *serve = lab_mobile_verified_serve(host);
-    bool allowed = serve != NULL;
-    json_free(serve);
+    bool candidate = host && string_ends_with(host, ".ts.net");
     string_free(host);
+    json_t *status = candidate ? lab_mobile_tailscale_json(false) : NULL;
+    json_t *serve = status ? lab_mobile_tailscale_json(true) : NULL;
+    bool allowed = lab_mobile_host_allowed_from_status(host_header, status, serve);
+    json_free(serve);
+    json_free(status);
     return allowed;
 }
 
@@ -329,23 +345,28 @@ static bool lab_mobile_https_proxy(const json_t *serve, const string_t *host, ui
     return matches;
 }
 
-/* Report private sharing already reachable through the supplied, verified local host. */
-json_t *lab_mobile_details(const string_t *host_header, uint16_t port)
+/* Select a verified HTTPS proxy before falling back to a directly bound private interface. */
+json_t *lab_mobile_details_from_status(const string_t *host_header, uint16_t port,
+                                      const json_t *status, const json_t *serve)
 {
     string_t *host = lab_mobile_host_name(host_header), *url = string_new();
     const char *configured_bind = getenv("MARS_LAB_BIND_HOST");
     string_t *bind = string_new_with(configured_bind ? configured_bind : "127.0.0.1");
     bool tailnet = false, ipv6 = false, reachable = false;
     int error = 0;
-    json_t *serve = host && port ? lab_mobile_verified_serve(host) : NULL;
-    bool proxy = serve && lab_mobile_https_proxy(serve, host, port, 0), bind_ipv6 = false, bind_tailnet = false;
+    bool local_tailnet = false, local_ipv6 = false;
+    bool local = host && (lab_mobile_desktop_host(host) ||
+                         lab_mobile_local_private_address(host, &local_tailnet, &local_ipv6));
+    string_t *own = NULL;
+    bool verified = host && port && lab_mobile_verified_serve(local ? NULL : host, status, serve, &own);
+    bool proxy = verified && lab_mobile_https_proxy(serve, own, port, 0), bind_ipv6 = false, bind_tailnet = false;
     bool wildcard = bind && lab_mobile_wildcard_bind(bind, &bind_ipv6);
     bool direct_tailnet = bind && lab_mobile_local_private_address(bind, &bind_tailnet, &bind_ipv6) && bind_tailnet;
-    if (serve && (proxy || wildcard || direct_tailnet)) {
+    if (verified && (proxy || wildcard || direct_tailnet)) {
         tailnet = true;
         error = !url    ? -1
-                : proxy ? string_append_format(url, "https://%S/", host)
-                        : string_append_format(url, "http://%S:%u/", host, (unsigned)port);
+                : proxy ? string_append_format(url, "https://%S/", own)
+                        : string_append_format(url, "http://%S:%u/", own, (unsigned)port);
         reachable = error >= 0;
     } else if (host && bind && port && lab_mobile_bound_address(bind, host) &&
                lab_mobile_local_private_address(host, &tailnet, &ipv6)) {
@@ -376,7 +397,7 @@ json_t *lab_mobile_details(const string_t *host_header, uint16_t port)
               lab_mobile_put(result, "tailscale", tailscale);
     json_free(tailscale);
     json_free(disabled);
-    json_free(serve);
+    string_free(own);
     string_free(qr);
     string_free(url);
     string_free(host);
@@ -387,5 +408,18 @@ json_t *lab_mobile_details(const string_t *host_header, uint16_t port)
         json_free(result);
         result = NULL;
     }
+    return result;
+}
+
+/* Fetch read-only daemon state; an unavailable daemon leaves ordinary Wi-Fi discovery intact. */
+json_t *lab_mobile_details(const string_t *host_header, uint16_t port)
+{
+    string_t *host = lab_mobile_host_name(host_header);
+    json_t *status = host && port ? lab_mobile_tailscale_json(false) : NULL;
+    json_t *serve = status ? lab_mobile_tailscale_json(true) : NULL;
+    json_t *result = lab_mobile_details_from_status(host_header, port, status, serve);
+    string_free(host);
+    json_free(serve);
+    json_free(status);
     return result;
 }

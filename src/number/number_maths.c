@@ -15,17 +15,17 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+#include "computation-t.h"
 #include "number-t.h"
-#define MARS_NUMBER_INTERNAL_ACCESS
-#include "number_internal.h"
+#include "string-t.h"
 #define MARS_SHARED_QFLOAT_INTERNAL_ACCESS
 #include "internal/qfloat_internal.h"
-#include "string-t.h"
+#define MARS_NUMBER_INTERNAL_ACCESS
+#include "number_internal.h"
 
 enum {
     NUMBER_LAMBERT_W_HALLEY_STEPS = 12,
-    NUMBER_BERNOULLI_EVEN_TERM_COUNT = 260,
-    NUMBER_BERNOULLI_WORK_COUNT = (2 * NUMBER_BERNOULLI_EVEN_TERM_COUNT) + 1,
+    NUMBER_BERNOULLI_MIN_TERMS = 260,
     NUMBER_POLYGAMMA_GUARD_BITS = 128,
     NUMBER_POLYGAMMA_TERM_GUARD_BITS = 16,
     NUMBER_EI_GUARD_BITS = 32,
@@ -39,39 +39,8 @@ enum {
     NUMBER_LOMMEL_MAX_SERIES_TERMS = 200000
 };
 
-static mpq_t number_bernoulli_even_terms[NUMBER_BERNOULLI_EVEN_TERM_COUNT];
-static bool number_bernoulli_even_term_ready[NUMBER_BERNOULLI_EVEN_TERM_COUNT];
-static bool number_bernoulli_even_terms_initialised;
-static mpq_t *number_bernoulli_work;
-static size_t number_bernoulli_next_degree;
-
-static int number_bernoulli_prepare(void)
-{
-    if (number_bernoulli_even_terms_initialised)
-        return 0;
-    number_bernoulli_work = calloc(NUMBER_BERNOULLI_WORK_COUNT, sizeof(*number_bernoulli_work));
-    if (!number_bernoulli_work)
-        return -1;
-    for (size_t i = 0u; i < NUMBER_BERNOULLI_EVEN_TERM_COUNT; ++i)
-        mpq_init(number_bernoulli_even_terms[i]);
-    for (size_t i = 0u; i < NUMBER_BERNOULLI_WORK_COUNT; ++i)
-        mpq_init(number_bernoulli_work[i]);
-    number_bernoulli_next_degree = 0u;
-    number_bernoulli_even_terms_initialised = true;
-    return 0;
-}
-
 static void __attribute__((destructor)) number_shutdown(void)
 {
-    if (number_bernoulli_even_terms_initialised) {
-        for (size_t i = 0u; i < NUMBER_BERNOULLI_EVEN_TERM_COUNT; ++i)
-            mpq_clear(number_bernoulli_even_terms[i]);
-        if (number_bernoulli_work) {
-            for (size_t i = 0u; i < NUMBER_BERNOULLI_WORK_COUNT; ++i)
-                mpq_clear(number_bernoulli_work[i]);
-            free(number_bernoulli_work);
-        }
-    }
     number_constants_shutdown();
     mpfr_free_cache();
 }
@@ -135,39 +104,6 @@ static bool number_text_to_int(const string_t *text, int *out)
 done:
     string_cursor_free(cursor);
     return ok;
-}
-
-static int number_bernoulli_even_ensure(size_t index)
-{
-    mpq_t scale;
-    size_t target_degree;
-
-    if (index == 0u || index > NUMBER_BERNOULLI_EVEN_TERM_COUNT)
-        return -1;
-    if (number_bernoulli_even_term_ready[index - 1u])
-        return 0;
-    if (number_bernoulli_prepare() != 0)
-        return -1;
-
-    target_degree = index * 2u;
-    mpq_init(scale);
-    for (size_t i = number_bernoulli_next_degree; i <= target_degree; ++i) {
-        mpq_set_ui(number_bernoulli_work[i], 1u, (unsigned long)i + 1u);
-        for (size_t j = i; j >= 1u; --j) {
-            mpq_sub(number_bernoulli_work[j - 1u], number_bernoulli_work[j - 1u], number_bernoulli_work[j]);
-            mpq_set_ui(scale, (unsigned long)j, 1u);
-            mpq_mul(number_bernoulli_work[j - 1u], number_bernoulli_work[j - 1u], scale);
-        }
-        if (i != 0u && (i % 2u) == 0u) {
-            size_t term_index = (i / 2u) - 1u;
-
-            mpq_set(number_bernoulli_even_terms[term_index], number_bernoulli_work[0]);
-            number_bernoulli_even_term_ready[term_index] = true;
-        }
-        number_bernoulli_next_degree = i + 1u;
-    }
-    mpq_clear(scale);
-    return 0;
 }
 
 typedef qfloat_t (*number_qfloat_unary_fn)(qfloat_t);
@@ -1428,39 +1364,10 @@ static int number_mpfr_gammainc_q_mut(mpfr_t value, const mpfr_t other)
 }
 
 
-static int number_mpfr_set_bernoulli_even(mpfr_t value, size_t index)
-{
-    if (index > NUMBER_BERNOULLI_EVEN_TERM_COUNT) {
-        if (index > ULONG_MAX / 2u) return -1;
-        unsigned long degree = (unsigned long)index * 2u;
-        mpfr_prec_t work = mpfr_get_prec(value) + 32;
-        mpfr_t coefficient, scale, zeta;
-        mpfr_inits2(work, coefficient, scale, zeta, (mpfr_ptr)0);
-        /* B_(2k) = (-1)^(k+1) 2 (2k)! zeta(2k) / (2*pi)^(2k).
-         * Keep the small exact cache, but do not let its size limit achievable precision. */
-        mpfr_const_pi(scale, MPFR_RNDN);
-        mpfr_mul_2ui(scale, scale, 1u, MPFR_RNDN);
-        mpfr_pow_ui(scale, scale, degree, MPFR_RNDN);
-        mpfr_fac_ui(coefficient, degree, MPFR_RNDN);
-        mpfr_zeta_ui(zeta, degree, MPFR_RNDN);
-        mpfr_mul(coefficient, coefficient, zeta, MPFR_RNDN);
-        mpfr_mul_2ui(coefficient, coefficient, 1u, MPFR_RNDN);
-        mpfr_div(coefficient, coefficient, scale, MPFR_RNDN);
-        if (!(index & 1u)) mpfr_neg(coefficient, coefficient, MPFR_RNDN);
-        mpfr_set(value, coefficient, MPFR_RNDN);
-        mpfr_clears(coefficient, scale, zeta, (mpfr_ptr)0);
-        return mpfr_number_p(value) ? 0 : -1;
-    }
-    if (number_bernoulli_even_ensure(index) != 0)
-        return -1;
-    mpfr_set_q(value, number_bernoulli_even_terms[index - 1u], MPFR_RNDN);
-    return 0;
-}
-
 static size_t number_bernoulli_term_budget(mpfr_prec_t precision)
 {
     size_t terms = (size_t)precision / 4u + 64u;
-    return terms > NUMBER_BERNOULLI_EVEN_TERM_COUNT ? terms : NUMBER_BERNOULLI_EVEN_TERM_COUNT;
+    return terms > NUMBER_BERNOULLI_MIN_TERMS ? terms : NUMBER_BERNOULLI_MIN_TERMS;
 }
 
 static bool number_mpfr_term_below_target(mpfr_srcptr term, mpfr_prec_t target_prec)
@@ -1475,19 +1382,18 @@ static bool number_mpfr_term_below_target(mpfr_srcptr term, mpfr_prec_t target_p
 
 static bool number_mpc_term_below_target(mpc_srcptr term, mpfr_prec_t target_prec)
 {
-    mpfr_t magnitude;
-    bool small;
-
-    mpfr_init2(magnitude, target_prec + NUMBER_POLYGAMMA_GUARD_BITS);
-    mpc_abs(magnitude, term, MPFR_RNDN);
-    small = number_mpfr_term_below_target(magnitude, target_prec);
-    mpfr_clear(magnitude);
-    return small;
+    /* |a+ib| <= |a|+|b| < 2^(max(component exponent)+1); reserve that extra bit. */
+    mpfr_exp_t bound = -(mpfr_exp_t)(target_prec + NUMBER_POLYGAMMA_TERM_GUARD_BITS) - 1;
+    return mpfr_number_p(mpc_realref(term)) && mpfr_number_p(mpc_imagref(term)) &&
+           (mpfr_zero_p(mpc_realref(term)) || mpfr_get_exp(mpc_realref(term)) <= bound) &&
+           (mpfr_zero_p(mpc_imagref(term)) || mpfr_get_exp(mpc_imagref(term)) <= bound);
 }
 
 static unsigned long number_polygamma_shift_target(mpfr_prec_t target_prec)
 {
-    unsigned long target = (unsigned long)target_prec;
+    /* The least asymptotic term is about exp(-2*pi*z). A sixth of the bit count, plus a fixed
+     * margin, keeps that minimum beyond the requested accuracy without thousands of extra shifts. */
+    unsigned long target = 32ul + (unsigned long)target_prec / 6ul;
 
     if (target < 64ul)
         target = 64ul;
@@ -1557,7 +1463,7 @@ static int number_mpfr_polygamma_order_mut(mpfr_t value, unsigned int order)
 
     mpfr_mul(power, power, inv, MPFR_RNDN);
     for (n = 1u; n <= number_bernoulli_term_budget(target_prec); ++n) {
-        if (number_mpfr_set_bernoulli_even(term, n) != 0) {
+        if (number_coefficient_bernoulli(term, n) != 0) {
             mpfr_clears(y, inv, inv2, power, term, sum, asymp, fact, (mpfr_ptr)0);
             return -1;
         }
@@ -1647,7 +1553,7 @@ static int number_mpc_polygamma_order(mpc_ptr out, mpc_srcptr z, unsigned int or
 
     mpc_mul(power, power, inv, MPC_RNDNN);
     for (n = 1u; n <= number_bernoulli_term_budget(target_prec); ++n) {
-        if (number_mpfr_set_bernoulli_even(coeff, n) != 0) {
+        if (number_coefficient_bernoulli(coeff, n) != 0) {
             rc = -1;
             break;
         }
@@ -1733,7 +1639,7 @@ static int number_mpc_digamma_positive(mpc_ptr out, mpc_srcptr z, mpc_rnd_t rnd)
     mpc_set(power, inv2, MPC_RNDNN);
 
     for (size_t n = 1u; n <= number_bernoulli_term_budget(target_prec); ++n) {
-        if (number_mpfr_set_bernoulli_even(coeff, n) != 0) {
+        if (number_coefficient_bernoulli(coeff, n) != 0) {
             rc = -1;
             break;
         }
@@ -1815,142 +1721,21 @@ static unsigned long number_zeta_sum_terms(mpfr_prec_t precision, mpc_srcptr arg
 
 static int number_mpc_zeta_euler_maclaurin(mpc_ptr out, mpc_srcptr s, bool want_derivative, mpc_rnd_t rnd)
 {
-    mpfr_prec_t target_prec = mpc_get_prec(out);
-    mpfr_prec_t work_prec = target_prec + 128;
-    const unsigned long endpoint = number_zeta_sum_terms(target_prec, s);
-    mpc_t sum, derivative, term, factor, rising, rising_derivative, power, power_step, s_minus_one, temporary;
-    mpfr_t log_n, log_endpoint, bernoulli, factorial;
-    bool converged = false;
-    int rc = 0;
-
-    mpc_init2(sum, work_prec);
-    mpc_init2(derivative, work_prec);
-    mpc_init2(term, work_prec);
-    mpc_init2(factor, work_prec);
-    mpc_init2(rising, work_prec);
-    mpc_init2(rising_derivative, work_prec);
-    mpc_init2(power, work_prec);
-    mpc_init2(power_step, work_prec);
-    mpc_init2(s_minus_one, work_prec);
-    mpc_init2(temporary, work_prec);
-    mpfr_inits2(work_prec, log_n, log_endpoint, bernoulli, factorial, (mpfr_ptr)0);
-
-    mpfr_log_ui(log_endpoint, endpoint, MPFR_RNDN);
-    mpc_set_ui(sum, 0u, MPC_RNDNN);
-    mpc_set_ui(derivative, 0u, MPC_RNDNN);
-
-    for (unsigned long n = 1ul; n < endpoint; ++n) {
-        mpfr_log_ui(log_n, n, MPFR_RNDN);
-        mpc_mul_fr(term, s, log_n, MPC_RNDNN);
-        mpc_neg(term, term, MPC_RNDNN);
-        mpc_exp(term, term, MPC_RNDNN);
-        mpc_add(sum, sum, term, MPC_RNDNN);
-        if (want_derivative) {
-            mpc_mul_fr(temporary, term, log_n, MPC_RNDNN);
-            mpc_sub(derivative, derivative, temporary, MPC_RNDNN);
-        }
-    }
-
-    mpc_sub_ui(s_minus_one, s, 1u, MPC_RNDNN);
-    if (mpc_cmp_si_si(s_minus_one, 0, 0) == 0) {
-        mpfr_set_inf(mpc_realref(out), want_derivative ? -1 : 1);
-        mpfr_set_zero(mpc_imagref(out), 1);
-        goto done;
-    }
-
-    mpc_ui_sub(power, 1u, s, MPC_RNDNN);
-    mpc_mul_fr(power, power, log_endpoint, MPC_RNDNN);
-    mpc_exp(power, power, MPC_RNDNN);
-    mpc_div(term, power, s_minus_one, MPC_RNDNN);
-    mpc_add(sum, sum, term, MPC_RNDNN);
-
-    if (want_derivative) {
-        mpc_fr_div(temporary, log_endpoint, s_minus_one, MPC_RNDNN);
-        mpc_neg(temporary, temporary, MPC_RNDNN);
-        mpc_sqr(term, s_minus_one, MPC_RNDNN);
-        mpc_ui_div(term, 1u, term, MPC_RNDNN);
-        mpc_sub(temporary, temporary, term, MPC_RNDNN);
-        mpc_mul(temporary, temporary, power, MPC_RNDNN);
-        mpc_add(derivative, derivative, temporary, MPC_RNDNN);
-    }
-
-    mpc_mul_fr(term, s, log_endpoint, MPC_RNDNN);
-    mpc_neg(term, term, MPC_RNDNN);
-    mpc_exp(term, term, MPC_RNDNN);
-    mpc_div_2ui(term, term, 1u, MPC_RNDNN);
-    mpc_add(sum, sum, term, MPC_RNDNN);
-    if (want_derivative) {
-        mpc_mul_fr(temporary, term, log_endpoint, MPC_RNDNN);
-        mpc_sub(derivative, derivative, temporary, MPC_RNDNN);
-    }
-
-    mpc_set_ui(rising, 1u, MPC_RNDNN);
-    mpc_set_ui(rising_derivative, 0u, MPC_RNDNN);
-    mpc_set_ui(power_step, endpoint, MPC_RNDNN);
-    mpc_sqr(power_step, power_step, MPC_RNDNN);
-    mpc_ui_div(power_step, 1u, power_step, MPC_RNDNN);
-
-    for (size_t k = 1u; k <= number_bernoulli_term_budget(target_prec); ++k) {
-        unsigned int rising_count = (unsigned int)(2u * k - 1u);
-
-        if (number_mpfr_set_bernoulli_even(bernoulli, k) != 0) {
-            rc = -1;
-            break;
-        }
-        mpfr_fac_ui(factorial, 2u * k, MPFR_RNDN);
-        mpfr_div(bernoulli, bernoulli, factorial, MPFR_RNDN);
-        /* Extend the previous product; division would fail at non-positive integers. */
-        for (unsigned int j = k == 1u ? 0u : rising_count - 2u; j < rising_count; ++j) {
-            mpc_add_ui(factor, s, j, MPC_RNDNN);
-            if (want_derivative) {
-                mpc_mul(rising_derivative, rising_derivative, factor, MPC_RNDNN);
-                mpc_add(rising_derivative, rising_derivative, rising, MPC_RNDNN);
-            }
-            mpc_mul(rising, rising, factor, MPC_RNDNN);
-        }
-        if (k == 1u) {
-            mpc_add_ui(power, s, rising_count, MPC_RNDNN);
-            mpc_neg(power, power, MPC_RNDNN);
-            mpc_mul_fr(power, power, log_endpoint, MPC_RNDNN);
-            mpc_exp(power, power, MPC_RNDNN);
-        } else {
-            mpc_mul(power, power, power_step, MPC_RNDNN);
-        }
-        mpc_mul(term, rising, power, MPC_RNDNN);
-        mpc_mul_fr(term, term, bernoulli, MPC_RNDNN);
-        mpc_add(sum, sum, term, MPC_RNDNN);
-
-        if (want_derivative) {
-            mpc_mul_fr(temporary, rising, log_endpoint, MPC_RNDNN);
-            mpc_sub(temporary, rising_derivative, temporary, MPC_RNDNN);
-            mpc_mul(temporary, temporary, power, MPC_RNDNN);
-            mpc_mul_fr(temporary, temporary, bernoulli, MPC_RNDNN);
-            mpc_add(derivative, derivative, temporary, MPC_RNDNN);
-        }
-        if (k >= 4u && number_mpc_term_below_target(want_derivative ? temporary : term, target_prec)) {
-            converged = true;
-            break;
-        }
-    }
-
-    if (rc == 0 && !converged)
-        rc = -1;
-    if (rc == 0)
-        mpc_set(out, want_derivative ? derivative : sum, rnd);
-
-done:
-    mpfr_clears(log_n, log_endpoint, bernoulli, factorial, (mpfr_ptr)0);
-    mpc_clear(temporary);
-    mpc_clear(s_minus_one);
-    mpc_clear(power_step);
-    mpc_clear(power);
-    mpc_clear(rising_derivative);
-    mpc_clear(rising);
-    mpc_clear(factor);
-    mpc_clear(term);
+    mpfr_prec_t target = mpc_get_prec(out), work = target + 128;
+    unsigned long count = number_zeta_sum_terms(target, s);
+    mpc_t sum, derivative, endpoint;
+    mpc_init2(sum, work);
+    mpc_init2(derivative, work);
+    mpc_init2(endpoint, work);
+    mpc_set_ui(endpoint, count, MPC_RNDNN);
+    number_zeta_finite_sum(sum, want_derivative ? derivative : NULL, s, count);
+    int status = number_zeta_tail(sum, want_derivative ? derivative : NULL, s, endpoint, target,
+                                  number_bernoulli_term_budget(target), NUMBER_POLYGAMMA_TERM_GUARD_BITS);
+    if (!status) mpc_set(out, want_derivative ? derivative : sum, rnd);
+    mpc_clear(endpoint);
     mpc_clear(derivative);
     mpc_clear(sum);
-    return rc;
+    return status;
 }
 
 static int number_mpc_zeta_mut(mpc_ptr out, mpc_srcptr in, mpc_rnd_t rnd)
@@ -1966,152 +1751,31 @@ static int number_mpc_zetap_mut(mpc_ptr out, mpc_srcptr in, mpc_rnd_t rnd)
 static int number_mpc_zetah_euler_maclaurin(mpc_ptr out, mpc_srcptr s, mpc_srcptr a,
                                             bool want_derivative, mpc_rnd_t rnd)
 {
-    mpfr_prec_t target_prec = mpc_get_prec(out);
-    mpfr_prec_t work_prec = target_prec + 128;
-    const unsigned long term_count = number_zeta_sum_terms(target_prec, s);
-    mpc_t sum, derivative, base, log_base, term, factor, rising, rising_derivative, power, s_minus_one;
-    mpc_t endpoint, log_endpoint, temporary, power_step;
-    mpfr_t bernoulli, factorial;
-    bool converged = false;
-    int rc = 0;
-
-    mpc_init2(sum, work_prec);
-    mpc_init2(derivative, work_prec);
-    mpc_init2(base, work_prec);
-    mpc_init2(log_base, work_prec);
-    mpc_init2(term, work_prec);
-    mpc_init2(factor, work_prec);
-    mpc_init2(rising, work_prec);
-    mpc_init2(rising_derivative, work_prec);
-    mpc_init2(power, work_prec);
-    mpc_init2(power_step, work_prec);
-    mpc_init2(s_minus_one, work_prec);
-    mpc_init2(endpoint, work_prec);
-    mpc_init2(log_endpoint, work_prec);
-    mpc_init2(temporary, work_prec);
-    mpfr_inits2(work_prec, bernoulli, factorial, (mpfr_ptr)0);
-
+    mpfr_prec_t target = mpc_get_prec(out), work = target + 128;
+    unsigned long count = number_zeta_sum_terms(target, s);
+    mpc_t sum, derivative, logarithm, term, temporary, endpoint;
+    mpc_init2(sum, work); mpc_init2(derivative, work); mpc_init2(logarithm, work);
+    mpc_init2(term, work); mpc_init2(temporary, work); mpc_init2(endpoint, work);
     mpc_set_ui(sum, 0u, MPC_RNDNN);
     mpc_set_ui(derivative, 0u, MPC_RNDNN);
-    for (unsigned long n = 0ul; n < term_count; ++n) {
-        mpc_add_ui(base, a, n, MPC_RNDNN);
-        mpc_log(log_base, base, MPC_RNDNN);
-        mpc_mul(term, s, log_base, MPC_RNDNN);
+    for (unsigned long n = 0ul; n < count; ++n) {
+        number_zeta_logarithm(logarithm, a, n);
+        mpc_mul(term, s, logarithm, MPC_RNDNN);
         mpc_neg(term, term, MPC_RNDNN);
         mpc_exp(term, term, MPC_RNDNN);
         mpc_add(sum, sum, term, MPC_RNDNN);
         if (want_derivative) {
-            mpc_mul(temporary, term, log_base, MPC_RNDNN);
+            mpc_mul(temporary, term, logarithm, MPC_RNDNN);
             mpc_sub(derivative, derivative, temporary, MPC_RNDNN);
         }
     }
-
-    mpc_add_ui(endpoint, a, term_count, MPC_RNDNN);
-    mpc_log(log_endpoint, endpoint, MPC_RNDNN);
-    mpc_sub_ui(s_minus_one, s, 1u, MPC_RNDNN);
-    if (mpc_cmp_si_si(s_minus_one, 0, 0) == 0) {
-        mpfr_set_inf(mpc_realref(out), want_derivative ? -1 : 1);
-        mpfr_set_zero(mpc_imagref(out), 1);
-        goto done;
-    }
-
-    mpc_ui_sub(power, 1u, s, MPC_RNDNN);
-    mpc_mul(power, power, log_endpoint, MPC_RNDNN);
-    mpc_exp(power, power, MPC_RNDNN);
-    mpc_div(term, power, s_minus_one, MPC_RNDNN);
-    mpc_add(sum, sum, term, MPC_RNDNN);
-
-    if (want_derivative) {
-        mpc_div(temporary, log_endpoint, s_minus_one, MPC_RNDNN);
-        mpc_neg(temporary, temporary, MPC_RNDNN);
-        mpc_sqr(term, s_minus_one, MPC_RNDNN);
-        mpc_ui_div(term, 1u, term, MPC_RNDNN);
-        mpc_sub(temporary, temporary, term, MPC_RNDNN);
-        mpc_mul(temporary, temporary, power, MPC_RNDNN);
-        mpc_add(derivative, derivative, temporary, MPC_RNDNN);
-    }
-
-    mpc_mul(term, s, log_endpoint, MPC_RNDNN);
-    mpc_neg(term, term, MPC_RNDNN);
-    mpc_exp(term, term, MPC_RNDNN);
-    mpc_div_2ui(term, term, 1u, MPC_RNDNN);
-    mpc_add(sum, sum, term, MPC_RNDNN);
-    if (want_derivative) {
-        mpc_mul(temporary, term, log_endpoint, MPC_RNDNN);
-        mpc_sub(derivative, derivative, temporary, MPC_RNDNN);
-    }
-
-    mpc_set_ui(rising, 1u, MPC_RNDNN);
-    mpc_set_ui(rising_derivative, 0u, MPC_RNDNN);
-    mpc_set(power_step, endpoint, MPC_RNDNN);
-    mpc_sqr(power_step, power_step, MPC_RNDNN);
-    mpc_ui_div(power_step, 1u, power_step, MPC_RNDNN);
-
-    for (size_t k = 1u; k <= number_bernoulli_term_budget(target_prec); ++k) {
-        unsigned int rising_count = (unsigned int)(2u * k - 1u);
-
-        if (number_mpfr_set_bernoulli_even(bernoulli, k) != 0) {
-            rc = -1;
-            break;
-        }
-        mpfr_fac_ui(factorial, 2u * k, MPFR_RNDN);
-        mpfr_div(bernoulli, bernoulli, factorial, MPFR_RNDN);
-        /* Extend the previous product; division would fail at non-positive integers. */
-        for (unsigned int j = k == 1u ? 0u : rising_count - 2u; j < rising_count; ++j) {
-            mpc_add_ui(factor, s, j, MPC_RNDNN);
-            if (want_derivative) {
-                mpc_mul(rising_derivative, rising_derivative, factor, MPC_RNDNN);
-                mpc_add(rising_derivative, rising_derivative, rising, MPC_RNDNN);
-            }
-            mpc_mul(rising, rising, factor, MPC_RNDNN);
-        }
-        if (k == 1u) {
-            mpc_add_ui(power, s, rising_count, MPC_RNDNN);
-            mpc_neg(power, power, MPC_RNDNN);
-            mpc_mul(power, power, log_endpoint, MPC_RNDNN);
-            mpc_exp(power, power, MPC_RNDNN);
-        } else {
-            mpc_mul(power, power, power_step, MPC_RNDNN);
-        }
-        mpc_mul(term, rising, power, MPC_RNDNN);
-        mpc_mul_fr(term, term, bernoulli, MPC_RNDNN);
-        mpc_add(sum, sum, term, MPC_RNDNN);
-
-        if (want_derivative) {
-            mpc_mul(temporary, rising, log_endpoint, MPC_RNDNN);
-            mpc_sub(temporary, rising_derivative, temporary, MPC_RNDNN);
-            mpc_mul(temporary, temporary, power, MPC_RNDNN);
-            mpc_mul_fr(temporary, temporary, bernoulli, MPC_RNDNN);
-            mpc_add(derivative, derivative, temporary, MPC_RNDNN);
-        }
-        if (k >= 4u && number_mpc_term_below_target(want_derivative ? temporary : term, target_prec)) {
-            converged = true;
-            break;
-        }
-    }
-
-    if (rc == 0 && !converged)
-        rc = -1;
-    if (rc == 0)
-        mpc_set(out, want_derivative ? derivative : sum, rnd);
-
-done:
-    mpfr_clears(bernoulli, factorial, (mpfr_ptr)0);
-    mpc_clear(temporary);
-    mpc_clear(log_endpoint);
-    mpc_clear(endpoint);
-    mpc_clear(s_minus_one);
-    mpc_clear(power_step);
-    mpc_clear(power);
-    mpc_clear(rising_derivative);
-    mpc_clear(rising);
-    mpc_clear(factor);
-    mpc_clear(term);
-    mpc_clear(log_base);
-    mpc_clear(base);
-    mpc_clear(derivative);
-    mpc_clear(sum);
-    return rc;
+    mpc_add_ui(endpoint, a, count, MPC_RNDNN);
+    int status = number_zeta_tail(sum, want_derivative ? derivative : NULL, s, endpoint, target,
+                                  number_bernoulli_term_budget(target), NUMBER_POLYGAMMA_TERM_GUARD_BITS);
+    if (!status) mpc_set(out, want_derivative ? derivative : sum, rnd);
+    mpc_clear(endpoint); mpc_clear(temporary); mpc_clear(term); mpc_clear(logarithm);
+    mpc_clear(derivative); mpc_clear(sum);
+    return status;
 }
 
 static int number_mpc_zetah_mut(mpc_ptr out, mpc_srcptr s, mpc_srcptr a, mpc_rnd_t rnd)
@@ -2126,6 +1790,22 @@ static int number_mpc_zatahp_mut(mpc_ptr out, mpc_srcptr s, mpc_srcptr a, mpc_rn
 
 static int number_mpfr_zeta_mut(mpfr_t value)
 {
+    /* Stay below the coefficient and factorised-sum cache limits at very large precisions. */
+    if (mpfr_get_prec(value) >= 1024 && mpfr_get_prec(value) <= 8192 &&
+        mpfr_number_p(value) && mpfr_sgn(value) > 0 &&
+        mpfr_cmp_ui(value, 64u) <= 0 && !mpfr_integer_p(value)) {
+        mpc_t input, result;
+        mpc_init2(input, mpfr_get_prec(value));
+        mpc_init2(result, mpfr_get_prec(value));
+        mpc_set_fr(input, value, MPC_RNDNN);
+        int status = number_mpc_zeta_euler_maclaurin(result, input, false, MPC_RNDNN);
+        if (!status && mpfr_number_p(mpc_realref(result)) && mpfr_zero_p(mpc_imagref(result)))
+            mpfr_set(value, mpc_realref(result), MPFR_RNDN);
+        else status = -1;
+        mpc_clear(input);
+        mpc_clear(result);
+        if (!status) return 0;
+    }
     mpfr_zeta(value, value, MPFR_RNDN);
     return 0;
 }
@@ -2184,84 +1864,52 @@ static int number_mpfr_zatahp_mut(mpfr_t s, const mpfr_t a)
 
 static double number_double_zeta(double value)
 {
-    return qf_to_double(qf_zeta(qf_from_double(value)));
+    mpfr_t input;
+    mpfr_init2(input, 53);
+    mpfr_set_d(input, value, MPFR_RNDN);
+    mpfr_zeta(input, input, MPFR_RNDN);
+    double result = mpfr_get_d(input, MPFR_RNDN);
+    mpfr_clear(input);
+    return result;
 }
 
 static double number_double_zetap(double value)
 {
-    return qf_to_double(qf_zetap(qf_from_double(value)));
+    if (!isfinite(value)) return value > 0 ? 0.0 : NAN;
+    mpfr_t input;
+    mpfr_init2(input, 53);
+    mpfr_set_d(input, value, MPFR_RNDN);
+    int status = number_mpfr_zetap_mut(input);
+    double result = status ? NAN : mpfr_get_d(input, MPFR_RNDN);
+    mpfr_clear(input);
+    return result;
+}
+
+static double number_double_zetah_common(double s, double a, bool derivative)
+{
+    if (isnan(s) || isnan(a) || a <= 0.0) return NAN;
+    if (a == 1.0) return derivative ? number_double_zetap(s) : number_double_zeta(s);
+    if (s == 1.0) return derivative ? -INFINITY : INFINITY;
+    if (isinf(a)) return s > 1.0 ? 0.0 : NAN;
+    if (isinf(s)) return s > 0.0 && a >= 1.0 ? 0.0 : NAN;
+    mpfr_t first, second;
+    mpfr_inits2(53, first, second, (mpfr_ptr)0);
+    mpfr_set_d(first, s, MPFR_RNDN);
+    mpfr_set_d(second, a, MPFR_RNDN);
+    int status = number_mpfr_zetah_common_mut(first, second, derivative);
+    double result = status ? NAN : mpfr_get_d(first, MPFR_RNDN);
+    mpfr_clears(first, second, (mpfr_ptr)0);
+    return result;
 }
 
 static double number_double_zetah(double s, double a)
 {
-    return qf_to_double(qf_zetah(qf_from_double(s), qf_from_double(a)));
+    return number_double_zetah_common(s, a, false);
 }
 
 static double number_double_zatahp(double s, double a)
 {
-    return qf_to_double(qf_zatahp(qf_from_double(s), qf_from_double(a)));
-}
-
-static int number_mpfr_gammainv_mut(mpfr_t value)
-{
-    mpfr_prec_t result_prec = mpfr_get_prec(value);
-    mpfr_prec_t work_prec = result_prec + (result_prec > 256 ? result_prec / 4 : 64);
-    mpfr_t y, gamma_min, log_y, x, lgamma_x, digamma_x, residual, step;
-    qfloat_t qstart;
-    double y_double;
-    double x_start;
-    int max_iterations = (int)(result_prec / 8u) + 32;
-
-    if (!mpfr_number_p(value) || mpfr_sgn(value) <= 0) {
-        mpfr_set_nan(value);
-        return 0;
-    }
-
-    mpfr_inits2(work_prec, y, gamma_min, log_y, x, lgamma_x, digamma_x, residual, step, (mpfr_ptr)0);
-    mpfr_set(y, value, MPFR_RNDN);
-    mpfr_set_str(gamma_min, "0.885603194410888700278815900582588733207951533669903448871200165", 10, MPFR_RNDN);
-    if (mpfr_cmp(y, gamma_min) < 0) {
-        mpfr_set_nan(value);
-        mpfr_clears(y, gamma_min, log_y, x, lgamma_x, digamma_x, residual, step, (mpfr_ptr)0);
-        return 0;
-    }
-
-    mpfr_log(log_y, y, MPFR_RNDN);
-    y_double = mpfr_get_d(y, MPFR_RNDN);
-    qstart = qf_gammainv((qfloat_t){y_double, 0.0});
-    x_start = qf_to_double(qstart);
-
-    if (isfinite(x_start) && x_start > 0.0) {
-        mpfr_set_d(x, x_start, MPFR_RNDN);
-    } else if (mpfr_cmp_ui(y, 1u) <= 0) {
-        mpfr_set_ui(x, 1u, MPFR_RNDN);
-    } else {
-        mpfr_set(x, log_y, MPFR_RNDN);
-        if (mpfr_cmp_d(x, 1.5) < 0)
-            mpfr_set_d(x, 1.5, MPFR_RNDN);
-    }
-
-    for (int i = 0; i < max_iterations; ++i) {
-        mpfr_lngamma(lgamma_x, x, MPFR_RNDN);
-        mpfr_sub(residual, lgamma_x, log_y, MPFR_RNDN);
-        mpfr_digamma(digamma_x, x, MPFR_RNDN);
-        if (mpfr_zero_p(digamma_x) || !mpfr_number_p(digamma_x))
-            break;
-
-        mpfr_div(step, residual, digamma_x, MPFR_RNDN);
-        mpfr_sub(x, x, step, MPFR_RNDN);
-        if (!mpfr_number_p(x) || mpfr_sgn(x) <= 0) {
-            mpfr_set_d(x, x_start > 0.0 ? x_start : 1.5, MPFR_RNDN);
-            break;
-        }
-        mpfr_abs(step, step, MPFR_RNDN);
-        if (mpfr_zero_p(step) || mpfr_cmp_ui_2exp(step, 1u, -((long)result_prec + 8L)) <= 0)
-            break;
-    }
-
-    mpfr_set(value, x, MPFR_RNDN);
-    mpfr_clears(y, gamma_min, log_y, x, lgamma_x, digamma_x, residual, step, (mpfr_ptr)0);
-    return 0;
+    return number_double_zetah_common(s, a, true);
 }
 
 static int number_mpfr_lambert_w_mut(mpfr_t value, bool branch_m1)
@@ -4181,14 +3829,18 @@ static int number_factors_append(number_factors_t *factors, mpz_srcptr prime, un
     return 0;
 }
 
+/* Return a complete factorisation only; stopping discards every partial factor. */
 number_factors_t *num_factors(const number_t number)
 {
+    computation_t *control = computation_current();
     number_factors_t *factors;
     mpz_t work;
     mpz_t prime;
     mpz_t quotient;
     mpz_t remainder;
 
+    if (control && !computation_checkpoint(control, 0))
+        return NULL;
     mpz_init(work);
     if (!number_get_exact_integer_mpz(number, work) || mpz_sgn(work) <= 0) {
         mpz_clear(work);
@@ -4207,6 +3859,8 @@ number_factors_t *num_factors(const number_t number)
     while (mpz_cmp_ui(work, 1u) > 0) {
         unsigned long exponent = 0u;
 
+        if (control && !computation_checkpoint(control, 1))
+            goto stopped;
         if (mpz_probab_prime_p(work, 25) > 0) {
             if (number_factors_append(factors, work, 1u) != 0) {
                 num_factors_free(factors);
@@ -4216,6 +3870,8 @@ number_factors_t *num_factors(const number_t number)
         }
 
         for (;;) {
+            if (control && !computation_checkpoint(control, 1))
+                goto stopped;
             mpz_tdiv_qr(quotient, remainder, work, prime);
             if (mpz_sgn(remainder) != 0)
                 break;
@@ -4233,6 +3889,12 @@ number_factors_t *num_factors(const number_t number)
         else
             mpz_nextprime(prime, prime);
     }
+    goto done;
+
+stopped:
+    num_factors_free(factors);
+    factors = NULL;
+done:
     mpz_clear(remainder);
     mpz_clear(quotient);
     mpz_clear(prime);
@@ -5253,6 +4915,7 @@ number_t num_zetah(const number_t s, const number_t a)
     if (num_is_nan(s) || num_is_nan(a))
         return NUM_NAN;
     if (num_is_real(a) && num_is_inf(a)) {
+        if (num_get_sign(a) < 0) return NUM_NAN;
         number_t one = num_clone(NUM_ONE);
         number_t result = num_gt(s, one) ? num_clone(NUM_ZERO) : NUM_NAN;
 
@@ -5300,6 +4963,7 @@ number_t num_zatahp(const number_t s, const number_t a)
     if (num_is_nan(s) || num_is_nan(a))
         return NUM_NAN;
     if (num_is_real(a) && num_is_inf(a)) {
+        if (num_get_sign(a) < 0) return NUM_NAN;
         number_t one = num_clone(NUM_ONE);
         number_t result = num_gt(s, one) ? num_clone(NUM_ZERO) : NUM_NAN;
 
@@ -5310,45 +4974,41 @@ number_t num_zatahp(const number_t s, const number_t a)
                                                 number_mpfr_zatahp_mut, number_mpc_zatahp_mut);
 }
 
-static void number_polylog_tolerance(mpfr_t tolerance, mpfr_prec_t precision)
+static mpfr_prec_t number_polylog_target_bits(mpfr_prec_t precision)
 {
-    unsigned long bits = (unsigned long)(precision > 0 ? precision : 128);
-
-    if (bits > ULONG_MAX - 32ul)
-        bits = ULONG_MAX - 32ul;
-    mpfr_set_ui(tolerance, 1u, MPFR_RNDN);
-    mpfr_div_2ui(tolerance, tolerance, bits + 16ul, MPFR_RNDN);
+    mpfr_prec_t bits = precision > 0 ? precision : 128;
+    return bits > MPFR_PREC_MAX - 16 ? MPFR_PREC_MAX : bits + 16;
 }
 
 static int number_mpfr_polylog_series_int(mpfr_t out, int order, const mpfr_t z)
 {
     mpfr_prec_t precision = mpfr_get_prec(out);
-    mpfr_t sum, term, add, denom, abs_add, abs_sum, threshold, tolerance;
+    mpfr_t sum, term, add, denom, abs_add, abs_sum, threshold;
 
     if (order < 0)
         return -1;
+    if (!mpfr_number_p(z)) { mpfr_set_nan(out); return 0; }
 
-    mpfr_inits2(precision, sum, term, add, denom, abs_add, abs_sum, threshold, tolerance, (mpfr_ptr)0);
-    number_polylog_tolerance(tolerance, precision);
+    mpfr_inits2(precision, sum, term, add, denom, abs_add, abs_sum, threshold, (mpfr_ptr)0);
+    mpfr_prec_t target_bits = number_polylog_target_bits(precision);
     mpfr_set_zero(sum, 0);
     mpfr_set(term, z, MPFR_RNDN);
 
     for (unsigned long k = 1ul; k < NUMBER_POLYLOG_SERIES_MAX_TERMS; ++k) {
-        if (order == 0)
-            mpfr_set_ui(denom, 1u, MPFR_RNDN);
-        else
+        unsigned long small = number_series_integer_power(k, (unsigned long)order);
+        if (small) mpfr_div_ui(add, term, small, MPFR_RNDN);
+        else {
             mpfr_ui_pow_ui(denom, k, (unsigned long)order, MPFR_RNDN);
-
-        mpfr_div(add, term, denom, MPFR_RNDN);
+            mpfr_div(add, term, denom, MPFR_RNDN);
+        }
         mpfr_add(sum, sum, add, MPFR_RNDN);
 
         mpfr_abs(abs_add, add, MPFR_RNDN);
         mpfr_abs(abs_sum, sum, MPFR_RNDN);
-        mpfr_add_ui(threshold, abs_sum, 1u, MPFR_RNDN);
-        mpfr_mul(threshold, threshold, tolerance, MPFR_RNDN);
-        if (mpfr_cmp(abs_add, threshold) <= 0) {
+        mpfr_add_ui(threshold, abs_sum, 1u, MPFR_RNDD);
+        if (number_series_small(abs_add, threshold, target_bits, 0u)) {
             mpfr_set(out, sum, MPFR_RNDN);
-            mpfr_clears(sum, term, add, denom, abs_add, abs_sum, threshold, tolerance, (mpfr_ptr)0);
+            mpfr_clears(sum, term, add, denom, abs_add, abs_sum, threshold, (mpfr_ptr)0);
             return 0;
         }
 
@@ -5356,7 +5016,7 @@ static int number_mpfr_polylog_series_int(mpfr_t out, int order, const mpfr_t z)
     }
 
     mpfr_set(out, sum, MPFR_RNDN);
-    mpfr_clears(sum, term, add, denom, abs_add, abs_sum, threshold, tolerance, (mpfr_ptr)0);
+    mpfr_clears(sum, term, add, denom, abs_add, abs_sum, threshold, (mpfr_ptr)0);
     return 0;
 }
 
@@ -5404,38 +5064,38 @@ static int number_mpc_polylog_series_int(mpc_ptr out, int order, mpc_srcptr z, m
 {
     mpfr_prec_t precision = mpc_get_prec(out);
     mpc_t sum, term, add;
-    mpfr_t denom, abs_add, abs_sum, threshold, tolerance;
+    mpfr_t denom, abs_add, abs_sum, threshold;
 
     if (order < 0)
         return -1;
+    if (!mpfr_number_p(mpc_realref(z)) || !mpfr_number_p(mpc_imagref(z))) { mpc_set_nan(out); return 0; }
 
     mpc_init2(sum, precision);
     mpc_init2(term, precision);
     mpc_init2(add, precision);
-    mpfr_inits2(precision, denom, abs_add, abs_sum, threshold, tolerance, (mpfr_ptr)0);
-    number_polylog_tolerance(tolerance, precision);
+    mpfr_inits2(precision, denom, abs_add, abs_sum, threshold, (mpfr_ptr)0);
+    mpfr_prec_t target_bits = number_polylog_target_bits(precision);
     mpc_set_ui_ui(sum, 0u, 0u, rnd);
     mpc_set(term, z, rnd);
 
     for (unsigned long k = 1ul; k < NUMBER_POLYLOG_SERIES_MAX_TERMS; ++k) {
-        if (order == 0)
-            mpfr_set_ui(denom, 1u, MPFR_RNDN);
-        else
+        unsigned long small = number_series_integer_power(k, (unsigned long)order);
+        if (small) mpc_div_ui(add, term, small, rnd);
+        else {
             mpfr_ui_pow_ui(denom, k, (unsigned long)order, MPFR_RNDN);
-
-        mpc_div_fr(add, term, denom, rnd);
+            mpc_div_fr(add, term, denom, rnd);
+        }
         mpc_add(sum, sum, add, rnd);
 
-        mpc_abs(abs_add, add, MPFR_RNDN);
-        mpc_abs(abs_sum, sum, MPFR_RNDN);
-        mpfr_add_ui(threshold, abs_sum, 1u, MPFR_RNDN);
-        mpfr_mul(threshold, threshold, tolerance, MPFR_RNDN);
-        if (mpfr_cmp(abs_add, threshold) <= 0) {
+        number_mpc_abs_upper(abs_add, add);
+        number_mpc_abs_lower(abs_sum, sum);
+        mpfr_add_ui(threshold, abs_sum, 1u, MPFR_RNDD);
+        if (number_series_small(abs_add, threshold, target_bits, 0u)) {
             mpc_set(out, sum, rnd);
             mpc_clear(add);
             mpc_clear(term);
             mpc_clear(sum);
-            mpfr_clears(denom, abs_add, abs_sum, threshold, tolerance, (mpfr_ptr)0);
+            mpfr_clears(denom, abs_add, abs_sum, threshold, (mpfr_ptr)0);
             return 0;
         }
 
@@ -5446,7 +5106,7 @@ static int number_mpc_polylog_series_int(mpc_ptr out, int order, mpc_srcptr z, m
     mpc_clear(add);
     mpc_clear(term);
     mpc_clear(sum);
-    mpfr_clears(denom, abs_add, abs_sum, threshold, tolerance, (mpfr_ptr)0);
+    mpfr_clears(denom, abs_add, abs_sum, threshold, (mpfr_ptr)0);
     return 0;
 }
 
@@ -5481,8 +5141,8 @@ static int number_mpc_Ei(mpc_ptr out, mpc_srcptr z, mpc_rnd_t rnd)
         unsigned long next = k + 1ul;
 
         mpc_add(sum, sum, term, MPC_RNDNN);
-        mpc_abs(term_magnitude, term, MPFR_RNDN);
-        mpc_abs(sum_magnitude, sum, MPFR_RNDN);
+        number_mpc_abs_upper(term_magnitude, term);
+        number_mpc_abs_lower(sum_magnitude, sum);
         if (!mpfr_number_p(term_magnitude) || !mpfr_number_p(sum_magnitude) ||
             number_special_series_converged(term_magnitude, sum_magnitude, target_precision))
             break;
@@ -5534,6 +5194,7 @@ static int number_mpc_dilog(mpc_ptr out, mpc_srcptr z, mpc_rnd_t rnd)
     mpc_t inv_z, log_neg_z, log_sq, half_log_sq, inner, one_minus_z;
     mpc_t log_z, log_one_minus_z, log_product, pi2_complex;
 
+    if (mpfr_nan_p(mpc_realref(z)) || mpfr_nan_p(mpc_imagref(z))) { mpc_set_nan(out); return 0; }
     if (mpc_cmp_si_si(z, 0l, 0l) == 0) {
         mpc_set_ui_ui(out, 0u, 0u, rnd);
         return 0;
@@ -5861,8 +5522,10 @@ done:
     return result;
 }
 
+/* Evaluate the principal dilogarithm without matching NaN components to finite special values. */
 number_t num_dilog(const number_t number)
 {
+    if (num_is_nan(number)) return NUM_NAN;
     if (!num_is_real(number))
         return number_mpc_polylog_number(&number, 2);
     if (num_gt(number, NUM_ONE))
@@ -5873,6 +5536,7 @@ number_t num_dilog(const number_t number)
 /* Evaluate the order-one polylogarithm using the number's native precision. */
 number_t num_polylog1(const number_t number)
 {
+    if (num_is_nan(number)) return NUM_NAN;
     number_t one_minus_number = num_sub(NUM_ONE, number);
     number_t logarithm = num_log(one_minus_number);
     number_t result = num_neg(logarithm);
@@ -5882,10 +5546,12 @@ number_t num_polylog1(const number_t number)
     return result;
 }
 
+/* Evaluate supported integer-order polylogarithms with explicit NaN propagation. */
 number_t num_polylog(const number_t order, const number_t number)
 {
     int order_int;
 
+    if (num_is_nan(order) || num_is_nan(number)) return NUM_NAN;
     if (!number_try_get_exact_int(order, &order_int))
         return NUM_NAN;
     if (order_int < 0)
@@ -6096,6 +5762,32 @@ number_t num_legendre_chi(const number_t order, const number_t number)
         return NUM_NAN;
     if (order_int < 0)
         return NUM_NAN;
+
+    number_math_family_t family = number_math_family_value(&number);
+    if (order_int >= 2 && (family == NUMBER_MATH_MPFR || family == NUMBER_MATH_COMPLEX)) {
+        number_t *promoted = number_coerce(&number, num_is_real(number) ? NUMBER_MPFR : NUMBER_COMPLEX);
+        if (!promoted) return number_invalid();
+        size_t precision = num_get_prec_bits(*promoted);
+        int status = -1;
+        if (num_is_real(number)) {
+            number_mpfr_t *real = number_impl(promoted)->value.mpfr;
+            if (!number_mpfr_ensure(real, precision))
+                status = number_mpfr_chi_series(real->value, (unsigned long)order_int, real->value);
+            if (!status) return number_take(promoted);
+        } else {
+            mpc_t input, output;
+            mpc_init2(input, (mpfr_prec_t)precision); mpc_init2(output, (mpfr_prec_t)precision);
+            number_t result = number_invalid();
+            if (!number_complex_get_mpc(input, number_impl_const(promoted)->value.cx, precision)) {
+                status = number_mpc_chi_series(output, (unsigned long)order_int, input);
+                if (!status) result = number_take_mpc_complex_result(output, precision);
+            }
+            mpc_clear(input); mpc_clear(output);
+            if (!status) { number_box_free(promoted); return result; }
+        }
+        number_box_free(promoted);
+        if (status < 0) return number_invalid();
+    }
 
     canonical_order = num_create_from_long((long)order_int);
     neg_number = num_neg(number);

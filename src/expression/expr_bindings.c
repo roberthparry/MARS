@@ -44,7 +44,7 @@ typedef struct {
 } binding_parser_t;
 
 #define BINDING_CONST_COUNT 5u
-#define BINDING_EXPR_KIND_COUNT 11u
+#define BINDING_EXPR_KIND_COUNT 12u
 
 typedef struct {
     expr_binding_const_id_t id;
@@ -197,7 +197,19 @@ static void emit_binding_func_unary_op(const expr_binding_expr_t *expr, sbuf_t *
 static void emit_binding_func_binary_op(const expr_binding_expr_t *expr, sbuf_t *b, int parent_prec);
 static void emit_binding_func_expr(const expr_binding_expr_t *expr, sbuf_t *b, int parent_prec);
 
+static expr_t *binding_eval_native_call(const expr_binding_expr_t *expr);
+static expr_binding_expr_t *binding_clone_native_call(const expr_binding_expr_t *expr);
+static void emit_binding_native_call(const expr_binding_expr_t *expr, sbuf_t *out, int parent_prec);
+
 static const binding_expr_ops_t s_binding_expr_ops[BINDING_EXPR_KIND_COUNT] = {
+    [EXPR_BINDING_EXPR_NATIVE_CALL] = {
+        .precedence = BIND_PREC_ATOM, .atomic = true, .free_payload = binding_free_number,
+        .clone = binding_clone_native_call, .eval_expr = binding_eval_native_call,
+        .number_value = binding_number_value_false, .simplify = expr_binding_simplify_atom,
+        .struct_eq = binding_struct_eq_number, .numeric_literal = binding_numeric_literal_false,
+        .explicit_mul_separator = binding_explicit_mul_separator_true,
+        .emit_expr = emit_binding_native_call, .emit_func = emit_binding_native_call
+    },
     [EXPR_BINDING_EXPR_ARRAY] = {.precedence = BIND_PREC_ATOM,
                                  .atomic = true,
                                  .free_payload = binding_free_array,
@@ -530,6 +542,24 @@ static expr_binding_expr_t *binding_clone_binary_plain(const expr_binding_expr_t
                                                                                     expr_binding_expr_t *))
 {
     return ctor(expr_binding_expr_clone(expr->u.binary.left), expr_binding_expr_clone(expr->u.binary.right));
+}
+
+static expr_binding_expr_t *binding_clone_native_call(const expr_binding_expr_t *expr)
+{
+    expr_binding_expr_t *copy = binding_expr_alloc(EXPR_BINDING_EXPR_NATIVE_CALL);
+    copy->u.text = expr_tostring_xstrdup(expr->u.text);
+    return copy;
+}
+
+static expr_t *binding_eval_native_call(const expr_binding_expr_t *expr)
+{
+    return expr_from_string(expr->u.text, NULL);
+}
+
+static void emit_binding_native_call(const expr_binding_expr_t *expr, sbuf_t *out, int parent_prec)
+{
+    (void)parent_prec;
+    sbuf_puts(out, expr->u.text);
 }
 
 static expr_binding_expr_t *binding_clone_number(const expr_binding_expr_t *expr)
@@ -1973,183 +2003,204 @@ typedef struct {
 #define BINDING_FUNC_TABLE_SIZE 256u
 
 static const unsigned char s_binding_func_displacements[BINDING_FUNC_TABLE_SIZE] = {
-    0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 1, 0, 2, 0, 0, 0, 1, 0, 0, 0,
-    0, 0, 4, 0, 2, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0,
-    1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 7, 0, 6, 0,
-    1, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0,
-    1, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0, 2, 0, 0, 0,
-    0, 2, 0, 0, 0, 4, 0, 0, 0, 5, 0, 0, 4, 0, 4, 0,
-    0, 1, 0, 5, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0,
-    0, 0, 1, 20, 0, 0, 0, 1, 1, 0, 2, 0, 0, 0, 2, 1,
-    0, 0, 5, 0, 0, 2, 0, 0, 0, 0, 11, 0, 0, 1, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 9, 0, 0,
-    0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 23, 1,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0,
+    1, 0, 5, 0, 0, 1, 0, 0, 0, 0, 2, 0, 1, 0, 1, 0,
+    0, 0, 0, 0, 0, 0, 1, 2, 0, 0, 1, 0, 0, 5, 0, 0,
+    0, 1, 0, 0, 0, 0, 0, 2, 2, 0, 1, 3, 1, 0, 0, 1,
+    0, 0, 4, 6, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 1, 1, 0, 0, 0, 2, 0, 0, 0, 1, 0, 0, 0, 1, 3,
+    6, 0, 0, 0, 0, 0, 0, 1, 1, 0, 7, 0, 2, 0, 1, 0,
+    2, 2, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 4, 1,
+    0, 6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0,
+    0, 0, 1, 0, 2, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0,
+    0, 0, 0, 0, 6, 0, 0, 0, 0, 3, 0, 6, 3, 0, 0, 0,
+    0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0,
+    0, 0, 5, 9, 0, 0, 0, 2, 0, 0, 2, 0, 1, 0, 0, 0,
+    0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 8, 0, 0, 0,
+    5, 0, 0, 0, 0, 0, 0, 0, 4, 2, 0, 3, 7, 7, 0, 1,
+    0, 0, 1, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 2, 3,
 };
 
 static const binding_func_entry_t s_binding_funcs[BINDING_FUNC_TABLE_SIZE] = {
-    [  0] = { .kw = "productlog",           .is_binary = false,                      .ops = &ops_lambert_w },
-    [  4] = { .kw = "acosh",                .is_binary = false,                      .ops = &ops_acosh },
-    [  5] = { .kw = "lambert_wm1",          .is_binary = false,                      .ops = &ops_lambert_wm1 },
-    [  9] = { .kw = "beta",                 .is_binary = true,                       .ops = &ops_beta },
-    [ 10] = { .kw = "hypot",                .is_binary = true,                       .ops = &ops_hypot },
-    [ 11] = { .kw = "polylog",              .is_binary = true,                       .ops = &ops_polylog },
-    [ 12] = { .kw = "Li2",                  .is_binary = false,                      .ops = &ops_dilog },
-    [ 17] = { .kw = "acosec",               .is_binary = false,                      .ops = &ops_acosec },
-    [ 20] = { .kw = "ChebyshevT",           .is_binary = true,                       .ops = &ops_chebyshev_t },
-    [ 21] = { .kw = "floor",                .is_binary = false,                      .ops = &ops_floor },
-    [ 22] = { .kw = "covercos",             .is_binary = false,                      .ops = &ops_covercos },
-    [ 23] = { .kw = "trigamma",             .is_binary = false,                      .ops = &ops_trigamma },
-    [ 24] = { .kw = "atan",                 .is_binary = false,                      .ops = &ops_atan },
-    [ 25] = { .kw = "sqrt",                 .is_binary = false,                      .ops = &ops_sqrt },
-    [ 26] = { .kw = "isqrt",                .is_binary = false,                      .ops = &ops_isqrt },
-    [ 28] = { .kw = "tanh",                 .is_binary = false,                      .ops = &ops_tanh },
-    [ 31] = { .kw = "Ei",                   .is_binary = false,                      .ops = &ops_Ei },
-    [ 32] = { .kw = "haversin",             .is_binary = false,                      .ops = &ops_haversin },
-    [ 39] = { .kw = "arcsch",               .is_binary = false,                      .ops = &ops_acosech },
-    [ 42] = { .kw = "chebyshev_u",          .is_binary = true,                       .ops = &ops_chebyshev_u },
-    [ 43] = { .kw = "normal_pdf",           .is_binary = false,                      .ops = &ops_normal_pdf },
-    [ 45] = { .kw = "E1",                   .is_binary = false,                      .ops = &ops_E1 },
-    [ 46] = { .kw = "factors",              .is_binary = false,                      .ops = &ops_factors },
-    [ 47] = { .kw = "asin",                 .is_binary = false,                      .ops = &ops_asin },
-    [ 48] = { .kw = "OR",                   .is_binary = true,                       .ops = &ops_bit_or },
-    [ 52] = { .kw = "acot",                 .is_binary = false,                      .ops = &ops_acot },
-    [ 54] = { .kw = "exp",                  .is_binary = false,                      .ops = &ops_exp },
-    [ 60] = { .kw = "erfc",                 .is_binary = false,                      .ops = &ops_erfc },
-    [ 62] = { .kw = "SHL",                  .is_binary = true,                       .ops = &ops_shl },
-    [ 63] = { .kw = "cosh",                 .is_binary = false,                      .ops = &ops_cosh },
-    [ 65] = { .kw = "legendre_chi",         .is_binary = true,                       .ops = &ops_legendre_chi },
-    [ 66] = { .kw = "gammainc_P",           .is_binary = true,                       .ops = &ops_gammainc_P },
-    [ 69] = { .kw = "asec",                 .is_binary = false,                      .ops = &ops_asec },
-    [ 70] = { .kw = "archaversin",          .is_binary = false,                      .ops = &ops_archaversin },
-    [ 72] = { .kw = "AND",                  .is_binary = true,                       .ops = &ops_bit_and },
-    [ 73] = { .kw = "logbeta",              .is_binary = true,                       .ops = &ops_logbeta },
-    [ 74] = { .kw = "cosech",               .is_binary = false,                      .ops = &ops_cosech },
-    [ 77] = { .kw = "cdf",                  .is_binary = false,                      .ops = &ops_cdf },
-    [ 78] = { .kw = "lommel_s",                                 .is_ternary = true,  .ops = &ops_lommel_s },
-    [ 79] = { .kw = "lnΓ",                  .is_binary = false,                      .ops = &ops_lgamma },
-    [ 80] = { .kw = "next_prime",           .is_binary = false,                      .ops = &ops_next_prime },
-    [ 81] = { .kw = "HermiteH",             .is_binary = true,                       .ops = &ops_hermite_h },
-    [ 82] = { .kw = "harmonic_poly",        .is_binary = true,                       .ops = &ops_harmonic_poly },
-    [ 85] = { .kw = "arcosech",             .is_binary = false,                      .ops = &ops_acosech },
-    [ 86] = { .kw = "archacovercos",        .is_binary = false,                      .ops = &ops_archacovercos },
-    [ 87] = { .kw = "arccosec",             .is_binary = false,                      .ops = &ops_acosec },
-    [ 89] = { .kw = "sec",                  .is_binary = false,                      .ops = &ops_sec },
-    [ 93] = { .kw = "lambert_w0",           .is_binary = false,                      .ops = &ops_lambert_w0 },
-    [ 94] = { .kw = "conj",                 .is_binary = false,                      .ops = &ops_conj },
-    [ 95] = { .kw = "W₀",                   .is_binary = false,                      .ops = &ops_lambert_w0 },
-    [ 96] = { .kw = "gamma",                .is_binary = false,                      .ops = &ops_gamma },
-    [ 97] = { .kw = "arccoversin",          .is_binary = false,                      .ops = &ops_arccoversin },
-    [ 98] = { .kw = "bessel_j",             .is_binary = true,                       .ops = &ops_bessel_j },
-    [ 99] = { .kw = "roundn",               .is_binary = true,                       .ops = &ops_roundn },
-    [100] = { .kw = "acsc",                 .is_binary = false,                      .ops = &ops_acosec },
-    [101] = { .kw = "logpdf",               .is_binary = false,                      .ops = &ops_logpdf },
-    [104] = { .kw = "arccot",               .is_binary = false,                      .ops = &ops_acot },
-    [106] = { .kw = "W0",                   .is_binary = false,                      .ops = &ops_lambert_w0 },
-    [107] = { .kw = "W_0",                  .is_binary = false,                      .ops = &ops_lambert_w0 },
-    [108] = { .kw = "fibonacci",            .is_binary = false,                      .ops = &ops_fibonacci },
-    [110] = { .kw = "modinv",               .is_binary = true,                       .ops = &ops_modinv },
-    [113] = { .kw = "ζ",                    .is_binary = false,                      .ops = &ops_zeta },
-    [114] = { .kw = "sech",                 .is_binary = false,                      .ops = &ops_sech },
-    [116] = { .kw = "cosec",                .is_binary = false,                      .ops = &ops_cosec },
-    [117] = { .kw = "normal_logpdf",        .is_binary = false,                      .ops = &ops_normal_logpdf },
-    [118] = { .kw = "lcm",                  .is_binary = true,                       .ops = &ops_lcm },
-    [121] = { .kw = "cot",                  .is_binary = false,                      .ops = &ops_cot },
-    [122] = { .kw = "prev_prime",           .is_binary = false,                      .ops = &ops_prev_prime },
-    [126] = { .kw = "gammainv",             .is_binary = false,                      .ops = &ops_gammainv },
-    [127] = { .kw = "gammainc_Q",           .is_binary = true,                       .ops = &ops_gammainc_Q },
-    [128] = { .kw = "cubrt",                .is_binary = false,                      .ops = &ops_cubrt },
-    [129] = { .kw = "root",                 .is_binary = true,                       .ops = &ops_root },
-    [130] = { .kw = "archacoversin",        .is_binary = false,                      .ops = &ops_archacoversin },
-    [131] = { .kw = "W",                    .is_binary = false,                      .ops = &ops_lambert_w },
-    [132] = { .kw = "dilog",                .is_binary = false,                      .ops = &ops_dilog },
-    [133] = { .kw = "ChebyshevU",           .is_binary = true,                       .ops = &ops_chebyshev_u },
-    [134] = { .kw = "pdf",                  .is_binary = false,                      .ops = &ops_pdf },
-    [140] = { .kw = "havercos",             .is_binary = false,                      .ops = &ops_havercos },
-    [143] = { .kw = "conjugate",            .is_binary = false,                      .ops = &ops_conj },
-    [146] = { .kw = "mod",                  .is_binary = true,                       .ops = &ops_mod },
-    [152] = { .kw = "csc",                  .is_binary = false,                      .ops = &ops_cosec },
-    [153] = { .kw = "W_-1",                 .is_binary = false,                      .ops = &ops_lambert_wm1 },
-    [154] = { .kw = "lnB",                  .is_binary = true,                       .ops = &ops_logbeta },
-    [155] = { .kw = "LommelS",                                  .is_ternary = true,  .ops = &ops_lommel_s },
-    [156] = { .kw = "ℋ",                    .is_binary = true,                       .ops = &ops_hermite_h },
-    [157] = { .kw = "sign",                 .is_binary = false,                      .ops = &ops_sgn },
-    [158] = { .kw = "sin",                  .is_binary = false,                      .ops = &ops_sin },
-    [159] = { .kw = "W-1",                  .is_binary = false,                      .ops = &ops_lambert_wm1 },
-    [161] = { .kw = "digamma",              .is_binary = false,                      .ops = &ops_digamma },
-    [167] = { .kw = "atan2",                .is_binary = true,                       .ops = &ops_atan2 },
-    [168] = { .kw = "acosech",              .is_binary = false,                      .ops = &ops_acosech },
-    [169] = { .kw = "SHR",                  .is_binary = true,                       .ops = &ops_shr },
-    [170] = { .kw = "arccovercos",          .is_binary = false,                      .ops = &ops_arccovercos },
-    [171] = { .kw = "acos",                 .is_binary = false,                      .ops = &ops_acos },
-    [172] = { .kw = "abs",                  .is_binary = false,                      .ops = &ops_abs },
-    [173] = { .kw = "sgn",                  .is_binary = false,                      .ops = &ops_sgn },
-    [174] = { .kw = "ceil",                 .is_binary = false,                      .ops = &ops_ceil },
-    [175] = { .kw = "NOT",                  .is_binary = false,                      .ops = &ops_bit_not },
-    [176] = { .kw = "arcversin",            .is_binary = false,                      .ops = &ops_arcversin },
-    [177] = { .kw = "arcvercos",            .is_binary = false,                      .ops = &ops_arcvercos },
-    [178] = { .kw = "zetap",                .is_binary = false,                      .ops = &ops_zetap },
-    [179] = { .kw = "tan",                  .is_binary = false,                      .ops = &ops_tan },
-    [180] = { .kw = "ln",                   .is_binary = false,                      .ops = &ops_log },
-    [181] = { .kw = "atanh",                .is_binary = false,                      .ops = &ops_atanh },
-    [184] = { .kw = "erf",                  .is_binary = false,                      .ops = &ops_erf },
-    [185] = { .kw = "is_prime",             .is_binary = false,                      .ops = &ops_is_prime },
-    [186] = { .kw = "chebyshev_t",          .is_binary = true,                       .ops = &ops_chebyshev_t },
-    [187] = { .kw = "asinh",                .is_binary = false,                      .ops = &ops_asinh },
-    [189] = { .kw = "XOR",                  .is_binary = true,                       .ops = &ops_bit_xor },
-    [191] = { .kw = "chi",                  .is_binary = true,                       .ops = &ops_legendre_chi },
-    [192] = { .kw = "W_n",                  .is_binary = true,                       .ops = &ops_lambert_wn },
-    [193] = { .kw = "Tn",                   .is_binary = true,                       .ops = &ops_chebyshev_t },
-    [194] = { .kw = "ψq",                   .is_binary = true,                       .ops = &ops_qdigamma },
-    [195] = { .kw = "bessel_y",             .is_binary = true,                       .ops = &ops_bessel_y },
-    [196] = { .kw = "csch",                 .is_binary = false,                      .ops = &ops_cosech },
-    [197] = { .kw = "normal_cdf",           .is_binary = false,                      .ops = &ops_normal_cdf },
-    [198] = { .kw = "erfcinv",              .is_binary = false,                      .ops = &ops_erfcinv },
-    [199] = { .kw = "arcsec",               .is_binary = false,                      .ops = &ops_asec },
-    [200] = { .kw = "arsech",               .is_binary = false,                      .ops = &ops_asech },
-    [201] = { .kw = "acoth",                .is_binary = false,                      .ops = &ops_acoth },
-    [202] = { .kw = "log",                  .is_binary = false,                      .ops = &ops_log10 },
-    [203] = { .kw = "BesselJ",              .is_binary = true,                       .ops = &ops_bessel_j },
-    [204] = { .kw = "archavercos",          .is_binary = false,                      .ops = &ops_archavercos },
-    [205] = { .kw = "versin",               .is_binary = false,                      .ops = &ops_versin },
-    [206] = { .kw = "sinh",                 .is_binary = false,                      .ops = &ops_sinh },
-    [207] = { .kw = "arcoth",               .is_binary = false,                      .ops = &ops_acoth },
-    [208] = { .kw = "hacoversin",           .is_binary = false,                      .ops = &ops_hacoversin },
-    [209] = { .kw = "asech",                .is_binary = false,                      .ops = &ops_asech },
-    [210] = { .kw = "partition",            .is_binary = false,                      .ops = &ops_partition },
-    [211] = { .kw = "coth",                 .is_binary = false,                      .ops = &ops_coth },
-    [212] = { .kw = "vercos",               .is_binary = false,                      .ops = &ops_vercos },
-    [213] = { .kw = "Un",                   .is_binary = true,                       .ops = &ops_chebyshev_u },
-    [214] = { .kw = "erfinv",               .is_binary = false,                      .ops = &ops_erfinv },
-    [215] = { .kw = "coversin",             .is_binary = false,                      .ops = &ops_coversin },
-    [216] = { .kw = "rounds",               .is_binary = true,                       .ops = &ops_rounds },
-    [217] = { .kw = "gammainc_lower",       .is_binary = true,                       .ops = &ops_gammainc_lower },
-    [219] = { .kw = "log10",                .is_binary = false,                      .ops = &ops_log10 },
-    [220] = { .kw = "zeta",                 .is_binary = false,                      .ops = &ops_zeta },
-    [221] = { .kw = "Wₙ",                   .is_binary = true,                       .ops = &ops_lambert_wn },
-    [222] = { .kw = "pow",                  .is_binary = true,                       .ops = &ops_pow },
-    [226] = { .kw = "Hn",                   .is_binary = true,                       .ops = &ops_harmonic_poly },
-    [227] = { .kw = "lg",                   .is_binary = false,                      .ops = &ops_log10 },
-    [229] = { .kw = "acsch",                .is_binary = false,                      .ops = &ops_acosech },
-    [232] = { .kw = "W₋₁",                  .is_binary = false,                      .ops = &ops_lambert_wm1 },
-    [233] = { .kw = "gammainc_upper",       .is_binary = true,                       .ops = &ops_gammainc_upper },
-    [234] = { .kw = "qdigamma",             .is_binary = true,                       .ops = &ops_qdigamma },
-    [235] = { .kw = "signum",               .is_binary = false,                      .ops = &ops_sgn },
-    [236] = { .kw = "BesselY",              .is_binary = true,                       .ops = &ops_bessel_y },
-    [238] = { .kw = "cos",                  .is_binary = false,                      .ops = &ops_cos },
-    [241] = { .kw = "Wn",                   .is_binary = true,                       .ops = &ops_lambert_wn },
-    [243] = { .kw = "gcd",                  .is_binary = true,                       .ops = &ops_gcd },
-    [244] = { .kw = "arccsc",               .is_binary = false,                      .ops = &ops_acosec },
-    [245] = { .kw = "factorial",            .is_binary = false,                      .ops = &ops_factorial },
-    [247] = { .kw = "hermite_h",            .is_binary = true,                       .ops = &ops_hermite_h },
-    [250] = { .kw = "round",                .is_binary = false,                      .ops = &ops_round },
-    [252] = { .kw = "lambert_wn",           .is_binary = true,                       .ops = &ops_lambert_wn },
-    [253] = { .kw = "lgamma",               .is_binary = false,                      .ops = &ops_lgamma },
-    [255] = { .kw = "hacovercos",           .is_binary = false,                      .ops = &ops_hacovercos },
+    [  0] = { .kw = "pow_int",        .is_binary = true,                       .ops = &ops_pow },
+    [  1] = { .kw = "factorial",      .is_binary = false,                      .ops = &ops_factorial },
+    [  2] = { .kw = "gammainc_lower", .is_binary = true,                       .ops = &ops_gammainc_lower },
+    [  3] = { .kw = "arcversin",      .is_binary = false,                      .ops = &ops_arcversin },
+    [  4] = { .kw = "mul",            .is_binary = true,                       .ops = &ops_mul },
+    [  5] = { .kw = "arccsc",         .is_binary = false,                      .ops = &ops_acosec },
+    [  6] = { .kw = "lnB",            .is_binary = true,                       .ops = &ops_logbeta },
+    [  7] = { .kw = "coversin",       .is_binary = false,                      .ops = &ops_coversin },
+    [  8] = { .kw = "pow",            .is_binary = true,                       .ops = &ops_pow },
+    [ 10] = { .kw = "archaversin",    .is_binary = false,                      .ops = &ops_archaversin },
+    [ 11] = { .kw = "factors",        .is_binary = false,                      .ops = &ops_factors },
+    [ 12] = { .kw = "OR",             .is_binary = true,                       .ops = &ops_bit_or },
+    [ 13] = { .kw = "bessel_j",       .is_binary = true,                       .ops = &ops_bessel_j },
+    [ 14] = { .kw = "SHR",            .is_binary = true,                       .ops = &ops_shr },
+    [ 18] = { .kw = "arcsch",         .is_binary = false,                      .ops = &ops_acosech },
+    [ 19] = { .kw = "sign",           .is_binary = false,                      .ops = &ops_sgn },
+    [ 22] = { .kw = "gammainc_Q",     .is_binary = true,                       .ops = &ops_gammainc_Q },
+    [ 24] = { .kw = "ζ",              .is_binary = false,                      .ops = &ops_zeta },
+    [ 27] = { .kw = "sgn",            .is_binary = false,                      .ops = &ops_sgn },
+    [ 28] = { .kw = "gammainv",       .is_binary = false,                      .ops = &ops_gammainv },
+    [ 29] = { .kw = "logpdf",         .is_binary = false,                      .ops = &ops_logpdf },
+    [ 30] = { .kw = "gammainc_upper", .is_binary = true,                       .ops = &ops_gammainc_upper },
+    [ 31] = { .kw = "cosh",           .is_binary = false,                      .ops = &ops_cosh },
+    [ 32] = { .kw = "bit_length",     .is_binary = false,                      .ops = &ops_bit_length },
+    [ 33] = { .kw = "csch",           .is_binary = false,                      .ops = &ops_cosech },
+    [ 34] = { .kw = "round",          .is_binary = false,                      .ops = &ops_round },
+    [ 35] = { .kw = "clear_bit",      .is_binary = true,                       .ops = &ops_clear_bit },
+    [ 36] = { .kw = "asin",           .is_binary = false,                      .ops = &ops_asin },
+    [ 38] = { .kw = "div",            .is_binary = true,                       .ops = &ops_div },
+    [ 39] = { .kw = "rounds",         .is_binary = true,                       .ops = &ops_rounds },
+    [ 41] = { .kw = "LommelS",        .is_binary = false, .is_ternary = true,  .ops = &ops_lommel_s },
+    [ 42] = { .kw = "arccot",         .is_binary = false,                      .ops = &ops_acot },
+    [ 43] = { .kw = "digamma",        .is_binary = false,                      .ops = &ops_digamma },
+    [ 45] = { .kw = "zetap",          .is_binary = false,                      .ops = &ops_zetap },
+    [ 51] = { .kw = "pdf",            .is_binary = false,                      .ops = &ops_pdf },
+    [ 54] = { .kw = "ceil",           .is_binary = false,                      .ops = &ops_ceil },
+    [ 55] = { .kw = "asech",          .is_binary = false,                      .ops = &ops_asech },
+    [ 56] = { .kw = "W₀",             .is_binary = false,                      .ops = &ops_lambert_w0 },
+    [ 58] = { .kw = "acot",           .is_binary = false,                      .ops = &ops_acot },
+    [ 60] = { .kw = "tan",            .is_binary = false,                      .ops = &ops_tan },
+    [ 62] = { .kw = "cot",            .is_binary = false,                      .ops = &ops_cot },
+    [ 64] = { .kw = "arcosech",       .is_binary = false,                      .ops = &ops_acosech },
+    [ 65] = { .kw = "log",            .is_binary = false,                      .ops = &ops_log10 },
+    [ 67] = { .kw = "acsc",           .is_binary = false,                      .ops = &ops_acosec },
+    [ 68] = { .kw = "erfc",           .is_binary = false,                      .ops = &ops_erfc },
+    [ 69] = { .kw = "prev_prime",     .is_binary = false,                      .ops = &ops_prev_prime },
+    [ 70] = { .kw = "ChebyshevT",     .is_binary = true,                       .ops = &ops_chebyshev_t },
+    [ 71] = { .kw = "asinh",          .is_binary = false,                      .ops = &ops_asinh },
+    [ 72] = { .kw = "W₋₁",            .is_binary = false,                      .ops = &ops_lambert_wm1 },
+    [ 73] = { .kw = "legendre_chi",   .is_binary = true,                       .ops = &ops_legendre_chi },
+    [ 74] = { .kw = "archavercos",    .is_binary = false,                      .ops = &ops_archavercos },
+    [ 75] = { .kw = "erf",            .is_binary = false,                      .ops = &ops_erf },
+    [ 76] = { .kw = "lnΓ",            .is_binary = false,                      .ops = &ops_lgamma },
+    [ 77] = { .kw = "conj",           .is_binary = false,                      .ops = &ops_conj },
+    [ 78] = { .kw = "acsch",          .is_binary = false,                      .ops = &ops_acosech },
+    [ 79] = { .kw = "partition",      .is_binary = false,                      .ops = &ops_partition },
+    [ 80] = { .kw = "covercos",       .is_binary = false,                      .ops = &ops_covercos },
+    [ 81] = { .kw = "asec",           .is_binary = false,                      .ops = &ops_asec },
+    [ 82] = { .kw = "BesselY",        .is_binary = true,                       .ops = &ops_bessel_y },
+    [ 83] = { .kw = "polylog1",       .is_binary = false,                      .ops = &ops_polylog1 },
+    [ 84] = { .kw = "erfinv",         .is_binary = false,                      .ops = &ops_erfinv },
+    [ 85] = { .kw = "W_0",            .is_binary = false,                      .ops = &ops_lambert_w0 },
+    [ 86] = { .kw = "roundn",         .is_binary = true,                       .ops = &ops_roundn },
+    [ 88] = { .kw = "tanh",           .is_binary = false,                      .ops = &ops_tanh },
+    [ 89] = { .kw = "bessel_y",       .is_binary = true,                       .ops = &ops_bessel_y },
+    [ 90] = { .kw = "abs",            .is_binary = false,                      .ops = &ops_abs },
+    [ 91] = { .kw = "normal_pdf",     .is_binary = false,                      .ops = &ops_normal_pdf },
+    [ 92] = { .kw = "trigamma",       .is_binary = false,                      .ops = &ops_trigamma },
+    [ 93] = { .kw = "lcm",            .is_binary = true,                       .ops = &ops_lcm },
+    [ 94] = { .kw = "lgamma",         .is_binary = false,                      .ops = &ops_lgamma },
+    [ 95] = { .kw = "mod",            .is_binary = true,                       .ops = &ops_mod },
+    [ 96] = { .kw = "chebyshev_u",    .is_binary = true,                       .ops = &ops_chebyshev_u },
+    [ 98] = { .kw = "productlog",     .is_binary = false,                      .ops = &ops_lambert_w },
+    [101] = { .kw = "dilog",          .is_binary = false,                      .ops = &ops_dilog },
+    [102] = { .kw = "divmod",         .is_binary = false, .is_ternary = true,  .ops = &ops_divmod },
+    [103] = { .kw = "qdigamma",       .is_binary = true,                       .ops = &ops_qdigamma },
+    [104] = { .kw = "beta",           .is_binary = true,                       .ops = &ops_beta },
+    [105] = { .kw = "logbeta",        .is_binary = true,                       .ops = &ops_logbeta },
+    [106] = { .kw = "sech",           .is_binary = false,                      .ops = &ops_sech },
+    [107] = { .kw = "havercos",       .is_binary = false,                      .ops = &ops_havercos },
+    [108] = { .kw = "haversin",       .is_binary = false,                      .ops = &ops_haversin },
+    [110] = { .kw = "cosech",         .is_binary = false,                      .ops = &ops_cosech },
+    [111] = { .kw = "SHL",            .is_binary = true,                       .ops = &ops_shl },
+    [112] = { .kw = "vercos",         .is_binary = false,                      .ops = &ops_vercos },
+    [113] = { .kw = "BesselJ",        .is_binary = true,                       .ops = &ops_bessel_j },
+    [114] = { .kw = "cosec",          .is_binary = false,                      .ops = &ops_cosec },
+    [115] = { .kw = "signum",         .is_binary = false,                      .ops = &ops_sgn },
+    [116] = { .kw = "chi",            .is_binary = true,                       .ops = &ops_legendre_chi },
+    [117] = { .kw = "hacoversin",     .is_binary = false,                      .ops = &ops_hacoversin },
+    [118] = { .kw = "bit_or",         .is_binary = true,                       .ops = &ops_bit_or },
+    [119] = { .kw = "cdf",            .is_binary = false,                      .ops = &ops_cdf },
+    [120] = { .kw = "Tn",             .is_binary = true,                       .ops = &ops_chebyshev_t },
+    [122] = { .kw = "archacoversin",  .is_binary = false,                      .ops = &ops_archacoversin },
+    [123] = { .kw = "bit_not",        .is_binary = false,                      .ops = &ops_bit_not },
+    [124] = { .kw = "csc",            .is_binary = false,                      .ops = &ops_cosec },
+    [131] = { .kw = "W0",             .is_binary = false,                      .ops = &ops_lambert_w0 },
+    [139] = { .kw = "XOR",            .is_binary = true,                       .ops = &ops_bit_xor },
+    [140] = { .kw = "lommel_s",       .is_binary = false, .is_ternary = true,  .ops = &ops_lommel_s },
+    [141] = { .kw = "arccoversin",    .is_binary = false,                      .ops = &ops_arccoversin },
+    [142] = { .kw = "add_long",       .is_binary = true,                       .ops = &ops_add },
+    [147] = { .kw = "set_bit",        .is_binary = true,                       .ops = &ops_set_bit },
+    [148] = { .kw = "HermiteH",       .is_binary = true,                       .ops = &ops_hermite_h },
+    [149] = { .kw = "atan2",          .is_binary = true,                       .ops = &ops_atan2 },
+    [150] = { .kw = "cos",            .is_binary = false,                      .ops = &ops_cos },
+    [151] = { .kw = "W_-1",           .is_binary = false,                      .ops = &ops_lambert_wm1 },
+    [152] = { .kw = "AND",            .is_binary = true,                       .ops = &ops_bit_and },
+    [153] = { .kw = "hermite_h",      .is_binary = true,                       .ops = &ops_hermite_h },
+    [154] = { .kw = "Hn",             .is_binary = true,                       .ops = &ops_harmonic_poly },
+    [155] = { .kw = "atanh",          .is_binary = false,                      .ops = &ops_atanh },
+    [156] = { .kw = "versin",         .is_binary = false,                      .ops = &ops_versin },
+    [157] = { .kw = "acoth",          .is_binary = false,                      .ops = &ops_acoth },
+    [158] = { .kw = "add",            .is_binary = true,                       .ops = &ops_add },
+    [159] = { .kw = "modinv",         .is_binary = true,                       .ops = &ops_modinv },
+    [160] = { .kw = "neg",            .is_binary = false,                      .ops = &ops_neg },
+    [161] = { .kw = "Wn",             .is_binary = true,                       .ops = &ops_lambert_wn },
+    [162] = { .kw = "Li2",            .is_binary = false,                      .ops = &ops_dilog },
+    [163] = { .kw = "cubrt",          .is_binary = false,                      .ops = &ops_cubrt },
+    [164] = { .kw = "test_bit",       .is_binary = true,                       .ops = &ops_test_bit },
+    [168] = { .kw = "E1",             .is_binary = false,                      .ops = &ops_E1 },
+    [169] = { .kw = "acos",           .is_binary = false,                      .ops = &ops_acos },
+    [170] = { .kw = "acosec",         .is_binary = false,                      .ops = &ops_acosec },
+    [172] = { .kw = "mul_long",       .is_binary = true,                       .ops = &ops_mul },
+    [173] = { .kw = "polylog",        .is_binary = true,                       .ops = &ops_polylog },
+    [175] = { .kw = "gammainc_P",     .is_binary = true,                       .ops = &ops_gammainc_P },
+    [176] = { .kw = "arsech",         .is_binary = false,                      .ops = &ops_asech },
+    [177] = { .kw = "Ei",             .is_binary = false,                      .ops = &ops_Ei },
+    [178] = { .kw = "ChebyshevU",     .is_binary = true,                       .ops = &ops_chebyshev_u },
+    [179] = { .kw = "lambert_wn",     .is_binary = true,                       .ops = &ops_lambert_wn },
+    [180] = { .kw = "lambert_w0",     .is_binary = false,                      .ops = &ops_lambert_w0 },
+    [181] = { .kw = "normal_logpdf",  .is_binary = false,                      .ops = &ops_normal_logpdf },
+    [182] = { .kw = "hacovercos",     .is_binary = false,                      .ops = &ops_hacovercos },
+    [183] = { .kw = "arcsec",         .is_binary = false,                      .ops = &ops_asec },
+    [184] = { .kw = "Wₙ",             .is_binary = true,                       .ops = &ops_lambert_wn },
+    [185] = { .kw = "gcd",            .is_binary = true,                       .ops = &ops_gcd },
+    [187] = { .kw = "W_n",            .is_binary = true,                       .ops = &ops_lambert_wn },
+    [188] = { .kw = "acosh",          .is_binary = false,                      .ops = &ops_acosh },
+    [192] = { .kw = "powmod",         .is_binary = false, .is_ternary = true,  .ops = &ops_powmod },
+    [195] = { .kw = "atan",           .is_binary = false,                      .ops = &ops_atan },
+    [196] = { .kw = "is_prime",       .is_binary = false,                      .ops = &ops_is_prime },
+    [197] = { .kw = "bit_xor",        .is_binary = true,                       .ops = &ops_bit_xor },
+    [198] = { .kw = "sinh",           .is_binary = false,                      .ops = &ops_sinh },
+    [199] = { .kw = "bit_and",        .is_binary = true,                       .ops = &ops_bit_and },
+    [200] = { .kw = "gcdext",         .is_binary = false, .is_ternary = true,  .ops = &ops_gcdext },
+    [201] = { .kw = "exp",            .is_binary = false,                      .ops = &ops_exp },
+    [202] = { .kw = "NOT",            .is_binary = false,                      .ops = &ops_bit_not },
+    [203] = { .kw = "arccovercos",    .is_binary = false,                      .ops = &ops_arccovercos },
+    [204] = { .kw = "Un",             .is_binary = true,                       .ops = &ops_chebyshev_u },
+    [205] = { .kw = "zeta",           .is_binary = false,                      .ops = &ops_zeta },
+    [206] = { .kw = "harmonic_poly",  .is_binary = true,                       .ops = &ops_harmonic_poly },
+    [207] = { .kw = "hypot",          .is_binary = true,                       .ops = &ops_hypot },
+    [208] = { .kw = "prove_prime",    .is_binary = false,                      .ops = &ops_prove_prime },
+    [211] = { .kw = "erfcinv",        .is_binary = false,                      .ops = &ops_erfcinv },
+    [216] = { .kw = "floor",          .is_binary = false,                      .ops = &ops_floor },
+    [220] = { .kw = "next_prime",     .is_binary = false,                      .ops = &ops_next_prime },
+    [221] = { .kw = "sin",            .is_binary = false,                      .ops = &ops_sin },
+    [223] = { .kw = "acosech",        .is_binary = false,                      .ops = &ops_acosech },
+    [224] = { .kw = "arcoth",         .is_binary = false,                      .ops = &ops_acoth },
+    [226] = { .kw = "chebyshev_t",    .is_binary = true,                       .ops = &ops_chebyshev_t },
+    [227] = { .kw = "arcvercos",      .is_binary = false,                      .ops = &ops_arcvercos },
+    [228] = { .kw = "sqrt",           .is_binary = false,                      .ops = &ops_sqrt },
+    [229] = { .kw = "lg",             .is_binary = false,                      .ops = &ops_log10 },
+    [230] = { .kw = "W-1",            .is_binary = false,                      .ops = &ops_lambert_wm1 },
+    [231] = { .kw = "ψq",             .is_binary = true,                       .ops = &ops_qdigamma },
+    [233] = { .kw = "gamma",          .is_binary = false,                      .ops = &ops_gamma },
+    [234] = { .kw = "W",              .is_binary = false,                      .ops = &ops_lambert_w },
+    [235] = { .kw = "arccosec",       .is_binary = false,                      .ops = &ops_acosec },
+    [238] = { .kw = "isqrt",          .is_binary = false,                      .ops = &ops_isqrt },
+    [239] = { .kw = "lambert_wm1",    .is_binary = false,                      .ops = &ops_lambert_wm1 },
+    [240] = { .kw = "fibonacci",      .is_binary = false,                      .ops = &ops_fibonacci },
+    [241] = { .kw = "ln",             .is_binary = false,                      .ops = &ops_log },
+    [242] = { .kw = "root",           .is_binary = true,                       .ops = &ops_root },
+    [243] = { .kw = "archacovercos",  .is_binary = false,                      .ops = &ops_archacovercos },
+    [248] = { .kw = "ℋ",              .is_binary = true,                       .ops = &ops_hermite_h },
+    [249] = { .kw = "coth",           .is_binary = false,                      .ops = &ops_coth },
+    [250] = { .kw = "sub",            .is_binary = true,                       .ops = &ops_sub },
+    [251] = { .kw = "normal_cdf",     .is_binary = false,                      .ops = &ops_normal_cdf },
+    [252] = { .kw = "conjugate",      .is_binary = false,                      .ops = &ops_conj },
+    [253] = { .kw = "log10",          .is_binary = false,                      .ops = &ops_log10 },
+    [254] = { .kw = "sec",            .is_binary = false,                      .ops = &ops_sec },
 };
 
 #define LOGARITHMIC_INTEGRAL_BINDING_FUNC_TABLE_SIZE 11u
@@ -2210,7 +2261,7 @@ static unsigned binding_func_bucket_hash(string_view_t kw)
 
 static unsigned binding_func_slot_hash(string_view_t kw)
 {
-    return binding_func_hash_values(kw, 0x85ebca6bu);
+    return binding_func_hash_values(kw, 0x811c9dc6u);
 }
 
 static bool binding_func_entry_matches(const binding_func_entry_t *entry, string_view_t kw)
@@ -2442,6 +2493,58 @@ static int parse_binding_three_args(binding_parser_t *p, expr_binding_expr_t **a
     return 1;
 }
 
+/* Missing registry entries replay through the primary parser, retaining source for later precision changes. */
+static expr_binding_expr_t *parse_binding_native_call(binding_parser_t *p)
+{
+    string_cursor_t *scan = string_cursor_clone(p->cursor);
+    size_t start = binding_pos(p);
+    unsigned char byte;
+    if (!scan)
+        return NULL;
+    while (string_cursor_peek_ascii(scan, &byte) && binding_ascii_is_function_name_char(byte))
+        string_cursor_skip(scan, 1);
+    size_t name_end = string_cursor_position(scan);
+    string_view_t name = string_cursor_view_between(start, name_end, p->cursor);
+    const binding_func_entry_t *existing = binding_func_lookup(name);
+    bool packed = existing && (existing->ops == &ops_powmod || existing->ops == &ops_divmod ||
+                               existing->ops == &ops_gcdext || existing->ops == &ops_clausen2);
+    string_cursor_skip_spaces(scan);
+    if (name_end == start || (existing && !packed) || !expr_stringin_has_function(name) ||
+        !string_cursor_peek_ascii(scan, &byte) || byte != '(') {
+        string_cursor_free(scan);
+        return NULL;
+    }
+    size_t depth = 0;
+    do {
+        if (string_cursor_peek_ascii(scan, &byte)) {
+            if (byte == '(')
+                ++depth;
+            else if (byte == ')')
+                --depth;
+        }
+        if (string_cursor_next(scan) != 0)
+            break;
+    } while (depth);
+    size_t end = string_cursor_position(scan);
+    string_t *source = !depth ? string_cursor_slice_between(start, end, p->cursor) : NULL;
+    string_cursor_free(scan);
+    expr_bindings_t *bindings = NULL;
+    expr_t *parsed = source ? expr_from_text(source, &bindings) : NULL;
+    bool ok = parsed && expr_bindings_count(bindings) == 0;
+    expr_free(parsed);
+    expr_bindings_free(bindings);
+    if (!ok) {
+        string_free(source);
+        binding_set_error(p, "binding function requires valid numerical constant arguments");
+        return NULL;
+    }
+    expr_binding_expr_t *result = binding_expr_alloc(EXPR_BINDING_EXPR_NATIVE_CALL);
+    result->u.text = expr_tostring_xstrdup(string_c_str(source));
+    string_free(source);
+    binding_set_pos(p, end);
+    return result;
+}
+
 static const binding_func_entry_t *parse_binding_function_head(binding_parser_t *p, size_t *paren_pos_out)
 {
     string_cursor_t *scan = string_cursor_clone(p->cursor);
@@ -2639,6 +2742,11 @@ static expr_binding_expr_t *parse_binding_atom_mode(binding_parser_t *p, bool al
     }
 
     {
+        expr_binding_expr_t *native = parse_binding_native_call(p);
+        if (native)
+            return native;
+        if (p->error)
+            return NULL;
         size_t paren_pos = 0u;
         const binding_func_entry_t *func = parse_binding_function_head(p, &paren_pos);
 
@@ -2658,7 +2766,9 @@ static expr_binding_expr_t *parse_binding_atom_mode(binding_parser_t *p, bool al
                     expr_binding_expr_free(c);
                     return NULL;
                 }
-                parameters = expr_binding_expr_new_binary_op(&ops_lommel_s_pack, a, b);
+                const expr_ops_t *pack = func->ops == &ops_powmod || func->ops == &ops_divmod ||
+                                                func->ops == &ops_gcdext ? &ops_integer_pack : &ops_lommel_s_pack;
+                parameters = expr_binding_expr_new_binary_op(pack, a, b);
                 return expr_binding_expr_new_binary_op(func->ops, parameters, c);
             } else if (func->is_binary) {
                 expr_binding_expr_t *a = NULL;

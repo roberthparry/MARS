@@ -410,7 +410,7 @@ window.checkLabEvents = function checkLabEvents(): boolean {
         }
         check(registryComplete, 'bootstrap supplies every native service');
         native.lab_workspace_select(0);
-        const runServices = 'resetPlotPreview,clearForwardHistory,clearGoalSeekRequest,hideTargetEntry,evaluateCurrentMode';
+        const runServices = 'resetPlotPreview,clearGoalSeekRequest,hideTargetEntry,evaluateCurrentMode';
         expect(0, {}, runServices);
         // Check bootstrap registration before explicitly installing anything in this suite.
         send(document.getElementById('run'), click(), runServices);

@@ -258,6 +258,8 @@ http_response_t *http_perform_once(http_client_t *client, const http_request_t *
     if (code != CURLE_OK) goto curl_fail; \
 } while (0)
     SET(CURLOPT_URL, string_c_str(request->url));
+    if (client->unix_socket)
+        SET(CURLOPT_UNIX_SOCKET_PATH, string_c_str(client->unix_socket));
     if (request->http2) {
         const curl_version_info_data *info = curl_version_info(CURLVERSION_NOW);
         if (!info || !(info->features & CURL_VERSION_HTTP2)) {

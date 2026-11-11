@@ -29,6 +29,7 @@ typedef struct _http_client_t {
     array_t *ca;
     array_t *certificate, *private_key;
     string_t *key_password;
+    string_t *unix_socket; /**< Owned optional Unix socket pathname, independent of request authorities. */
     bool cookies;
     unsigned redirects;
     http_cancel_fn cancel;

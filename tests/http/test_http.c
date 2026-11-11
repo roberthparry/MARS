@@ -25,6 +25,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
+#include <sys/un.h>
 #include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
@@ -136,6 +137,56 @@ static bool header_equals(const http_response_t *response, const char *name, con
     bool ok = value && string_view_equals_literal(string_view_all(value), expected);
     string_free(key);
     return ok;
+}
+
+static void test_http_unix_socket(void)
+{
+    string_t *path = string_sprintf("%s/http.sock", test_case_temp_dir());
+    struct sockaddr_un address = {.sun_family = AF_UNIX};
+    bool ready = path && string_byte_length(path) < sizeof address.sun_path;
+    if (ready)
+        memcpy(address.sun_path, string_c_str(path), string_byte_length(path) + 1);
+    int listener = ready ? socket(AF_UNIX, SOCK_STREAM, 0) : -1;
+    ready = listener >= 0 && !bind(listener, (struct sockaddr *)&address, sizeof address) && !listen(listener, 8);
+    string_t *descriptor = ready ? string_sprintf("%d", listener) : NULL;
+    pid_t child = descriptor ? fork() : -1;
+    if (child == 0) {
+        execl(MARS_HTTP_FIXTURE_PATH, "http_fixture", "http", string_c_str(descriptor), (char *)NULL);
+        _exit(127);
+    }
+    if (listener >= 0)
+        close(listener);
+    string_free(descriptor);
+    http_client_t *client = http_client_new();
+    string_t *url = string_new_with("http://local-daemon.invalid/json");
+    http_request_t *request = url ? http_request_new(HTTP_GET, url) : NULL;
+    bool ok = child > 0 && client && request && http_client_set_unix_socket(client, path);
+    string_free(path); /* The client retains its own socket pathname. */
+    string_t *invalid = string_new_with("relative.sock");
+    ok = ok && !http_client_set_unix_socket(client, invalid);
+    string_clear(invalid);
+    ok = ok && !http_client_set_unix_socket(client, invalid);
+    string_append_bytes(invalid, "/tmp/a\0b", 8);
+    ok = ok && !http_client_set_unix_socket(client, invalid);
+    string_free(invalid);
+    http_response_t *response = ok ? http_client_send(client, request) : NULL;
+    json_t *value = response ? http_response_json(response) : NULL;
+    ok = ok && http_response_ok(response) && value;
+    json_free(value);
+    http_response_free(response);
+    http_request_free(request);
+    request = request_for(HTTP_GET, "/json");
+    ok = ok && http_client_set_unix_socket(client, NULL);
+    response = ok ? http_client_send(client, request) : NULL;
+    ok = ok && http_response_ok(response);
+    http_response_free(response);
+    http_request_free(request);
+    http_client_free(client);
+    string_free(url);
+    stop_fixture(child);
+    if (address.sun_path[0])
+        unlink(address.sun_path);
+    TEST_ASSERT_TRUE(ok, "Unix HTTP owns its path, preserves settings on invalid input and restores TCP cleanly");
 }
 
 static void test_http_async_receiver(void)
@@ -1210,6 +1261,7 @@ int tests_main(void)
     }
     TEST_SECTION("HTTP");
     TEST_RUN_IN_GROUP(test_http_async_receiver, tests, NULL);
+    TEST_RUN_IN_GROUP(test_http_unix_socket, tests, NULL);
     TEST_RUN_IN_GROUP(test_http_validation_and_encoding, tests, NULL);
     TEST_RUN_IN_GROUP(test_http_headers_status_and_reuse, tests, NULL);
     TEST_RUN_IN_GROUP(test_http_methods_and_binary, tests, NULL);

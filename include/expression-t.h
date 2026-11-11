@@ -1400,8 +1400,10 @@ expr_t *expr_dilog(const expr_t *expr);
  *
  * For real arguments this is the real, odd, 2π-periodic sine series
  * @f$\sum_{k=1}^{\infty}\sin(k\theta)/k^2@f$.
- * @param argument Angle expression; it is retained.
- * @return An owning Clausen expression, or NULL on error.
+ * Equivalent to expr_clausen(2, argument). The expression parser accepts both
+ * clausen(x) and clausen2(x) for this order, and Cl(n,x) for an explicit order.
+ * @param argument Angle expression in radians; retained without consuming the caller's reference.
+ * @return An owning Clausen expression; release with expr_free(). NULL on error.
  */
 expr_t *expr_clausen2(const expr_t *argument);
 
@@ -1411,9 +1413,11 @@ expr_t *expr_clausen2(const expr_t *argument);
  * Even orders use the sine Fourier series and odd orders use the cosine
  * Fourier series, with denominator k raised to the given order. Order one
  * is -ln|2 sin(θ/2)| for real angles away from multiples of 2π.
+ * The C API requires an explicit order; order two is equivalent to expr_clausen2(argument).
+ * In expression input, use Cl(n,x) for this family; clausen(x) always selects order two.
  * @param order Positive integer order.
- * @param argument Angle expression; it is retained.
- * @return An owning Clausen expression, or NULL for order zero or on error.
+ * @param argument Angle expression in radians; retained without consuming the caller's reference.
+ * @return An owning Clausen expression; release with expr_free(). NULL for order zero or on error.
  */
 expr_t *expr_clausen(unsigned long order, const expr_t *argument);
 
@@ -1797,6 +1801,87 @@ expr_t *expr_mod(const expr_t *a, const expr_t *b);
 expr_t *expr_modinv(const expr_t *a, const expr_t *b);
 
 /**
+ * @brief Construct exact modular exponentiation without constructing the unreduced power.
+ * Base, non-negative exponent and positive modulus must evaluate to exact integers.
+ * @param[in] base Borrowed base expression; retained, not consumed. NULL is invalid.
+ * @param[in] exponent Borrowed exponent expression; retained, not consumed. NULL is invalid.
+ * @param[in] modulus Borrowed modulus expression; retained, not consumed. NULL is invalid.
+ * @return Owned expression released with expr_free(), or NULL for a missing operand.
+ * Invalid numerical arguments evaluate to NAN. These discrete operations have no continuous derivative.
+ */
+expr_t *expr_powmod(const expr_t *base, const expr_t *exponent, const expr_t *modulus);
+
+/**
+ * @brief Construct the bit length of an exact integer.
+ * Uses the absolute integer magnitude; zero has bit length zero.
+ * @param[in] value Borrowed value expression; retained, not consumed. NULL is invalid.
+ * @return Owned expression released with expr_free(), or NULL for a missing operand.
+ * Invalid numerical arguments evaluate to NAN. These discrete operations have no continuous derivative.
+ */
+expr_t *expr_bit_length(const expr_t *value);
+
+/**
+ * @brief Set a zero-based bit in an exact integer.
+ * The bit index must evaluate to an exact non-negative integer representable by size_t.
+ * @param[in] value Borrowed value expression; retained, not consumed. NULL is invalid.
+ * @param[in] index Borrowed index expression; retained, not consumed. NULL is invalid.
+ * @return Owned expression released with expr_free(), or NULL for a missing operand.
+ * Invalid numerical arguments evaluate to NAN. These discrete operations have no continuous derivative.
+ */
+expr_t *expr_set_bit(const expr_t *value, const expr_t *index);
+
+/**
+ * @brief Clear a zero-based bit in an exact integer.
+ * The bit index must evaluate to an exact non-negative integer representable by size_t.
+ * @param[in] value Borrowed value expression; retained, not consumed. NULL is invalid.
+ * @param[in] index Borrowed index expression; retained, not consumed. NULL is invalid.
+ * @return Owned expression released with expr_free(), or NULL for a missing operand.
+ * Invalid numerical arguments evaluate to NAN. These discrete operations have no continuous derivative.
+ */
+expr_t *expr_clear_bit(const expr_t *value, const expr_t *index);
+
+/**
+ * @brief Test a zero-based bit in an exact integer, returning zero or one.
+ * The bit index must evaluate to an exact non-negative integer representable by size_t.
+ * @param[in] value Borrowed value expression; retained, not consumed. NULL is invalid.
+ * @param[in] index Borrowed index expression; retained, not consumed. NULL is invalid.
+ * @return Owned expression released with expr_free(), or NULL for a missing operand.
+ * Invalid numerical arguments evaluate to NAN. These discrete operations have no continuous derivative.
+ */
+expr_t *expr_test_bit(const expr_t *value, const expr_t *index);
+
+/**
+ * @brief Construct the exact integer primality-proof value function.
+ * Evaluation returns one for proven prime, zero for composite, and minus one when no proof is established.
+ * @param[in] value Borrowed value expression; retained, not consumed. NULL is invalid.
+ * @return Owned expression released with expr_free(), or NULL for a missing operand.
+ * Invalid numerical arguments evaluate to NAN. These discrete operations have no continuous derivative.
+ */
+expr_t *expr_prove_prime(const expr_t *value);
+
+/**
+ * @brief Select one result of truncated exact integer division.
+ * Component zero selects the quotient and one selects the remainder. The divisor must be non-zero.
+ * @param[in] value Borrowed value expression; retained, not consumed. NULL is invalid.
+ * @param[in] divisor Borrowed divisor expression; retained, not consumed. NULL is invalid.
+ * @param[in] component Borrowed component expression; retained, not consumed. NULL is invalid.
+ * @return Owned expression released with expr_free(), or NULL for a missing operand.
+ * Invalid numerical arguments evaluate to NAN. These discrete operations have no continuous derivative.
+ */
+expr_t *expr_divmod(const expr_t *value, const expr_t *divisor, const expr_t *component);
+
+/**
+ * @brief Select one result of the extended Euclidean algorithm.
+ * Components zero, one and two select g, s and t, where a*s+b*t=g and g is non-negative.
+ * @param[in] a Borrowed a expression; retained, not consumed. NULL is invalid.
+ * @param[in] b Borrowed b expression; retained, not consumed. NULL is invalid.
+ * @param[in] component Borrowed component expression; retained, not consumed. NULL is invalid.
+ * @return Owned expression released with expr_free(), or NULL for a missing operand.
+ * Invalid numerical arguments evaluate to NAN. These discrete operations have no continuous derivative.
+ */
+expr_t *expr_gcdext(const expr_t *a, const expr_t *b, const expr_t *component);
+
+/**
  * @brief Construct an integer primality-test value expression.
  * @param n Borrowed integer argument expression; retained, not consumed.
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
@@ -1866,8 +1951,11 @@ expr_t *expr_shr(const expr_t *a, const expr_t *bits);
 
 /**
  * @brief Construct a prime-factor product, evaluating a known argument when possible.
- * @param n Borrowed integer argument expression; retained, not consumed.
- * @return Owned expression; release with expr_free. NULL when the operation reports failure.
+ * @param[in] n Borrowed argument expression; not consumed. A formal call may retain it.
+ * @return Owned prime-factor product with independently owned constant bindings when the argument is a known
+ * positive integer, or a formal factors call when factorisation is unavailable. Release with expr_free().
+ * Returns NULL for a null argument. No fixed operand bit-length cutoff is imposed; runtime depends on the
+ * argument's factor structure and the number module's factorisation algorithm.
  */
 expr_t *expr_factors(const expr_t *n);
 

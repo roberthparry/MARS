@@ -621,9 +621,38 @@ html[data-almanac-jurisdiction-flag] .almanac-summary .almanac-location-flag:has
 }
 
 .almanac-globe { margin-bottom: 1rem; border: 1px solid var(--line, #52675b); border-radius: 16px; overflow: hidden; }
-.almanac-globe-toolbar { display: flex; align-items: center; gap: .5rem; padding: .7rem; flex-wrap: wrap; }
+.almanac-globe-toolbar { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: .5rem; padding: .7rem; }
 .almanac-globe-toolbar strong { margin-right: auto; }
 .workspace-history { display: contents; }
+.almanac-globe-toolbar .workspace-history { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .5rem; }
+.almanac-globe-view-controls { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: .5rem; }
+.history-editor {
+  width: min(58rem, calc(100vw - 2rem));
+  max-height: 82vh;
+  box-sizing: border-box;
+  padding: 1.2rem;
+  border: 1px solid var(--line, #52675b);
+  border-radius: 16px;
+  background: #10271e;
+  color: var(--code, #e3e8d7);
+  overflow: hidden;
+}
+.history-editor[open] { display: flex; flex-direction: column; }
+.history-editor::backdrop { background: rgba(0, 0, 0, .6); }
+.history-editor-heading { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-shrink: 0; }
+.history-editor-heading h2 { margin: 0; }
+.history-editor p { font-size: .9rem; }
+.history-editor ol { padding: 0; margin: .8rem 0 0; list-style: none; min-height: 0; overflow: auto; overscroll-behavior: contain; }
+.history-entry { display: flex; align-items: center; flex-wrap: wrap; gap: .5rem; padding: .6rem; border-bottom: 1px solid #52675b; }
+.history-entry[aria-current] { background: rgba(233, 181, 77, .12); border-radius: 8px; }
+.history-entry-open { flex: 1 1 16rem; min-width: 0; text-align: left; white-space: pre-wrap; overflow-wrap: anywhere; }
+.history-entry-location { display: flex; align-items: center; gap: .65rem; white-space: normal; }
+.history-entry-flag { width: 2rem; height: 1.4rem; object-fit: contain; flex: 0 0 2rem; }
+.history-entry-place { display: flex; flex-direction: column; gap: .3rem; min-width: 0; }
+.history-entry-place-name { font-size: .95rem; }
+.history-entry-place-detail { font-size: .8rem; font-weight: normal; color: var(--muted, #b8cabb); }
+.history-entry-actions { display: flex; align-items: center; flex-wrap: wrap; gap: .4rem; }
+.history-current { color: #f0c873; font-size: .8rem; padding: .3rem; }
 .globe-travel-notice {
   position: absolute;
   top: 0.6rem;

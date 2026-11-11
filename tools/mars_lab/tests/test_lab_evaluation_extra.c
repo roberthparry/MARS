@@ -370,6 +370,62 @@ static void test_lab_extra_surface_refinement(void)
     json_free(fields);
 }
 
+static void test_lab_extra_surface_root_power(void)
+{
+    const char *scales[] = {"auto", "all"};
+    for (unsigned mode = 0; mode < 2; ++mode) {
+        string_t *payload = string_sprintf(
+            "{\"expression\":\"acos(sin(2-x*y)-10^(-root(x^2+y^2,5)))\",\"action\":\"plot\","
+            "\"precision\":17,\"plot_scale\":\"%s\"}", scales[mode]);
+        unsigned status = 0;
+        json_t *fields = request("/eval", string_c_str(payload), &status);
+        const char *svg = lab_eval_text(fields, "plot_svg");
+        bool ok = status == 200 && test_lab_ok(fields, true) &&
+                  contains(fields, "plot_svg", "data-sample-side=\"70\"") &&
+                  contains(fields, "plot_svg", "data-plot-title");
+        const char *attributes[] = {"data-x-min=\"", "data-x-max=\"", "data-y-min=\"", "data-y-max=\"",
+                                    "data-z-min=\"", "data-z-max=\""};
+        double bounds[6] = {0};
+        for (unsigned i = 0; ok && i < 6; ++i) {
+            const char *value = strstr(svg, attributes[i]);
+            ok = value != NULL;
+            if (value)
+                bounds[i] = strtod(value + strlen(attributes[i]), NULL);
+        }
+        size_t vertices = 0;
+        for (const char *p = strstr(svg, "data-vertices=\""); ok && p; p = strstr(p, "data-vertices=\"")) {
+            p += strlen("data-vertices=\"");
+            while (ok && *p && *p != '"') {
+                double point[3];
+                for (unsigned axis = 0; ok && axis < 3; ++axis) {
+                    char *end = NULL;
+                    double fraction = strtod(p, &end);
+                    ok = end != p;
+                    point[axis] = bounds[2 * axis] + fraction * (bounds[2 * axis + 1] - bounds[2 * axis]);
+                    p = end;
+                }
+                if (ok) {
+                    ok = point[2] >= 0 && point[2] <= acos(-1.0) + 1e-8;
+                    if (mode == 1) {
+                        double argument = sin(2 - point[0] * point[1]) -
+                                          pow(10, -pow(point[0] * point[0] + point[1] * point[1], 0.2));
+                        ok = ok && fabs(cos(point[2]) - argument) < 2e-5;
+                    }
+                    ++vertices;
+                }
+                while (*p == ' ')
+                    ++p;
+            }
+        }
+        ok = ok && vertices > 100 && vertices < 6 * 69 * 69;
+        if (!ok)
+            show_failure(fields);
+        json_free(fields);
+        string_free(payload);
+        TEST_ASSERT_TRUE(ok, "nested principal roots and powers plot finite real facets with non-real domain gaps");
+    }
+}
+
 static void test_lab_extra_mesh_closed(void)
 {
     const char *equations[] = {"x^2+y^2+z^2=9", "(sqrt(x^2+y^2)-2)^2+z^2=1"};
@@ -963,8 +1019,10 @@ static void test_lab_extra_surface(void)
                  contains(fields, "plot_svg", "data-roll=\"90.000\"") &&
                  contains(fields, "plot_svg", "data-axis-arrow=\"2\"") &&
                  contains(fields, "plot_svg", "data-plot-tick=\"2\"");
-        if (!ok)
+        if (!ok) {
+            fprintf(stderr, "Surface case %zu: %s\n", i, cases[i]);
             show_failure(fields);
+        }
         json_free(fields);
         TEST_ASSERT_TRUE(ok, "native surfaces preserve bindings, holes and range-aware numerical precision");
     }
@@ -1081,7 +1139,7 @@ static void test_lab_extra_plot_preview(void)
     expect_response("/eval", "{\"expression\":\"x+y\",\"action\":\"plot\",\"plot_quality\":\"unknown\"}",
                     422u, "error", "plotting quality");
     const char *const modes[] = {"expression", "equation", "diffequation"};
-    const char *const sources[] = {"sin(30*x)", "sin(30*x)=0", "Dx(y)=30*cos(30*x); y(0)=0"};
+    const char *const sources[] = {"sin(30*x)", "sin(30*x)=x", "Dx(y)=30*cos(30*x); y(0)=0"};
     for (unsigned i = 0; i < 3; ++i) {
         size_t lengths[2] = {0};
         for (unsigned quality = 0; quality < 2; ++quality) {
@@ -1097,6 +1155,8 @@ static void test_lab_extra_plot_preview(void)
             json_free(result);
             string_free(payload);
         }
+        if (!lengths[0] || lengths[1] <= lengths[0])
+            string_printf("%s preview/full SVG sizes: %zu/%zu bytes\n", modes[i], lengths[0], lengths[1]);
         TEST_ASSERT_TRUE(lengths[0] > 0 && lengths[1] > lengths[0],
                          "all curve modes use reduced sampling for previews and restore full detail");
     }
@@ -2043,6 +2103,28 @@ static void test_lab_extra_constant_identity(void)
     TEST_ASSERT_TRUE(ok, "simplified-value fallback does not invent a value for a remaining unset variable");
 }
 
+static void test_lab_extra_factorisation(void)
+{
+    const unsigned precisions[] = {17, 78};
+    for (size_t i = 0; i < sizeof precisions / sizeof *precisions; ++i) {
+        string_t *payload = string_sprintf(
+            "{\"expression\":\"factors(2^512*3^256*5^128)\",\"action\":\"evaluate\",\"precision\":%u}",
+            precisions[i]);
+        unsigned status = 0;
+        json_t *fields = payload ? request("/eval", string_c_str(payload), &status) : NULL;
+        bool ok = status == 200 && test_lab_ok(fields, true) &&
+            contains(fields, "expression", "a₀⁵¹²·a₁²⁵⁶·a₂¹²⁸") &&
+            contains(fields, "expression", "a₀ = 2, a₁ = 3, a₂ = 5") &&
+            contains(fields, "tex", "a_{0}^{512}") && contains(fields, "tex", "a_{1}^{256}") &&
+            contains(fields, "tex", "a_{2}^{128}") && contains(fields, "function", "a₀^512") &&
+            !contains(fields, "expression", "factors(") && *test_lab_text(fields, "value");
+        if (!ok) show_failure(fields);
+        json_free(fields);
+        string_free(payload);
+        TEST_ASSERT_TRUE(ok, "large exact prime-factor products reach every Lab result card at either precision");
+    }
+}
+
 static void test_lab_extra_bindings(void)
 {
     expect_response("/eval", "{\"expression\":\"{x+c | x=?; c=2}\",\"action\":\"bindings\"}", 200u, "bindings",
@@ -2294,6 +2376,36 @@ static void test_lab_extra_equation(void)
         show_failure(sphere);
     json_free(sphere);
     TEST_ASSERT_TRUE(ok, "symbolic opposite branches use plus-minus without unavailable numerical rows");
+}
+
+static void test_lab_extra_complex_power_equation(void)
+{
+    const char *sources[] = {"i^x=2", "{i^x=2 | x=-0.44i}"};
+    for (size_t i = 0; i < sizeof sources / sizeof *sources; ++i) {
+        json_t *input = json_new_object();
+        lab_eval_set(input, "equation", sources[i]);
+        string_t *precision_key = string_new_with("precision");
+        string_t *precision_text = string_new_with("78");
+        json_t *precision = json_new_number(precision_text);
+        json_object_set(input, precision_key, precision);
+        json_free(precision);
+        string_free(precision_text);
+        string_free(precision_key);
+        string_t *route = string_new_with("/equation-eval");
+        unsigned status = 0;
+        json_t *result = lab_eval_request(route, input, &status);
+        bool ok = status == 200 && test_lab_ok(result, true) && contains(result, "solutions", "4n") &&
+                  contains(result, "solutions", "ln(2)") && contains(result, "solutions_TeX", "\\ln") &&
+                  contains(result, "solutions_TeX", "\\pi") &&
+                  contains(result, "solutions_TeX", "n \\in \\mathbb{Z}") &&
+                  !*lab_eval_text(result, "render_error") && contains(result, "svg", "<svg");
+        if (!ok)
+            show_failure(result);
+        json_free(result);
+        string_free(route);
+        json_free(input);
+        TEST_ASSERT_TRUE(ok, "complex exponential equations render their closed integer family even with a saved seed");
+    }
 }
 
 static void test_lab_extra_equation_real_surd_numerics(void)
@@ -3168,6 +3280,7 @@ void test_lab_evaluation_extra_cases(void)
     TEST_RUN_IN_GROUP(test_lab_extra_surface, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_surface_continuity, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_surface_refinement, tests, NULL);
+    TEST_RUN_IN_GROUP(test_lab_extra_surface_root_power, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_surface_slices, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_folded_laplace_plot, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_distribution_plot, tests, NULL);
@@ -3197,6 +3310,7 @@ void test_lab_evaluation_extra_cases(void)
     TEST_RUN_IN_GROUP(test_lab_extra_expression, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_help_examples, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_constant_identity, tests, NULL);
+    TEST_RUN_IN_GROUP(test_lab_extra_factorisation, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_plot_availability, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_bindings, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_binding_edit, tests, NULL);
@@ -3207,6 +3321,7 @@ void test_lab_evaluation_extra_cases(void)
     TEST_RUN_IN_GROUP(test_lab_extra_gaussian_derivative_round_trip, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_exact_derivative_round_trip, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_equation, tests, NULL);
+    TEST_RUN_IN_GROUP(test_lab_extra_complex_power_equation, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_equation_real_surd_numerics, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_equation_decimal_notation, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_number_card_markup, tests, NULL);

@@ -14,6 +14,8 @@
 #include "quaternion-t.h"
 #include "globe-t.h"
 #include "lab_dom.h"
+#include "lab_location.h"
+#include "lab_globe_markers.h"
 #include "lab_globe.h"
 
 static const double globe_radian = 0.017453292519943295;
@@ -371,17 +373,47 @@ void lab_globe_flight_ahead(jsref start, jsref target, double progress, bool red
     globe_result(view, 7);
 }
 
-/* Measure the actual camera route, including a redirected flight's current starting point. */
-void lab_globe_flight_distance(jsref start, jsref target)
+static double globe_camera_distance(const double a[5], const double b[5])
 {
-    double a[5], b[5], am[9], bm[9];
-    if (!globe_camera_read(start, a) || !globe_camera_read(target, b) ||
-        !quaternion_matrix3(am, a) || !quaternion_matrix3(bm, b)) { lab_dom_return(0); return; }
+    double am[9], bm[9];
+    if (!quaternion_matrix3(am, a) || !quaternion_matrix3(bm, b)) return NAN;
     double x = am[7] * bm[8] - am[8] * bm[7];
     double y = am[8] * bm[6] - am[6] * bm[8];
     double z = am[6] * bm[7] - am[7] * bm[6];
     double dot = am[6] * bm[6] + am[7] * bm[7] + am[8] * bm[8];
-    lab_dom_return(lab_dom_numeric(6371.0088 * atan2(hypot(hypot(x, y), z), dot)));
+    return 6371.0088 * atan2(hypot(hypot(x, y), z), dot);
+}
+
+/* Measure the actual camera route, including a redirected flight's current starting point. */
+void lab_globe_flight_distance(jsref start, jsref target)
+{
+    double a[5], b[5];
+    double distance = globe_camera_read(start, a) && globe_camera_read(target, b) ? globe_camera_distance(a, b) : NAN;
+    lab_dom_return(isfinite(distance) ? lab_dom_numeric(distance) : 0);
+}
+
+/* Keep the destination readable before its optional town catalogue arrives, and report actual remaining travel. */
+void lab_globe_travel_notice(node_jsref notice, jsref current, jsref target)
+{
+    double a[5], b[5];
+    if (!notice || !globe_camera_read(current, a) || !globe_camera_read(target, b)) return;
+    double distance = globe_camera_distance(a, b);
+    if (!isfinite(distance)) return;
+    int town = lab_dom_read(lab_dom_id("almanacTown"), LAB_DOM_VALUE, "");
+    int name = lab_location_town_text(lab_dom_item(lab_dom_split(town, "|"), 0));
+    if (!lab_dom_length(name)) {
+        double lat = lab_dom_to_number(lab_dom_read(lab_dom_id("almanacLatitude"), LAB_DOM_VALUE, ""));
+        double lon = lab_dom_to_number(lab_dom_read(lab_dom_id("almanacLongitude"), LAB_DOM_VALUE, ""));
+        name = lab_dom_join(lab_globe_coordinate_text(lat, lab_dom_string("N"), lab_dom_string("S")), 0, ", ");
+        name = lab_dom_join(name, lab_globe_coordinate_text(lon, lab_dom_string("E"), lab_dom_string("W")), "");
+    }
+    int text = lab_dom_join(lab_dom_string(distance < .001 ? "Orienting view at " : "Travelling to "), name, "");
+    if (distance >= .001) {
+        text = lab_dom_join(text, 0, " · ");
+        text = lab_dom_join(text, lab_dom_format(floor(distance * (distance < 1 ? 1000 : 1) + .5), "",
+            distance < 1 ? " m remaining" : " km remaining"), "");
+    }
+    if (!lab_dom_equal(lab_dom_read(notice, LAB_DOM_TEXT, ""), text)) lab_dom_write(notice, LAB_DOM_TEXT, "", text);
 }
 
 static double globe_flight_motion(const double a[5], const double b[5], double viewport)

@@ -144,7 +144,8 @@ bool lab_worker_plot_ranges(const char *source, const char *first, const char *s
     if (!needed)
         return lab_worker_plot_bounds(limits[0], limits[1], &bounds[0], &bounds[1]) &&
                (!second || lab_worker_plot_bounds(limits[2], limits[3], &bounds[2], &bounds[3]));
-    size_t saved = num_get_default_prec_bits(), length = 0;
+    /* Parameter bindings can contain close, large coordinates even when both axis limits are automatic. */
+    size_t saved = num_get_default_prec_bits(), length = strlen(source);
     for (unsigned i = 0; i < 2 * dimensions; ++i)
         length += strlen(limits[i]);
     num_set_default_prec_bits(length < 2000 ? 128 + 4 * length : 8192);

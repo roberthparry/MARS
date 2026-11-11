@@ -234,6 +234,15 @@ typedef enum {
     EXPR_KIND_REAL_BOUND,
     EXPR_KIND_IMAG_COORDINATE,
     EXPR_KIND_ARGUMENT_LIST,
+    EXPR_KIND_INTEGER_PACK, /**< Private unevaluated integer operand pair. */
+    EXPR_KIND_POWMOD, /**< Exact integer powmod operation. */
+    EXPR_KIND_BIT_LENGTH, /**< Exact integer bit length operation. */
+    EXPR_KIND_SET_BIT, /**< Exact integer set bit operation. */
+    EXPR_KIND_CLEAR_BIT, /**< Exact integer clear bit operation. */
+    EXPR_KIND_TEST_BIT, /**< Exact integer test bit operation. */
+    EXPR_KIND_PROVE_PRIME, /**< Exact integer prove prime operation. */
+    EXPR_KIND_DIVMOD, /**< Exact integer divmod operation. */
+    EXPR_KIND_GCDEXT, /**< Exact integer gcdext operation. */
     EXPR_KIND_COUNT
 } expr_op_kind_t;
 
@@ -311,7 +320,8 @@ typedef enum {
     EXPR_BINDING_EXPR_DIV,
     EXPR_BINDING_EXPR_POWI,
     EXPR_BINDING_EXPR_UNARY_OP,
-    EXPR_BINDING_EXPR_BINARY_OP
+    EXPR_BINDING_EXPR_BINARY_OP,
+    EXPR_BINDING_EXPR_NATIVE_CALL /**< Precision-replayable numeric call parsed by the primary function registry. */
 } expr_binding_expr_kind_t;
 
 typedef enum {
@@ -697,6 +707,134 @@ extern const expr_ops_t ops_gcd;
 extern const expr_ops_t ops_lcm;
 extern const expr_ops_t ops_mod;
 extern const expr_ops_t ops_modinv;
+
+/**
+ * @brief Lower the inverse parser alias into native scalar operations.
+ * @param[in] argument Borrowed argument expression, not consumed; retained where needed by the result.
+ * @return Owned expression released with expr_free(), or NULL for invalid operands or component selection.
+ */
+expr_t *expr_alias_inverse(const expr_t *argument);
+
+/**
+ * @brief Test whether a complete function spelling belongs to the primary parser registry.
+ * @param[in] name Borrowed function-name view; not retained and need only remain valid during this call.
+ * @return True for a registered spelling, false for an empty or unknown name. Uses the existing perfect hash.
+ */
+bool expr_stringin_has_function(string_view_t name);
+
+/**
+ * @brief Lower the square parser alias into native scalar operations.
+ * @param[in] argument Borrowed argument expression, not consumed; retained where needed by the result.
+ * @return Owned expression released with expr_free(), or NULL for invalid operands or component selection.
+ */
+expr_t *expr_alias_square(const expr_t *argument);
+
+/**
+ * @brief Lower the pow10 parser alias into native scalar operations.
+ * @param[in] argument Borrowed argument expression, not consumed; retained where needed by the result.
+ * @return Owned expression released with expr_free(), or NULL for invalid operands or component selection.
+ */
+expr_t *expr_alias_pow10(const expr_t *argument);
+
+/**
+ * @brief Lower the mul pow10 parser alias into native scalar operations.
+ * @param[in] argument Borrowed argument expression, not consumed; retained where needed by the result.
+ * @param[in] exponent Borrowed exponent expression, not consumed; retained where needed by the result.
+ * @return Owned expression released with expr_free(), or NULL for invalid operands or component selection.
+ */
+expr_t *expr_alias_mul_pow10(const expr_t *argument, const expr_t *exponent);
+
+/**
+ * @brief Lower the ldexp parser alias into native scalar operations.
+ * @param[in] argument Borrowed argument expression, not consumed; retained where needed by the result.
+ * @param[in] exponent Borrowed exponent expression, not consumed; retained where needed by the result.
+ * @return Owned expression released with expr_free(), or NULL for invalid operands or component selection.
+ */
+expr_t *expr_alias_ldexp(const expr_t *argument, const expr_t *exponent);
+
+/**
+ * @brief Lower the tetragamma parser alias into native scalar operations.
+ * @param[in] argument Borrowed argument expression, not consumed; retained where needed by the result.
+ * @return Owned expression released with expr_free(), or NULL for invalid operands or component selection.
+ */
+expr_t *expr_alias_tetragamma(const expr_t *argument);
+
+/**
+ * @brief Lower the arg parser alias into native scalar operations.
+ * @param[in] argument Borrowed argument expression, not consumed; retained where needed by the result.
+ * @return Owned expression released with expr_free(), or NULL for invalid operands or component selection.
+ */
+expr_t *expr_alias_arg(const expr_t *argument);
+
+/**
+ * @brief Lower the sincos parser alias into native scalar operations.
+ * @param[in] argument Borrowed argument expression, not consumed; retained where needed by the result.
+ * @param[in] component Borrowed component expression, not consumed; retained where needed by the result.
+ * @return Owned expression released with expr_free(), or NULL for invalid operands or component selection.
+ */
+expr_t *expr_alias_sincos(const expr_t *argument, const expr_t *component);
+
+/**
+ * @brief Lower the sinhcosh parser alias into native scalar operations.
+ * @param[in] argument Borrowed argument expression, not consumed; retained where needed by the result.
+ * @param[in] component Borrowed component expression, not consumed; retained where needed by the result.
+ * @return Owned expression released with expr_free(), or NULL for invalid operands or component selection.
+ */
+expr_t *expr_alias_sinhcosh(const expr_t *argument, const expr_t *component);
+
+/**
+ * @brief Construct either the one-argument Clausen function or a specified integral order.
+ * @param[in] count Number of arguments; only one and two are accepted.
+ * @param[in] arguments Borrowed non-NULL operand array of count entries; nodes are retained where required.
+ * @return Owned expression released with expr_free(), or NULL for unsupported arity.
+ */
+expr_t *expr_clausen_args(size_t count, expr_t *const *arguments);
+/** @brief Immutable integer pack dispatch; owned by expression and valid for the process lifetime. */
+extern const expr_ops_t ops_integer_pack;
+/** @brief Immutable powmod dispatch; owned by expression and valid for the process lifetime. */
+extern const expr_ops_t ops_powmod;
+/** @brief Immutable bit length dispatch; owned by expression and valid for the process lifetime. */
+extern const expr_ops_t ops_bit_length;
+/** @brief Immutable set bit dispatch; owned by expression and valid for the process lifetime. */
+extern const expr_ops_t ops_set_bit;
+/** @brief Immutable clear bit dispatch; owned by expression and valid for the process lifetime. */
+extern const expr_ops_t ops_clear_bit;
+/** @brief Immutable test bit dispatch; owned by expression and valid for the process lifetime. */
+extern const expr_ops_t ops_test_bit;
+/** @brief Immutable prove prime dispatch; owned by expression and valid for the process lifetime. */
+extern const expr_ops_t ops_prove_prime;
+/** @brief Immutable divmod dispatch; owned by expression and valid for the process lifetime. */
+extern const expr_ops_t ops_divmod;
+/** @brief Immutable gcdext dispatch; owned by expression and valid for the process lifetime. */
+extern const expr_ops_t ops_gcdext;
+
+/**
+ * @brief Retain two unevaluated integer operands in a private argument pair.
+ * @param[in] left Borrowed first operand; retained, not consumed. NULL is invalid.
+ * @param[in] right Borrowed second operand; retained, not consumed. NULL is invalid.
+ * @return Owned pair released with expr_free(), or NULL for invalid operands.
+ */
+expr_t *expr_integer_pack(const expr_t *left, const expr_t *right);
+
+/**
+ * @brief Reconstruct a packed integer operation during binding replay.
+ * @param[in] ops Borrowed immutable integer operation descriptor; must outlive the result.
+ * @param[in] parameters Borrowed operand pair; retained, not consumed.
+ * @param[in] third Borrowed third operand; retained, not consumed.
+ * @return Owned expression released with expr_free(), or NULL for missing operands.
+ */
+expr_t *expr_integer_from_pack(const expr_ops_t *ops, const expr_t *parameters, const expr_t *third);
+
+/**
+ * @brief Inspect the three operands of a packed integer operation without evaluation.
+ * @param[in] expression Borrowed expression to inspect.
+ * @param[out] a Required destination for the borrowed first operand.
+ * @param[out] b Required destination for the borrowed second operand.
+ * @param[out] c Required destination for the borrowed third operand.
+ * @return True for a complete private operand pair; false otherwise, leaving outputs unspecified.
+ * Output pointers remain valid whilst expression is retained. No ownership is transferred.
+ */
+bool expr_integer_unpack(const expr_t *expression, const expr_t **a, const expr_t **b, const expr_t **c);
 extern const expr_ops_t ops_is_prime;
 extern const expr_ops_t ops_next_prime;
 extern const expr_ops_t ops_prev_prime;

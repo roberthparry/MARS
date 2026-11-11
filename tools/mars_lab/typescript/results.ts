@@ -128,7 +128,8 @@ namespace WorksheetResults {
             promise: Promise<{name: string; flag: string}>;
         }>();
 
-        private async fetchFlag(code: string, signal: AbortSignal): Promise<{name: string; flag: string}> {
+        /** @brief Share cancellable country metadata requests with menus, tooltips and worksheet history. */
+        public async countryMetadata(code: string, signal: AbortSignal): Promise<{name: string; flag: string}> {
             if (signal.aborted) throw new DOMException('Cancelled', 'AbortError');
             const cached = this.cachedCountry(code);
             if (cached) return cached;
@@ -298,7 +299,7 @@ namespace WorksheetResults {
                 this.menuRequest = request;
                 const timer = window.setTimeout(() => request.abort(), 5000);
                 try {
-                    const {flag} = await this.fetchFlag(code, request.signal);
+                    const {flag} = await this.countryMetadata(code, request.signal);
                     if (request.signal.aborted) return;
                     if (this.visibleCountries.has(item) && this.displayCountryCode(item) === code) this.countryArtwork(item, flag);
                 } catch { return; }
@@ -332,7 +333,7 @@ namespace WorksheetResults {
             const timer = window.setTimeout(() => request.controller.abort(), 5000);
             void (async () => {
                 try {
-                    const {name, flag} = await this.fetchFlag(code, request.controller.signal);
+                    const {name, flag} = await this.countryMetadata(code, request.controller.signal);
                     if (request.controller.signal.aborted || this.flagRequest !== request) return;
                     const active = this.activeButton;
                     if (active?.isConnected && this.displayCountryCode(active) === code) {

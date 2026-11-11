@@ -421,6 +421,100 @@ int lab_workspace_history_read(lab_mode_t mode, unsigned side, unsigned index)
     return (int)entry.length;
 }
 
+/* Chronological positions address the two bounded stacks without copying snapshot payloads. */
+int lab_workspace_history_current(lab_mode_t mode)
+{
+    return (unsigned)mode < LAB_WS_MODES ? (int)lab_workspace_modes[mode].count[0] : -1;
+}
+
+/* Enumerate the displayed timeline from earliest Back entry to furthest Forward entry. */
+int lab_workspace_history_item(lab_mode_t mode, unsigned position)
+{
+    if ((unsigned)mode >= LAB_WS_MODES) return -1;
+    lab_workspace_mode_t *state = &lab_workspace_modes[mode];
+    unsigned current = state->count[0], total = current + 1 + state->count[1];
+    if (position >= total) return -1;
+    return position == current ? lab_workspace_history_read(mode, 2, 0) : position < current
+        ? lab_workspace_history_read(mode, 0, position)
+        : lab_workspace_history_read(mode, 1, total - position - 1);
+}
+
+/* Descriptor copies are bounded by 257 entries; image, worksheet and camera bytes stay in the arena. */
+static unsigned lab_workspace_timeline(lab_workspace_mode_t *state, lab_workspace_entry_t *entries)
+{
+    unsigned back = state->count[0], forward = state->count[1];
+    memcpy(entries, state->entries[0], back * sizeof *entries);
+    entries[back] = state->committed;
+    for (unsigned i = 0; i < forward; ++i) entries[back + 1 + i] = state->entries[1][forward - i - 1];
+    return back + forward + 1;
+}
+
+static void lab_workspace_timeline_install(lab_workspace_mode_t *state, const lab_workspace_entry_t *entries,
+                                           unsigned count, unsigned current)
+{
+    state->count[0] = current;
+    state->count[1] = count - current - 1;
+    memcpy(state->entries[0], entries, current * sizeof *entries);
+    state->committed = entries[current];
+    for (unsigned i = 0; i < state->count[1]; ++i) state->entries[1][i] = entries[count - i - 1];
+    ++state->revision;
+}
+
+/* Reordering preserves the active worksheet's identity and never evicts another history item. */
+bool lab_workspace_history_move(lab_mode_t mode, unsigned from, unsigned to)
+{
+    if ((unsigned)mode >= LAB_WS_MODES) return false;
+    lab_workspace_mode_t *state = &lab_workspace_modes[mode];
+    unsigned current = state->count[0], count = current + 1 + state->count[1];
+    if (from >= count || to >= count) return false;
+    unsigned next = from == current ? to : current - (from < current && to >= current) + (from > current && to <= current);
+    if (next > LAB_WS_ENTRIES || count - next - 1 > LAB_WS_ENTRIES) return false;
+    if (from == to) return true;
+    lab_workspace_entry_t entries[1 + 2 * LAB_WS_ENTRIES];
+    lab_workspace_timeline(state, entries);
+    lab_workspace_entry_t moving = entries[from];
+    if (from < to) memmove(entries + from, entries + from + 1, (to - from) * sizeof *entries);
+    else memmove(entries + to + 1, entries + to, (from - to) * sizeof *entries);
+    entries[to] = moving;
+    lab_workspace_timeline_install(state, entries, count, next);
+    return true;
+}
+
+/* Removing the active item promotes its next neighbour, or its predecessor at the end. */
+bool lab_workspace_history_remove(lab_mode_t mode, unsigned position)
+{
+    if ((unsigned)mode >= LAB_WS_MODES) return false;
+    lab_workspace_mode_t *state = &lab_workspace_modes[mode];
+    unsigned current = state->count[0], count = current + 1 + state->count[1];
+    if (position >= count || count == 1) return false;
+    if (position != current) {
+        lab_workspace_remove(state, position < current ? 0 : 1, position < current ? position : count - position - 1);
+        return true;
+    }
+    unsigned offset = state->committed.offset, length = state->committed.length;
+    state->committed.length = 0;
+    if (length) lab_workspace_remove_bytes(offset, length);
+    unsigned side = state->count[1] ? 1 : 0;
+    state->committed = state->entries[side][--state->count[side]];
+    ++state->revision;
+    return true;
+}
+
+/* Select a timeline item atomically after retaining the staged live worksheet in its existing position. */
+int lab_workspace_history_select(lab_mode_t mode, unsigned position, unsigned length)
+{
+    if ((unsigned)mode >= LAB_WS_MODES || !length || length > LAB_WS_BYTES) return -1;
+    lab_workspace_mode_t *state = &lab_workspace_modes[mode];
+    unsigned count = state->count[0] + 1 + state->count[1];
+    if (position >= count || position > LAB_WS_ENTRIES || count - position - 1 > LAB_WS_ENTRIES ||
+        length > LAB_WS_ARENA - lab_workspace_used + state->committed.length) return -1;
+    if (!lab_workspace_commit(mode, length)) return -1;
+    lab_workspace_entry_t entries[1 + 2 * LAB_WS_ENTRIES];
+    lab_workspace_timeline(state, entries);
+    lab_workspace_timeline_install(state, entries, count, position);
+    return lab_workspace_history_read(mode, 2, 0);
+}
+
 /* Validate and reserve the whole replacement before altering any retained snapshot. */
 bool lab_workspace_history_replace(lab_mode_t mode, unsigned back, unsigned forward, unsigned length)
 {

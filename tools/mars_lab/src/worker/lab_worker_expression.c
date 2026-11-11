@@ -803,6 +803,10 @@ static char *owned_number_text(number_t value, int precision)
         text = xstrdup_local("NAN");
     } else if (num_is_inf(value)) {
         text = xstrdup_local(num_get_sign(value) < 0 ? "-∞" : "∞");
+    } else if (num_is_real(value) && num_is_exact(value) && num_is_integer(value)) {
+        string_t *integer = num_to_string(value);
+        text = integer ? xstrdup_local(string_c_str(integer)) : NULL;
+        string_free(integer);
     } else {
         text = num_is_real(value) ? format_real_number(num_real_part(value), display_precision)
                                   : format_complex_number(value, display_precision);

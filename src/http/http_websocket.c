@@ -112,6 +112,8 @@ http_websocket_t *http_websocket_open(http_client_t *client, const http_request_
             goto curl_fail;                                                                                            \
     } while (0)
     SET(CURLOPT_URL, address);
+    if (client->unix_socket)
+        SET(CURLOPT_UNIX_SOCKET_PATH, string_c_str(client->unix_socket));
     SET(CURLOPT_PROTOCOLS_STR, "ws,wss");
     SET(CURLOPT_CONNECT_ONLY, 2L);
     SET(CURLOPT_HTTP_VERSION, (long)CURL_HTTP_VERSION_1_1);

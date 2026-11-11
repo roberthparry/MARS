@@ -531,7 +531,8 @@ static expr_t *equ_symbolic_pi_expr(void);
 static expr_t *equ_symbolic_two_pi_expr(void);
 static expr_t *equ_exact_tan_sqrt_three_family_expr(const char *branch_name);
 
-static const char *equ_branch_parameter_name(const equation_t *equation)
+/* Choose an integer-family parameter distinct from the original equation's bindings. */
+const char *equ_branch_parameter_name(const equation_t *equation)
 {
     static const char *const preferences[] = {"n", "m", "k", "l", "j"};
 

@@ -25,6 +25,10 @@ worksheet's Back/Forward history and does not change the selected observer.
 Native restoration establishes mode ownership before processing saved editors;
 inactive editor text is retained without metadata requests or canonicalisation
 evaluations. Its usual preparation occurs when that mode is selected.
+Integrator reference inspection uses a small native computation budget. If parsing
+would trigger expensive mathematics, such as factorising a difficult integer,
+the form retains all rows conservatively rather than delaying worksheet restoration.
+Full evaluation runs separately with its usual calculation limits.
 
 The HTTP listener starts without opening the astronomical catalogue or preparing
 the global shoreline. A separate, supervised native process prepares geometry on
@@ -446,8 +450,17 @@ the updater does not stop running applications automatically.
 
 ## Native calculation control
 
-Each built-in calculation process enters a fresh [`computation_t`](computation.md)
-scope. Expression evaluation and symbolic checkpoints, and nested numerical
+Each HTTP request process owns a resident calculation process. Built-in mathematical
+entry points are called directly; a successful request retains that process and its
+module caches, including high-precision coefficients. The library remains linked
+as `libmars.so`; cache ownership belongs to each resident process. Requests handled
+by different HTTP processes warm their own caches.
+
+Every job enters a fresh [`computation_t`](computation.md) scope and numeric ownership
+scope. Standard input, output, working directory, environment and default precision
+are reset between jobs. Arguments and the environment travel over private Protobuf
+transport, using anonymous descriptors rather than temporary disk files. Expression
+evaluation and symbolic checkpoints, and nested numerical
 integration, share cancellation, a monotonic deadline and optional work accounting.
 Set `MARS_LAB_WORK_LIMIT` in the server environment to a non-negative integer;
 the default zero means unlimited work. This algorithm-dependent allowance is not
@@ -460,6 +473,23 @@ process group. The child's signal handler only sets a flag. Existing output limi
 and hard process supervision remain necessary for unchecked operations and numerical
 primitives. Diagnostic executable overrides retain immediate termination and do not
 receive the built-in computation scope.
+
+A small single-threaded supervisor replaces calculation processes after a crash,
+cancelled job, exhausted work allowance, 256 completed jobs, or a resident-memory
+high-water mark reaching half their allocation ceiling. It starts before rendering
+threads; replacement never forks a threaded HTTP handler. Request sockets remain
+owned by the HTTP process, not the calculation process. A supervisor failure fails
+subsequent calculations explicitly rather than launching replacement processes from
+a threaded handler; restarting the Lab restores that service.
+
+Calculation and calculation-supervisor address spaces are limited to one
+thirty-second of physical RAM, rounded down to whole MiB and clamped to 128–512 MiB
+(256 MiB if RAM size cannot be determined). HTTP processes receive twice that ceiling;
+the launcher receives the single ceiling. Stricter inherited hard limits are preserved.
+These are allocation safeguards, not a claim that every allocation is leak-free.
+The number of processes, captured output (at most 64 MiB per built-in call) and input
+(at most 8 MiB) are also bounded. A calculation exceeding its memory budget can fail
+without allowing its allocations to grow indefinitely in the HTTP server.
 
 The server polls the request socket during calculation supervision. Browser aborts
 that close the connection therefore request cancellation; this is best-effort
@@ -476,8 +506,9 @@ streaming browser progress or promise a percentage-complete estimate.
 ## Installing and starting the Lab
 
 MARS Lab runs as a native C server with calculation modes linked into that same
-executable. It launches itself with `--worker-control TIMEOUT_MS WORK_LIMIT MODE` for isolated calculations;
-no separate scratch worker binaries are required.
+executable. Normal requests reuse resident calculation processes without launching
+an executable. `--worker-control TIMEOUT_MS WORK_LIMIT MODE` remains available for
+direct diagnostics; no separate scratch worker binaries are required.
 
 The browser runs C/WebAssembly with TypeScript-authored browser adapters and HTML/CSS, served from
 `tools/mars_lab/assets/index.html`, with its stylesheet in `tools/mars_lab/assets/index.css`
@@ -679,6 +710,29 @@ that profile's association with its saved history, but does not erase other prof
 The last mode and its current snapshot are restored before initial evaluation;
 Almanac also restores its saved orientation and zoom without an arrival animation.
 Results are recalculated rather than retaining plot images or geography caches.
+
+Each mode's **History** button opens its saved worksheets in navigation order,
+with the current entry marked. A new evaluation is inserted immediately after
+the current entry: for example, evaluating D while viewing B in A → B → C
+produces A → B → D → C. Forward still reaches C. Re-evaluating an unchanged
+worksheet does not add another entry, and Clear also retains later entries.
+
+In the history editor, each row shows its worksheet input, with **Current** marking
+the active worksheet. Select the input to open it, use **↑ Earlier** and **↓ Later**
+to reorder it, or choose **Remove**. Moving entries keeps the current worksheet
+open. Removing the current entry opens its successor, or its predecessor at the
+end. The sole remaining open worksheet cannot be removed. Changes use the same
+browser-separated persistence and offline recovery as normal navigation; other
+modes and browser profiles are unaffected. Existing capacity limits still apply.
+
+Almanac and DateTime entries show the saved town and country names, with the date
+and Almanac GMT time beneath. Flags load asynchronously from the jurisdiction
+database using the shared bounded country cache. Locations without a saved town
+show their coordinates; an unidentified country is resolved without moving the
+observer or recalculating the worksheet. Existing history needs no reimport.
+The entry list scrolls independently, so the heading, instructions and Close
+button remain visible. Opening or closing the editor preserves the page position.
+Custom coordinates use the same degrees-and-minutes notation as the globe.
 
 Persistent history has these fixed limits:
 
@@ -1165,18 +1219,21 @@ the closest detail. Both source grids use the same bounded GPU and decoded-sourc
 without the additional grid continue using the original tiles. Source GeoTIFFs are preparation inputs,
 not runtime dependencies. `make release` imports a changed prepared manifest even when the managed-data
 revision is unchanged, retaining matching PNG rows and the other geographic layers.
-The prepared Sentinel-2 catalogue contains 4,971 regional images covering the UK,
+The prepared Sentinel-2 catalogue contains 5,291 regional images covering the UK,
 Ireland, Denmark, Netherlands, Italy and the requested Mediterranean and Atlantic
 islands, mainland Portugal and Spain, coastal Svalbard and Cape Peninsula. It also
 includes mainland France, New Zealand and its offshore islands, Finland and Åland,
 Sweden, Norway, Iceland, and the requested areas around Brisbane, Sydney, Melbourne, Perth,
 Mooloolaba, Maroochydore, Canberra, Cairns, Alice Springs and Gold Coast.
+Cyprus and the Cairo area have regional coverage at the same resolution as Spain,
+including broad approach images and overlapping detail tiles. Offshore pixels remain
+transparent; the existing sea photograph supplies their colour.
 Spain, Svalbard and most of this latest expansion use reduced-resolution 1800-square images;
 earlier regional coverage generally uses 3600-square images. Sydney's four tiles now use
 3600-square images rebuilt from the original Sentinel rasters, giving approximately
 10–13 metres per pixel instead of 20–26 metres. Remaining missing observations are
-transparent. Managed globe revision 17 imports the approximately
-35.7 GiB PNG package with `make release`; only photographs
+transparent. `make release` imports the approximately
+39.0 GiB PNG package; only photographs
 needed for the current view are loaded, using the existing bounded caches.
 
 The fallback `lab_globe_photo_patch` planner wraps longitude at the date line and
@@ -1630,8 +1687,12 @@ rewriting the history database or removing entries.
 Destination photographs are requested when navigation starts and prepared
 asynchronously during travel. Source-image reads have an eight-second deadline;
 missing tiles leave the existing photograph usable.
-A travelling notice names the destination and route distance; the selected destination
-marker remains visible whenever it projects into view.
+A travelling notice names the destination and updates the remaining great-circle
+distance during travel. It identifies the final orientation adjustment once the
+destination is reached. Saved town names remain available before the town catalogue
+has loaded. The selected destination marker remains visible whenever it projects
+into view. Navigation buttons stay beside the globe title; the view controls occupy
+their own wrapping row.
 Broad geographic cells supply the approach while finer route and destination cells
 are prepared and retained; the global photograph remains the fallback. Old raster river ink fades when magnified
 beyond its prepared scale while its photographs remain useful during refinement.
@@ -1847,9 +1908,11 @@ without browser base64 calls, byte-to-string loops or spread-argument chunks.
 Write and encoding errors remain visible to callers, while asynchronous server
 publication failures remain non-fatal. C owns saved-record selection, recovery
 ordering, stale-save rejection and history contents.
-Plain history-cursor pushes use flags zero. Recorded snapshot pushes use flags
-three: deduplicate adjacent snapshots and clear forward history, including when
-the new snapshot is blank or a duplicate. These operations are not interchangeable.
+Plain history-cursor pushes use flags zero. Recorded snapshot pushes use flag one
+to deduplicate adjacent snapshots while retaining Forward entries. Timeline edits
+reorder native snapshot descriptors without copying worksheet payloads. Opening a
+selected entry preserves the live worksheet in its existing position before
+restoring the chosen entry through the normal request-ownership workflow.
 
 The redraw scheduler in `surface_volume.ts` uses named methods and concrete data
 records rather than generic utility types or nested callbacks. Its control flow
@@ -2858,7 +2921,34 @@ requires it.
 
 ## Expression mode
 
+Numerical functions use the native expression registry, including exact-integer
+`powmod(base,exponent,modulus)`, bit-length and bit-editing helpers, and primality
+proofs. Large integer operands remain exact at every precision setting.
+`divmod(a,b,k)` selects quotient or remainder for `k=0,1`; `gcdext(a,b,k)` selects
+the GCD or either Bézout coefficient for `k=0,1,2`. The paired trigonometric
+helpers similarly accept a zero or one component selector. The
+[expression guide](expression.md#value-only-functions-owning) lists these
+functions and their domain restrictions. The benchmark catalogue is checked
+against the parser to catch functions that would otherwise be available only
+through the C API.
+
+Clausen input names distinguish aliases from explicit orders: `clausen(x)`
+and `clausen2(x)` both produce Cl₂(x), as does `Cl(2,x)`. Use `Cl(n,x)`
+or `cl(n,x)` for a chosen positive integer order; `Cl(3,x)` produces Cl₃(x).
+Angles are in radians. Lab's Help includes this distinction; the
+[expression guide](expression.md#clausen-functions) lists all accepted aliases.
+
 ### Native function plots
+
+Nested roots and powers use the expression module's guarded native sampler on
+their positive real branches. Uncertain points and branch boundaries retain
+ordinary native evaluation, and non-real surface regions remain gaps. When
+optional surface refinement exceeds the output allowance, the full-size validated
+grid is reused without repeating its numerical sampling. A smaller grid is sampled
+only if that full-size fallback also exceeds the allowance.
+Reusable calculation workers also use the number module's indexed temporary
+ownership, so a large surface does not repeatedly scan its growing set of live
+numbers. Request cleanup still releases all remaining temporary numbers.
 
 Single-real-input functions with non-zero imaginary samples have four linked
 views inside the Plot card: a rotatable three-dimensional curve with input, real
@@ -3446,11 +3536,25 @@ during a drag preview and 31-digit working precision for the completed view. The
 newly plotted roots do not change the worksheet solutions. Requests are limited to 96 new roots per band,
 256 retained points and imaginary heights within ±10000; a caption identifies a reached search limit.
 Repeated identical views use the existing plot cache. The separate
-exact family of negative-even trivial zeros remains in the solution notes. Symbolic infinite families are not
-sampled to invent a finite root set, and diagrams are limited to 256 roots. Real-only equations retain their
+exact family of negative-even trivial zeros remains in the solution notes. Numerical root diagrams are limited
+to 256 roots. Ordinary real-only equations retain their
 curve plots. The completed solve supplies the point data directly, without repeating the solve for plotting
 or viewport changes. Select one equation variable
 and bind any remaining parameters. The equation in the editor is unchanged.
+
+Affine integer solution families use a discrete point diagram too. For `i^x = 2`,
+the initial view shows eleven members of `x = 4n - 2i·ln(2)/π`, with integer `n`.
+The solved formula is cached independently of the viewport. Native coefficient
+matching derives each family's spacing; both the real and imaginary limits then
+select the visible integer interval directly. Panning to real limits 36 to 44
+and imaginary limits −1 to 0 shows the three members for `n = 9, 10, 11`,
+without another equation solve. Tooltips identify the integer and a shortened
+numerical value. Points remain unconnected; empty views retain their axes.
+Dense views are bounded to 256 labelled representative integer members with a
+zoom-in notice. The caption also identifies views beyond the supported integer
+index range ±4503599627370495. Non-affine families and unresolved parameters do
+not become invented point sets. The complete symbolic formula remains in the
+Rendered TeX and Solutions cards.
 
 The Rendered TeX card can also extend a **limited numerical solution list**, when the native solver supplies
 a continuation. This currently applies to non-trivial zeta zeros, not ordinary finite solution sets, symbolic
@@ -3509,6 +3613,11 @@ solver and numerical formatter as Evaluate, rather than retained from an older r
 Structurally opposite symbolic branches share a single ± row in plain text and
 rendered mathematics. Unavailable or non-finite numerical approximations are omitted;
 the symbolic solutions remain visible when their parameters are unset.
+Complex constant-base exponentials retain their complete logarithmic family.
+For example, `i^x = 2` displays the exact closed form `x = 4n - 2i·ln(2)/π`,
+with `n ∈ ℤ`, even if `x` already has a numerical starting value. The integer
+parameter is detected from the native expression's symbols, including compact
+terms such as `4n`; the card does not infer it by parsing formatted mathematics.
 There is no generic left/right legend; hovering over a curve identifies its native
 expression. Automatic equation framing samples both sides and their residual,
 using connected crossings and detected turning points to choose padded horizontal
@@ -5140,6 +5249,14 @@ scan the displayed code. MARS Lab recognises an existing private Tailscale Serve
 configuration; it does not change Tailscale settings or enable public Funnel access. A phone
 that is not connected to the same Tailscale network cannot use the private QR
 code.
+
+The card prefers a verified HTTPS Serve proxy even when the desktop page was
+opened through localhost or a LAN address. Discovery reads the daemon's local
+Unix-socket HTTP API through marslib; it does not start the Tailscale command-line
+programme or relax the Lab's memory limits. The exact online node name, proxy
+port and disabled Funnel configuration are checked before advertising the URL
+or accepting its Host header. Browser page errors use readable text rather than
+a binary API response that a phone might download as a document.
 
 ## Troubleshooting
 

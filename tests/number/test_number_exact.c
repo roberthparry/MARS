@@ -11,6 +11,7 @@
 
 #include <stdio.h>
 
+#include "computation-t.h"
 #include "test_number.h"
 
 static void run_number_exact_integer_construction_tests(void)
@@ -426,6 +427,55 @@ static void run_number_exact_bit_tests(void)
     num_destroy(&thirteen);
 }
 
+/** @brief Factorisation outputs belonging to one scoped-control regression. */
+typedef struct {
+    number_t input;
+    number_factors_t *factors;
+} factor_control_case_t;
+
+static bool factor_with_control(void *argument)
+{
+    factor_control_case_t *test = argument;
+    test->factors = num_factors(test->input);
+    return test->factors != NULL;
+}
+
+static void run_number_factor_control_tests(void)
+{
+    /* Removing small factors must not conceal a stop while searching the remaining composite. */
+    factor_control_case_t test = {.input = num_create_from_string("8000000128000000504")};
+    computation_options_t options = {.work_limit = 16};
+    computation_t *control = computation_new(&options);
+    ASSERT_NOT_NULL(control);
+    ASSERT_TRUE(!computation_run(control, factor_with_control, &test));
+    ASSERT_TRUE(computation_status(control) == COMPUTATION_BUDGET_EXHAUSTED);
+    ASSERT_TRUE(test.factors == NULL);
+    ASSERT_TRUE(computation_current() == NULL);
+    computation_free(control);
+
+    options.work_limit = 4096;
+    control = computation_new(&options);
+    computation_cancel(control);
+    ASSERT_TRUE(!computation_run(control, factor_with_control, &test));
+    ASSERT_TRUE(computation_status(control) == COMPUTATION_CANCELLED);
+    ASSERT_TRUE(test.factors == NULL);
+    computation_free(control);
+    num_destroy(&test.input);
+
+    /* A large smooth integer still completes within the metadata work budget. */
+    test.input = num_shl(NUM_ONE, 2048);
+    control = computation_new(&options);
+    ASSERT_TRUE(computation_run(control, factor_with_control, &test));
+    ASSERT_NOT_NULL(test.factors);
+    if (test.factors) {
+        ASSERT_EQ_LONG((long)test.factors->count, 1);
+        assert_number_factor(test.factors->items, "2", 2048);
+    }
+    num_factors_free(test.factors);
+    computation_free(control);
+    num_destroy(&test.input);
+}
+
 void run_number_exact_backend_tests(void)
 {
     printf(C_CYAN "Testing exact integer and rational backends...\n" C_RESET);
@@ -436,6 +486,7 @@ void run_number_exact_backend_tests(void)
     run_number_exact_integer_math_tests();
     run_number_exact_number_theory_tests();
     run_number_exact_bit_tests();
+    run_number_factor_control_tests();
 
     {
         number_t two_from_long;

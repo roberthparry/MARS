@@ -6305,11 +6305,10 @@ expr_t *expr_shr(const expr_t *a, const expr_t *b)
 
 static expr_t *expr_factor_product_from_number(number_t value)
 {
-    enum { FACTOR_MAX_BITS = 1024 };
     number_factors_t *factors;
     expr_t *out = NULL;
 
-    if (!num_is_integer(value) || num_get_sign(value) <= 0 || num_bit_length(value) > FACTOR_MAX_BITS)
+    if (!num_is_integer(value) || num_get_sign(value) <= 0)
         return NULL;
 
     factors = num_factors(value);
@@ -6359,6 +6358,7 @@ static expr_t *expr_factor_product_from_number(number_t value)
     return out;
 }
 
+/* Preserve known prime factors as constant bindings instead of multiplying them back together. */
 expr_t *expr_factors(const expr_t *a)
 {
     expr_t *product;

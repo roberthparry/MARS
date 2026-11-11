@@ -841,7 +841,8 @@ static void emit_expr_inner(const expr_t *f, sbuf_t *b, int parent_prec)
             emit_expr_hypergeometric_pFq(f, b);
             return;
         }
-        if (expr_is_op(f, &ops_lerch_phi) && f->a && expr_is_op(f->a, &ops_lerch_phi_pack)) {
+        if ((expr_is_op(f, &ops_lerch_phi) && f->a && expr_is_op(f->a, &ops_lerch_phi_pack)) ||
+            (f->a && expr_is_op(f->a, &ops_integer_pack))) {
             sbuf_puts(b, expr_ops_expression_name(f->ops));
             sbuf_putc(b, '(');
             emit_expr(f->a->a, b, 0);

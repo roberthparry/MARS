@@ -139,12 +139,27 @@ static const TeX_model_node_t *hypergeometric(notation_build_t *build, const exp
     return node(build, TeX_NODE_APPLY, 2u, children);
 }
 
+static const TeX_model_node_t *integer_function(notation_build_t *build, const expr_t *expression)
+{
+    const expr_t *a, *b, *c;
+    if (!expr_integer_unpack(expression, &a, &b, &c))
+        return NULL;
+    const TeX_model_node_t *children[] = {
+        notation_build_literal(build, TeX_NODE_FUNCTION_NAME, expr_ops_function_name(expression->ops)),
+        notation_build_expr(build, a), notation_build_expr(build, b), notation_build_expr(build, c)
+    };
+    return node(build, TeX_NODE_APPLY, 4u, children);
+}
+
 /* Operation identifiers index native unpackers directly; no function-name search is involved. */
 const TeX_model_node_t *expr_notation_packed_function(notation_build_t *build, const expr_t *expression)
 {
     typedef const TeX_model_node_t *(*unpack_fn)(notation_build_t *, const expr_t *);
     static const unpack_fn unpackers[EXPR_KIND_COUNT] = {
         [EXPR_KIND_LERCH_PHI]          = lerch,
+        [EXPR_KIND_POWMOD]             = integer_function,
+        [EXPR_KIND_DIVMOD]             = integer_function,
+        [EXPR_KIND_GCDEXT]             = integer_function,
         [EXPR_KIND_LOMMEL_S]           = lommel,
         [EXPR_KIND_APPELL_F1]          = appell,
         [EXPR_KIND_LAURICELLA_F]       = lauricella,

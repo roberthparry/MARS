@@ -163,6 +163,18 @@ void lab_globe_flight_ahead(jsref start, jsref target, double progress, bool red
 void lab_globe_flight_distance(jsref start, jsref target);
 
 /**
+ * @brief Update a journey notice using the selected town identity and remaining great-circle distance.
+ * @param notice Borrowed browser element receiving safe text; zero leaves the display unchanged.
+ * @param current Borrowed current camera: quaternion x,y,z,w and zoom in 1..4096.
+ * @param target Borrowed destination camera in the same layout.
+ * @return No value; malformed cameras leave the notice unchanged. Text is retained by the DOM, with no native handle
+ * retained. The saved town key supplies its name even before catalogue hydration; custom points use geographic notation.
+ * @note Distances below one kilometre use metres. Once translation has finished, the notice describes arrival
+ * orientation instead of reporting a completed route as remaining travel. Call synchronously on the browser thread.
+ */
+void lab_globe_travel_notice(node_jsref notice, jsref current, jsref target);
+
+/**
  * @brief Advance the display clock at a distance-dependent, screen-motion-limited rate.
  * @param start Departure camera: unit quaternion x,y,z,w and zoom in 1..4096.
  * @param target Destination camera in the same format.
@@ -170,7 +182,7 @@ void lab_globe_flight_distance(jsref start, jsref target);
  * @param elapsed_ms Available animation time, non-negative and capped internally at 50 milliseconds.
  * @param viewport Positive viewport width in CSS pixels.
  * @param redirect Whether the interrupted route skips departure-heading alignment.
- * @details Heading and arrival turns take nominally 1.2 and 1.5 seconds. The travel phase takes two
+ * @details Heading and arrival turns take nominally 1.2 and four seconds. The travel phase takes two
  * seconds plus six seconds per radian, so longer arcs take longer without lengthening local turns.
  * Translation, rotation and magnification share
  * a 360 CSS-pixel-per-second motion budget, capped at six pixels per frame even under load.

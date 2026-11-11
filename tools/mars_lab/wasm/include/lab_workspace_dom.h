@@ -26,6 +26,30 @@
 #include "lab_handle.h"
 #include "lab_mode.h"
 
+/**
+ * @brief Append an editable timeline row using safe worksheet or saved-place labels and native action labels.
+ * @param list Borrowed ordered-list DOM handle receiving the row.
+ * @param snapshot Borrowed decoded worksheet snapshot. Calendar modes use saved town, jurisdiction and date fields;
+ * other modes use their authored mathematical text. Unknown calendar places retain identifying coordinates.
+ * @param position Zero-based chronological position stored on the row for event routing.
+ * @param current Position of the active worksheet, marked with aria-current.
+ * @param count Total entries, used to disable actions at timeline boundaries and removal of the sole entry.
+ * @return No value. Browser nodes remain owned by the list; no handles or snapshots are retained.
+ * Call inside a synchronous labDOM scope on the owning browser thread. Mathematical text is never evaluated.
+ */
+void lab_workspace_dom_history_row(jsref list, jsref snapshot, unsigned position, unsigned current, unsigned count);
+
+/**
+ * @brief Apply country names and SVG flag artwork to an existing calendar history row.
+ * @param button Borrowed history-open button created by lab_workspace_dom_history_row(); unrelated nodes are ignored.
+ * @param metadata Borrowed country response or cached name/flag record. Text is copied safely; only supported local
+ * SVG artwork is accepted. Unavailable fields and invalid artwork leave their corresponding display unchanged.
+ * @return No value. The browser retains copied text and artwork references; no scoped handle is retained.
+ * @note Call synchronously on the owning browser thread after checking the asynchronous request is still current.
+ * This updates presentation only and never changes worksheet snapshots, the selected observer or history ordering.
+ */
+void lab_workspace_dom_history_country(node_jsref button, jsref metadata);
+
 /** @brief Requested help/result pane visibility transition. */
 typedef enum {
     LAB_WORKSPACE_SHOW_RESULTS = 0, /**< Show results without updating status text. */

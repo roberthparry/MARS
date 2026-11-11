@@ -87,7 +87,7 @@ interface WorksheetStateReadFrame { read: WorksheetStateReader; local: boolean; 
 interface WorksheetStateHistoryFrame { state: WorksheetSnapshot | null; isCurrent: WorksheetGuard; }
 
 /** @brief Navigation direction and request ownership. */
-interface WorksheetStateNavigateFrame { direction: number; request: WorksheetRequest; }
+interface WorksheetStateNavigateFrame { direction: number; request: WorksheetRequest; position?: number; remove?: boolean; }
 
 /**
  * @brief Native execution seam with checked operation/frame/result overloads.
@@ -467,7 +467,7 @@ interface WorksheetHistoryCapabilities {
     stateCalendarHistory: typeof WorksheetLocations.calendarActions.restoreCalendarHistory;
 
     /** @brief Navigate native history using the current snapshot. */
-    stateNavigate(direction: number): WorksheetSnapshot | null;
+    stateNavigate(direction: number, position?: number, remove?: boolean): WorksheetSnapshot | null;
 
     /** @brief Refresh history navigation button availability. */
     stateHistoryButtons: typeof WorksheetWorkspace.presentation.updateHistoryButtons;

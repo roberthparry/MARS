@@ -36,6 +36,8 @@
 #include "string-t.h"
 #include "mars_paths.h"
 #include "lab_process.h"
+#define MARS_LAB_PROCESS_INTERNAL_ACCESS
+#include "lab_process_session.h"
 
 extern char **environ;
 
@@ -57,7 +59,8 @@ lab_proc_cancel_context_t lab_proc_cancel_context(void)
     return (lab_proc_cancel_context_t){lab_process_cancel_check, lab_process_cancel_argument};
 }
 
-static bool lab_proc_cancelled(void)
+/* Consult both process-wide and request-local observers without retaining new ownership. */
+bool lab_proc_cancelled(void)
 {
     return (lab_process_cancel_flag && *lab_process_cancel_flag) ||
            (lab_process_cancel_check && lab_process_cancel_check(lab_process_cancel_argument));
@@ -120,7 +123,7 @@ static int lab_proc_spawn(pid_t *child, const char *const argv[], const char *cw
 }
 
 /* Return a short polling interval, respecting the remaining monotonic deadline. */
-static int lab_proc_interval(const struct timespec *start, unsigned timeout_ms)
+int lab_proc_interval(const struct timespec *start, unsigned timeout_ms)
 {
     if (lab_proc_cancelled()) {
         errno = ECANCELED;
@@ -165,7 +168,7 @@ static int lab_proc_prepare_input(file_t *file, const string_t *input, const str
 }
 
 /* Retain at most three trailing bytes when a UTF-8 scalar spans pipe reads. */
-static int lab_proc_append(string_t *output, char *buffer, size_t count, size_t *pending)
+int lab_proc_append(string_t *output, char *buffer, size_t count, size_t *pending)
 {
     size_t complete = count;
     size_t lead = count;

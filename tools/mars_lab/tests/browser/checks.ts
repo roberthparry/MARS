@@ -3162,8 +3162,8 @@
                     }
                     latitude.value = '53';
                     await automatic();
-                    check(history.forwardCount() === 0 && forward.disabled && !back.disabled,
-                          mode + ': a fresh edit discards the forward branch');
+                    check(history.forwardCount() === 1 && !forward.disabled && !back.disabled,
+                          mode + ': a fresh edit retains the later observer');
                     if (globe) {
                         MarsAlmanacGlobe.finishHistory(MarsAlmanacGlobe.beginHistory(), secondCamera, true);
                         document.querySelector<HTMLButtonElement>('[data-globe-action="in"]')!.click();
@@ -3566,12 +3566,15 @@
                 return;
             }
             if (new URLSearchParams(location.search).get('history-check') === '1') {
+                await runBrowserGroup('labWorkspaceChecks', window.labWorkspaceChecks);
+                await runBrowserGroup('checkLabEvents', window.checkLabEvents);
+                await runBrowserGroup('checkLabStateFlow', window.checkLabStateFlow);
                 await runBrowserGroup('checkLabRequests', window.checkLabRequests);
                 await runBrowserGroup('checkLabLayout', window.checkLabLayout);
                 await runBrowserGroup('checkLabWorkspaceDom', window.checkLabWorkspaceDom);
                 await runBrowserGroup('checkLabLocationDom', window.checkLabLocationDom);
-                await runBrowserGroup('checkCalendarHistoryNavigation', checkCalendarHistoryNavigation, 600000);
                 await runBrowserGroup('checkLabHistoryPersistence', window.checkLabHistoryPersistence, 120000);
+                await runBrowserGroup('checkCalendarHistoryNavigation', checkCalendarHistoryNavigation, 600000);
                 await report('PASS: persistent per-browser history, all modes, reopening, revisions and size limits');
                 return;
             }

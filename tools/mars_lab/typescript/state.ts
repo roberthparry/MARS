@@ -255,6 +255,17 @@ namespace WorksheetPersistence {
             return this.port.read(this.port.navigate(this.port.currentIndex(), direction, length, Number(!!current.text)));
         }
 
+        /** @brief Select or remove the current timeline entry using native ordering and ownership. */
+        select(position: number, remove = false): WorksheetSnapshot | null {
+            const native = labWire.exports(), mode = this.port.currentIndex();
+            if (remove) {
+                if (!native.lab_workspace_history_remove(mode, position)) throw new Error('Could not remove this history entry');
+                return this.port.read(native.lab_workspace_history_read(mode, 2, 0));
+            }
+            const length = this.port.stage(this.snapshot());
+            return this.port.read(native.lab_workspace_history_select(mode, position, length));
+        }
+
         /** @brief Read the selected worksheet's native backward count. */
         backwardCount(): number {
             return this.cursor(this.port.backwardStore()).length;
@@ -334,6 +345,12 @@ namespace WorksheetPersistence {
 
         private navigateRequest(direction: number, request: WorksheetRequest): Promise<void> {
             return this.runtime.restore(22, {direction, request});
+        }
+
+        /** @brief Open a selected history entry, or restore the neighbour of a removed current entry. */
+        select(position: number, remove = false): Promise<unknown> {
+            return this.requests.run(this.requests.mode(), request =>
+                this.runtime.restore(22, {direction: 0, position, remove, request}));
         }
     }
 
@@ -901,8 +918,8 @@ namespace WorksheetPersistence {
         },
 
         /** @brief Navigate native history using the current snapshot. */
-        stateNavigate(direction: number) {
-            return history.navigate(direction);
+        stateNavigate(direction: number, position?: number, remove?: boolean) {
+            return position === undefined ? history.navigate(direction) : history.select(position, remove);
         },
 
         /** @brief Restore a snapshot while its request remains current. */
@@ -953,9 +970,8 @@ namespace WorksheetPersistence {
         /** @brief Stage and retain a snapshot, propagating native history rejection. */
         statePushSnapshot(snapshot: WorksheetSnapshot) {
             const mode = WorksheetWorkspace.mode.workspaceModeId(snapshot.mode), length = WorksheetWorkspace.labWorkspaceBuffer.stageSnapshot(snapshot);
-            // Flags 3: bit 0 deduplicates adjacent snapshots; bit 1 clears forward history,
-            // even for a blank or duplicate snapshot. A plain cursor push must not do this.
-            if (labWire.exports().lab_workspace_history_push(mode, 0, length, Number(!!snapshot.text), 3) < 0)
+            // Deduplicate adjacent snapshots while retaining every later entry after the current position.
+            if (labWire.exports().lab_workspace_history_push(mode, 0, length, Number(!!snapshot.text), 1) < 0)
                 throw new Error('Could not retain worksheet history');
         },
 

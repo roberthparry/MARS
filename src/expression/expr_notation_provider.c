@@ -613,11 +613,12 @@ static const TeX_model_node_t *build_expression(notation_build_t *build, const e
         return notation_build_node(build, (TeX_node_view_t){.kind = TeX_NODE_TRANSFORM,
             .child_count = 3u, .transform = transforms[kind]}, children);
     }
-    if (kind == EXPR_KIND_LERCH_PHI || kind == EXPR_KIND_LOMMEL_S || kind == EXPR_KIND_APPELL_F1 ||
+    if (kind == EXPR_KIND_POWMOD || kind == EXPR_KIND_DIVMOD || kind == EXPR_KIND_GCDEXT ||
+        kind == EXPR_KIND_LERCH_PHI || kind == EXPR_KIND_LOMMEL_S || kind == EXPR_KIND_APPELL_F1 ||
         kind == EXPR_KIND_LAURICELLA_F || kind == EXPR_KIND_HYPERGEOMETRIC_PFQ)
         return expr_notation_packed_function(build, expression);
     /* Packing and domain-marker nodes are interpreted only by their owning parents. */
-    if (kind == EXPR_KIND_ARGUMENT_LIST ||
+    if (kind == EXPR_KIND_ARGUMENT_LIST || kind == EXPR_KIND_INTEGER_PACK ||
         kind == EXPR_KIND_LERCH_PHI_PACK || kind == EXPR_KIND_LOMMEL_S_PACK || kind == EXPR_KIND_APPELL_F1_PACK ||
         kind == EXPR_KIND_HYPERGEOMETRIC_PFQ_PACK ||
         kind == EXPR_KIND_NONNEGATIVE_INTEGER || kind == EXPR_KIND_REAL_PARAMETER ||

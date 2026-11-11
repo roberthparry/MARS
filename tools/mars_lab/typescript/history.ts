@@ -105,6 +105,7 @@ class WorksheetHistoryPersistence {
 
     /** Restore every mode before initial evaluation; no camera animation runs during startup. */
     public async start(): Promise<void> {
+        if (this === worksheetHistoryPersistence) worksheetHistoryEditor.start();
         if (this.started || this.restoring) return;
         this.restoring = true;
         try {
@@ -218,6 +219,7 @@ class WorksheetHistoryPersistence {
 
     private observe(): void {
         if (!this.started || this.restoring) return;
+        if (this === worksheetHistoryPersistence) worksheetHistoryEditor.refresh();
         for (let mode = 0; mode < 7; ++mode) {
             const revision = labWire.exports().lab_workspace_history_revision(mode);
             if (revision !== this.revisions.get(mode)) {
@@ -226,6 +228,13 @@ class WorksheetHistoryPersistence {
             }
         }
         if (this.dirty.size) this.schedule();
+    }
+
+    /** Save a native timeline edit without adding a navigation entry. */
+    public changed(mode: number): void {
+        if (!this.started || this.restoring) return;
+        this.dirty.add(mode);
+        this.schedule();
     }
 
     private schedule(): void {
@@ -247,6 +256,7 @@ class WorksheetHistoryPersistence {
 
     /** Write one bounded batch; callers serialize batches through pendingSave. */
     private async save(keepalive: boolean): Promise<void> {
+        if (this === worksheetHistoryPersistence && worksheetHistoryEditor.pending) return;
         for (const mode of [...this.dirty]) {
             this.dirty.delete(mode);
             if (this.blocked.has(mode)) continue;
@@ -282,6 +292,7 @@ class WorksheetHistoryPersistence {
 
     /** Stop subscriptions without erasing saved history; used by application teardown and isolated browser fixtures. */
     public dispose(): void {
+        if (this === worksheetHistoryPersistence) worksheetHistoryEditor.dispose();
         this.started = false;
         clearTimeout(this.timer); clearInterval(this.poll);
         this.timer = this.poll = 0;
@@ -294,3 +305,174 @@ class WorksheetHistoryPersistence {
 }
 
 const worksheetHistoryPersistence = new WorksheetHistoryPersistence();
+
+/** Browser dialog lifetime and opaque snapshot transfer; native code owns timeline edits and row presentation. */
+class WorksheetHistoryEditor {
+    private lifetime: AbortController | null = null;
+    private artwork: AbortController | null = null;
+    private mode = -1;
+    private revision = -1;
+    private editing = false;
+
+    /** Hold persistence while a native timeline edit is still restoring its browser worksheet. */
+    public get pending(): boolean { return this.editing; }
+
+    /** Attach detachable browser listeners after native workspace startup. */
+    public start(): void {
+        if (this.lifetime) return;
+        this.lifetime = new AbortController();
+        const options = {signal: this.lifetime.signal};
+        document.getElementById('historyEdit')?.addEventListener('click', this.open, options);
+        document.getElementById('historyEditorClose')?.addEventListener('click', this.close, options);
+        document.getElementById('historyEditorEntries')?.addEventListener('click', this.click, options);
+        document.getElementById('historyEditor')?.addEventListener('close', this.cancelArtwork, options);
+    }
+
+    private readonly open = (): void => {
+        try {
+            WorksheetPersistence.history.commit();
+            this.mode = labWire.exports().lab_workspace_mode();
+            this.revision = -1;
+            this.status('');
+            this.render();
+            (document.getElementById('historyEditor') as HTMLDialogElement).showModal();
+            const current = document.getElementById('historyEditorEntries')?.querySelector<HTMLElement>('[aria-current] button');
+            current?.focus({preventScroll: true});
+            current?.scrollIntoView({block: 'nearest'});
+        } catch (error) { WorksheetWorkspace.presentation.setStatus(String(error)); }
+    };
+
+    private readonly close = (): void => {
+        this.cancelArtwork();
+        (document.getElementById('historyEditor') as HTMLDialogElement)?.close();
+        document.getElementById('historyEdit')?.focus({preventScroll: true});
+    };
+
+    private status(text: string): void {
+        const status = document.getElementById('historyEditorStatus');
+        if (status) status.textContent = text;
+    }
+
+    /** Reproject only when native history changes; no browser history copy is maintained. */
+    public refresh(): void {
+        const dialog = document.getElementById('historyEditor') as HTMLDialogElement | null;
+        if (!dialog?.open) return;
+        if (this.mode !== labWire.exports().lab_workspace_mode()) { this.close(); return; }
+        if (this.revision !== labWire.exports().lab_workspace_history_revision(this.mode)) this.render();
+    }
+
+    private render(): void {
+        const native = labWire.exports(), buffer = WorksheetWorkspace.labWorkspaceBuffer;
+        const list = document.getElementById('historyEditorEntries');
+        if (!list || this.mode < 0) return;
+        this.cancelArtwork();
+        const current = native.lab_workspace_history_current(this.mode);
+        const count = current + 1 + native.lab_workspace_history_count(this.mode, 1);
+        const scroll = list.scrollTop;
+        list.replaceChildren();
+        for (let position = 0; position < count; ++position) {
+            const snapshot = buffer.readSnapshot(native.lab_workspace_history_item(this.mode, position));
+            labDOM.call('lab_workspace_dom_history_row', list, snapshot, position, current, count);
+        }
+        this.revision = native.lab_workspace_history_revision(this.mode);
+        list.scrollTop = scroll;
+        this.artwork = new AbortController();
+        void this.loadArtwork(list, this.artwork.signal);
+    }
+
+    private readonly cancelArtwork = (): void => {
+        this.artwork?.abort();
+        this.artwork = null;
+    };
+
+    /** Transfer country metadata asynchronously; native code owns labels, artwork validation and DOM projection. */
+    private async loadArtwork(list: HTMLElement, signal: AbortSignal): Promise<void> {
+        const buttons = [...list.querySelectorAll<HTMLButtonElement>('[data-history-location]')];
+        let next = 0;
+        const load = async (): Promise<void> => {
+            while (!signal.aborted && next < buttons.length) {
+                const button = buttons[next++], code = button.dataset.historyCountryCode;
+                if (!code && (!button.dataset.historyLatitude || !button.dataset.historyLongitude)) continue;
+                const request = new AbortController(), cancel = (): void => request.abort();
+                signal.addEventListener('abort', cancel, {once: true});
+                const timer = window.setTimeout(cancel, 5000);
+                try {
+                    let metadata: unknown;
+                    if (code) metadata = await WorksheetResults.tooltip.countryMetadata(code, request.signal);
+                    else {
+                        const response = await labHttp.fetch('/almanac-country', {method: 'POST', signal: request.signal,
+                            body: labWire.encode({lat: button.dataset.historyLatitude, lon: button.dataset.historyLongitude})});
+                        if (!response.ok) continue;
+                        metadata = await response.labData();
+                    }
+                    if (!signal.aborted && !request.signal.aborted && button.isConnected)
+                        labDOM.call('lab_workspace_dom_history_country', button, metadata);
+                } catch { /* Saved names remain usable when country artwork is unavailable. */ }
+                finally {
+                    window.clearTimeout(timer);
+                    signal.removeEventListener('abort', cancel);
+                }
+            }
+        };
+        await Promise.all([load(), load(), load()]);
+    }
+
+    private readonly click = (event: Event): void => { void this.edit(event); };
+
+    private async edit(event: Event): Promise<void> {
+        const button = event.target instanceof Element ? event.target.closest<HTMLButtonElement>('button[data-history-action]') : null;
+        const row = button?.closest<HTMLElement>('[data-history-position]');
+        if (!button || button.disabled || !row || this.editing || this.mode !== labWire.exports().lab_workspace_mode()) return;
+        if (this.revision !== labWire.exports().lab_workspace_history_revision(this.mode)) {
+            this.render();
+            this.status('History changed; choose the entry again.');
+            return;
+        }
+        const position = Number(row.dataset.historyPosition), action = button.dataset.historyAction;
+        this.editing = true;
+        try {
+            const native = labWire.exports();
+            if (action === 'open') {
+                this.close();
+                await WorksheetPersistence.navigation.select(position);
+                return;
+            }
+            if (action === 'remove' && position === native.lab_workspace_history_current(this.mode)) {
+                await WorksheetPersistence.navigation.select(position, true);
+            } else {
+                await WorksheetRequests.labRequests.runUI('evaluate', WorksheetWorkspace.mode.currentMode(), () => {
+                    if (action === 'remove') {
+                        if (!native.lab_workspace_history_remove(this.mode, position))
+                            throw new Error('Could not remove this history entry');
+                    } else {
+                        const destination = position + (action === 'earlier' ? -1 : 1);
+                        if (!native.lab_workspace_history_move(this.mode, position, destination))
+                            throw new Error('This move would exceed the history limit; remove an older entry first');
+                    }
+                });
+            }
+            WorksheetWorkspace.presentation.updateHistoryButtons();
+            worksheetHistoryPersistence.changed(this.mode);
+            this.render();
+            this.status(action === 'remove' ? 'Entry removed.' : 'Entry moved.');
+            const focus = Math.min(position, native.lab_workspace_history_current(this.mode) + native.lab_workspace_history_count(this.mode, 1));
+            const selected = document.querySelector<HTMLElement>(`#historyEditorEntries [data-history-position="${focus}"] button`);
+            selected?.focus({preventScroll: true});
+            selected?.scrollIntoView({block: 'nearest'});
+        } catch (error) { this.status(String(error)); }
+        finally {
+            this.editing = false;
+            worksheetHistoryPersistence.changed(this.mode);
+        }
+    }
+
+    /** Release browser listeners and close an open editor without modifying saved history. */
+    public dispose(): void {
+        this.cancelArtwork();
+        this.lifetime?.abort();
+        this.lifetime = null;
+        (document.getElementById('historyEditor') as HTMLDialogElement | null)?.close();
+    }
+}
+
+const worksheetHistoryEditor = new WorksheetHistoryEditor();

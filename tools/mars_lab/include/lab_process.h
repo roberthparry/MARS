@@ -6,7 +6,7 @@
  * standard error in caller-owned string_t storage. Deadlines and byte limits
  * bound collection, and failed runs terminate their process group and reap the
  * direct child. This is a tools-only interface, not part of the MARS library API.
- * Calculations use built-in server modes, with optional diagnostic executable overrides.
+ * Calculations use bounded resident processes and reusable module caches, with optional diagnostic executable overrides.
  * Calls have independent state; callers must not reap these children elsewhere
  * or configure SIGCHLD with SIG_IGN or SA_NOCLDWAIT.
  */
@@ -21,6 +21,40 @@
 #include "lab_process_request.h"
 
 typedef struct _string_t string_t;
+
+/**
+ * @brief Start this HTTP process's bounded persistent calculation service before starting threads.
+ * @param memory_limit Maximum calculation address-space bytes; zero chooses one thirty-second of physical RAM,
+ * clamped to 128..512 MiB. Existing operating-system limits may be stricter.
+ * @param max_jobs Maximum completed calculations before recycling a worker; zero selects 256.
+ * @return True when ready, including an already started service; false sets errno on invalid limits or startup
+ * failure. One single-threaded supervisor owns one calculation process. Requests are sequential per HTTP process.
+ * @note Call during single-threaded startup. Forked request fixtures receive independent services on first use.
+ * No ownership escapes; stop with lab_proc_workers_stop() before this owning process exits.
+ */
+bool lab_proc_workers_start(size_t memory_limit, unsigned max_jobs);
+
+/**
+ * @brief Stop this process's calculation service and reap its supervisor.
+ * @return No value; repeated calls and inherited sessions from another PID are harmless. Complete the current
+ * request first. Calculation children terminate with their supervisor and never keep listener descriptors open.
+ */
+void lab_proc_workers_stop(void);
+
+/**
+ * @brief Obtain the automatic per-process address-space ceiling used for native calculations and HTTP workers.
+ * @return Bytes, between 128 and 512 MiB; no allocation or ownership transfer occurs. Uses physical RAM size,
+ * falling back to 256 MiB if the operating system cannot report it. This is independent of temporary free memory.
+ */
+size_t lab_proc_memory_budget(void);
+
+/**
+ * @brief Apply an address-space ceiling to the current process without relaxing an existing hard limit.
+ * @param bytes Desired non-zero ceiling in bytes.
+ * @return True on success, false with errno from getrlimit/setrlimit. Call during single-threaded startup;
+ * it affects subsequent allocations and mappings, not existing ownership. No resources need releasing.
+ */
+bool lab_proc_memory_limit(size_t bytes);
 
 /** @brief Initialise bounded anonymous plot caches before forking request workers; failure disables caching. */
 void lab_proc_plot_cache_init(void);
@@ -43,18 +77,18 @@ diagnostic_t *lab_proc_diagnostic(bool completed, int process_error, int exit_st
  * @details By default every mode resolves to the configured lab_worker resource.
  * A non-empty per-mode MARS_LAB_*_BINARY override
  * selects an external diagnostic executable. Use lab_proc_run_worker to supply
- * the necessary --worker-control dispatch arguments; this path alone is not a command.
+ * the necessary dispatch arguments; this path alone is not a command. Normal built-in calls do not execute this path.
  */
 string_t *lab_proc_worker_path(const char *name);
 
 /**
- * @brief Runs a built-in calculation in an isolated instance of the server executable.
+ * @brief Run a built-in calculation in this HTTP process's resident calculation service.
  * @param argv Borrowed NULL-terminated vector: mode name followed by its arguments.
  * At most 255 entries including the mode name are accepted; excess gives E2BIG.
  * @param cwd Optional child working directory; NULL inherits the current directory.
- * @param input Optional borrowed standard-input contents; NULL selects /dev/null.
+ * @param input Optional borrowed standard-input contents, at most 8 MiB; NULL selects empty input.
  * @param timeout_ms Execution deadline in milliseconds; zero disables the deadline.
- * @param max_output Maximum captured output bytes.
+ * @param max_output Maximum captured output bytes, at most 64 MiB for built-ins.
  * @param output Required owned output destination, initialised to NULL; release with string_free.
  * @param exit_status Required child exit status destination, initialised to -1.
  * @return Collection success as for lab_proc_run_input; an unknown mode gives EINVAL.
@@ -63,6 +97,10 @@ string_t *lab_proc_worker_path(const char *name);
  * cleanup as lab_proc_run_input. Explicit per-mode executable overrides receive
  * the original calculation arguments without the server's --worker-control prefix.
  * Built-ins receive a fresh computation scope and at most 250 ms of cooperative cleanup.
+ * Successful jobs retain the worker and its module caches, resetting numeric precision, standard input,
+ * environment and working directory between jobs. The service must be started before creating threads.
+ * A failed supervisor makes later calls fail explicitly until single-threaded service reinitialisation;
+ * worker failures are recovered inside the supervisor. Concurrent calls within one HTTP process give EBUSY.
  */
 bool lab_proc_run_worker(const char *const argv[], const char *cwd, const string_t *input, unsigned timeout_ms,
                          size_t max_output, string_t **output, int *exit_status);

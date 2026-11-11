@@ -18,7 +18,10 @@
 #include <unistd.h>
 
 #include "file-t.h"
+#include "expression-t.h"
+#include "number-t.h"
 #include "sqlite-t.h"
+#include "xml-t.h"
 #include "checks_benchmarks.h"
 #include "checks_controls.h"
 #include "checks_process.h"
@@ -32,6 +35,7 @@ static bool benchmark_test_environment(const string_t *root, const char *const *
     checks_strings_t *args = checks_strings_new();
     checks_strings_add(args, checks_text("env"));
     checks_strings_add(args, string_sprintf("MARS_ROOT=%s", string_c_str(root)));
+    checks_strings_add(args, string_sprintf("MARS_HOME=%s", string_c_str(root)));
     for (size_t i = 0; i < env_count; ++i) checks_strings_add(args, checks_text(environment[i]));
     checks_strings_add(args, checks_text(MARS_CHECKS_PROGRAM_PATH));
     checks_strings_add(args, checks_text("bench-db"));
@@ -196,11 +200,13 @@ static void test_benchmarks_stats(void)
         benchmark_test_column_contains(out, 1, "2,1,0.7") &&
         string_find(out, "Median µs") >= 0 && string_find(out, "Mean µs") >= 0 &&
         string_find(out, "-50 ▲") >= 0 && string_find(out, "2 ▬") >= 0 && string_find(out, "300 ▼ †") >= 0 &&
-        string_find(out, "FAIL") >= 0 && string_find(out, "TIMEOUT") >= 0 && string_find(out, "SKIPPED") >= 0 &&
+        string_find(out, "FAIL") >= 0 && string_find(out, "TIMEOUT") >= 0 && string_find(out, "SKIPPED") < 0 &&
+        string_find(out, "asin") < 0 &&
         string_find(out, "PENDING") >= 0 && string_find(out, "\033") < 0 && benchmark_test_grid_width(out, 132);
     if (!ok && out) fprintf(stderr, "Plain benchmark grid: %s\n", string_c_str(out));
     string_free(out); out = NULL;
-    ok = ok && benchmark_test_environment(root, stats, 4, 0, &out, colour, 4, NULL);
+    const char *including_skipped[] = {"stats", "--run", "1", "--summary", "--include-skipped"};
+    ok = ok && benchmark_test_environment(root, including_skipped, 5, 0, &out, colour, 4, NULL);
     ok = ok && string_find(out, "\033[1;92mPASS") >= 0 && string_find(out, "\033[1;91mFAIL") >= 0 &&
         string_find(out, "\033[1;93mSKIPPED") >= 0 && string_find(out, "\033[96m") >= 0 &&
         string_find(out, "\033[1;38;2;255;140;0m2 ▬") >= 0 && string_find(out, "\033[1;96m") >= 0;
@@ -254,7 +260,23 @@ static void test_benchmarks_stats_exports(void)
     const char *empty_tsv[] = {"stats", "--backend", "not-a-backend", "--format=tsv"};
     ok = ok && benchmark_test_command(root, empty_tsv, 4, 0, &out) && string_starts_with(out, "backend\tbits\t") &&
         string_find(out, "No recorded benchmark") < 0;
-    string_free(out);
+    string_free(out); out = NULL;
+    const char *formats[] = {"--format=grid", "--format=markdown", "--format=tsv"};
+    for (size_t i = 0; ok && i < sizeof formats / sizeof *formats; ++i) {
+        const char *hidden[] = {"stats", "--run", "1", "--operation", "asin", formats[i], "--details"};
+        const char *included[] = {"stats", "--run", "1", "--operation", "asin", formats[i], "--details",
+                                  "--include-skipped"};
+        ok = benchmark_test_environment(root, hidden, 7, 0, &out, colour, 3, NULL) &&
+            string_find(out, "SKIPPED") < 0 && string_find(out, "Backend:") < 0;
+        string_free(out); out = NULL;
+        ok = ok && benchmark_test_environment(root, included, 8, 0, &out, colour, 3, NULL) &&
+            string_find(out, "SKIPPED") >= 0 && string_find(out, "asin") >= 0;
+        string_free(out); out = NULL;
+    }
+    sqlite_t *db = benchmark_test_open(root);
+    ok = db && benchmark_test_integer(db,
+        "SELECT count(*) FROM benchmark_result WHERE outcome = 'unsupported'") == 1 && ok;
+    sqlite_close(db);
     ok = test_checks_finish(root) && ok;
     TEST_ASSERT_TRUE(ok, "benchmark exports are numeric, escaped and colour-free, and invalid or empty selections are explicit");
 }
@@ -329,6 +351,33 @@ static void test_benchmarks_stats_default_details(void)
     TEST_ASSERT_TRUE(ok, "default summary retains arguments in every format and explicit details add metadata");
 }
 
+static bool benchmark_test_wrapped_inputs(const string_t *text, const char *row, const char *expected, size_t width)
+{
+    const char *start = strstr(string_c_str(text), row);
+    start = start ? start + strlen(row) : NULL;
+    const char *end = start ? strstr(start, "</span>") : NULL;
+    string_t *markup = end ? checks_slice(text, (size_t)(start - string_c_str(text)),
+                                         (size_t)(end - start) + strlen("</span>")) : NULL;
+    xml_t *document = markup ? xml_from_text(markup) : NULL;
+    const xml_t *span = xml_child_at(document, 0);
+    string_t *key = string_new_with("style"), *restored = string_new();
+    string_t *wanted_width = string_sprintf("width:%zuch", width);
+    const string_t *style = xml_get_attribute(span, key);
+    bool ok = span && checks_equal(xml_name(span), "span") && style && wanted_width &&
+              string_find(style, string_c_str(wanted_width)) >= 0 && restored;
+    for (size_t i = 0; ok && i < xml_child_count(span); ++i) {
+        const xml_t *child = xml_child_at(span, i);
+        if (xml_type(child) == XML_TEXT) {
+            const string_t *part = xml_text(child);
+            ok = string_length(part) <= width && string_append_cstr(restored, string_c_str(part)) >= 0;
+        } else ok = checks_equal(xml_name(child), "br");
+    }
+    ok = ok && checks_equal(restored, expected);
+    string_free(wanted_width); string_free(restored); string_free(key); string_free(markup);
+    xml_free(document);
+    return ok;
+}
+
 static void test_benchmarks_complex_inputs(void)
 {
     string_t *root = test_checks_root(), *out = NULL;
@@ -357,7 +406,8 @@ static void test_benchmarks_complex_inputs(void)
         string_find(out, "| bessel_j | 2,0.7 | 5.0 µs |") >= 0 &&
         string_find(out, "| polygamma | 3, 2.345+0.125i | 7.0 µs |") >= 0 &&
         string_find(out, "| sgn | -0.7 | 8.0 µs |") >= 0 &&
-        string_find(out, "0.5+0.125i, 0.7+0.125i, 0.8+0.125i, 2.5+0.125i, 0.2+0.125i, 0.3+0.125i") >= 0;
+        benchmark_test_wrapped_inputs(out, "| appell_f1 | ",
+            "0.5+0.125i, 0.7+0.125i, 0.8+0.125i, 2.5+0.125i, 0.2+0.125i, 0.3+0.125i", 40);
     string_free(out); out = NULL;
     const char *formats[] = {"--format=grid", "--format=markdown", "--format=tsv"};
     const char *environment[] = {"NO_COLOR=1", "COLUMNS=132"};
@@ -374,6 +424,11 @@ static void test_benchmarks_complex_inputs(void)
     const char *long_arguments = "0.5+0.125i, 0.7+0.125i, 0.8+0.125i, 2.5+0.125i, 0.2+0.125i, 0.3+0.125i";
     const char *wide[] = {"stats", "--run", "1", "--backend", "qcomplex", "--operation", "appell_f1"};
     const char *narrow[] = {"NO_COLOR=1", "COLUMNS=60"};
+    const char *markdown[] = {"stats", "--run", "1", "--backend", "qcomplex", "--operation", "appell_f1",
+                              "--format=markdown"};
+    ok = ok && benchmark_test_command(root, markdown, 8, 0, &out) &&
+        benchmark_test_wrapped_inputs(out, "| appell\\_f1 | ", long_arguments, 40);
+    string_free(out); out = NULL;
     ok = ok && benchmark_test_environment(root, wide, 7, 0, &out, environment, 2, NULL) &&
         string_find(out, "╠") >= 0 && benchmark_test_grid_width(out, 132) &&
         benchmark_test_column_contains(out, 1, long_arguments);
@@ -392,6 +447,62 @@ static void test_benchmarks_complex_inputs(void)
     TEST_ASSERT_TRUE(ok, "reports show saved complex operands, keep integer orders real and preserve measurements");
 }
 
+static void test_benchmarks_integer_inputs(void)
+{
+    string_t *root = test_checks_root(), *out = NULL, *wide_arguments = NULL;
+    const char *sync[] = {"sync"};
+    bool ok = benchmark_test_fixture(root) && benchmark_test_command(root, sync, 1, 0, NULL);
+    sqlite_t *db = benchmark_test_open(root);
+    sqlite_stmt_t *query = db ? sqlite_stmt_prepare(db,
+        "SELECT arguments FROM benchmark_operation WHERE name = ?1") : NULL;
+    const char *names[] = {"bit_length", "gcd", "is_prime", "factors"};
+    const size_t widths[] = {1024, 1024, 521, 1215};
+    ok = ok && query;
+    for (size_t i = 0; ok && i < sizeof names / sizeof *names; ++i) {
+        ok = sqlite_stmt_bind_text(query, 1, names[i]) && sqlite_stmt_step(query) == SQLITE_STEP_ROW;
+        const char *arguments = ok ? sqlite_stmt_column_text(query, 0) : "";
+        if (ok && i == 1) wide_arguments = string_new_with(arguments);
+        const char *comma = strchr(arguments, ',');
+        string_t *text = string_new_with(arguments);
+        string_t *first = comma ? checks_slice(text, 0, (size_t)(comma - arguments)) : string_clone(text);
+        number_t value = num_create_from_text(first);
+        ok = num_is_exact(value) && num_is_integer(value) && num_bit_length(value) == widths[i] && ok;
+        if (i == 1) ok = comma != NULL && ok;
+        if (ok && i == 1) {
+            number_t other = num_create_from_string(comma + 1);
+            number_t gcd = num_gcd(value, other);
+            number_t expected = num_create_from_string("340282366920938463463374607431768211454");
+            ok = num_bit_length(other) == 512 && num_eq(gcd, expected);
+            num_destroy(&expected); num_destroy(&gcd); num_destroy(&other);
+        }
+        num_destroy(&value);
+        string_free(first); string_free(text);
+        sqlite_stmt_reset(query);
+    }
+    sqlite_stmt_finalize(query); sqlite_close(db);
+    const char *run[] = {"run", "--backend", "exact-integer", "--samples", "3", "--timeout", "3"};
+    ok = ok && benchmark_test_command(root, run, 7, 0, NULL);
+    db = benchmark_test_open(root);
+    ok = db && benchmark_test_integer(db,
+        "SELECT count(*) FROM benchmark_result WHERE outcome = 'pass'") == 26 &&
+        benchmark_test_integer(db, "SELECT count(*) FROM benchmark_sample") == 78 &&
+        benchmark_test_integer(db,
+            "SELECT count(*) FROM benchmark_result AS r JOIN benchmark_operation AS o ON o.name = r.operation\n"
+            "WHERE r.arguments <> o.arguments OR r.outcome IN ('fail', 'timeout', 'pending')") == 0 && ok;
+    sqlite_close(db);
+    const char *report[] = {"report", "1"};
+    ok = ok && benchmark_test_command(root, report, 2, 0, &out) &&
+        string_find(out, "| factorial | 5000 |") >= 0 &&
+        string_find(out, "| fibonacci | 10000 |") >= 0 &&
+        string_find(out, "| partition | 5000 |") >= 0 &&
+        wide_arguments && benchmark_test_wrapped_inputs(out, "| gcd | ", string_c_str(wide_arguments), 80) &&
+        string_find(out, ", <br/>") >= 0 &&
+        string_find(out, "| gcd | 17, 5 |") < 0;
+    string_free(out); string_free(wide_arguments);
+    ok = test_checks_finish(root) && ok;
+    TEST_ASSERT_TRUE(ok, "integer workloads retain multi-limb inputs, a non-trivial GCD and checked exact results");
+}
+
 static void test_benchmarks_measurements(void)
 {
     string_t *root = test_checks_root();
@@ -406,7 +517,9 @@ static void test_benchmarks_measurements(void)
         benchmark_test_integer(db,
             "SELECT length(library_sha256) + length(executable_sha256) FROM benchmark_run WHERE id = 1") == 128 && ok;
     ok = ok && benchmark_test_integer(db,
-        "SELECT count(*) FROM benchmark_run WHERE clock LIKE '%warmup=20ms%' AND id = 1") == 1;
+        "SELECT count(*) FROM benchmark_run WHERE clock LIKE '%warmup=100ms; target_batch=5ms%' AND id = 1") == 1;
+    ok = ok && benchmark_test_integer(db,
+        "SELECT max(iterations) FROM benchmark_result WHERE run_id = 1 AND backend = 'number-double'") > 512;
     /* Recreate an interrupted checkpoint and prove resume touches only its one pending case. */
     ok = ok && sqlite_exec_cstr(db,
         "DELETE FROM benchmark_sample WHERE backend = 'qfloat'; "
@@ -591,6 +704,61 @@ static void test_benchmarks_api_coverage(void)
     TEST_ASSERT_TRUE(ok, "every public numeric mathematical operation has a stable benchmark catalogue entry");
 }
 
+static void test_benchmarks_expression_coverage(void)
+{
+    string_t *root = test_checks_root();
+    const char *sync[] = {"sync"};
+    bool ok = benchmark_test_fixture(root) && benchmark_test_command(root, sync, 1, 0, NULL);
+    sqlite_t *db = ok ? benchmark_test_open(root) : NULL;
+    sqlite_stmt_t *rows = db ? sqlite_stmt_prepare(db,
+        "SELECT name, arguments FROM benchmark_operation ORDER BY name") : NULL;
+    size_t count = 0, saved = num_get_default_prec_bits();
+    num_set_default_prec_bits(53);
+    sqlite_step_result_t step = SQLITE_STEP_ERROR;
+    while (rows && (step = sqlite_stmt_step(rows)) == SQLITE_STEP_ROW) {
+        const char *name = sqlite_stmt_column_text(rows, 0);
+        bool component = !strcmp(name, "divmod") || !strcmp(name, "gcdext") ||
+                         !strcmp(name, "sincos") || !strcmp(name, "sinhcosh");
+        string_t *source = string_sprintf("%s(%s%s)", name, sqlite_stmt_column_text(rows, 1),
+                                           component ? ",0" : "");
+        if (!strcmp(name, "hypergeometric_pFq")) {
+            string_free(source);
+            source = string_sprintf("hypergeometric_pFq(1,1,%s)", sqlite_stmt_column_text(rows, 1));
+        } else if (!strcmp(name, "lauricella_f")) {
+            string_t *arguments = string_new_with(sqlite_stmt_column_text(rows, 1));
+            checks_strings_t *parts = arguments ? checks_split(arguments, ',') : NULL;
+            string_free(source);
+            source = parts && checks_strings_count(parts) == 3 ?
+                string_sprintf("lauricella_f(1,%s,%s,%s,%s)",
+                    string_c_str(checks_strings_get(parts, 0)), string_c_str(checks_strings_get(parts, 1)),
+                    string_c_str(checks_strings_get(parts, 2)), string_c_str(checks_strings_get(parts, 1))) : NULL;
+            checks_strings_free(parts);
+            string_free(arguments);
+        }
+        expr_bindings_t *bindings = NULL;
+        expr_t *expression = source ? expr_from_text(source, &bindings) : NULL;
+        bool parsed = expression && expr_bindings_count(bindings) == 0;
+        string_t *bound_source = source ? string_sprintf("{[result] | [result]=%s}", string_c_str(source)) : NULL;
+        expr_t *bound = bound_source ? expr_from_text(bound_source, NULL) : NULL;
+        parsed = parsed && bound;
+        if (!parsed)
+            fprintf(stderr, "Numerical benchmark is unavailable as an expression: %s\n", string_c_str(source));
+        ok = parsed && ok;
+        ++count;
+        expr_free(expression);
+        expr_free(bound);
+        string_free(bound_source);
+        expr_bindings_free(bindings);
+        string_free(source);
+    }
+    num_set_default_prec_bits(saved);
+    ok = ok && rows && step == SQLITE_STEP_DONE && count > 150;
+    sqlite_stmt_finalize(rows);
+    sqlite_close(db);
+    ok = test_checks_finish(root) && ok;
+    TEST_ASSERT_TRUE(ok, "every benchmarked mathematical operation is callable through the native expression parser");
+}
+
 static void test_benchmarks_documentation(void)
 {
     string_t *root = test_checks_root();
@@ -636,7 +804,8 @@ static void test_benchmarks_documentation(void)
                 string_find(source, "no separate fraction measurements") >= 0 &&
                 string_find(source, "### `number-double`") < 0 && string_find(source, "### `mpfr`") < 0 &&
                 string_find(source, "### `mpc`") < 0 && string_find(source, "### `exact-integer`") < 0 &&
-                string_find(source, "| gcd | 17, 5 | 1.0 µs |") >= 0;
+                string_find(source, "17, <br/>5</span> | 1.0 µs |") >= 0 &&
+                benchmark_test_wrapped_inputs(source, "| gcd | ", "17, 5", 80);
             if (!ok) fprintf(stderr, "Generated number benchmark document:\n%s\n", string_c_str(source));
         }
         string_free(path); string_free(source);
@@ -942,7 +1111,9 @@ void test_checks_benchmark_cases(void)
 {
     TEST_RUN_IN_GROUP(test_benchmarks_catalogue, tests, "benchmark,storage");
     TEST_RUN_IN_GROUP(test_benchmarks_api_coverage, tests, "benchmark,coverage");
+    TEST_RUN_IN_GROUP(test_benchmarks_expression_coverage, tests, "benchmark,expression,coverage");
     TEST_RUN_IN_GROUP(test_benchmarks_measurements, tests, "benchmark,timing");
+    TEST_RUN_IN_GROUP(test_benchmarks_integer_inputs, tests, "benchmark,integer,timing");
     TEST_RUN_IN_GROUP(test_benchmarks_documentation, tests, "benchmark,markdown");
     TEST_RUN_IN_GROUP(test_benchmarks_documentation_supported_rows, tests, "benchmark,markdown");
     TEST_RUN_IN_GROUP(test_benchmarks_stats, tests, "benchmark,statistics");

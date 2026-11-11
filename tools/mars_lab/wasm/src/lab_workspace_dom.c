@@ -336,7 +336,7 @@ void lab_workspace_dom_mode(lab_mode_t mode, jsref coverage)
     if (actions && home && !lab_dom_equal(lab_dom_get(actions, "parentElement"), home))
         lab_dom_append(home, actions);
     int history = lab_dom_id(mode == LAB_MODE_ALMANAC ? "almanacGlobeHistory" : "workspaceHistoryHome");
-    static const char *const navigation[] = {"back", "forward"};
+    static const char *const navigation[] = {"back", "forward", "historyEdit"};
     for (unsigned i = 0; history && i < sizeof navigation / sizeof *navigation; ++i) {
         int button = lab_dom_id(navigation[i]);
         if (button && !lab_dom_equal(lab_dom_get(button, "parentElement"), history))

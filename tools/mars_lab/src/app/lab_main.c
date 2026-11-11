@@ -3,7 +3,7 @@
  * @brief Native Linux MARS Lab launcher and bounded worker supervisor.
  *
  * Owns an IP listener and a fixed pool of separate request processes. Mathematical
- * calculations run as built-in modes of this executable in isolated children;
+ * calculations call built-in modes in bounded resident children with reusable module caches;
  * TeX utilities remain external programmes. No Python interpreter
  * is loaded or launched. Resource locations and persistent settings come from the
  * configured MARS database, without changing the caller's working directory.
@@ -91,11 +91,19 @@ static bool lab_app_integer(const char *text, unsigned maximum, unsigned *value)
 static int lab_app_worker(lab_server_t *server)
 {
     lab_proc_set_cancel_flag(&stopping);
+    size_t budget = lab_proc_memory_budget();
+    if (!lab_proc_workers_start(budget, 256) || !lab_proc_memory_limit(2u * budget)) {
+        perror("MARS Lab calculation service or memory ceiling");
+        lab_proc_workers_stop();
+        lab_svr_free(server);
+        return 1;
+    }
     while (!stopping) {
         int rc = lab_svr_serve_once(server, 200);
         if (rc < 0 && errno != EINTR && errno != EAGAIN && errno != ETIMEDOUT && errno != EPIPE && errno != ECONNRESET)
             fprintf(stderr, "mars-lab: connection failed (errno %d)\n", errno);
     }
+    lab_proc_workers_stop();
     lab_svr_free(server);
     return 0;
 }
@@ -200,6 +208,11 @@ int main(int argc, char **argv)
         }
     }
     lab_surface_service_select(workers);
+    if (!lab_proc_memory_limit(lab_proc_memory_budget())) {
+        perror("MARS Lab supervisor memory ceiling");
+        failed = true;
+        stopping = 1;
+    }
     string_t *host_text = string_new_with(host);
     bool ipv6 = host_text && string_find(host_text, ":") >= 0;
     const char *access = lab_app_option(host, "0.0.0.0") ? "127.0.0.1" : lab_app_option(host, "::") ? "::1" : host;

@@ -16,9 +16,54 @@
 
 #include "test_number.h"
 
+static void test_scoped_payload_index(void)
+{
+    enum { count = 4096 };
+    number_t *values = calloc(count, sizeof(*values));
+    num_scope_t *outer = num_scope_enter();
+    TEST_ASSERT_TRUE(values && outer, "allocate a large numeric ownership scope");
+    if (!values || !outer) {
+        num_scope_leave(&outer);
+        free(values);
+        return;
+    }
+    const char *inputs[] = {"1.125", "7/9", "123456789012345678901", "1.125+0.25i"};
+    for (unsigned pass = 0; pass < 2; ++pass) {
+        bool ok = true;
+        for (unsigned i = 0; i < count; ++i) {
+            values[i] = num_create_from_string(inputs[i % 4]);
+            ok = ok && num_is_finite(values[i]);
+        }
+        num_scope_t *inner = num_scope_enter();
+        ok = ok && inner;
+        for (unsigned i = 0; inner && i < 128; ++i) {
+            number_t clone = num_clone(values[(i * 5) % count]);
+            ok = ok && num_eq(clone, values[(i * 5) % count]);
+            if (i & 1)
+                num_destroy(&clone);
+        }
+        num_scope_leave(&inner);
+        /* The odd stride visits every slot, independently of allocation and cleanup order. */
+        for (unsigned i = 0; i < count; ++i) {
+            unsigned slot = (i * 2053u) % count;
+            ok = ok && num_is_finite(values[slot]);
+            num_destroy(&values[slot]);
+        }
+        TEST_ASSERT_TRUE(ok, "nested scopes preserve parent payloads and remove reused pointer keys exactly once");
+    }
+    number_t third = num_create_from_string("1/3"), sixth = num_create_from_string("1/6");
+    number_t detached = num_scope_detach(num_add(third, sixth));
+    num_scope_leave(&outer);
+    assert_number_string("detached result after indexed scope cleanup", detached, "½");
+    num_destroy(&detached);
+    free(values);
+}
+
+/* Exercise scalar construction, ownership and public arithmetic contracts. */
 void run_number_public_api_tests(void)
 {
     printf(C_CYAN "Testing number_t as a standalone public API...\n" C_RESET);
+    TEST_RUN_SUBTEST(test_scoped_payload_index, NULL);
 
     /* Internal arithmetic scopes must return their results to the caller's temporary scope. */
     {

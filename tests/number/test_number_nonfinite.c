@@ -9,6 +9,8 @@
  * run suites sequentially; this source is not part of the installed library.
  */
 
+#include <math.h>
+
 #include "test_number.h"
 
 /* Non-finite complex inputs must not enter finite-exponent convergence arithmetic. */
@@ -24,6 +26,13 @@ void run_number_nonfinite_series_tests(void)
         ASSERT_EQ_INT(num_set_prec_bits(&input, 256u), 0);
         ASSERT_TRUE(num_is_nan(num_Ei(input)));
         ASSERT_TRUE(num_is_nan(num_E1(input)));
+        number_t dilog = num_dilog(input), polylog = num_polylog(num_create_from_long(3), input);
+        if ((i < 2u && !num_is_nan(dilog)) || (i >= 2u && num_is_finite(dilog)))
+            printf("Non-finite input %zu: dilog finite=%d, nan=%d, inf=%d\n", i,
+                   num_is_finite(dilog), num_is_nan(dilog), num_is_inf(dilog));
+        ASSERT_TRUE(i < 2u ? num_is_nan(dilog) : !num_is_finite(dilog));
+        ASSERT_TRUE(i < 2u ? num_is_nan(polylog) : !num_is_finite(polylog));
+        ASSERT_TRUE(num_is_nan(num_appell_f1(NUM_HALF, NUM_ONE, NUM_ONE, NUM_TWO, input, NUM_HALF)));
         if (i < 2u)
             ASSERT_TRUE(num_is_nan(num_Li(input)));
         num_destroy(&input);
@@ -35,4 +44,25 @@ void run_number_nonfinite_series_tests(void)
     ASSERT_TRUE(num_is_inf(ei_zero) && num_sign(ei_zero) < 0);
     ASSERT_TRUE(num_is_inf(e1_zero) && num_sign(e1_zero) > 0);
     ASSERT_TRUE(num_is_inf(li_one) && num_sign(li_one) < 0);
+
+    /* Double dispatch retains the real-domain endpoint contracts of the other fixed-precision backend. */
+    number_t infinity = num_create_from_double(INFINITY), nan = num_create_from_double(NAN);
+    number_t one = num_create_from_double(1.0), two = num_create_from_double(2.0);
+    number_t negative = num_create_from_double(-INFINITY), half = num_create_from_double(0.5);
+    ASSERT_TRUE(num_is_one(num_zeta(infinity)));
+    ASSERT_TRUE(num_is_zero(num_zetap(infinity)));
+    ASSERT_TRUE(num_is_nan(num_zetap(negative)));
+    ASSERT_TRUE(num_is_nan(num_zetap(nan)));
+    ASSERT_TRUE(num_is_zero(num_zetah(two, infinity)));
+    ASSERT_TRUE(num_is_zero(num_zatahp(two, infinity)));
+    ASSERT_TRUE(num_is_one(num_zetah(infinity, one)));
+    ASSERT_TRUE(num_is_zero(num_zetah(infinity, two)));
+    ASSERT_TRUE(num_is_zero(num_zatahp(infinity, one)));
+    ASSERT_TRUE(num_is_nan(num_zetah(infinity, half)));
+    ASSERT_TRUE(num_is_nan(num_zetah(two, negative)));
+    ASSERT_TRUE(num_is_nan(num_zatahp(two, negative)));
+    ASSERT_TRUE(num_is_nan(num_zatahp(two, nan)));
+    ASSERT_TRUE(num_is_inf(num_zetah(one, two)));
+    number_t derivative_pole = num_zatahp(one, two);
+    ASSERT_TRUE(num_is_inf(derivative_pole) && num_sign(derivative_pole) < 0);
 }

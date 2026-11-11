@@ -242,6 +242,16 @@ int lab_worker_solver_plot(int argc, char **argv)
             return rc;
         }
         lab_plot_prepared_t *prepared = lab_worker_plot_prepared_read(argc, argv);
+        if (prepared && prepared->family) {
+            int rc = lab_worker_plot_integer_families((const expr_t *const *)prepared->curves, prepared->labels,
+                                                      prepared->count, axis, string_c_str(prepared->title),
+                                                      string_c_str(prepared->TeX), argv);
+            if (!rc)
+                fputs(string_c_str(prepared->numeric), stdout);
+            lab_worker_plot_prepared_free(prepared);
+            equ_free(equ);
+            return rc;
+        }
         if (prepared && prepared->count == 2 && !prepared->family) {
             int rc = prepared->root_count
                 ? lab_worker_plot_roots(prepared->roots, prepared->root_count, equ, axis,
@@ -256,22 +266,36 @@ int lab_worker_solver_plot(int argc, char **argv)
         }
         lab_worker_plot_prepared_free(prepared);
         char *title = equ_to_TeX_body_wrapped(equ, 110);
-        size_t root_count = 0;
+        size_t root_count = 0, family_count = 0;
         number_t *roots = NULL;
-        string_t *numeric = lab_worker_equation_plot_solutions(equ, atoi(argv[3]), &roots, &root_count);
-        int rc = root_count ? lab_worker_plot_roots(roots, root_count, equ, axis, argv[1], title, argv)
+        expr_t *families[16] = {0};
+        string_t *parameters[16] = {0};
+        string_t *numeric = lab_worker_equation_plot_solutions(equ, atoi(argv[3]), &roots, &root_count,
+                                                               families, parameters, &family_count);
+        int rc = family_count
+                     ? lab_worker_plot_integer_families((const expr_t *const *)families, parameters, family_count,
+                                                         axis, argv[1], title, argv)
+                     : root_count ? lab_worker_plot_roots(roots, root_count, equ, axis, argv[1], title, argv)
                            : plot_curves(argv[1], argv[1], title, axis, curves, NULL, 2, true, false, argv, NULL);
         if (!rc) {
             if (numeric) {
                 fputs(string_c_str(numeric), stdout);
-                lab_worker_plot_prepared_write(argc, argv, argv[1], title, curves, NULL, 2, false,
-                                               numeric, roots, root_count);
+                if (family_count)
+                    lab_worker_plot_prepared_write(argc, argv, argv[1], title, (const expr_t *const *)families,
+                                                   parameters, family_count, true, numeric, NULL, 0);
+                else
+                    lab_worker_plot_prepared_write(argc, argv, argv[1], title, curves, NULL, 2, false,
+                                                   numeric, roots, root_count);
             }
         }
         string_free(numeric);
         for (size_t i = 0; i < root_count; ++i)
             num_destroy(&roots[i]);
         free(roots);
+        for (size_t i = 0; i < family_count; ++i) {
+            expr_free(families[i]);
+            string_free(parameters[i]);
+        }
         free(title);
         equ_free(equ);
         return rc;

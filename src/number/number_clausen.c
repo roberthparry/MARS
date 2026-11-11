@@ -63,7 +63,7 @@ static void number_mpfr_clausen(mpfr_ptr out, unsigned long order, mpfr_srcptr i
         if (order == 1ul)
             mpfr_set_inf(sum, 1);
         else if (order & 1ul)
-            mpfr_zeta_ui(sum, order, MPFR_RNDN);
+            number_coefficient_zeta(sum, order);
         else
             mpfr_set_zero(sum, 0);
         goto done;
@@ -92,7 +92,7 @@ static void number_mpfr_clausen(mpfr_ptr out, unsigned long order, mpfr_srcptr i
         mpfr_set_ui_2exp(quarter, 1ul, -2, MPFR_RNDN);
         mpfr_const_log2(sum, MPFR_RNDN);
         for (unsigned long j = 1ul; j <= (unsigned long)precision + 64ul; ++j) {
-            mpfr_zeta_ui(coefficient, 2ul * j, MPFR_RNDN);
+            number_coefficient_zeta(coefficient, 2ul * j);
             mpfr_ui_sub(scratch, 1ul, quarter, MPFR_RNDN);
             mpfr_mul(add, coefficient, scratch, MPFR_RNDN);
             mpfr_mul(add, add, term, MPFR_RNDN);
@@ -120,7 +120,7 @@ static void number_mpfr_clausen(mpfr_ptr out, unsigned long order, mpfr_srcptr i
         mpfr_set_ui(term, 1ul, MPFR_RNDN);
     mpfr_set_zero(sum, 0);
     for (; k < order - 1ul; k += 2ul) {
-        mpfr_zeta_ui(coefficient, order - k, MPFR_RNDN);
+        number_coefficient_zeta(coefficient, order - k);
         mpfr_mul(add, term, coefficient, MPFR_RNDN);
         mpfr_add(sum, sum, add, MPFR_RNDN);
         mpfr_mul(term, term, square, MPFR_RNDN);
@@ -146,7 +146,7 @@ static void number_mpfr_clausen(mpfr_ptr out, unsigned long order, mpfr_srcptr i
     mpfr_div_ui(term, term, order, MPFR_RNDN);
     mpfr_div_ui(term, term, order + 1ul, MPFR_RNDN);
     for (unsigned long j = 1ul; j <= (unsigned long)precision + 64ul; ++j) {
-        mpfr_zeta_ui(coefficient, 2ul * j, MPFR_RNDN);
+        number_coefficient_zeta(coefficient, 2ul * j);
         mpfr_mul(add, term, coefficient, MPFR_RNDN);
         mpfr_add(sum, sum, add, MPFR_RNDN);
         if (number_clausen_small(add, sum, bits, scratch)) {
@@ -241,7 +241,7 @@ static void number_mpc_clausen(mpc_ptr out, unsigned long order, mpc_srcptr inpu
         mpfr_const_log2(scratch, MPFR_RNDN);
         mpc_set_fr(sum, scratch, MPC_RNDNN);
         for (unsigned long j = 1ul; j <= (unsigned long)precision + 64ul; ++j) {
-            mpfr_zeta_ui(coefficient, 2ul * j, MPFR_RNDN);
+            number_coefficient_zeta(coefficient, 2ul * j);
             mpfr_ui_sub(scratch, 1ul, quarter, MPFR_RNDN);
             mpfr_mul(coefficient, coefficient, scratch, MPFR_RNDN);
             mpfr_div_ui(coefficient, coefficient, j, MPFR_RNDN);
@@ -275,7 +275,7 @@ static void number_mpc_clausen(mpc_ptr out, unsigned long order, mpc_srcptr inpu
             mpc_set_ui(term, 1ul, MPC_RNDNN);
         mpc_set_ui(sum, 0ul, MPC_RNDNN);
         for (; k < order - 1ul; k += 2ul) {
-            mpfr_zeta_ui(coefficient, order - k, MPFR_RNDN);
+            number_coefficient_zeta(coefficient, order - k);
             mpc_mul_fr(add, term, coefficient, MPC_RNDNN);
             mpc_add(sum, sum, add, MPC_RNDNN);
             mpc_mul(term, term, square, MPC_RNDNN);
@@ -302,7 +302,7 @@ static void number_mpc_clausen(mpc_ptr out, unsigned long order, mpc_srcptr inpu
         mpc_div_ui(term, term, order, MPC_RNDNN);
         mpc_div_ui(term, term, order + 1ul, MPC_RNDNN);
         for (unsigned long j = 1ul; j <= (unsigned long)precision + 64ul; ++j) {
-            mpfr_zeta_ui(coefficient, 2ul * j, MPFR_RNDN);
+            number_coefficient_zeta(coefficient, 2ul * j);
             mpc_mul_fr(add, term, coefficient, MPC_RNDNN);
             mpc_add(sum, sum, add, MPC_RNDNN);
             if (number_clausen_complex_small(add, sum, bits, magnitude, scratch)) {
@@ -342,7 +342,7 @@ static void number_mpc_clausen(mpc_ptr out, unsigned long order, mpc_srcptr inpu
             mpc_mul_i(add, add, 1, MPC_RNDNN);
             mpc_add(polynomial, polynomial, add, MPC_RNDNN);
         } else if (((order - k) & 1ul) == 0ul) {
-            mpfr_zeta_ui(coefficient, order - k, MPFR_RNDN);
+            number_coefficient_zeta(coefficient, order - k);
             mpfr_mul_2ui(coefficient, coefficient, 1u, MPFR_RNDN);
             mpc_mul_fr(add, term, coefficient, MPC_RNDNN);
             mpc_add(polynomial, polynomial, add, MPC_RNDNN);
@@ -391,11 +391,19 @@ number_t num_clausen(unsigned long order, const number_t theta)
 
     if (order == 0ul || !num_is_finite(theta))
         return num_clone(NUM_NAN);
+    if (number_kind_value(&theta) == NUMBER_DOUBLE) {
+        mpfr_t value;
+        mpfr_init2(value, 53);
+        mpfr_set_d(value, num_to_double(theta), MPFR_RNDN);
+        number_mpfr_clausen(value, order, value);
+        double result = mpfr_get_d(value, MPFR_RNDN);
+        mpfr_clear(value);
+        return num_create_from_double(result);
+    }
     if (family == NUMBER_MATH_QREAL) {
         qfloat_t value = qf_clausen(order, number_value_to_qfloat(&theta));
 
-        return number_kind_value(&theta) == NUMBER_DOUBLE ? num_create_from_double(qf_to_double(value))
-                                                          : num_create_from_qfloat(value);
+        return num_create_from_qfloat(value);
     }
     if (family == NUMBER_MATH_QCOMPLEX)
         return num_create_from_qcomplex(qc_clausen(order, number_value_to_qcomplex(&theta)));

@@ -4,7 +4,8 @@
  *
  * An indexed query snapshots one saved run before any potentially blocking terminal output. Backend and precision
  * groups use double table borders, colour-coded outcomes and compatible-run comparisons. UTF-8 cells wrap at whole
- * grapheme boundaries without truncating their contents. Markdown and TSV exports contain no terminal escapes.
+ * grapheme boundaries without truncating their contents. Unsupported cases are hidden unless explicitly requested.
+ * Markdown and TSV exports contain no terminal escapes.
  */
 #include <errno.h>
 #include <locale.h>
@@ -29,7 +30,7 @@ typedef struct {
     long run;
     const char *backend, *operation, *format;
     long bits;
-    bool bits_selected, details;
+    bool bits_selected, details, include_skipped;
 } benchmark_stats_options_t;
 
 typedef struct {
@@ -55,6 +56,7 @@ static bool benchmark_stats_options(int argc, char **argv, benchmark_stats_optio
         const char *key = argv[i];
         if (!strcmp(key, "--details")) options->details = true;
         else if (!strcmp(key, "--summary")) options->details = false;
+        else if (!strcmp(key, "--include-skipped")) options->include_skipped = true;
         else if (!strncmp(key, "--format=", 9)) {
             options->format = key + 9;
             if (strcmp(options->format, "grid") && strcmp(options->format, "markdown") &&
@@ -141,16 +143,16 @@ static bool benchmark_stats_colour(void)
 static string_t *benchmark_stats_metadata(sqlite_t *db, long *run)
 {
     sqlite_stmt_t *query = sqlite_stmt_prepare(db,
-        "SELECT id, started_utc, status, machine, cpu, clock\n"
+        "SELECT id, started_utc, status, cpu, clock\n"
         "FROM benchmark_run\n"
         "WHERE id = CASE WHEN ?1 = 0 THEN (SELECT max(id) FROM benchmark_run) ELSE ?1 END");
     bool ok = query && sqlite_stmt_bind_int64(query, 1, *run) && sqlite_stmt_step(query) == SQLITE_STEP_ROW;
     string_t *header = NULL;
     if (ok) {
         *run = (long)sqlite_stmt_column_int64(query, 0);
-        string_t *raw = string_sprintf("Benchmark run %ld — %s — %s (UTC); %s; %s. Timing: %s.", *run,
+        string_t *raw = string_sprintf("Benchmark run %ld — %s — %s (UTC); %s. Timing: %s.", *run,
             sqlite_stmt_column_text(query, 2), sqlite_stmt_column_text(query, 1), sqlite_stmt_column_text(query, 3),
-            sqlite_stmt_column_text(query, 4), sqlite_stmt_column_text(query, 5));
+            sqlite_stmt_column_text(query, 4));
         if (raw) header = benchmark_stats_text(string_c_str(raw));
         string_free(raw);
     }
@@ -176,11 +178,13 @@ static bool benchmark_stats_load(sqlite_t *db, const benchmark_stats_options_t *
         "FROM benchmark_result\n"
         "WHERE run_id = ?1 AND (?2 = '' OR backend = ?2)\n"
         "  AND (?3 = 0 OR bits = ?4) AND (?5 = '' OR operation = ?5)\n"
+        "  AND (?6 OR outcome <> 'unsupported')\n"
         "ORDER BY CASE backend WHEN 'number-double' THEN 0 WHEN 'qfloat' THEN 1 WHEN 'qcomplex' THEN 2\n"
         "                      WHEN 'mpfr' THEN 3 WHEN 'mpc' THEN 4 ELSE 5 END, backend, bits, operation");
     bool ok = query && sqlite_stmt_bind_int64(query, 1, options->run) &&
         sqlite_stmt_bind_text(query, 2, options->backend) && sqlite_stmt_bind_int(query, 3, options->bits_selected) &&
-        sqlite_stmt_bind_int64(query, 4, options->bits) && sqlite_stmt_bind_text(query, 5, options->operation);
+        sqlite_stmt_bind_int64(query, 4, options->bits) && sqlite_stmt_bind_text(query, 5, options->operation) &&
+        sqlite_stmt_bind_int(query, 6, options->include_skipped);
     sqlite_step_result_t step = SQLITE_STEP_DONE;
     while (ok && (step = sqlite_stmt_step(query)) == SQLITE_STEP_ROW) {
         benchmark_stats_row_t row = {.bits = sqlite_stmt_column_int(query, 1)};
@@ -376,7 +380,11 @@ static bool benchmark_stats_print(const array_t *rows, const benchmark_stats_opt
                 fputs(tsv ? "\t" : "| ", stdout);
                 if (markdown && j == RESULT) fputs("**", stdout);
                 if (tsv) fputs(string_c_str(row->cells[j]), stdout);
-                else benchmark_stats_markdown(string_c_str(row->cells[j]));
+                else if (j == ARGUMENTS) {
+                    string_t *inputs = benchmark_arguments_markdown(row->cells[j], !strcmp(next, "exact-integer"));
+                    ok = inputs && fputs(string_c_str(inputs), stdout) != EOF && ok;
+                    string_free(inputs);
+                } else benchmark_stats_markdown(string_c_str(row->cells[j]));
                 if (markdown && j == RESULT) fputs("**", stdout);
                 if (markdown) putchar(' ');
             }
@@ -428,7 +436,9 @@ int benchmark_stats(sqlite_t *db, int argc, char **argv)
             puts("Times are microseconds per call. Batches are timed samples, not independent runs.");
             puts("Change compares the previous compatible, non-outlier run: ▲ faster; ▼ slower; ▬ within 5%. "
                  "† marks a retained slowdown outlier.");
-            puts("SKIPPED means the backend does not support this case. '-' means no measured value.");
+            puts(options.include_skipped
+                ? "SKIPPED means the backend does not support this case. '-' means no measured value."
+                : "Unsupported cases are hidden; use --include-skipped to show them. '-' means no measured value.");
         }
         if (!array_size(rows) && strcmp(options.format, "tsv")) puts("No recorded benchmark cases match these filters.");
         else ok = benchmark_stats_print(rows, &options, widths);

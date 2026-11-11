@@ -11,6 +11,7 @@
  * exposes this optional optimisation to native plotting workers only.
  */
 #include <float.h>
+#include <limits.h>
 #include <math.h>
 #include <stdlib.h>
 
@@ -132,6 +133,38 @@ static sample_value_t common_logarithm(sample_value_t a, sample_value_t b)
     return rounded(natural.value / log(10.0), natural.error / log(10.0));
 }
 
+static sample_value_t power(sample_value_t a, sample_value_t b)
+{
+    /* The positive real branch is unambiguous; all other bases use ordinary evaluation. */
+    if (!(a.value > a.error))
+        return (sample_value_t){NAN, INFINITY};
+    double logarithm = log(a.value);
+    double exponent_error = fabs(b.value) * a.error / (a.value - a.error) +
+                            b.error * (fabs(logarithm) + a.error / (a.value - a.error));
+    double value = pow(a.value, b.value);
+    return rounded(value, fabs(value) * expm1(exponent_error));
+}
+
+static sample_value_t root(sample_value_t a, sample_value_t b)
+{
+    /* Compilation checks that this degree is an exact supported constant. */
+    return power(a, divide((sample_value_t){1, 0}, b));
+}
+
+static sample_value_t square_root(sample_value_t a, sample_value_t b)
+{
+    (void)b;
+    if (!(a.value > a.error))
+        return (sample_value_t){NAN, INFINITY};
+    return rounded(sqrt(a.value), a.error / (2 * sqrt(a.value - a.error)));
+}
+
+static sample_value_t cube_root(sample_value_t a, sample_value_t b)
+{
+    (void)b;
+    return root(a, (sample_value_t){3, 0});
+}
+
 static const sample_operation_t operations[EXPR_KIND_COUNT] = {
     [EXPR_KIND_ADD]   = add,
     [EXPR_KIND_SUB]   = subtract,
@@ -145,7 +178,24 @@ static const sample_operation_t operations[EXPR_KIND_COUNT] = {
     [EXPR_KIND_LOG]   = logarithm,
     [EXPR_KIND_LOG10] = common_logarithm,
     [EXPR_KIND_ACOS]  = arccosine,
+    [EXPR_KIND_POW]   = power,
+    [EXPR_KIND_POW_D] = power,
+    [EXPR_KIND_ROOT]  = root,
+    [EXPR_KIND_SQRT]  = square_root,
+    [EXPR_KIND_CUBRT] = cube_root,
 };
+
+static bool constant_value(number_t value, sample_value_t *output)
+{
+    double real = num_to_double(value);
+    number_t converted = num_create_from_double(real), difference = num_sub(value, converted);
+    double error = fabs(num_to_double(difference));
+    bool ok = num_is_real(value) && num_is_finite(value) && isfinite(real) && isfinite(error);
+    *output = rounded(real, error);
+    num_destroy(&difference);
+    num_destroy(&converted);
+    return ok;
+}
 
 static bool compile(expr_real_sample_t *sample, const expr_t *expr, const expr_t *const *axes,
                     unsigned depth, size_t *index)
@@ -161,18 +211,16 @@ static bool compile(expr_real_sample_t *sample, const expr_t *expr, const expr_t
                 instruction.axis = (int)i;
         if (instruction.axis < 0) {
             number_t value = expr_eval(expr);
-            double real = num_to_double(value);
-            number_t converted = num_create_from_double(real), difference = num_sub(value, converted);
-            double error = fabs(num_to_double(difference));
-            bool ok = num_is_real(value) && num_is_finite(value) && isfinite(real) && isfinite(error);
-            instruction.constant = rounded(real, error);
-            num_destroy(&difference);
-            num_destroy(&converted);
+            bool ok = constant_value(value, &instruction.constant);
             num_destroy(&value);
             if (!ok)
                 return false;
         }
     } else {
+        if (kind == EXPR_KIND_ROOT && (!expr->b || expr->b->ops != &ops_const ||
+            !num_is_integer(expr->b->c) || !num_gt(expr->b->c, NUM_ONE) ||
+            num_to_double(expr->b->c) > INT_MAX))
+            return false;
         instruction.operation = kind < EXPR_KIND_COUNT ? operations[kind] : NULL;
         bool squared = (kind == EXPR_KIND_POW_D && num_eq(expr->c, NUM_TWO)) ||
                        (kind == EXPR_KIND_POW && expr->b && expr->b->ops == &ops_const &&
@@ -181,7 +229,15 @@ static bool compile(expr_real_sample_t *sample, const expr_t *expr, const expr_t
             instruction.operation = square;
         if (!instruction.operation || !compile(sample, expr->a, axes, depth + 1, &instruction.left))
             return false;
-        if (!squared && expr->ops->arity == EXPR_OP_BINARY &&
+        if (!squared && kind == EXPR_KIND_POW_D) {
+            if (sample->count == SAMPLE_NODES)
+                return false;
+            sample_instruction_t exponent = {.axis = -1};
+            if (!constant_value(expr->c, &exponent.constant))
+                return false;
+            instruction.right = sample->count;
+            sample->instructions[sample->count++] = exponent;
+        } else if (!squared && expr->ops->arity == EXPR_OP_BINARY &&
             !compile(sample, expr->b, axes, depth + 1, &instruction.right))
             return false;
     }

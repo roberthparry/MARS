@@ -150,6 +150,17 @@ void http_client_free(http_client_t *client);
 bool http_client_set_limits(http_client_t *client, const http_limits_t *limits);
 
 /**
+ * @brief Route HTTP, HTTPS and WebSocket connections through a local Unix-domain socket.
+ * @param[in,out] client Idle client to configure; its existing connection cache is cleared on success.
+ * @param[in] path Borrowed absolute socket pathname, copied by the client; NULL restores ordinary TCP transport.
+ * The request URL still supplies the HTTP authority and, for HTTPS, the verified TLS hostname.
+ * @return True on success. False for an active/null client, an empty, relative or NUL-containing path,
+ * unsupported libcurl transport or allocation failure; previous settings remain unchanged.
+ * Release the client with http_client_free(). Socket access follows the operating system's permissions.
+ */
+bool http_client_set_unix_socket(http_client_t *client, const string_t *path);
+
+/**
  * @brief Load a custom PEM trust bundle through the file module.
  * @param client Idle client to modify; verification remains enabled.
  * @param path Borrowed regular-file path, or NULL to restore system trust. Symlinks are rejected; maximum 4 MiB.

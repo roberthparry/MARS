@@ -148,6 +148,13 @@ static const TeX_model_node_t *build_binding(notation_build_t *build, const expr
         case EXPR_BINDING_EXPR_NUMBER:
             return build_number(build, binding);
 
+        case EXPR_BINDING_EXPR_NATIVE_CALL: {
+            expr_t *expression = expr_binding_expr_eval_expr(binding);
+            const TeX_model_node_t *result = expression ? notation_build_expr(build, expression) : NULL;
+            expr_free(expression);
+            return result;
+        }
+
         case EXPR_BINDING_EXPR_CONST:
             return build_constant(build, binding->u.const_id);
 

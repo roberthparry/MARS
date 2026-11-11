@@ -300,15 +300,7 @@ class MarsAlmanacGlobe {
             Number(globe.input('Latitude').value), Number(globe.input('Longitude').value), zoom) as number[];
         globe.observerSignature = globe.observerState();
         globe.flightTarget = target;
-        const destination = globe.selectedTown();
-        const name = destination ? MarsAlmanacGlobe.townLabel(destination, zoom, 600).full :
-            `${MarsAlmanacGlobe.coordinate(Number(globe.input('Latitude').value), 'N', 'S')}, ` +
-            MarsAlmanacGlobe.coordinate(Number(globe.input('Longitude').value), 'E', 'W');
-        const distance = labDOM.call('lab_globe_flight_distance', start, target) as number | null;
-        const distanceLabel = distance !== null && Number.isFinite(distance) && distance >= 0
-            ? distance < 1 ? `${Math.round(distance * 1000).toLocaleString()} m`
-                : `${Math.round(distance).toLocaleString()} km` : '';
-        globe.travelNotice.textContent = `Travelling to ${name}${distanceLabel ? ` · ${distanceLabel}` : ''}`;
+        labDOM.call('lab_globe_travel_notice', globe.travelNotice, start, target);
         globe.travelNotice.hidden = false;
         // Fetch the destination once, before zooming towards it, rather than chasing intermediate regions.
         void globe.loadShore();
@@ -335,7 +327,7 @@ class MarsAlmanacGlobe {
         }
         void globe.loadHighResolution();
         globe.draw(true);
-        let previous = performance.now(), progress = 0, speed = redirect ? globe.flightSpeed : 0;
+        let previous = performance.now(), noticeAt = previous, progress = 0, speed = redirect ? globe.flightSpeed : 0;
         const tick = (now: number): void => {
             if (globe.flightTarget !== target) return;
             if (WorksheetWorkspace.mode.currentMode() !== 'almanac') { globe.cancelFlight(); return; }
@@ -364,6 +356,10 @@ class MarsAlmanacGlobe {
                 globe.photoAtlas?.follow(labDOM.call('lab_globe_flight_ahead', start, target,
                     progress, Number(redirect)) as number[] | null);
                 globe.applyCamera(next);
+                if (now - noticeAt >= 100) {
+                    labDOM.call('lab_globe_travel_notice', globe.travelNotice, next, target);
+                    noticeAt = now;
+                }
             }
             globe.flightFrame = requestAnimationFrame(tick);
         };

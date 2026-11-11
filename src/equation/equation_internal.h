@@ -113,10 +113,18 @@ number_t equ_polynomial_rational_candidate(number_t value);
  * @param wrt Borrowed variable to isolate.
  * @param solutions Borrowed collection receiving reduced solutions or a proved-empty status.
  * @return Zero after a handled reduction, one when inapplicable, or minus one on allocation or computation failure.
- * @note Square-root targets must have a known principal-root range. Constant-base exponential inversion requires
- * a finite positive real base different from one; it returns the principal logarithmic inverse.
+ * @note Square-root targets must have a known principal-root range. Positive real constant bases retain their
+ * principal inverse. Finite non-zero negative or complex bases produce the complete integer logarithmic family.
  */
 int equ_try_solve_unary_inverse(const equation_t *equation, const expr_t *wrt, equation_solutions_t *solutions);
+
+/**
+ * @brief Choose the name of a fresh integer parameter for a symbolic solution family.
+ * @param[in] equation Borrowed source whose binding names must be avoided; no bindings are modified.
+ * @return Borrowed static identifier valid for the process lifetime; do not free it.
+ * @note Used only by equation-owned symbolic solvers. The bounded name preference list requires no allocation.
+ */
+const char *equ_branch_parameter_name(const equation_t *equation);
 
 int equ_try_solve_cubic(const equation_t *equation, const expr_t *wrt, equation_solutions_t *solutions);
 

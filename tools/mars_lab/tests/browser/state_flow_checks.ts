@@ -516,7 +516,7 @@ async function labStateFormsChecks() {
         capture = labStateDeferred();
         const stale = WorksheetWorkspace.mode.clearWorksheetFromEvent();
         equal(
-            events.join(','), 'cancel,request,history,forward,reset,blank,capture',
+            events.join(','), 'cancel,request,history,reset,blank,capture',
             'clear cancellation/history/reset order');
         capture.resolve(false);
         await stale;
@@ -539,7 +539,7 @@ async function labStateFormsChecks() {
         await success;
         equal(
             events.join(','),
-            'cancel,request,forward,reset,calendar:3,capture,source,target,result,save-result,commit,buttons,Ready,focus',
+            'cancel,request,reset,calendar:3,capture,source,target,result,save-result,commit,buttons,Ready,focus',
             'calendar clear retains completion order and skips empty history');
 
         // Forms services resolve native-backed expression state only outside a DOM handle scope.

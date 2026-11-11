@@ -6,6 +6,117 @@ CREATE TABLE IF NOT EXISTS expression_cases (
 ) WITHOUT ROWID;
 CREATE INDEX IF NOT EXISTS expression_cases_operation ON expression_cases(operation, name);
 
+-- Numeric callable coverage includes exact-width operands, aliases and preserved binding function calls.
+INSERT INTO test_case_runner(module, source, parent, table_name, operation) VALUES (
+    'expression.numeric_callables', 'tests/expression/test_expr_numeric.c', 'tests.test_expr_numeric_callables',
+    'expression_cases', 'numeric_callable')
+ON CONFLICT(module) DO UPDATE SET table_name=excluded.table_name, operation=excluded.operation;
+INSERT INTO test_case_runner(module, source, parent, table_name, operation) VALUES (
+    'expression.numeric_rendering', 'tests/expression/test_expr_numeric.c', 'tests.test_expr_numeric_callables',
+    'expression_cases', 'numeric_render')
+ON CONFLICT(module) DO UPDATE SET table_name=excluded.table_name, operation=excluded.operation;
+INSERT OR IGNORE INTO expression_cases(name, operation, input, expected) VALUES
+    ('powmod_small', 'numeric_callable', 'powmod(4,13,497)', '445'),
+    ('powmod_constant_integral', 'numeric_callable', '@S_0^1 powmod(2,3,5) dx', '3'),
+    ('powmod_constant_derivative', 'numeric_callable', 'd/dx(powmod(2,3,5)*x)', '3'),
+    ('gcd_constant_derivative', 'numeric_callable', 'd/dx(gcd(12,18)*x)', '6'),
+    ('powmod_original_1024_bit_operands', 'numeric_callable', 'powmod(97128534091520311412078115857277804694847051212062325796074342369690095336188259720191897149915705664060543226969142780725822337496727884659619483452400511633617514882293623272276764857474830401626415841035971458657442133370777607803464071101158385124186229995073045427448918227959893082282919863982307657776,12498846048367045926370716602609982839721641429222959125376462582674869403443996972648628699047686839582654905384579341977328653591547736951147466435189662,6864797660130609714981900799081393217269435300143305409394463459185543183397656052122559640661454554977296311391480858037121987999716643812574028291115057151)', '2426708632600750408239409365812084203045954767825752904850432903124881973671736995843975761420957307038639263776889805180044277291952781094657794927246068639'),
+    ('powmod_huge_exponent', 'numeric_callable', 'powmod(2,2^512,17)', '1'),
+    ('powmod_negative_base', 'numeric_callable', 'powmod(-2,5,13)', '7'),
+    ('powmod_zero_exponent', 'numeric_callable', 'powmod(9,0,7)', '1'),
+    ('powmod_one_modulus', 'numeric_callable', 'powmod(9,0,1)', '0'),
+    ('powmod_zero_modulus', 'numeric_callable', 'powmod(2,3,0)', 'NAN'),
+    ('powmod_negative_exponent', 'numeric_callable', 'powmod(2,-1,7)', 'NAN'),
+    ('powmod_fraction', 'numeric_callable', 'powmod(2,1/2,7)', 'NAN'),
+    ('integer_bit_length', 'numeric_callable', 'bit_length(2^1024)', '1025'),
+    ('integer_bit_length_zero', 'numeric_callable', 'bit_length(0)', '0'),
+    ('integer_bit_length_negative', 'numeric_callable', 'bit_length(-8)', '4'),
+    ('integer_bit_length_fraction', 'numeric_callable', 'bit_length(1/2)', 'NAN'),
+    ('integer_set_bit', 'numeric_callable', 'set_bit(0,701)', '2^701'),
+    ('integer_clear_bit', 'numeric_callable', 'clear_bit(2^701+5,701)', '5'),
+    ('integer_test_bit', 'numeric_callable', 'test_bit(2^701,701)', '1'),
+    ('integer_test_bit_absent', 'numeric_callable', 'test_bit(2^701,700)', '0'),
+    ('integer_negative_index', 'numeric_callable', 'set_bit(0,-1)', 'NAN'),
+    ('integer_fractional_index', 'numeric_callable', 'clear_bit(0,1/2)', 'NAN'),
+    ('integer_index_overflow', 'numeric_callable', 'test_bit(0,2^128)', 'NAN'),
+    ('integer_prove_prime', 'numeric_callable', 'prove_prime(97)', '1'),
+    ('integer_prove_composite', 'numeric_callable', 'prove_prime(91)', '0'),
+    ('integer_divmod_quotient', 'numeric_callable', 'divmod(17,5,0)', '3'),
+    ('integer_divmod_remainder', 'numeric_callable', 'divmod(17,5,1)', '2'),
+    ('integer_divmod_negative', 'numeric_callable', 'divmod(-17,5,0)', '-3'),
+    ('integer_divmod_negative_remainder', 'numeric_callable', 'divmod(-17,5,1)', '-2'),
+    ('integer_divmod_zero', 'numeric_callable', 'divmod(17,0,0)', 'NAN'),
+    ('integer_divmod_selector', 'numeric_callable', 'divmod(17,5,2)', 'NAN'),
+    ('integer_gcdext_gcd', 'numeric_callable', 'gcdext(30,21,0)', '3'),
+    ('integer_gcdext_identity', 'numeric_callable', '30*gcdext(30,21,1)+21*gcdext(30,21,2)', '3'),
+    ('integer_gcdext_selector', 'numeric_callable', 'gcdext(30,21,3)', 'NAN'),
+    ('alias_bit_and', 'numeric_callable', 'bit_and(12,10)', '8'),
+    ('alias_bit_or', 'numeric_callable', 'bit_or(12,10)', '14'),
+    ('alias_bit_xor', 'numeric_callable', 'bit_xor(12,10)', '6'),
+    ('alias_bit_not', 'numeric_callable', 'bit_not(12)', 'not(12)'),
+    ('alias_arithmetic_add', 'numeric_callable', 'add(2,3)', '5'),
+    ('alias_arithmetic_sub', 'numeric_callable', 'sub(2,3)', '-1'),
+    ('alias_arithmetic_mul', 'numeric_callable', 'mul(2,3)', '6'),
+    ('alias_arithmetic_div', 'numeric_callable', 'div(2,3)', '2/3'),
+    ('alias_arithmetic_neg', 'numeric_callable', 'neg(2)', '-2'),
+    ('alias_add_long', 'numeric_callable', 'add_long(2,3)', '5'),
+    ('alias_mul_long', 'numeric_callable', 'mul_long(2,3)', '6'),
+    ('alias_pow_int', 'numeric_callable', 'pow_int(2,13)', '8192'),
+    ('alias_inverse', 'numeric_callable', 'inv(2)', '1/2'),
+    ('alias_square', 'numeric_callable', 'sqr(13)', '169'),
+    ('alias_pow10', 'numeric_callable', 'pow10(3)', '1000'),
+    ('alias_ldexp', 'numeric_callable', 'ldexp(3,5)', '96'),
+    ('alias_mul_pow10', 'numeric_callable', 'mul_pow10(3,-2)', '3/100'),
+    ('alias_arg', 'numeric_callable', 'arg(1+i)', '@pi/4'),
+    ('alias_polylog1', 'numeric_callable', 'polylog1(0)', '0'),
+    ('alias_tetragamma', 'numeric_callable', 'tetragamma(1)', 'polygamma(2,1)'),
+    ('alias_sincos_sine', 'numeric_callable', 'sincos(0,0)', '0'),
+    ('alias_sincos_cosine', 'numeric_callable', 'sincos(0,1)', '1'),
+    ('alias_sinhcosh_sinh', 'numeric_callable', 'sinhcosh(0,0)', '0'),
+    ('alias_sinhcosh_cosh', 'numeric_callable', 'sinhcosh(0,1)', '1'),
+    ('clausen_explicit_order', 'numeric_callable', 'clausen(1,1)', 'Cl(1,1)'),
+    ('clausen_legacy_one', 'numeric_callable', 'clausen(1)', 'clausen2(1)'),
+    ('powmod_binding', 'numeric_callable', '{x | x=powmod(4,13,497)}', '445'),
+    ('bit_length_binding', 'numeric_callable', '{x | x=bit_length(2^1024)}', '1025'),
+    ('alias_binding_inverse', 'numeric_callable', '{x | x=inv(2)}', '1/2'),
+    ('alias_binding_pow10', 'numeric_callable', '{x | x=pow10(3)}', '1000'),
+    ('alias_binding_sinhcosh', 'numeric_callable', '{x | x=sinhcosh(0,1)}', '1'),
+    ('clausen_binding_order', 'numeric_callable', '{x | x=clausen(1,1)}', 'Cl(1,1)'),
+    ('powmod_finite_sum', 'numeric_callable', '@Z_(k=1)^3 powmod(2,k,7)', '7');
+INSERT OR IGNORE INTO expression_cases(name, operation, input, expected) VALUES
+    ('symbolic_powmod', 'numeric_render', '{powmod(a,b,c) | a=4,b=13,c=497}', 'powmod('),
+    ('symbolic_bit_edit', 'numeric_render', '{set_bit(a,b) | a=0,b=701}', 'set_bit('),
+    ('symbolic_divmod', 'numeric_render', '{divmod(a,b,c) | a=17,b=5,c=1}', 'divmod('),
+    ('symbolic_gcdext', 'numeric_render', '{gcdext(a,b,c) | a=30,b=21,c=2}', 'gcdext('),
+    ('symbolic_binding_powmod', 'numeric_render', '{x | x=powmod(4,13,497)}', 'powmod(');
+
+INSERT INTO test_case_runner(module, source, parent, table_name, operation) VALUES (
+    'expression.real_sample', 'tests/expression/test_expression.c', 'tests.test_expr_real_sample',
+    'expression_cases', 'real_sample')
+ON CONFLICT(module) DO UPDATE SET table_name=excluded.table_name, operation=excluded.operation;
+
+INSERT OR IGNORE INTO expression_cases(name, operation, input, expected) VALUES
+    ('sample_nested_acos_root_power', 'real_sample', '{acos(sin(2-x*y)-10^(-root(x^2+y^2,5))) | x=0.37,y=-0.29}', 'accept'),
+    ('sample_positive_variable_power', 'real_sample', '{x^y | x=0.37,y=-0.29}', 'accept'),
+    ('sample_positive_integer_power', 'real_sample', '{x^3 | x=0.37}', 'accept'),
+    ('sample_positive_fractional_power', 'real_sample', '{x^(1/5) | x=0.37}', 'accept'),
+    ('sample_positive_negative_power', 'real_sample', '{x^(-3) | x=0.37}', 'accept'),
+    ('sample_positive_fifth_root', 'real_sample', '{root(x,5) | x=0.37}', 'accept'),
+    ('sample_positive_square_root', 'real_sample', '{sqrt(x) | x=0.37}', 'accept'),
+    ('sample_positive_cube_root', 'real_sample', '{cubrt(x) | x=0.37}', 'accept'),
+    ('sample_positive_large_root', 'real_sample', '{root(x,2147483647) | x=0.37}', 'accept'),
+    ('sample_negative_integer_power_fallback', 'real_sample', '{x^3 | x=-0.37}', 'fallback'),
+    ('sample_negative_principal_root_fallback', 'real_sample', '{root(x,5) | x=-0.37}', 'fallback'),
+    ('sample_zero_principal_root_fallback', 'real_sample', '{root(x,5) | x=0}', 'fallback'),
+    ('sample_negative_cube_root_fallback', 'real_sample', '{cubrt(x) | x=-0.37}', 'fallback'),
+    ('sample_variable_root_order_fallback', 'real_sample', '{root(x,y) | x=0.37,y=5}', 'fallback'),
+    ('sample_noninteger_root_order_fallback', 'real_sample', '{root(x,2.5) | x=0.37}', 'fallback'),
+    ('sample_unsupported_root_order_fallback', 'real_sample', '{root(x,2147483648) | x=0.37}', 'fallback'),
+    ('sample_outside_acos_domain_fallback', 'real_sample', '{acos(1+x) | x=0.37}', 'fallback'),
+    ('sample_root_cancellation_fallback', 'real_sample', '{sqrt(x)-sqrt(x+1e-30) | x=1}', 'fallback'),
+    ('sample_power_overflow_fallback', 'real_sample', '{10^x | x=400}', 'fallback'),
+    ('sample_power_underflow_fallback', 'real_sample', '{10^x | x=-400}', 'fallback');
+
 INSERT OR IGNORE INTO expression_cases(name, operation, input, expected) VALUES ('exact_addition', 'evaluate', '1/3+1/6', '1/2');
 
 INSERT OR IGNORE INTO expression_cases(name, operation, input, expected) VALUES ('trigonometric_identity', 'evaluate', 'sin(0)^2+cos(0)^2', '1');
@@ -493,6 +604,20 @@ INSERT OR IGNORE INTO expression_cases(name, operation, input, expected) VALUES 
 INSERT OR IGNORE INTO expression_cases(name, operation, input, expected) VALUES ('SHL(7, 3)', 'test_from_string_exact_value_functions_check_parse_num_1', '{ SHL(a, n) | a = 7, n = 3 }', '56');
 INSERT OR IGNORE INTO expression_cases(name, operation, input, expected) VALUES ('SHR(56, 3)', 'test_from_string_exact_value_functions_check_parse_num_1', '{ SHR(a, n) | a = 56, n = 3 }', '7');
 INSERT OR IGNORE INTO expression_cases(name, operation, input, expected) VALUES ('factors(360)', 'test_from_string_exact_value_functions_check_parse_num_1', '{ a₀³·a₁²·a₂ | ; a₀ = 2, a₁ = 3, a₂ = 5 }', '360');
+
+INSERT INTO test_case_runner(module, source, parent, table_name, operation) VALUES (
+    'expression.test_prime_factor_products', 'tests/expression/test_expr_from_string.c',
+    'tests.test_expr_t_from_string.test_from_string_exact_value_functions', 'expression_cases',
+    'test_prime_factor_products')
+ON CONFLICT(module) DO UPDATE SET table_name=excluded.table_name, operation=excluded.operation;
+INSERT OR IGNORE INTO expression_cases(name, operation, input, expected) VALUES ('factor_product_360', 'test_prime_factor_products', 'factors(360)', '{ a₀³·a₁²·a₂ | ; a₀ = 2, a₁ = 3, a₂ = 5 }');
+INSERT OR IGNORE INTO expression_cases(name, operation, input, expected) VALUES ('factor_product_benchmark_1215_bits', 'test_prime_factor_products', 'factors(547721190191546363398678620411634487909744841314598615206873278092099143398360125227595479954148677571112600596738260011818279723370813377533578833565803706508131569062299976033041302189833215742992653063887339218309467131548996199881113600000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000)', '{ a₀⁵¹²·a₁²⁵⁶·a₂¹²⁸ | ; a₀ = 2, a₁ = 3, a₂ = 5 }');
+INSERT OR IGNORE INTO expression_cases(name, operation, input, expected) VALUES ('factor_product_power_2048_bits', 'test_prime_factor_products', 'factors(2^2048)', '{ a₀²⁰⁴⁸ | ; a₀ = 2 }');
+INSERT OR IGNORE INTO expression_cases(name, operation, input, expected) VALUES ('factor_product_bound_power_2048_bits', 'test_prime_factor_products', '{ factors(n) | n = 2^2048 }', '{ a₀²⁰⁴⁸ | ; a₀ = 2 }');
+INSERT OR IGNORE INTO expression_cases(name, operation, input, expected) VALUES ('factor_product_identity', 'test_prime_factor_products', 'factors(1)', '1');
+INSERT OR IGNORE INTO expression_cases(name, operation, input, expected) VALUES ('factor_product_zero_formal', 'test_prime_factor_products', 'factors(0)', 'factors(0)');
+INSERT OR IGNORE INTO expression_cases(name, operation, input, expected) VALUES ('factor_product_negative_formal', 'test_prime_factor_products', 'factors(-8)', 'factors(-8)');
+INSERT OR IGNORE INTO expression_cases(name, operation, input, expected) VALUES ('factor_product_fraction_formal', 'test_prime_factor_products', 'factors(3/2)', 'factors(³⁄₂)');
 
 INSERT INTO test_case_runner(module, source, parent, table_name, operation) VALUES (
     'expression.test_from_string_number_literals_check_parse_num_1', 'tests/expression/test_expr_from_string.c', 'tests.test_expr_t_from_string.test_from_string_number_literals', 'expression_cases', 'test_from_string_number_literals_check_parse_num_1')

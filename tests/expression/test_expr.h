@@ -10,6 +10,18 @@
 #include "qfloat-t.h"
 #include "test_harness.h"
 
+/**
+ * @brief Run database-backed numerical callable and rendering regressions.
+ * @return No value; failures are recorded by the sequential test harness. Owns and releases its fixtures.
+ */
+void test_expr_numeric_callables(void);
+
+/**
+ * @brief Run the exact-integer callable programme synchronised with docs/expression.md.
+ * @return No value; prints documented output and records failures. Run after ordinary tests.
+ */
+void example_expression_integer_callables(void);
+
 /** Create a constant from a double and release the temporary number. */
 expr_t *test_expr_new_const_d(double x);
 

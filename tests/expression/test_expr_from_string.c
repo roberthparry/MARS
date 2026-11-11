@@ -1849,6 +1849,8 @@ static void test_from_string_exact_value_functions(void)
 
     test_run_database_cases(__FILE__, __LINE__,
         "expression.test_from_string_exact_value_functions_check_parse_num_1", NULL, check_parse_num_database_row);
+    test_run_database_cases(__FILE__, __LINE__,
+        "expression.test_prime_factor_products", NULL, check_parse_expr_database_row);
 
     expr = expr_from_string("{ gcd(x, y) | x = 84, y = 30 }", &bindings);
     if (!expr || expr_is_differentiable(expr)) {

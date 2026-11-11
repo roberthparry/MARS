@@ -2,8 +2,8 @@
  * @file lab_process_worker.c
  * @brief Server-specific command construction for built-in Lab calculations.
  *
- * Resolves the calculation registry and optional diagnostic executable overrides,
- * then delegates bounded child execution to the independent lab_process.c core.
+ * Resolves the calculation registry and optional diagnostic executable overrides.
+ * Built-ins use resident calculation sessions; overrides use the independent process runner.
  * Keeping this adapter in its own translation unit lets other native tools reuse
  * the generic process runner without linking the Lab's calculation entry points.
  */
@@ -17,6 +17,8 @@
 #include "lab_process.h"
 #define MARS_LAB_PROCESS_INTERNAL_ACCESS
 #include "lab_process_plot_cache.h"
+#define MARS_LAB_PROCESS_INTERNAL_ACCESS
+#include "lab_process_session.h"
 
 /* Resolve an explicit diagnostic override or the server containing the calculation. */
 string_t *lab_proc_worker_path(const char *name)
@@ -33,7 +35,7 @@ string_t *lab_proc_worker_path(const char *name)
     return path;
 }
 
-/* Wrap a calculation invocation in the server's built-in worker command. */
+/* Dispatch a built-in calculation without launching another executable. */
 bool lab_proc_run_worker(const char *const argv[], const char *cwd, const string_t *input, unsigned timeout_ms,
                          size_t max_output, string_t **output, int *exit_status)
 {
@@ -82,32 +84,15 @@ bool lab_proc_run_worker(const char *const argv[], const char *cwd, const string
         string_free(cached);
         prepared = lab_proc_plot_cache_get(prepared_key, true);
     }
-    const char *command[261] = {string_c_str(path)};
-    string_t *timeout = string_sprintf("%u", timeout_ms);
-    const char *limit = getenv("MARS_LAB_WORK_LIMIT");
-    if (!timeout) {
-        string_free(prepared);
-        string_free(prepared_key);
-        string_free(equation_key);
-        string_free(plot_key);
-        string_free(path);
-        errno = ENOMEM;
-        return false;
-    }
+    const char *command[258] = {external ? string_c_str(path) : argv[0]};
     size_t next = 1;
-    if (!external) {
-        command[next++] = "--worker-control";
-        command[next++] = string_c_str(timeout);
-        command[next++] = limit && *limit ? limit : "0";
-        command[next++] = argv[0];
-    }
     for (size_t i = 1; i < count; ++i)
         command[next++] = argv[i];
     if (prepared_key || equation_key)
         command[next++] = "--plot-cache";
     bool ran = external ? lab_proc_run_input(command, cwd, input, timeout_ms, max_output, output, exit_status)
-                        : lab_proc_run_input_cooperative(command, cwd, prepared ? prepared : input,
-                                                         timeout_ms, max_output, output, exit_status);
+                        : lab_proc_persistent_run(command, cwd, prepared ? prepared : input,
+                                                  timeout_ms, max_output, output, exit_status);
     int error = errno;
     if (ran && !external && *exit_status >= LAB_WORKER_CANCELLED && *exit_status <= LAB_WORKER_CONTROL_FAILED) {
         static const int errors[] = {ECANCELED, ETIMEDOUT, E2BIG, EIO};
@@ -128,7 +113,6 @@ bool lab_proc_run_worker(const char *const argv[], const char *cwd, const string
     string_free(prepared_key);
     string_free(equation_key);
     string_free(plot_key);
-    string_free(timeout);
     string_free(path);
     errno = error;
     return ran;

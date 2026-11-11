@@ -25,6 +25,167 @@
 #define MARS_SHARED_NUMBER_INTERNAL_ACCESS
 #include "internal/number_internal.h"
 
+/**
+ * @brief Calculate a positive integer series denominator exactly when it fits a machine word.
+ * @param base Positive integer base; series callers supply at least one.
+ * @param exponent Non-negative integer exponent; zero returns one.
+ * @return Exact base raised to exponent, or zero when a product would overflow unsigned long.
+ * @note Thread-safe, allocation-free and logarithmic in exponent. No ownership transfers. A zero return
+ * selects the caller's arbitrary-precision denominator calculation; it must never be used as a divisor.
+ */
+unsigned long number_series_integer_power(unsigned long base, unsigned long exponent);
+
+/**
+ * @brief Copy zeta(n) from the bounded numeric coefficient cache at the output's precision.
+ * @param[out] out Caller-owned initialised MPFR destination; its precision is preserved.
+ * @param[in] order Integer n, at least two.
+ * @return Zero on success; minus one on an invalid order or cache-lock failure. Invalid values become NaN.
+ * @note Thread-safe copies retain no borrowed cache pointers. Bounds affect retention only; larger requests
+ * are evaluated without caching. The destination remains caller-owned and is cleared with mpfr_clear().
+ */
+int number_coefficient_zeta(mpfr_ptr out, unsigned long order);
+
+/**
+ * @brief Copy the even Bernoulli coefficient B_(2k) at the output's working precision.
+ * @param[out] out Caller-owned initialised MPFR destination; its precision is preserved.
+ * @param[in] index Positive k, no larger than ULONG_MAX/2.
+ * @return Zero on success; minus one on invalid input or cache-lock failure, with invalid values set to NaN.
+ * @note Copies are protected by the shared cache mutex. No cache ownership is transferred; clear out normally.
+ * Requests exceeding the bounded cache are calculated without retention.
+ */
+int number_coefficient_bernoulli(mpfr_ptr out, size_t index);
+
+/**
+ * @brief Copy the factorial-normalised coefficient B_(2k)/(2k)! for Euler–Maclaurin summation.
+ * @param[out] out Caller-owned initialised MPFR destination, retained at its existing precision.
+ * @param[in] index Positive k, no larger than ULONG_MAX/2.
+ * @return Zero on success; minus one on invalid input or cache-lock failure. Invalid values become NaN.
+ * @note Uses the same thread-safe bounded retention policy as the ordinary coefficients. The caller clears
+ * out with mpfr_clear(); no cache entry or borrowed pointer escapes the call.
+ */
+int number_coefficient_normalised(mpfr_ptr out, size_t index);
+
+/**
+ * @brief Copy a positive integer's natural logarithm at the destination precision.
+ * @param[out] out Caller-owned initialised MPFR destination, whose precision is preserved.
+ * @param[in] value Positive integer; zero is invalid and produces NaN.
+ * @return Zero on success; minus one on invalid input or a cache-lock failure, with NaN in out.
+ * Integer logarithms share the bounded thread-safe coefficient cache. Higher-precision entries supply rounded
+ * copies for lower requests; oversized inputs or precisions are calculated without retention. The caller retains
+ * out and clears it with mpfr_clear(); no cache storage or ownership escapes the call.
+ */
+int number_integer_logarithm(mpfr_ptr out, unsigned long value);
+
+/**
+ * @brief Evaluate the finite sum of n^(-s), for integers 1 <= n < endpoint, at sum's precision.
+ * @param[out] sum Caller-owned initialised MPC destination, replaced with the sum.
+ * @param[out] derivative Optional caller-owned initialised MPC destination, replaced with the derivative in s.
+ * @param[in] argument Borrowed complex exponent s, valid for this call; must not alias either output.
+ * @param[in] endpoint Exclusive positive upper bound of the finite sum.
+ * @return Nothing; both outputs receive the result or the propagated non-finite arithmetic value.
+ * @note The outputs must be distinct and have matching precision. Temporary factorised powers are bounded;
+ * larger requests and allocation failures use direct summation. All temporary ownership stays in the call.
+ * The shared sieve is initialised once, making independent calls thread-safe. This helper has no persistent state
+ * depending on s and does not set an evaluation error; non-finite arithmetic propagates through the outputs.
+ */
+void number_zeta_finite_sum(mpc_ptr sum, mpc_ptr derivative, mpc_srcptr argument, unsigned long endpoint);
+
+/**
+ * @brief Add the Euler–Maclaurin integral, endpoint and Bernoulli tail to a finite zeta sum.
+ * @param[in,out] sum Caller-owned initialised MPC accumulator containing the finite value sum.
+ * @param[in,out] derivative Optional matching MPC accumulator containing the finite derivative in s.
+ * @param[in] argument Borrowed exponent s; must not alias an accumulator.
+ * @param[in] endpoint Borrowed first omitted base, on the principal logarithm branch; must not alias an accumulator.
+ * @param[in] target Required result precision in bits; accumulators must have at least 128 extra working bits.
+ * @param[in] budget Maximum number of Bernoulli corrections, at least four.
+ * @param[in] guard Additional bits required by the absolute correction stopping check.
+ * @return Zero after convergence, or minus one on exhausted corrections, non-finite arithmetic or coefficient failure.
+ * Failed accumulators are unspecified and must not be accepted as results. The pole at s=1 receives signed infinity.
+ * Both accumulators remain caller-owned and distinct, with identical precision; clear them with mpc_clear().
+ * All per-call state is local; shared coefficient copies use the bounded thread-safe cache.
+ */
+int number_zeta_tail(mpc_ptr sum, mpc_ptr derivative, mpc_srcptr argument, mpc_srcptr endpoint,
+                     mpfr_prec_t target, size_t budget, unsigned guard);
+
+/**
+ * @brief Copy log(offset + index), reusing bounded logarithms for the most recently used exact offset.
+ * @param[out] out Caller-owned initialised MPC destination, whose precision is preserved.
+ * @param[in] offset Borrowed complex offset; must not alias out and remains valid throughout this call.
+ * @param[in] index Non-negative integer shift.
+ * @return Nothing; out receives the logarithm or the corresponding MPC non-finite value.
+ * @note Thread-safe calls copy values; no cache pointer or ownership escapes. Offset changes release old entries.
+ * Requests beyond retention limits, locking failures and non-finite logarithms use direct evaluation. Arithmetic
+ * domain errors propagate as MPC non-finite values. The caller clears out normally with mpc_clear().
+ */
+void number_zeta_logarithm(mpc_ptr out, mpc_srcptr offset, unsigned long index);
+
+/**
+ * @brief Bound a complex modulus from above using |real| + |imag| and upward rounding.
+ * @param[out] out Caller-owned initialised MPFR destination, distinct from both components of value.
+ * @param[in] value Borrowed complex input, valid during this call.
+ * @return Nothing; out receives the upper bound, with non-finite components propagated.
+ * @note No allocation or ownership transfer occurs. NaNs and infinities propagate. Independent calls are
+ * thread-safe. This conservative bound is for convergence checks, not a replacement for the mathematical modulus.
+ */
+void number_mpc_abs_upper(mpfr_ptr out, mpc_srcptr value);
+
+/**
+ * @brief Bound a complex modulus from below using max(|real|, |imag|) and downward rounding.
+ * @param[out] out Caller-owned initialised MPFR destination, distinct from both components of value.
+ * @param[in] value Borrowed complex input, valid during this call.
+ * @return Nothing; out receives the lower bound, with non-finite components propagated.
+ * @note No allocation or ownership transfer occurs. NaNs and infinities propagate. Independent calls are
+ * thread-safe; clear out using mpfr_clear() when finished. Use this only where a conservative bound is sufficient.
+ */
+void number_mpc_abs_lower(mpfr_ptr out, mpc_srcptr value);
+
+/**
+ * @brief Conservatively test a scaled series term against a relative precision target using binary exponents.
+ * @param[in] term_upper Caller-owned finite non-negative upper bound on the omitted term or tail.
+ * @param[in] sum_lower Caller-owned finite non-negative lower bound on the absolute result scale.
+ * @param[in] bits Positive required relative precision in bits.
+ * @param[in] factor_bits Non-negative exponent bounding an additional multiplier by at most 2^factor_bits.
+ * @return True only when the scaled upper bound is proved smaller than sum_lower times 2^(-bits).
+ * A zero upper bound is accepted even with a zero scale. Invalid bounds, non-positive precision, exponent
+ * overflow or an inconclusive comparison return false. No allocation, mutation or ownership transfer occurs;
+ * both inputs remain valid throughout the call and independent calls are thread-safe.
+ */
+bool number_series_small(mpfr_srcptr term_upper, mpfr_srcptr sum_lower, mpfr_prec_t bits, unsigned factor_bits);
+
+/**
+ * @brief Refine the established real inverse-gamma branch with increasing working precision.
+ * @param[in,out] value Caller-owned initialised MPFR input, replaced with its inverse-gamma value at the same precision.
+ * @return Zero on success or a rejected real-domain input, minus one if checked refinement cannot converge.
+ * @note Rejected inputs and refinement failures become NaN. The fixed-precision seed chooses the existing real
+ * branch but never limits final accuracy. No ownership transfers; clear value with mpfr_clear(). Independent
+ * calls use local temporaries and are thread-safe subject to the ordinary fixed-precision seed's contract.
+ */
+int number_mpfr_gammainv_mut(mpfr_t value);
+
+/**
+ * @brief Sum the real non-negative integer-order Legendre chi series on |z| < 0.95.
+ * @param[out] out Caller-owned initialised MPFR destination, preserved at its existing precision.
+ * @param[in] order Non-negative integer order.
+ * @param[in] input Borrowed real argument; may alias out and must remain valid for this call.
+ * @return Zero for a verified sum, one outside the direct-series region without modifying out, or minus one
+ * for insufficient convergence or roundoff accuracy, setting out to NaN.
+ * @note All scratch storage is local. No ownership transfers; the caller clears out normally. Independent
+ * calls are thread-safe. The dispatcher retains analytic continuation through the established polylogarithms.
+ */
+int number_mpfr_chi_series(mpfr_ptr out, unsigned long order, mpfr_srcptr input);
+
+/**
+ * @brief Sum the complex non-negative integer-order Legendre chi series on |z| < 0.95.
+ * @param[out] out Caller-owned initialised MPC destination, preserved at its existing precision.
+ * @param[in] order Non-negative integer order.
+ * @param[in] input Borrowed complex argument; may alias out and remains valid during this call.
+ * @return Zero for a verified sum, one outside the direct-series region without modifying out, or minus one
+ * on insufficient convergence or roundoff accuracy, with out set to NaN.
+ * @note Local scratch values own their allocations. No pointers or ownership escape; clear out with mpc_clear().
+ * Independent calls are thread-safe. The caller supplies the existing continuation outside this region.
+ */
+int number_mpc_chi_series(mpc_ptr out, unsigned long order, mpc_srcptr input);
+
 /* Scoped allocation services implemented by number_core.c. */
 void *number_scope_mem_alloc(size_t size, size_t align);
 void *number_scope_mem_calloc(size_t count, size_t size, size_t align);
@@ -479,6 +640,8 @@ int number_mpc_lommel_s_derivative(mpc_ptr out, mpc_srcptr mu, mpc_srcptr nu, mp
  * @param[in] x Borrowed first argument with absolute value below 0.95.
  * @param[in] y Borrowed second argument with absolute value below 0.95.
  * @return Zero after convergence, or -1 with NaN on an unsupported domain, singular denominator or exhausted guard.
+ * Evaluation stays in real arithmetic. Shifted parameters preserve every input bit and permitted integer shift;
+ * coefficient recurrences are periodically refreshed and directed exponent checks can only delay acceptance.
  * No ownership transfers; callers initialise and clear their own MPFR values. No shared mutable state is used.
  */
 int number_mpfr_appell_f1(mpfr_ptr out, mpfr_srcptr a, mpfr_srcptr b1, mpfr_srcptr b2, mpfr_srcptr c,
@@ -493,6 +656,8 @@ int number_mpfr_appell_f1(mpfr_ptr out, mpfr_srcptr a, mpfr_srcptr b1, mpfr_srcp
  * @param[in] y Borrowed second argument with modulus below 0.95.
  * @param[in] rounding Final output rounding mode; guard calculations use nearest rounding.
  * @return Zero after convergence, or -1 with NaN on an unsupported domain, pole or exhausted numerical guard.
+ * Compact dyadic parameters use exact quadratic ratio coefficients with a real denominator; other parameters
+ * retain complex division. No input or output precision is narrowed by the compact representation.
  * All operands remain caller-owned and valid throughout the call; no internal storage escapes.
  */
 int number_mpc_appell_f1(mpc_ptr out, mpc_srcptr a, mpc_srcptr b1, mpc_srcptr b2, mpc_srcptr c,

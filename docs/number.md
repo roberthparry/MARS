@@ -4,7 +4,7 @@
 
 ## Implementation organisation
 
-Small related function families are grouped in two implementation units:
+Related function families and reusable numeric kernels have separate implementation units:
 
 - `src/number/number_cylindrical_series.c` contains Bessel I and Struve H/L,
   their shared guarded series and cylindrical precision selection. Bessel K
@@ -13,10 +13,18 @@ Small related function families are grouped in two implementation units:
 - `src/number/number_special.c` contains Chebyshev and Hermite recurrences
   together with the scalar signal functions. Both groups use the existing
   generic numeric arithmetic and precision policy.
+- `src/number/number_gamma_inverse.c` and `number_chi.c` contain staged inverse
+  gamma refinement and direct Legendre chi summation.
+- `src/number/number_coefficients.c`, `number_zeta_logs.c` and `number_zeta_sum.c`
+  own bounded coefficient reuse, shifted logarithm reuse and finite Dirichlet
+  sums. `number_complex_bounds.c` supplies conservative convergence bounds.
+- `src/number/number_series_power.c` supplies checked exact machine-word
+  denominators for polylogarithm and Legendre chi series, with arbitrary-precision
+  fallback when the integer power does not fit.
 
 Scoped allocation declarations live in `src/number/number_internal.h`.
 Applications continue to use `number-t.h`; this organisation does not change
-the public API, numerical algorithms or ownership rules.
+the public API or ownership rules.
 
 ## Signal functions
 
@@ -96,7 +104,7 @@ cannot be cleared accidentally by ordinary value destruction.
 
 At process shutdown, the number layer now runs an automatic destructor that:
 
-- clears the Bernoulli cache used by higher special functions
+- clears the coefficient caches used by higher special functions
 - clears any initialised GMP/MPFR backing storage owned by immortal `NUM_*`
   constants
 - clears MPC cache state attached to the immortal imaginary constants
@@ -341,6 +349,14 @@ Arithmetic helpers that use an internal scope return their results to the
 caller's scope. This includes rounding, integer addition and multiplication,
 arguments and pulse functions; their internal cleanup must neither free the
 returned result nor bypass the caller's automatic cleanup.
+
+The active scope chain indexes backend and payload ownership. A fixed 256-slot
+direct index handles small live sets without per-entry allocation; colliding keys
+use a dictionary that also accommodates larger scopes.
+Registration, duplicate-owner checks, explicit destruction and detachment use
+indexed lookup rather than scanning all live temporary numbers. Scope teardown
+visits each remaining record once; leaving the outermost scope releases the
+index and its storage. Nested scopes retain the same ownership and lifetime rules.
 
 Detaching behaves differently depending on how the scoped value is stored:
 
@@ -673,7 +689,13 @@ already evaluates its lower tail directly.
 #### Clausen functions
 
 `num_clausen(order, theta)` takes a positive integer order and an angle in
-radians; `num_clausen2(theta)` selects order two. For real angles, even
+radians; `num_clausen2(theta)` is exactly `num_clausen(2, theta)`.
+The C API requires the order in `num_clausen`. In contrast, MARS Lab's
+one-argument input names `clausen(theta)` and `clausen2(theta)` both select
+order two; use `Cl(n,theta)` for another order. See the
+[expression spellings](expression.md#clausen-functions).
+
+For real angles, even
 orders use the sine Fourier series and odd orders the cosine Fourier series.
 Order one is `-ln(2*abs(sin(theta/2)))`, with logarithmic poles at multiples
 of `2*pi`; higher orders are continuous and periodic on the real axis.
@@ -754,7 +776,9 @@ The result uses the greatest input precision, with exact inputs contributing
 the current default precision, including exact Cartesian components. Evaluation
 adds working precision for cancellation and proximity to integer orders, then
 rounds the result back to the requested precision. Integer orders use harmonic
-series for K₀ and K₁ followed by recurrence; non-integer orders use two reduced
+series for K₀ and K₁ followed by recurrence. These calculations reuse local MPC
+scratch values, avoiding numeric wrapper allocations inside the series loop.
+Non-integer orders use two reduced
 I-series with gamma factors. Each series is limited to 20000 iterations; failure
 to converge returns NaN. The near-integer guard also rejects an unrepresentable
 distance estimate or a required distance correction above 65536 bits. This is
@@ -958,6 +982,7 @@ L_0(1) = 0.7102431859378909
 | `num_is_prime(n)` | Returns `true` when `n` passes the library's primality test. |
 | `num_prove_prime(n)` | Returns `PRIME`, `COMPOSITE`, or `UNKNOWN` according to the proof result. |
 | `num_next_prime(n)` | Returns the least prime strictly greater than `n`. |
+
 | `num_prev_prime(n)` | Returns the greatest prime strictly less than `n`. |
 | `num_factors(n)` | Returns the exact prime factorisation as an owned `number_factors_t`. |
 | `num_bit_length(n)` | Returns the number of significant bits in the absolute integer value. |
@@ -972,8 +997,20 @@ L_0(1) = 0.7102431859378909
 | `num_shr(n, bits)` | Shifts right; a negative count delegates to a left shift. |
 | `num_isqrt(n)` | Returns `floor(sqrt(n))` exactly for a non-negative integer. |
 
+The scalar integer operations are also exposed by the native expression parser
+and MARS Lab, including three-argument `powmod(a,e,m)`. No floating-point
+conversion is used for its operands. Multi-result routines use an explicit
+component selector in scalar expressions; see the [expression guide](expression.md#value-only-functions-owning)
+for the callable spellings and examples.
+
 Binary arithmetic mixes supported backends automatically by promoting to a
 common target representation before dispatch.
+
+`num_factors()` honours the current `computation_run()` control during trial
+division and repeated factor removal. Cancellation, a deadline or an exhausted
+work budget returns `NULL` and discards partial factors. Without a control,
+factorisation is unrestricted and a difficult composite can take a long time;
+operand size alone does not predict its cost.
 
 Appell F₁ is the two-variable member of `num_lauricella_f(...)`. Its MPFR and
 MPC paths group the defining double series by total degree and generate the
@@ -995,11 +1032,47 @@ The complex error functions use an entire Kummer series with additional
 precision for exponential cancellation. The supported complex magnitude is
 at most 140, subject to a 65536-bit work limit. Real erf/erfc use MPFR at the
 participating precision. Real and complex inverse erf/erfc refine an initial
-estimate with checked Halley iteration and verify the forward residual;
+estimate with checked Halley iteration, increasing working precision as the
+estimate improves, and verify the final forward residual;
 the starting estimate does not limit the result to double precision. Inverse
 erfc works directly with small complementary probabilities. Non-convergence
 returns NaN, rather than an unchecked finite result. Real endpoint values
 retain their signed infinities.
+
+MPFR inverse gamma similarly increases Newton working precision in stages and
+checks the final logarithmic gamma residual. It retains the existing real branch
+selection; an approximate seed never determines the returned accuracy. Newton's
+slope uses half the current working precision plus 32 guard bits: its rounding
+error is multiplied by the small residual. The correction and final logarithmic
+residual still have to satisfy the full result-precision checks.
+
+For non-negative integer orders of at least two, MPFR and MPC Legendre chi use
+the direct odd-power series inside `|z| < 0.95`. A geometric tail bound and a
+roundoff check control convergence. Outside this region the existing
+polylogarithm continuation remains available.
+
+MPFR [Appell F₁](https://dlmf.nist.gov/16.13) uses real arithmetic throughout. Both real and complex paths sum
+by total degree and advance their linear coefficients by addition, refreshing
+them every 64 terms. Shifted upper and lower parameters retain all their input
+bits and every permitted integer shift, while simple dyadic parameters avoid
+full-width zero padding. When complex parameter products fit exactly in the
+working precision, an exact quadratic recurrence supplies the numerator and
+real squared denominator of their ratio. Other parameters retain ordinary
+complex division. Terminating numerators, lower-parameter poles, the existing
+`|x|, |y| < 0.95` domain and cancellation checks remain supported.
+
+Appell F₁, complex error functions, complex polylogarithms and integer-order Bessel K use directed
+upper and lower magnitude bounds for convergence checks where a square root
+is unnecessary. These conservative bounds leave the mathematical modulus and
+the returned function definitions unchanged.
+
+Appell, Legendre chi and polylogarithm series compare binary exponents of their
+directed bounds before accepting a small term. This avoids repeated products of
+full-width significands. Chi's exponent test includes an upper bound for its
+geometric tail factor. An inconclusive comparison continues summation, so this
+shortcut can require an extra term rather than accepting one prematurely.
+Dilogarithm and polylogarithm paths propagate NaN components before comparing
+inputs with finite special values such as zero and one.
 
 The related Gaussian PDF, log PDF and CDF also retain complex working precision.
 The CDF uses `erfc(-x/sqrt(2))/2` so small negative-tail probabilities survive
@@ -1116,21 +1189,67 @@ partial derivative with respect to `s`. The trailing `p` denotes a derivative.
 Dispatch preserves the active `number_t` backend, including qfloat, qcomplex,
 MPFR and MPC values.
 
-The native Euler–Maclaurin zeta paths reuse successive rising products and
-endpoint powers, and omit derivative work for value-only calls. This also
-applies to Hurwitz zeta. Above 512 working bits, their finite sums grow with
+The native Euler–Maclaurin zeta paths share a scaled recurrence for the combined
+rising product and endpoint power. Its quadratic factor advances by finite
+differences, avoiding separate factorial products and powers at each correction.
+One endpoint exponential supplies the integral, endpoint and correction terms.
+Analytic derivatives advance alongside the value without dividing by a possibly
+zero rising product; value-only calls omit derivative work. This also applies to
+[Hurwitz zeta](https://dlmf.nist.gov/25.11#iii). Riemann finite sums evaluate prime powers once and
+construct composite powers by multiplication, using a directly indexed sieve.
+Derivative sums also reuse the prime logarithms, constructing composite
+logarithms by addition. Integer logarithms are retained across evaluations in the
+shared coefficient cache, including rounded copies from higher working precision.
+Temporary power and logarithm storage together are
+bounded to eight MiB and 4096 indices; larger sums use direct evaluation.
+Above 512 working bits, their finite sums grow with
 precision instead of retaining a fixed 128-term length. Both value and derivative
 paths also extend the finite sum with the magnitude of the imaginary argument, so higher zero-search windows
 do not retain a summation length suited only to small heights. Both paths retain their convergence checks and
 precision-dependent Bernoulli corrections; an
 exhausted correction allowance still returns NaN rather than an unchecked value.
-Arbitrary-precision real Riemann zeta continues to use MPFR.
+For finite positive non-integer real arguments up to 64, working precision of
+1024–8192 bits selects the same native Euler–Maclaurin kernel, with a zero
+imaginary component. Integer arguments, other real arguments and other precisions
+retain MPFR's direct zeta calculation. An unsuccessful native evaluation falls
+back to MPFR without modifying the input. The shared kernel follows the
+[Euler–Maclaurin representation](https://dlmf.nist.gov/25.2#iii); selection changes
+the algorithm, not the precision or real result type.
 
-Multiprecision digamma and polygamma use a precision-dependent argument shift
-and correction allowance. Trigamma and tetragamma use this same kernel for MPFR
-and MPC operands. Corrections stop below the guarded precision target; the
-260-entry exact Bernoulli cache is extended numerically when higher precision
-requires more terms. The cache size therefore does not cap achievable accuracy.
+Complex asymptotic corrections test component exponents directly, reserving an
+extra bit for their sum. This avoids allocating a magnitude temporary for each
+correction. Polylogarithm and Legendre chi series also use exact integer division
+when their denominator fits `unsigned long`; checked binary exponentiation detects
+overflow and retains the full MPFR denominator path. Complex polylogarithm and
+exponential-integral convergence tests use conservative component bounds rather
+than repeated square roots. The [polylogarithm series](https://dlmf.nist.gov/25.12#ii)
+and its existing continuation and domain restrictions remain in use.
+
+Multiprecision digamma and polygamma balance argument shifts against their
+asymptotic correction series. Trigamma and tetragamma share this kernel for MPFR
+and MPC operands. Corrections stop below the guarded precision target.
+
+Clausen, zeta and polygamma reuse precision-aware, directly indexed coefficients
+and integer logarithms.
+Ordinary Bernoulli coefficients and their factorial-normalised equivalents are
+cached separately, avoiding repeated factorials in Euler–Maclaurin sums. Integer
+zeta coefficients are shared by Clausen evaluations. A mutex protects lazy
+precision upgrades; callers receive copies. Cached significands are bounded to
+eight MiB, plus fixed index metadata, and are released at process shutdown.
+Larger requests are calculated without retention, so cache limits do not cap accuracy.
+
+Hurwitz evaluations also retain `log(a+n)` for the most recently used exact
+offset `a`, independently of the varying exponent. Direct indexing avoids a
+search. A separate eight-MiB cache retains at most 4096 logarithms and 16384
+working bits, plus fixed metadata. Offset changes release its previous entries;
+signed zeros distinguish logarithmic branch-cut sides. A mutex protects copied
+values, while logarithms are calculated outside the lock. Larger requests use
+direct calculation. Both caches are released at process shutdown.
+
+Double-backed Riemann zeta uses MPFR at 53 bits. Its derivative, real Hurwitz
+variants and Clausen functions use the corresponding native kernels at that
+precision, rather than first performing a qfloat calculation. Other backends
+retain their own precision.
 
 ```c
 #include <stdio.h>
@@ -1253,10 +1372,14 @@ machine, backend and precision; the focused benchmark above remains available
 for separate investigations. See [the benchmark guide](benchmarks.md#persistent-mathematical-benchmarks)
 for selection, interruption recovery and raw sample storage.
 
-<!-- MARS-BENCHMARKS:BEGIN -->
-Benchmark run **11**, 2026-11-10T10:25:23.939Z (UTC).
+The exact-integer cases use 512–1,215-bit operands, including a 521-bit prime.
+Factorial, Fibonacci and partition indices remain ordinary integers because those
+APIs accept counts; their exact results exceed native integer sizes.
 
-Machine: ophelia; Intel(R) N95.
+<!-- MARS-BENCHMARKS:BEGIN -->
+Benchmark run **28**, 2026-11-11T13:11:05.705Z (UTC).
+
+Machine: Intel(R) N95.
 
 System: Linux 7.0.0-27-generic x86_64.
 
@@ -1264,7 +1387,7 @@ Compiler: 15.2.0; build flags: gcc -Wall -Wextra -Werror -O2 -fPIC -D_GNU_SOURCE
 
 Median per call from 7 timed batches.
 
-Timing method: CLOCK_MONOTONIC; warmup=20ms; target_batch=250us; max_batch=512.
+Timing method: CLOCK_MONOTONIC; warmup=100ms; target_batch=5ms; max_batch=1048576; storage_chunk=512.
 
 Argument parsing, output validation, disposal and database writes are outside timing.
 Inputs show the actual operands, including +0.125i for permitted complex arguments; integer orders remain real.
@@ -1277,459 +1400,459 @@ Failures and timeouts remain visible. † marks a retained slowdown outlier.
 
 | Operation | Inputs | 53 bits |
 |---|---|---:|
-| E1 | 2.345678 | 7.8 µs |
-| Ei | 2.345678 | 7.8 µs |
-| Li | 2.345 | 7.1 µs |
-| abs | 0.7 | 8.7 ns |
-| acos | 0.7 | 20.4 ns |
-| acosec | 2.345 | 15.8 ns |
-| acosech | 0.7 | 57.1 ns |
-| acosh | 2.345 | 26.4 ns |
-| acot | 0.7 | 40.9 ns |
-| acoth | 2.345 | 24.1 ns |
-| add | 0.7, 0.7 | 17.6 ns |
-| add_long | 17, 3 | 510.5 ns |
-| appell_f1 | 0.5, 0.7, 0.8, 2.5, 0.2, 0.3 | 44.9 µs |
-| arccovercos | 0.5 | 92.4 ns |
-| arccoversin | 0.5 | 90.1 ns |
-| archacovercos | 0.5 | 204.5 ns |
-| archacoversin | 0.5 | 198.4 ns |
-| archavercos | 0.5 | 185.2 ns |
-| archaversin | 0.5 | 177.6 ns |
-| arcvercos | 0.5 | 93.6 ns |
-| arcversin | 0.5 | 119.6 ns |
-| arg | 0.7 | 61.7 ns |
-| asec | 2.345 | 19.4 ns |
-| asech | 0.7 | 35.8 ns |
-| asin | 0.7 | 31.7 ns |
-| asinh | 0.7 | 54.8 ns |
+| E1 | 2.345678 | 12.0 µs † |
+| Ei | 2.345678 | 8.7 µs |
+| Li | 2.345 | 7.5 µs |
+| abs | 0.7 | 9.3 ns |
+| acos | 0.7 | 18.4 ns |
+| acosec | 2.345 | 17.6 ns |
+| acosech | 0.7 | 51.7 ns |
+| acosh | 2.345 | 30.5 ns |
+| acot | 0.7 | 49.2 ns |
+| acoth | 2.345 | 26.4 ns |
+| add | 0.7, 0.7 | 10.8 ns |
+| add_long | 17, 3 | 559.6 ns |
+| appell_f1 | 0.5, 0.7, 0.8, 2.5, 0.2, 0.3 | 26.4 µs |
+| arccovercos | 0.5 | 125.0 ns |
+| arccoversin | 0.5 | 114.5 ns |
+| archacovercos | 0.5 | 234.1 ns |
+| archacoversin | 0.5 | 230.3 ns |
+| archavercos | 0.5 | 207.7 ns |
+| archaversin | 0.5 | 231.1 ns |
+| arcvercos | 0.5 | 115.6 ns |
+| arcversin | 0.5 | 139.9 ns |
+| arg | 0.7 | 84.3 ns |
+| asec | 2.345 | 20.2 ns |
+| asech | 0.7 | 38.1 ns |
+| asin | 0.7 | 19.6 ns |
+| asinh | 0.7 | 54.9 ns |
 | atan | 0.7 | 31.1 ns |
-| atan2 | 0.5, -0.75 | 35.0 ns |
-| atanh | 0.7 | 22.8 ns |
-| bessel_i | 2, 0.7 | 34.5 µs |
-| bessel_j | 2, 0.7 | 5.6 µs |
-| bessel_k | 2, 0.7 | 142.3 µs |
-| bessel_y | 2, 0.7 | 16.6 µs |
-| beta | 2.3, 4.5 | 116.0 ns |
-| beta_pdf | 0.5, 2.5, 3.5 | 142.5 ns |
-| binomial | 5, 2 | 145.4 ns |
-| ceil | 0.7 | 143.6 ns |
-| chebyshev_t | 2, 0.7 | 745.5 ns |
-| chebyshev_u | 2, 0.7 | 1.2 µs |
-| circ | 0.7 | 277.0 ns |
-| clausen | 3, 0.7 | 419.0 µs † |
-| clausen2 | 0.7 | 5.9 µs |
-| conj | 0.7 | 9.2 ns |
-| cos | 0.7 | 36.3 ns |
-| cosec | 0.7 | 35.7 ns |
-| cosech | 0.7 | 59.3 ns |
-| cosh | 0.7 | 40.9 ns |
-| cot | 0.7 | 42.8 ns |
-| coth | 0.7 | 67.6 ns |
-| covercos | 0.7 | 128.9 ns |
-| coversin | 0.7 | 124.6 ns |
+| atan2 | 0.5, -0.75 | 52.9 ns |
+| atanh | 0.7 | 27.3 ns |
+| bessel_i | 2, 0.7 | 43.5 µs |
+| bessel_j | 2, 0.7 | 6.9 µs |
+| bessel_k | 2, 0.7 | 25.2 µs |
+| bessel_y | 2, 0.7 | 21.1 µs |
+| beta | 2.3, 4.5 | 147.9 ns |
+| beta_pdf | 0.5, 2.5, 3.5 | 180.5 ns |
+| binomial | 5, 2 | 181.8 ns |
+| ceil | 0.7 | 60.7 ns |
+| chebyshev_t | 2, 0.7 | 811.9 ns |
+| chebyshev_u | 2, 0.7 | 1.1 µs |
+| circ | 0.7 | 236.3 ns |
+| clausen | 3, 0.7 | 7.5 µs |
+| clausen2 | 0.7 | 7.6 µs |
+| conj | 0.7 | 7.6 ns |
+| cos | 0.7 | 29.7 ns |
+| cosec | 0.7 | 31.3 ns |
+| cosech | 0.7 | 54.1 ns |
+| cosh | 0.7 | 33.8 ns |
+| cot | 0.7 | 37.6 ns |
+| coth | 0.7 | 58.3 ns |
+| covercos | 0.7 | 108.6 ns |
+| coversin | 0.7 | 114.7 ns |
 | cubrt | 0.7 | 6.0 µs |
-| digamma | 2.345 | 3.5 µs † |
-| dilog | 0.7 | 16.0 µs |
-| div | 0.7, 0.7 | 12.5 ns |
-| erf | 0.7 | 74.3 ns |
-| erfc | 0.7 | 73.5 ns |
-| erfcinv | 0.5 | 224.1 µs |
-| erfinv | 0.5 | 188.8 µs |
+| digamma | 2.345 | 2.4 µs |
+| dilog | 0.7 | 13.2 µs |
+| div | 0.7, 0.7 | 10.5 ns |
+| erf | 0.7 | 64.2 ns |
+| erfc | 0.7 | 69.8 ns |
+| erfcinv | 0.5 | 211.3 µs |
+| erfinv | 0.5 | 190.0 µs |
 | exp | 1.23456789 | 40.5 ns |
-| floor | 0.7 | 9.2 ns |
-| gamma | 2.345 | 87.7 ns |
-| gammainc_P | 2.3, 1.4 | 11.5 µs |
-| gammainc_Q | 2.3, 1.4 | 19.7 µs † |
-| gammainc_lower | 2.3, 1.4 | 12.3 µs |
-| gammainc_upper | 2.3, 1.4 | 15.6 µs |
-| gammainv | 9.5 | 110.5 µs |
-| hacovercos | 0.7 | 193.8 ns |
-| hacoversin | 0.7 | 196.1 ns |
-| harmonic_poly | 2, 0.7 | 1.6 µs |
-| havercos | 0.7 | 239.1 ns |
-| haversin | 0.7 | 190.5 ns |
-| hermite_h | 2, 0.7 | 1.3 µs |
-| hypergeometric_pFq | 0.7, 2.5, 0.3 | 4.4 µs |
-| hypot | 0.7, 1.2 | 39.9 ns |
-| imag_part | 0.7 | 18.9 ns |
-| inv | 0.7 | 6.9 ns |
-| lambert_w0 | 0.7 | 13.5 µs |
-| lambert_wm1 | -0.2 | 13.1 µs |
-| lambert_wn | 1, 0.7 | 23.4 µs |
-| lauricella_f | 0.5, 0.3, 2.5 | 16.2 µs |
-| ldexp | 1.23456789, 3 | 33.7 ns |
-| legendre_chi | 2, 0.7 | 32.6 µs |
-| lerch_phi | 0.3, 2, 1.4 | 242.0 µs |
-| lg | 2.345678 | 20.1 ns |
-| lgamma | 2.345 | 54.4 ns |
-| ln | 2.345678 | 17.5 ns |
-| log | 2.345678 | 12.1 ns |
-| log10 | 2.345678 | 18.2 ns |
-| logbeta | 2.3, 4.5 | 103.8 ns |
-| logbeta_pdf | 0.5, 2.5, 3.5 | 132.3 ns |
-| lommel_s | 0.5, 0.7, 1.2 | 7.2 µs |
-| mul | 0.7, 0.7 | 32.4 ns |
-| mul_long | 17, 3 | 381.3 ns |
-| mul_pow10 | 1.23456789, 3 | 52.5 ns |
-| neg | 0.7 | 7.2 ns |
-| normal_cdf | 0.7 | 59.2 ns |
-| normal_logpdf | 0.7 | 13.0 ns |
-| normal_pdf | 0.7 | 19.8 ns |
-| polygamma | 3, 2.345 | 20.6 µs |
-| polylog | 2, 0.7 | 12.8 µs |
-| polylog1 | 0.7 | 94.4 ns |
-| pow | 1.23456789, 3.5 | 60.0 ns |
-| pow10 | 3 | 212.1 ns |
-| pow_int | 1.23456789, 3 | 67.0 ns |
-| productlog | 0.7 | 13.7 µs |
-| qdigamma | 0.5, 2.3 | 21.8 µs |
-| real_part | 0.7 | 25.2 ns |
-| rect | 0.7 | 216.4 ns |
-| root | 1.2345, 3 | 6.2 µs |
-| round | 0.7 | 315.6 ns |
-| roundn | 1.23456789, 3 | 5.3 µs † |
-| rounds | 1.23456789, 3 | 6.6 µs |
-| sec | 0.7 | 32.6 ns |
-| sech | 0.7 | 29.4 ns |
-| sgn | 0.7 | 99.1 ns |
-| sin | 0.567 | 28.4 ns |
-| sinc | 0.7 | 3.5 µs |
-| sincos | 0.7 | 480.8 ns |
-| sinh | 0.7 | 47.0 ns |
-| sinhcosh | 0.7 | 92.1 ns |
-| sqr | 0.7 | 7.2 ns |
-| sqrt | 1.23456789 | 9.9 ns |
-| step | 0.7 | 113.1 ns |
-| struve_h | 2, 0.7 | 54.5 µs |
-| struve_l | 2, 0.7 | 54.6 µs |
-| sub | 0.7, 0.7 | 10.0 ns |
-| tan | 0.7 | 4.9 µs |
-| tanh | 0.7 | 52.6 ns |
-| tetragamma | 2.345 | 3.5 µs |
-| tri | 0.7 | 203.5 ns |
-| trigamma | 2.345 | 2.3 µs |
-| vercos | 0.7 | 100.9 ns |
-| versin | 0.7 | 102.1 ns |
-| zatahp | 2.3, 1.4 | 321.7 µs |
-| zeta | 2.345 | 326.9 µs |
-| zetah | 2.3, 1.4 | 337.6 µs |
-| zetap | 2.345 | 261.7 µs |
+| floor | 0.7 | 8.5 ns |
+| gamma | 2.345 | 90.3 ns |
+| gammainc_P | 2.3, 1.4 | 11.1 µs |
+| gammainc_Q | 2.3, 1.4 | 12.1 µs |
+| gammainc_lower | 2.3, 1.4 | 13.5 µs |
+| gammainc_upper | 2.3, 1.4 | 13.4 µs |
+| gammainv | 9.5 | 100.9 µs |
+| hacovercos | 0.7 | 233.3 ns |
+| hacoversin | 0.7 | 229.4 ns |
+| harmonic_poly | 2, 0.7 | 1.4 µs |
+| havercos | 0.7 | 213.9 ns |
+| haversin | 0.7 | 228.1 ns |
+| hermite_h | 2, 0.7 | 1.5 µs |
+| hypergeometric_pFq | 0.7, 2.5, 0.3 | 3.6 µs |
+| hypot | 0.7, 1.2 | 33.3 ns |
+| imag_part | 0.7 | 23.6 ns |
+| inv | 0.7 | 7.7 ns |
+| lambert_w0 | 0.7 | 14.0 µs |
+| lambert_wm1 | -0.2 | 14.5 µs |
+| lambert_wn | 1, 0.7 | 25.6 µs |
+| lauricella_f | 0.5, 0.3, 2.5 | 17.3 µs |
+| ldexp | 1.23456789, 3 | 41.1 ns |
+| legendre_chi | 2, 0.7 | 33.7 µs |
+| lerch_phi | 0.3, 2, 1.4 | 288.2 µs |
+| lg | 2.345678 | 23.5 ns |
+| lgamma | 2.345 | 52.2 ns |
+| ln | 2.345678 | 16.9 ns |
+| log | 2.345678 | 18.1 ns |
+| log10 | 2.345678 | 19.6 ns |
+| logbeta | 2.3, 4.5 | 125.0 ns |
+| logbeta_pdf | 0.5, 2.5, 3.5 | 137.5 ns |
+| lommel_s | 0.5, 0.7, 1.2 | 6.7 µs |
+| mul | 0.7, 0.7 | 10.6 ns |
+| mul_long | 17, 3 | 466.4 ns |
+| mul_pow10 | 1.23456789, 3 | 60.6 ns |
+| neg | 0.7 | 8.3 ns |
+| normal_cdf | 0.7 | 64.4 ns |
+| normal_logpdf | 0.7 | 15.8 ns |
+| normal_pdf | 0.7 | 24.2 ns |
+| polygamma | 3, 2.345 | 22.8 µs |
+| polylog | 2, 0.7 | 14.1 µs |
+| polylog1 | 0.7 | 115.0 ns |
+| pow | 1.23456789, 3.5 | 33.1 ns |
+| pow10 | 3 | 168.0 ns |
+| pow_int | 1.23456789, 3 | 61.5 ns |
+| productlog | 0.7 | 14.6 µs |
+| qdigamma | 0.5, 2.3 | 22.9 µs |
+| real_part | 0.7 | 24.6 ns |
+| rect | 0.7 | 249.5 ns |
+| root | 1.2345, 3 | 7.0 µs |
+| round | 0.7 | 371.5 ns |
+| roundn | 1.23456789, 3 | 3.8 µs |
+| rounds | 1.23456789, 3 | 6.1 µs |
+| sec | 0.7 | 31.5 ns |
+| sech | 0.7 | 32.3 ns |
+| sgn | 0.7 | 114.8 ns |
+| sin | 0.567 | 32.0 ns |
+| sinc | 0.7 | 3.1 µs |
+| sincos | 0.7 | 621.3 ns |
+| sinh | 0.7 | 56.7 ns |
+| sinhcosh | 0.7 | 110.4 ns |
+| sqr | 0.7 | 8.2 ns |
+| sqrt | 1.23456789 | 8.3 ns |
+| step | 0.7 | 108.3 ns |
+| struve_h | 2, 0.7 | 67.0 µs |
+| struve_l | 2, 0.7 | 71.2 µs |
+| sub | 0.7, 0.7 | 11.1 ns |
+| tan | 0.7 | 6.2 µs |
+| tanh | 0.7 | 55.2 ns |
+| tetragamma | 2.345 | 3.0 µs |
+| tri | 0.7 | 217.8 ns |
+| trigamma | 2.345 | 2.5 µs |
+| vercos | 0.7 | 116.6 ns |
+| versin | 0.7 | 136.5 ns |
+| zatahp | 2.3, 1.4 | 365.4 µs |
+| zeta | 2.345 | 89.3 µs |
+| zetah | 2.3, 1.4 | 338.4 µs |
+| zetap | 2.345 | 141.3 µs |
 
 ### number / multi-precision floating point
 
 | Operation | Inputs | 256 bits | 512 bits | 768 bits | 1024 bits | 2048 bits | 4096 bits |
 |---|---|---:|---:|---:|---:|---:|---:|
-| E1 | 2.345678 | 31.3 µs | 59.2 µs | 125.8 µs | 176.0 µs | 445.3 µs | 1.725 ms |
-| Ei | 2.345678 | 32.3 µs | 58.8 µs | 112.9 µs | 135.4 µs | 425.3 µs | 1.713 ms |
-| Li | 2.345 | 79.7 µs † | 55.5 µs | 111.5 µs | 124.4 µs | 409.0 µs | 1.564 ms |
-| abs | 0.7 | 69.8 ns | 67.8 ns | 69.1 ns | 70.9 ns | 71.0 ns | 78.5 ns |
-| acos | 0.7 | 13.9 µs | 21.5 µs | 28.6 µs | 42.2 µs | 124.4 µs | 263.8 µs |
-| acosec | 2.345 | 14.5 µs | 22.0 µs | 38.1 µs | 42.8 µs | 119.2 µs | 349.8 µs |
-| acosech | 0.7 | 4.8 µs | 7.7 µs | 13.6 µs | 14.4 µs | 48.4 µs | 130.6 µs |
-| acosh | 2.345 | 5.1 µs | 7.8 µs | 15.0 µs | 17.8 µs | 46.5 µs | 97.5 µs |
-| acot | 0.7 | 11.6 µs | 24.6 µs | 32.2 µs | 39.0 µs | 122.3 µs | 259.3 µs |
-| acoth | 2.345 | 5.2 µs | 8.2 µs | 15.4 µs | 15.4 µs | 44.7 µs | 108.5 µs |
-| add | 0.7, 0.7 | 78.8 ns | 80.9 ns | 109.8 ns | 100.1 ns | 170.4 ns | 651.7 ns |
-| add_long | 17, 3 | 498.7 ns | 513.5 ns | 700.7 ns | 527.9 ns | 720.5 ns | 629.0 ns |
-| appell_f1 | 0.5, 0.7, 0.8, 2.5, 0.2, 0.3 | 202.8 µs | 517.7 µs | 1.066 ms | 1.383 ms | 7.481 ms | 35.083 ms |
-| arccovercos | 0.5 | 15.2 µs | 20.1 µs | 25.8 µs | 37.2 µs | 106.3 µs | 243.7 µs |
-| arccoversin | 0.5 | 12.1 µs | 20.0 µs | 25.0 µs | 37.0 µs | 105.3 µs | 307.4 µs |
-| archacovercos | 0.5 | 1.1 µs | 1.2 µs | 1.6 µs | 1.1 µs | 1.2 µs | 1.3 µs |
-| archacoversin | 0.5 | 1.1 µs | 1.1 µs | 2.9 µs † | 1.1 µs | 1.4 µs | 1.6 µs |
-| archavercos | 0.5 | 1.1 µs | 1.2 µs | 1.7 µs | 1.5 µs | 1.2 µs | 1.7 µs |
-| archaversin | 0.5 | 1.1 µs | 1.2 µs | 1.9 µs | 1.2 µs | 1.3 µs | 2.1 µs † |
-| arcvercos | 0.5 | 12.2 µs | 20.2 µs | 33.1 µs | 36.7 µs | 93.8 µs | 308.2 µs |
-| arcversin | 0.5 | 12.3 µs | 19.9 µs | 38.2 µs | 37.1 µs | 81.6 µs | 303.0 µs |
-| arg | 0.7 | 399.4 ns | 405.7 ns | 512.2 ns | 415.2 ns | 525.4 ns | 441.0 ns |
-| asec | 2.345 | 15.1 µs | 22.2 µs | 30.3 µs | 43.8 µs | 90.9 µs | 270.6 µs |
-| asech | 0.7 | 5.3 µs | 8.2 µs | 14.8 µs | 19.0 µs | 35.5 µs | 105.8 µs |
-| asin | 0.7 | 23.0 µs † | 27.1 µs | 36.3 µs | 44.2 µs | 245.3 µs † | 263.8 µs |
-| asinh | 0.7 | 6.3 µs | 7.5 µs | 10.6 µs | 18.0 µs | 59.4 µs † | 149.5 µs † |
-| atan | 0.7 | 10.8 µs | 26.4 µs | 30.5 µs | 35.3 µs | 87.1 µs | 317.2 µs |
-| atan2 | 0.5, -0.75 | 14.5 µs | 24.2 µs | 28.0 µs | 96.2 µs † | 92.0 µs | 329.8 µs |
-| atanh | 0.7 | 6.4 µs | 10.5 µs | 11.1 µs | 19.2 µs | 36.1 µs | 285.7 µs † |
-| bessel_i | 2, 0.7 | 79.7 µs | 224.2 µs | 348.1 µs | 562.9 µs | 1.542 ms | 7.514 ms |
-| bessel_j | 2, 0.7 | 5.8 µs | 18.4 µs | 21.6 µs | 34.2 µs | 142.5 µs | 873.2 µs |
-| bessel_k | 2, 0.7 | 298.2 µs | 761.4 µs | 882.8 µs | 1.192 ms | 3.405 ms | 13.203 ms |
-| bessel_y | 2, 0.7 | 48.3 µs | 169.0 µs † | 118.0 µs | 467.8 µs † | 851.4 µs | 4.011 ms |
-| beta | 2.3, 4.5 | 89.5 µs | 300.2 µs | 385.5 µs | 622.5 µs | 2.415 ms | 13.004 ms |
-| beta_pdf | 0.5, 2.5, 3.5 | 89.1 µs | 171.7 µs | 384.8 µs | 467.2 µs | 1.710 ms | 10.748 ms |
-| binomial | 5, 2 | 115.7 µs | 280.3 µs | 481.8 µs | 645.0 µs | 2.971 ms | 12.000 ms |
-| ceil | 0.7 | 486.8 ns | 467.4 ns | 431.2 ns | 381.3 ns | 410.8 ns | 560.3 ns |
-| chebyshev_t | 2, 0.7 | 2.6 µs | 6.3 µs † | 3.2 µs | 2.3 µs | 2.8 µs | 6.1 µs |
-| chebyshev_u | 2, 0.7 | 3.0 µs | 2.8 µs | 2.9 µs | 2.8 µs | 4.2 µs | 6.1 µs |
-| circ | 0.7 | 859.7 ns | 1.9 µs † | 677.6 ns | 722.1 ns | 709.1 ns | 1.1 µs |
-| clausen | 3, 0.7 | 1.331 ms | 5.257 ms | 10.510 ms | 22.032 ms | 145.463 ms | 986.164 ms |
-| clausen2 | 0.7 | 1.346 ms | 5.149 ms | 10.507 ms | 22.351 ms | 151.191 ms | 1.002 s |
-| conj | 0.7 | 81.6 ns | 94.1 ns | 93.2 ns | 66.1 ns | 65.8 ns | 126.5 ns |
-| cos | 0.7 | 2.4 µs | 4.9 µs | 7.6 µs | 11.8 µs | 40.5 µs | 126.0 µs |
-| cosec | 0.7 | 3.3 µs | 6.6 µs | 10.1 µs | 12.2 µs | 36.5 µs | 137.4 µs |
-| cosech | 0.7 | 3.1 µs | 5.0 µs | 10.9 µs | 15.4 µs | 40.6 µs | 371.3 µs † |
-| cosh | 0.7 | 3.0 µs | 4.7 µs | 10.7 µs | 12.3 µs | 39.4 µs | 180.5 µs |
-| cot | 0.7 | 4.5 µs | 11.0 µs | 18.9 µs | 29.7 µs | 71.8 µs | 263.9 µs |
-| coth | 0.7 | 6.2 µs | 12.1 µs | 20.9 µs | 31.6 µs | 106.7 µs | 288.1 µs |
-| covercos | 0.7 | 3.9 µs | 6.9 µs | 22.3 µs † | 15.7 µs | 44.9 µs | 133.5 µs |
-| coversin | 0.7 | 3.9 µs | 5.4 µs | 9.9 µs | 16.2 µs | 47.0 µs | 133.4 µs |
-| cubrt | 0.7 | 28.6 µs † | 15.7 µs | 28.8 µs | 31.3 µs | 110.1 µs | 642.7 µs † |
-| digamma | 2.345 | 119.4 µs | 285.6 µs | 658.7 µs | 797.0 µs | 4.862 ms | 17.217 ms |
-| dilog | 0.7 | 164.8 µs † | 220.2 µs | 544.2 µs | 681.5 µs | 3.757 ms | 16.204 ms |
-| div | 0.7, 0.7 | 339.2 ns | 559.9 ns | 882.4 ns | 1.0 µs | 2.8 µs | 8.6 µs |
-| erf | 0.7 | 13.7 µs | 32.7 µs | 71.3 µs | 90.4 µs | 575.4 µs | 2.025 ms |
-| erfc | 0.7 | 18.0 µs | 35.0 µs | 61.2 µs | 119.1 µs | 396.9 µs | 2.017 ms |
-| erfcinv | 0.5 | 271.0 µs | 521.0 µs † | 600.3 µs † | 980.5 µs † | 2.728 ms † | 11.389 ms † |
-| erfinv | 0.5 | 277.6 µs | 400.4 µs † | 834.2 µs † | 737.6 µs † | 2.670 ms † | 11.957 ms † |
-| exp | 1.23456789 | 2.9 µs | 4.5 µs | 8.1 µs | 13.0 µs | 43.2 µs | 190.7 µs |
-| floor | 0.7 | 92.5 ns | 67.5 ns | 70.4 ns | 69.0 ns | 71.8 ns | 103.1 ns |
-| gamma | 2.345 | 35.3 µs | 70.8 µs | 126.3 µs | 269.3 µs | 860.0 µs | 4.271 ms |
-| gammainc_P | 2.3, 1.4 | 111.0 µs | 204.2 µs | 361.2 µs | 778.3 µs | 2.681 ms | 14.079 ms |
-| gammainc_Q | 2.3, 1.4 | 114.7 µs | 205.5 µs | 657.9 µs | 1.217 ms | 5.682 ms | 25.823 ms |
-| gammainc_lower | 2.3, 1.4 | 61.8 µs | 163.6 µs | 226.0 µs | 469.5 µs | 2.365 ms | 8.397 ms |
-| gammainc_upper | 2.3, 1.4 | 85.0 µs | 205.5 µs | 758.3 µs | 1.330 ms | 5.549 ms | 23.756 ms |
-| gammainv | 9.5 | 1.145 ms † | 2.469 ms | 4.746 ms | 11.973 ms | 57.555 ms | 298.933 ms |
-| hacovercos | 0.7 | 3.7 µs | 6.4 µs | 9.4 µs | 23.2 µs † | 50.7 µs | 179.8 µs |
-| hacoversin | 0.7 | 3.7 µs | 6.2 µs | 9.4 µs | 17.7 µs | 50.0 µs | 166.5 µs |
-| harmonic_poly | 2, 0.7 | 3.0 µs | 3.7 µs | 5.3 µs | 6.2 µs | 12.1 µs | 32.6 µs |
-| havercos | 0.7 | 3.0 µs | 5.1 µs | 8.0 µs | 15.2 µs | 45.8 µs | 177.8 µs |
-| haversin | 0.7 | 3.7 µs | 7.1 µs | 8.0 µs | 32.0 µs † | 44.3 µs | 179.1 µs |
-| hermite_h | 2, 0.7 | 2.7 µs | 3.1 µs | 3.1 µs | 7.6 µs † | 5.3 µs | 7.1 µs |
-| hypergeometric_pFq | 0.7, 2.5, 0.3 | 3.8 µs | 5.0 µs | 3.8 µs | 4.8 µs | 5.0 µs | 5.0 µs |
-| hypot | 0.7, 1.2 | 534.2 ns | 945.7 ns | 945.2 ns | 1.6 µs | 3.3 µs | 7.2 µs |
-| imag_part | 0.7 | 63.2 ns | 82.3 ns | 61.6 ns | 85.2 ns | 90.9 ns | 62.6 ns |
-| inv | 0.7 | 169.7 ns | 249.1 ns | 321.7 ns | 561.5 ns | 1.4 µs | 3.3 µs |
-| lambert_w0 | 0.7 | 130.7 µs † | 102.3 µs | 160.9 µs | 224.7 µs | 894.7 µs | 3.252 ms |
-| lambert_wm1 | -0.2 | 49.9 µs | 102.0 µs | 155.8 µs | 449.1 µs † | 1.034 ms | 2.708 ms |
-| lambert_wn | 1, 0.7 | 24.1 µs | 30.8 µs | 24.1 µs | 24.4 µs | 32.1 µs | 24.8 µs |
-| lauricella_f | 0.5, 0.3, 2.5 | 32.2 µs † | 17.6 µs | 16.5 µs | 16.8 µs | 19.1 µs | 16.7 µs |
-| ldexp | 1.23456789, 3 | 98.6 ns | 121.0 ns | 95.5 ns | 129.1 ns | 226.9 ns | 101.7 ns |
-| legendre_chi | 2, 0.7 | 183.8 µs | 574.3 µs | 864.4 µs | 2.055 ms | 6.697 ms | 36.818 ms |
-| lerch_phi | 0.3, 2, 1.4 | 242.5 µs | 308.7 µs | 243.2 µs | 312.9 µs | 306.1 µs | 306.4 µs |
-| lg | 2.345678 | 12.4 µs | 18.1 µs | 20.7 µs | 34.1 µs | 89.0 µs | 241.2 µs |
-| lgamma | 2.345 | 29.0 µs | 93.6 µs | 159.3 µs | 268.7 µs | 879.3 µs | 3.737 ms |
-| ln | 2.345678 | 4.1 µs | 6.8 µs | 9.3 µs | 17.9 µs | 42.8 µs | 110.7 µs |
-| log | 2.345678 | 5.1 µs | 8.5 µs | 9.3 µs | 17.9 µs | 43.8 µs | 93.5 µs |
-| log10 | 2.345678 | 8.9 µs | 14.3 µs | 20.3 µs | 36.0 µs | 83.9 µs | 190.1 µs |
-| logbeta | 2.3, 4.5 | 118.7 µs | 237.2 µs | 397.2 µs | 826.1 µs | 3.271 ms | 14.394 ms |
-| logbeta_pdf | 0.5, 2.5, 3.5 | 73.8 µs | 167.8 µs | 312.7 µs | 469.6 µs | 2.093 ms | 9.682 ms |
-| lommel_s | 0.5, 0.7, 1.2 | 23.6 µs | 55.5 µs | 101.1 µs | 174.6 µs | 812.5 µs | 3.589 ms |
-| mul | 0.7, 0.7 | 94.5 ns | 181.0 ns | 224.1 ns | 352.8 ns | 1.0 µs | 2.8 µs |
-| mul_long | 17, 3 | 597.8 ns | 608.5 ns | 904.5 ns | 830.6 ns | 576.3 ns | 652.5 ns |
-| mul_pow10 | 1.23456789, 3 | 278.4 ns | 354.2 ns | 508.5 ns | 652.6 ns | 363.7 ns | 691.2 ns |
-| neg | 0.7 | 72.4 ns | 82.5 ns | 71.6 ns | 93.3 ns | 75.0 ns | 102.2 ns |
-| normal_cdf | 0.7 | 12.9 µs | 66.1 µs | 51.8 µs | 109.1 µs | 381.0 µs | 1.701 ms |
-| normal_logpdf | 0.7 | 4.0 µs | 9.2 µs | 10.0 µs | 17.3 µs | 70.8 µs † | 105.7 µs |
-| normal_pdf | 0.7 | 2.9 µs | 7.4 µs | 9.2 µs | 19.4 µs | 47.1 µs | 169.1 µs |
-| polygamma | 3, 2.345 | 141.3 µs | 322.3 µs | 687.9 µs | 1.184 ms | 7.759 ms | 100.409 ms |
-| polylog | 2, 0.7 | 85.2 µs | 213.1 µs | 400.7 µs | 884.3 µs | 3.749 ms | 17.572 ms |
-| polylog1 | 0.7 | 4.6 µs | 7.4 µs | 10.1 µs | 15.2 µs | 42.9 µs | 126.3 µs |
-| pow | 1.23456789, 3.5 | 7.3 µs | 12.5 µs | 19.1 µs | 29.2 µs | 93.2 µs | 311.6 µs |
-| pow10 | 3 | 192.0 ns | 240.0 ns | 301.8 ns | 1.1 µs † | 347.4 ns | 462.4 ns |
-| pow_int | 1.23456789, 3 | 223.7 ns | 325.5 ns | 461.2 ns | 762.4 ns | 2.6 µs | 7.5 µs |
-| productlog | 0.7 | 42.6 µs | 81.2 µs | 137.9 µs | 278.5 µs | 913.2 µs | 2.866 ms |
-| qdigamma | 0.5, 2.3 | 22.0 µs | 22.2 µs | 22.0 µs | 27.9 µs | 34.4 µs † | 28.2 µs |
-| real_part | 0.7 | 65.2 ns | 63.3 ns | 65.1 ns | 86.0 ns | 86.0 ns | 94.5 ns |
-| rect | 0.7 | 714.3 ns | 757.7 ns | 769.1 ns | 961.1 ns | 1.0 µs | 1.2 µs |
-| root | 1.2345, 3 | 11.4 µs | 16.4 µs | 22.8 µs | 40.2 µs | 201.5 µs † | 307.5 µs |
-| round | 0.7 | 1.9 µs | 1.9 µs | 1.8 µs | 1.9 µs | 2.4 µs | 2.6 µs |
-| roundn | 1.23456789, 3 | 4.6 µs | 5.2 µs | 4.1 µs | 4.7 µs | 5.3 µs | 10.2 µs |
-| rounds | 1.23456789, 3 | 19.9 µs | 21.4 µs | 76.2 µs † | 34.5 µs | 75.1 µs | 201.0 µs |
-| sec | 0.7 | 2.0 µs | 5.2 µs | 6.7 µs | 26.1 µs † | 33.2 µs | 163.2 µs |
-| sech | 0.7 | 2.4 µs | 4.9 µs | 8.4 µs | 12.8 µs | 112.0 µs † | 160.1 µs |
-| sgn | 0.7 | 179.6 ns | 176.3 ns | 444.3 ns | 178.1 ns | 178.1 ns | 229.9 ns |
-| sin | 0.567 | 3.3 µs | 4.7 µs | 7.6 µs | 11.8 µs | 88.5 µs † | 145.5 µs |
-| sinc | 0.7 | 4.1 µs | 6.7 µs | 9.9 µs | 14.5 µs | 52.0 µs | 186.9 µs |
-| sincos | 0.7 | 7.9 µs | 10.1 µs | 13.2 µs | 17.1 µs | 41.4 µs | 188.0 µs |
-| sinh | 0.7 | 2.4 µs | 4.8 µs | 19.7 µs † | 12.2 µs | 50.2 µs | 180.9 µs |
-| sinhcosh | 0.7 | 2.5 µs | 5.0 µs | 8.4 µs | 12.4 µs | 51.8 µs | 179.9 µs |
-| sqr | 0.7 | 173.4 ns | 218.3 ns | 248.1 ns | 364.8 ns | 634.6 ns | 1.5 µs |
-| sqrt | 1.23456789 | 259.9 ns | 364.1 ns | 593.2 ns | 565.2 ns | 1.1 µs | 2.4 µs |
-| step | 0.7 | 185.5 ns | 202.4 ns | 179.3 ns | 330.0 ns | 177.0 ns | 243.3 ns |
-| struve_h | 2, 0.7 | 124.3 µs | 270.9 µs | 430.0 µs | 691.9 µs | 3.042 ms | 12.529 ms |
-| struve_l | 2, 0.7 | 124.2 µs | 270.0 µs | 422.7 µs | 655.7 µs | 2.509 ms | 12.749 ms |
-| sub | 0.7, 0.7 | 74.6 ns | 67.6 ns | 83.0 ns | 202.9 ns | 113.7 ns | 213.6 ns |
-| tan | 0.7 | 9.1 µs | 11.4 µs | 14.6 µs | 19.0 µs | 47.3 µs | 189.7 µs |
-| tanh | 0.7 | 2.4 µs | 13.3 µs † | 16.2 µs † | 12.5 µs | 43.9 µs | 187.1 µs |
-| tetragamma | 2.345 | 110.1 µs | 426.1 µs † | 947.3 µs † | 1.305 ms † | 7.346 ms † | 108.400 ms † |
-| tri | 0.7 | 705.4 ns | 1.1 µs | 712.9 ns | 911.2 ns | 946.7 ns | 1.1 µs |
-| trigamma | 2.345 | 75.8 µs | 224.7 µs | 453.1 µs † | 848.1 µs † | 4.811 ms † | 82.123 ms † |
-| vercos | 0.7 | 2.9 µs | 4.1 µs | 7.0 µs | 10.5 µs | 42.2 µs | 149.8 µs |
-| versin | 0.7 | 2.2 µs | 4.0 µs | 6.8 µs | 10.5 µs | 32.6 µs | 126.7 µs |
-| zatahp | 2.3, 1.4 | 1.359 ms | 2.557 ms | 5.027 ms | 9.361 ms | 88.971 ms | 1.010 s |
-| zeta | 2.345 | 739.9 µs | 3.248 ms | 7.931 ms | 19.826 ms | 117.768 ms | 691.499 ms |
-| zetah | 2.3, 1.4 | 1.300 ms | 2.623 ms | 4.826 ms | 8.846 ms | 85.575 ms | 872.560 ms |
-| zetap | 2.345 | 2.322 ms | 5.231 ms | 8.900 ms | 15.359 ms | 110.676 ms | 1.170 s |
+| E1 | 2.345678 | 37.5 µs | 70.3 µs | 149.4 µs | 172.3 µs | 601.8 µs | 1.803 ms |
+| Ei | 2.345678 | 39.0 µs | 62.5 µs | 116.6 µs | 145.1 µs | 535.4 µs | 2.103 ms |
+| Li | 2.345 | 35.8 µs | 67.1 µs | 101.4 µs | 148.0 µs | 457.7 µs | 1.757 ms |
+| abs | 0.7 | 80.4 ns | 79.6 ns | 79.0 ns | 86.4 ns | 84.4 ns | 103.5 ns |
+| acos | 0.7 | 14.4 µs | 25.6 µs | 35.9 µs | 51.8 µs | 96.5 µs | 345.7 µs |
+| acosec | 2.345 | 17.2 µs | 24.9 µs | 35.0 µs | 54.4 µs | 121.9 µs | 358.5 µs |
+| acosech | 0.7 | 5.7 µs | 9.2 µs | 12.0 µs | 16.0 µs | 39.9 µs | 116.5 µs |
+| acosh | 2.345 | 6.0 µs | 9.9 µs | 13.2 µs | 17.1 µs | 42.2 µs | 116.8 µs |
+| acot | 0.7 | 13.5 µs | 25.2 µs | 29.1 µs | 48.9 µs | 121.5 µs | 267.0 µs |
+| acoth | 2.345 | 5.6 µs | 10.4 µs | 14.3 µs | 17.6 µs | 59.0 µs | 103.4 µs |
+| add | 0.7, 0.7 | 93.5 ns | 106.8 ns | 114.6 ns | 130.7 ns | 208.8 ns | 284.5 ns |
+| add_long | 17, 3 | 657.2 ns | 589.1 ns | 766.9 ns | 963.3 ns | 1.1 µs | 744.8 ns |
+| appell_f1 | 0.5, 0.7, 0.8, 2.5, 0.2, 0.3 | 114.4 µs | 343.7 µs | 635.4 µs | 966.3 µs | 5.430 ms | 25.813 ms |
+| arccovercos | 0.5 | 14.0 µs | 23.0 µs | 33.8 µs | 45.8 µs | 106.0 µs | 356.1 µs |
+| arccoversin | 0.5 | 13.7 µs | 23.1 µs | 32.5 µs | 43.7 µs | 120.5 µs | 259.3 µs |
+| archacovercos | 0.5 | 1.3 µs | 1.5 µs | 1.6 µs | 1.4 µs | 1.6 µs | 1.5 µs |
+| archacoversin | 0.5 | 1.3 µs | 1.4 µs | 1.9 µs | 1.6 µs | 1.7 µs | 1.5 µs |
+| archavercos | 0.5 | 1.4 µs | 1.4 µs | 2.0 µs | 1.5 µs | 2.0 µs | 1.8 µs |
+| archaversin | 0.5 | 1.4 µs | 1.4 µs | 1.8 µs | 1.3 µs | 1.7 µs | 1.9 µs |
+| arcvercos | 0.5 | 14.2 µs | 22.4 µs | 37.4 µs | 44.0 µs | 115.1 µs | 268.7 µs |
+| arcversin | 0.5 | 13.4 µs | 23.0 µs | 33.7 µs | 45.5 µs | 136.1 µs | 300.6 µs |
+| arg | 0.7 | 509.9 ns | 490.7 ns | 639.4 ns | 532.1 ns | 638.9 ns | 614.1 ns |
+| asec | 2.345 | 18.8 µs | 25.5 µs | 42.7 µs | 54.7 µs | 126.5 µs | 442.2 µs |
+| asech | 0.7 | 5.7 µs | 9.3 µs | 14.8 µs | 16.6 µs | 48.8 µs | 135.8 µs |
+| asin | 0.7 | 15.9 µs | 26.0 µs | 39.4 µs | 51.2 µs | 108.8 µs | 414.8 µs |
+| asinh | 0.7 | 4.8 µs | 8.0 µs | 13.4 µs | 15.6 µs | 49.4 µs | 123.5 µs |
+| atan | 0.7 | 12.4 µs | 21.5 µs | 35.5 µs | 39.7 µs | 114.7 µs | 399.6 µs |
+| atan2 | 0.5, -0.75 | 13.1 µs | 22.2 µs | 33.5 µs | 41.6 µs | 114.4 µs | 365.7 µs |
+| atanh | 0.7 | 5.9 µs | 9.6 µs | 15.3 µs | 16.3 µs | 53.3 µs | 160.3 µs † |
+| bessel_i | 2, 0.7 | 91.9 µs | 184.4 µs | 351.4 µs | 539.1 µs | 6.163 ms † | 8.662 ms |
+| bessel_j | 2, 0.7 | 6.1 µs | 14.6 µs | 26.6 µs | 41.5 µs | 224.3 µs | 886.4 µs |
+| bessel_k | 2, 0.7 | 49.0 µs | 103.6 µs | 195.5 µs | 242.1 µs | 1.263 ms | 4.903 ms |
+| bessel_y | 2, 0.7 | 45.6 µs | 93.4 µs | 161.6 µs | 199.4 µs | 1.254 ms † | 4.129 ms |
+| beta | 2.3, 4.5 | 93.7 µs | 253.9 µs | 526.7 µs | 837.1 µs | 8.299 ms † | 13.394 ms |
+| beta_pdf | 0.5, 2.5, 3.5 | 97.7 µs | 199.1 µs | 428.3 µs | 504.6 µs | 2.831 ms | 8.768 ms |
+| binomial | 5, 2 | 93.9 µs | 245.8 µs | 612.9 µs † | 840.1 µs | 2.915 ms | 12.575 ms |
+| ceil | 0.7 | 453.3 ns | 470.9 ns | 522.3 ns | 492.7 ns | 480.3 ns | 575.7 ns |
+| chebyshev_t | 2, 0.7 | 2.3 µs | 2.9 µs | 3.6 µs | 3.0 µs | 3.6 µs | 6.7 µs |
+| chebyshev_u | 2, 0.7 | 3.1 µs | 3.3 µs | 4.1 µs | 3.8 µs | 4.0 µs | 6.8 µs |
+| circ | 0.7 | 890.9 ns | 851.7 ns | 1.0 µs | 851.2 ns | 951.5 ns | 1.1 µs |
+| clausen | 3, 0.7 | 24.1 µs | 58.8 µs | 117.6 µs | 208.4 µs | 892.7 µs | 4.838 ms |
+| clausen2 | 0.7 | 23.9 µs | 64.7 µs | 133.9 µs | 187.1 µs | 942.0 µs | 5.530 ms |
+| conj | 0.7 | 83.4 ns | 78.7 ns | 82.6 ns | 77.3 ns | 83.5 ns | 100.9 ns |
+| cos | 0.7 | 2.0 µs | 4.3 µs | 7.3 µs | 12.0 µs | 37.8 µs | 182.6 µs |
+| cosec | 0.7 | 3.3 µs | 6.2 µs | 8.3 µs | 13.3 µs | 47.5 µs | 194.0 µs |
+| cosech | 0.7 | 2.6 µs | 6.2 µs | 10.5 µs | 14.7 µs | 60.9 µs | 187.2 µs |
+| cosh | 0.7 | 2.7 µs | 6.0 µs | 9.1 µs | 14.4 µs | 42.1 µs | 214.9 µs |
+| cot | 0.7 | 5.5 µs | 9.0 µs | 18.8 µs | 26.8 µs | 75.7 µs | 337.5 µs |
+| coth | 0.7 | 5.7 µs | 12.4 µs | 18.5 µs | 28.3 µs | 86.2 µs | 369.7 µs |
+| covercos | 0.7 | 3.5 µs | 6.0 µs | 9.2 µs | 13.5 µs | 37.9 µs | 168.9 µs |
+| coversin | 0.7 | 3.5 µs | 6.0 µs | 9.4 µs | 15.1 µs | 46.3 µs | 137.1 µs |
+| cubrt | 0.7 | 12.3 µs | 17.6 µs | 26.2 µs | 34.1 µs | 105.3 µs | 267.6 µs |
+| digamma | 2.345 | 95.9 µs | 266.2 µs | 487.8 µs | 927.9 µs | 3.738 ms | 18.930 ms |
+| dilog | 0.7 | 94.9 µs | 223.9 µs | 440.2 µs | 773.9 µs | 4.002 ms | 19.602 ms |
+| div | 0.7, 0.7 | 332.0 ns | 535.8 ns | 746.6 ns | 1.3 µs | 3.0 µs | 9.7 µs |
+| erf | 0.7 | 16.0 µs | 35.8 µs | 70.2 µs | 122.9 µs | 494.3 µs | 2.188 ms |
+| erfc | 0.7 | 17.2 µs | 41.7 µs | 64.4 µs | 145.1 µs | 518.4 µs | 2.025 ms |
+| erfcinv | 0.5 | 320.3 µs | 561.0 µs | 689.9 µs | 1.372 ms | 3.065 ms | 11.329 ms |
+| erfinv | 0.5 | 337.5 µs | 489.3 µs | 583.4 µs | 929.7 µs | 3.176 ms | 10.561 ms |
+| exp | 1.23456789 | 2.5 µs | 5.2 µs | 9.4 µs | 16.6 µs | 48.1 µs | 166.1 µs |
+| floor | 0.7 | 81.6 ns | 80.1 ns | 85.3 ns | 85.1 ns | 87.3 ns | 100.9 ns |
+| gamma | 2.345 | 30.9 µs | 86.2 µs | 150.5 µs | 233.8 µs | 903.2 µs | 4.037 ms |
+| gammainc_P | 2.3, 1.4 | 106.8 µs | 252.9 µs | 466.2 µs | 864.6 µs | 2.597 ms | 12.845 ms |
+| gammainc_Q | 2.3, 1.4 | 97.9 µs | 225.1 µs | 707.7 µs | 1.483 ms | 4.568 ms | 27.013 ms |
+| gammainc_lower | 2.3, 1.4 | 69.5 µs | 155.9 µs | 233.6 µs | 509.5 µs | 1.596 ms | 11.143 ms |
+| gammainc_upper | 2.3, 1.4 | 93.6 µs | 262.2 µs | 717.9 µs | 1.133 ms | 5.315 ms | 27.112 ms |
+| gammainv | 9.5 | 645.4 µs | 1.425 ms | 2.319 ms | 4.202 ms | 12.887 ms | 60.558 ms |
+| hacovercos | 0.7 | 4.0 µs | 7.0 µs | 12.0 µs | 15.4 µs | 42.8 µs | 155.0 µs |
+| hacoversin | 0.7 | 4.3 µs | 7.9 µs | 10.6 µs | 17.3 µs | 51.9 µs | 180.9 µs |
+| harmonic_poly | 2, 0.7 | 3.8 µs | 3.8 µs | 5.1 µs | 6.8 µs | 12.0 µs | 27.5 µs |
+| havercos | 0.7 | 3.5 µs | 5.9 µs | 8.9 µs | 14.9 µs | 43.4 µs | 138.8 µs |
+| haversin | 0.7 | 3.4 µs | 5.8 µs | 10.6 µs | 15.5 µs | 43.7 µs | 167.4 µs |
+| hermite_h | 2, 0.7 | 3.2 µs | 3.8 µs | 3.7 µs | 4.0 µs | 5.0 µs | 6.2 µs |
+| hypergeometric_pFq | 0.7, 2.5, 0.3 | 4.3 µs | 4.0 µs | 4.6 µs | 4.5 µs | 4.6 µs | 4.3 µs |
+| hypot | 0.7, 1.2 | 721.0 ns | 861.7 ns | 1.1 µs | 1.8 µs | 2.7 µs | 8.5 µs |
+| imag_part | 0.7 | 69.5 ns | 70.9 ns | 73.5 ns | 107.9 ns | 76.1 ns | 78.3 ns |
+| inv | 0.7 | 199.6 ns | 264.6 ns | 362.7 ns | 643.8 ns | 1.3 µs | 4.4 µs |
+| lambert_w0 | 0.7 | 55.8 µs | 86.3 µs | 158.7 µs | 255.3 µs | 756.4 µs | 3.869 ms |
+| lambert_wm1 | -0.2 | 52.4 µs | 108.6 µs | 166.0 µs | 314.5 µs | 886.6 µs | 3.624 ms |
+| lambert_wn | 1, 0.7 | 25.9 µs | 26.1 µs | 30.6 µs | 29.9 µs | 29.7 µs | 27.1 µs |
+| lauricella_f | 0.5, 0.3, 2.5 | 18.4 µs | 21.7 µs | 21.0 µs | 19.5 µs | 21.1 µs | 47.1 µs † |
+| ldexp | 1.23456789, 3 | 109.4 ns | 110.1 ns | 115.0 ns | 118.7 ns | 130.8 ns | 141.0 ns |
+| legendre_chi | 2, 0.7 | 54.4 µs | 162.5 µs | 407.6 µs | 494.3 µs | 2.663 ms | 12.256 ms |
+| lerch_phi | 0.3, 2, 1.4 | 301.7 µs | 283.3 µs | 285.2 µs | 314.0 µs | 320.9 µs | 347.2 µs |
+| lg | 2.345678 | 10.3 µs | 14.6 µs | 22.5 µs | 33.2 µs | 86.7 µs | 221.9 µs |
+| lgamma | 2.345 | 33.9 µs | 94.4 µs | 159.7 µs | 230.9 µs | 968.4 µs | 4.099 ms |
+| ln | 2.345678 | 4.9 µs | 7.3 µs | 12.3 µs | 16.7 µs | 40.2 µs | 96.4 µs |
+| log | 2.345678 | 4.8 µs | 8.2 µs | 11.4 µs | 14.6 µs | 41.7 µs | 131.0 µs |
+| log10 | 2.345678 | 9.5 µs | 17.7 µs | 26.1 µs | 34.1 µs | 107.3 µs | 265.3 µs |
+| logbeta | 2.3, 4.5 | 100.3 µs | 235.0 µs | 425.6 µs | 734.8 µs | 3.543 ms | 12.991 ms |
+| logbeta_pdf | 0.5, 2.5, 3.5 | 81.6 µs | 199.5 µs | 382.1 µs | 562.5 µs | 2.113 ms | 8.268 ms |
+| lommel_s | 0.5, 0.7, 1.2 | 28.3 µs | 63.2 µs | 107.4 µs | 216.7 µs | 746.5 µs | 2.829 ms |
+| mul | 0.7, 0.7 | 112.6 ns | 168.8 ns | 244.5 ns | 349.2 ns | 847.4 ns | 2.7 µs |
+| mul_long | 17, 3 | 647.3 ns | 919.0 ns | 823.0 ns | 696.4 ns | 770.5 ns | 876.6 ns |
+| mul_pow10 | 1.23456789, 3 | 312.4 ns | 431.9 ns | 563.9 ns | 602.4 ns | 467.9 ns | 606.1 ns |
+| neg | 0.7 | 82.7 ns | 86.3 ns | 87.6 ns | 101.0 ns | 94.8 ns | 102.9 ns |
+| normal_cdf | 0.7 | 13.9 µs | 69.5 µs | 62.4 µs | 103.8 µs | 377.1 µs | 1.665 ms |
+| normal_logpdf | 0.7 | 5.1 µs | 8.3 µs | 12.6 µs | 14.9 µs | 40.3 µs | 111.6 µs |
+| normal_pdf | 0.7 | 3.7 µs | 7.1 µs | 11.2 µs | 16.6 µs | 55.3 µs | 188.8 µs |
+| polygamma | 3, 2.345 | 45.0 µs | 109.7 µs | 237.9 µs | 343.7 µs | 1.741 ms | 16.714 ms † |
+| polylog | 2, 0.7 | 93.4 µs | 265.2 µs | 488.1 µs | 719.8 µs | 3.718 ms | 19.287 ms |
+| polylog1 | 0.7 | 6.0 µs | 7.6 µs | 11.7 µs | 18.4 µs | 35.2 µs | 109.1 µs |
+| pow | 1.23456789, 3.5 | 7.8 µs | 15.6 µs | 21.0 µs | 29.3 µs | 85.5 µs | 303.3 µs |
+| pow10 | 3 | 230.4 ns | 292.6 ns | 392.9 ns | 525.5 ns | 379.6 ns | 443.4 ns |
+| pow_int | 1.23456789, 3 | 269.9 ns | 408.8 ns | 597.5 ns | 863.1 ns | 2.3 µs | 7.5 µs |
+| productlog | 0.7 | 47.4 µs | 87.7 µs | 161.0 µs | 238.6 µs | 945.7 µs | 3.033 ms |
+| qdigamma | 0.5, 2.3 | 27.1 µs | 26.6 µs | 25.1 µs | 26.0 µs | 24.8 µs | 28.8 µs |
+| real_part | 0.7 | 81.9 ns | 84.9 ns | 76.3 ns | 95.6 ns | 158.4 ns | 125.6 ns |
+| rect | 0.7 | 857.9 ns | 864.5 ns | 951.8 ns | 895.9 ns | 1.2 µs | 1.1 µs |
+| root | 1.2345, 3 | 14.1 µs | 19.7 µs | 24.9 µs | 41.3 µs | 123.0 µs | 247.3 µs |
+| round | 0.7 | 2.2 µs | 2.3 µs | 2.4 µs | 2.7 µs | 3.3 µs | 2.4 µs |
+| roundn | 1.23456789, 3 | 5.3 µs | 5.1 µs | 5.5 µs | 6.1 µs | 8.5 µs | 9.8 µs |
+| rounds | 1.23456789, 3 | 17.3 µs | 24.0 µs | 31.0 µs | 44.3 µs | 94.6 µs | 211.9 µs |
+| sec | 0.7 | 2.3 µs | 5.0 µs | 9.0 µs | 12.5 µs | 42.6 µs | 133.8 µs |
+| sech | 0.7 | 2.7 µs | 5.6 µs | 8.9 µs | 14.4 µs | 49.6 µs | 178.0 µs |
+| sgn | 0.7 | 214.2 ns | 228.4 ns | 239.2 ns | 224.3 ns | 240.4 ns | 200.5 ns |
+| sin | 0.567 | 2.8 µs | 5.3 µs | 8.5 µs | 14.6 µs | 42.9 µs | 200.4 µs |
+| sinc | 0.7 | 4.6 µs | 7.5 µs | 16.4 µs | 19.3 µs | 53.0 µs | 168.3 µs |
+| sincos | 0.7 | 10.0 µs | 12.2 µs | 19.7 µs | 19.6 µs | 49.7 µs | 184.8 µs |
+| sinh | 0.7 | 3.0 µs | 6.0 µs | 11.8 µs | 15.6 µs | 41.8 µs | 148.5 µs |
+| sinhcosh | 0.7 | 2.8 µs | 6.2 µs | 24.1 µs † | 14.0 µs | 48.6 µs | 175.2 µs |
+| sqr | 0.7 | 130.4 ns | 192.4 ns | 367.1 ns | 409.9 ns | 638.4 ns | 1.3 µs |
+| sqrt | 1.23456789 | 295.2 ns | 428.3 ns | 629.7 ns | 630.1 ns | 1.2 µs | 2.8 µs |
+| step | 0.7 | 222.8 ns | 224.7 ns | 230.0 ns | 248.6 ns | 234.7 ns | 220.0 ns |
+| struve_h | 2, 0.7 | 135.1 µs | 289.7 µs | 516.0 µs | 772.8 µs | 2.860 ms | 11.819 ms |
+| struve_l | 2, 0.7 | 149.2 µs | 344.3 µs | 527.3 µs | 832.0 µs | 2.542 ms | 11.000 ms |
+| sub | 0.7, 0.7 | 74.3 ns | 77.9 ns | 92.4 ns | 91.0 ns | 154.6 ns | 263.1 ns |
+| tan | 0.7 | 12.4 µs | 12.8 µs | 19.6 µs | 20.8 µs | 50.5 µs | 168.4 µs |
+| tanh | 0.7 | 2.9 µs | 5.8 µs | 9.6 µs | 13.9 µs | 43.9 µs | 158.2 µs |
+| tetragamma | 2.345 | 43.9 µs | 123.5 µs | 257.3 µs | 432.8 µs | 1.899 ms | 11.580 ms |
+| tri | 0.7 | 814.7 ns | 887.5 ns | 840.1 ns | 962.2 ns | 939.1 ns | 1.1 µs |
+| trigamma | 2.345 | 28.7 µs | 81.8 µs | 192.1 µs | 292.0 µs | 1.596 ms | 7.217 ms |
+| vercos | 0.7 | 2.6 µs | 5.0 µs | 8.9 µs | 11.3 µs | 43.1 µs | 146.2 µs |
+| versin | 0.7 | 2.6 µs | 4.8 µs | 7.2 µs | 12.2 µs | 40.2 µs | 160.6 µs |
+| zatahp | 2.3, 1.4 | 575.3 µs | 1.121 ms | 2.523 ms | 3.975 ms | 19.597 ms | 124.965 ms |
+| zeta | 2.345 | 834.1 µs | 4.976 ms | 9.341 ms | 1.131 ms | 4.491 ms | 23.811 ms |
+| zetah | 2.3, 1.4 | 545.8 µs | 1.241 ms | 2.034 ms | 4.174 ms | 16.917 ms | 102.185 ms |
+| zetap | 2.345 | 212.4 µs | 445.1 µs | 774.1 µs | 1.830 ms | 6.282 ms | 31.897 ms |
 
 ### number / multi-precision complex floating point
 
 | Operation | Inputs | 256 bits | 512 bits | 768 bits | 1024 bits | 2048 bits | 4096 bits |
 |---|---|---:|---:|---:|---:|---:|---:|
-| E1 | 2.345678+0.125i | 175.3 µs | 379.4 µs | 546.8 µs | 1.292 ms | 4.276 ms | 16.771 ms |
-| Ei | 2.345678+0.125i | 162.5 µs | 379.1 µs | 697.4 µs | 1.171 ms | 4.449 ms | 16.740 ms |
-| Li | 2.345+0.125i | 115.6 µs | 463.3 µs † | 465.7 µs | 1.050 ms | 3.545 ms | 17.322 ms |
-| abs | 0.7+0.125i | 842.1 ns | 1.3 µs | 1.1 µs | 1.6 µs | 2.8 µs | 6.6 µs |
-| acos | 0.7+0.125i | 58.3 µs | 91.9 µs | 89.6 µs | 83.0 µs | 183.5 µs | 496.5 µs |
-| acosec | 2.345+0.125i | 210.1 µs | 1.383 ms † | 935.8 µs | 2.452 ms | 10.564 ms | 46.571 ms |
-| acosech | 0.7+0.125i | 39.6 µs | 84.7 µs | 199.7 µs † | 153.8 µs | 326.2 µs | 950.5 µs |
-| acosh | 2.345+0.125i | 46.2 µs | 87.1 µs | 92.6 µs | 77.0 µs | 254.2 µs | 458.5 µs |
-| acot | 0.7+0.125i | 50.5 µs | 85.9 µs | 97.9 µs | 150.3 µs | 278.4 µs | 962.1 µs |
-| acoth | 2.345+0.125i | 35.1 µs | 64.4 µs | 76.1 µs | 116.8 µs | 210.9 µs | 774.6 µs |
-| add | 0.7+0.125i, 0.7+0.125i | 363.6 ns | 424.6 ns | 391.3 ns | 310.4 ns | 340.7 ns | 432.5 ns |
-| add_long | 17+0.125i, 3 | 2.5 µs | 5.4 µs † | 2.2 µs | 3.5 µs | 2.0 µs | 2.1 µs |
-| appell_f1 | 0.5+0.125i, 0.7+0.125i, 0.8+0.125i, 2.5+0.125i, 0.2+0.125i, 0.3+0.125i | 1.189 ms | 3.656 ms | 6.156 ms | 11.562 ms | 40.844 ms | 193.985 ms |
-| arccovercos | 0.5+0.125i | 56.0 µs | 81.6 µs | 54.0 µs | 146.4 µs | 321.4 µs † | 355.9 µs |
-| arccoversin | 0.5+0.125i | 42.7 µs | 35.3 µs | 49.3 µs | 156.1 µs | 136.5 µs | 353.2 µs |
-| archacovercos | 0.5+0.125i | 12.6 µs | 27.5 µs † | 21.0 µs | 24.4 µs | 46.0 µs | 101.7 µs |
-| archacoversin | 0.5+0.125i | 26.8 µs † | 16.4 µs | 16.4 µs | 23.7 µs | 44.8 µs | 102.2 µs |
-| archavercos | 0.5+0.125i | 10.0 µs | 16.4 µs | 16.4 µs | 24.8 µs | 42.0 µs | 101.8 µs |
-| archaversin | 0.5+0.125i | 12.4 µs | 20.2 µs † | 16.3 µs | 25.0 µs | 50.9 µs | 129.7 µs |
-| arcvercos | 0.5+0.125i | 55.8 µs | 37.9 µs | 87.4 µs | 74.8 µs | 169.0 µs | 463.7 µs |
-| arcversin | 0.5+0.125i | 25.1 µs | 43.8 µs | 107.3 µs | 81.9 µs | 169.3 µs | 437.8 µs |
-| arg | 0.7+0.125i | 13.8 µs | 29.7 µs | 37.3 µs | 37.0 µs | 112.2 µs | 312.5 µs |
-| asec | 2.345+0.125i | 270.2 µs † | 603.2 µs | 1.234 ms | 2.223 ms | 9.771 ms | 47.318 ms |
-| asech | 0.7+0.125i | 62.4 µs † | 35.9 µs | 54.2 µs | 63.4 µs | 184.3 µs | 412.8 µs |
-| asin | 0.7+0.125i | 78.2 µs † | 192.7 µs † | 97.6 µs | 156.1 µs | 351.1 µs | 435.3 µs |
-| asinh | 0.7+0.125i | 37.3 µs | 158.7 µs † | 99.3 µs | 110.9 µs | 338.6 µs | 764.6 µs |
-| atan | 0.7+0.125i | 47.2 µs | 77.9 µs | 77.9 µs | 107.8 µs | 327.0 µs | 745.8 µs |
-| atan2 | 0.5+0.125i, -0.75+0.125i | 11.2 µs | 9.1 µs | 10.4 µs | 9.1 µs | 11.6 µs | 9.0 µs |
-| atanh | 0.7+0.125i | 45.8 µs | 67.5 µs | 72.5 µs | 126.2 µs | 252.3 µs | 803.6 µs |
-| bessel_i | 2, 0.7+0.125i | 238.7 µs † | 458.5 µs | 708.6 µs | 1.126 ms | 3.625 ms | 18.437 ms |
-| bessel_j | 2, 0.7+0.125i | 246.1 µs † | 395.5 µs | 785.4 µs | 1.006 ms | 4.086 ms | 17.274 ms |
-| bessel_k | 2, 0.7+0.125i | 2.743 ms | 5.110 ms | 7.501 ms | 9.752 ms | 30.079 ms | 106.762 ms |
-| bessel_y | 2, 0.7+0.125i | 219.8 µs † | 376.7 µs | 676.5 µs | 1.015 ms | 4.449 ms | 17.442 ms |
-| beta | 2.3+0.125i, 4.5+0.125i | 49.9 µs † | 32.4 µs | 32.4 µs | 34.2 µs | 41.0 µs | 32.6 µs |
-| beta_pdf | 0.5+0.125i, 2.5+0.125i, 3.5+0.125i | 60.8 µs | 116.4 µs † | 59.7 µs | 48.6 µs | 60.1 µs | 47.4 µs |
-| binomial | 5+0.125i, 2+0.125i | 30.8 µs | 31.2 µs | 31.8 µs | 28.3 µs | 30.8 µs | 24.2 µs |
-| ceil | 0.7+0.125i | 2.1 µs † | 1.4 µs | 1.6 µs | 1.1 µs | 1.2 µs | 1.1 µs |
-| chebyshev_t | 2, 0.7+0.125i | 7.4 µs | 9.5 µs | 9.1 µs | 8.3 µs | 12.5 µs | 13.0 µs |
-| chebyshev_u | 2, 0.7+0.125i | 13.6 µs | 28.2 µs † | 14.0 µs | 10.5 µs | 15.8 µs | 15.1 µs |
-| circ | 0.7 | 1.9 µs | 1.8 µs | 2.6 µs | 2.1 µs | 4.2 µs | 7.9 µs |
-| clausen | 3, 0.7+0.125i | 1.318 ms | 5.436 ms | 13.188 ms | 25.447 ms | 159.600 ms | 1.001 s |
-| clausen2 | 0.7+0.125i | 1.490 ms | 5.670 ms | 12.402 ms | 24.261 ms | 159.577 ms | 1.001 s |
-| conj | 0.7+0.125i | 228.0 ns | 302.0 ns | 451.4 ns | 222.1 ns | 219.6 ns | 503.3 ns |
-| cos | 0.7+0.125i | 17.0 µs | 14.2 µs | 26.9 µs | 36.6 µs | 83.1 µs | 394.3 µs |
-| cosec | 0.7+0.125i | 21.2 µs | 38.3 µs † | 29.7 µs | 40.7 µs | 88.6 µs | 416.3 µs |
-| cosech | 0.7+0.125i | 12.1 µs | 17.7 µs | 30.8 µs † | 89.0 µs | 70.6 µs | 300.3 µs |
-| cosh | 0.7+0.125i | 9.3 µs | 14.3 µs | 23.2 µs | 69.8 µs | 65.6 µs | 290.8 µs |
-| cot | 0.7+0.125i | 47.9 µs † | 75.9 µs † | 54.8 µs | 76.8 µs | 173.9 µs | 772.4 µs |
-| coth | 0.7+0.125i | 19.1 µs | 25.1 µs | 79.2 µs † | 151.0 µs | 138.6 µs | 592.4 µs |
-| covercos | 0.7+0.125i | 39.3 µs † | 18.4 µs | 25.0 µs | 32.4 µs | 85.7 µs | 381.7 µs |
-| coversin | 0.7+0.125i | 20.2 µs | 19.6 µs | 57.4 µs † | 41.3 µs | 85.6 µs | 354.7 µs |
-| cubrt | 0.7+0.125i | 88.9 µs † | 68.2 µs | 99.5 µs | 138.6 µs | 311.0 µs | 1.322 ms |
-| digamma | 2.345+0.125i | 718.2 µs | 1.529 ms | 3.072 ms | 4.764 ms | 12.199 ms | 127.862 ms |
-| dilog | 0.7+0.125i | 343.3 µs | 1.232 ms | 2.431 ms | 4.081 ms | 16.600 ms | 93.743 ms |
-| div | 0.7+0.125i, 0.7+0.125i | 11.0 µs † | 26.8 µs † | 17.0 µs | 18.3 µs | 78.7 µs † | 112.9 µs |
-| erf | 0.7+0.125i | 303.4 µs † | 358.4 µs † | 734.1 µs † | 834.4 µs † | 3.032 ms † | 14.910 ms † |
-| erfc | 0.7+0.125i | 206.6 µs † | 292.1 µs † | 614.7 µs † | 959.2 µs † | 3.080 ms † | 14.572 ms † |
-| erfcinv | 0.5+0.125i | 1.200 ms | 2.882 ms | 4.403 ms | 7.270 ms | 26.087 ms | 139.874 ms |
-| erfinv | 0.5+0.125i | 1.333 ms † | 2.807 ms † | 4.125 ms † | 7.524 ms † | 23.547 ms † | 134.729 ms † |
-| exp | 1.23456789+0.125i | 11.7 µs | 42.1 µs † | 28.9 µs | 54.2 µs | 178.2 µs | 485.0 µs |
-| floor | 0.7+0.125i | 678.7 ns | 298.0 ns | 273.2 ns | 213.1 ns | 227.9 ns | 229.4 ns |
-| gamma | 2.345+0.125i | 15.6 µs | 17.4 µs | 15.0 µs | 14.8 µs | 12.0 µs | 15.1 µs |
-| gammainc_P | 2.3+0.125i, 1.4+0.125i | 69.3 µs | 136.5 µs † | 73.2 µs | 70.0 µs | 63.3 µs | 55.0 µs |
-| gammainc_Q | 2.3+0.125i, 1.4+0.125i | 119.5 µs † | 70.5 µs | 71.5 µs | 68.8 µs | 54.9 µs | 55.2 µs |
-| gammainc_lower | 2.3+0.125i, 1.4+0.125i | 64.6 µs † | 50.9 µs | 45.0 µs | 58.0 µs | 54.2 µs | 54.1 µs |
-| gammainc_upper | 2.3+0.125i, 1.4+0.125i | 152.0 µs † | 56.4 µs | 69.5 µs | 67.6 µs | 57.4 µs | 68.9 µs |
-| gammainv | 9.5+0.125i | 153.4 µs | 152.3 µs | 300.9 µs † | 121.0 µs | 122.0 µs | 120.9 µs |
-| hacovercos | 0.7+0.125i | 24.0 µs | 50.3 µs † | 26.5 µs | 35.1 µs | 118.8 µs | 413.7 µs |
-| hacoversin | 0.7+0.125i | 25.5 µs | 17.7 µs | 32.8 µs | 43.6 µs | 120.7 µs | 412.3 µs |
-| harmonic_poly | 2, 0.7+0.125i | 16.0 µs | 16.3 µs | 16.0 µs | 16.5 µs | 27.4 µs | 63.2 µs |
-| havercos | 0.7+0.125i | 25.4 µs | 17.8 µs | 25.0 µs | 35.4 µs | 96.2 µs | 366.2 µs |
-| haversin | 0.7+0.125i | 25.5 µs | 22.9 µs | 25.0 µs | 38.9 µs | 99.2 µs | 401.0 µs |
-| hermite_h | 2, 0.7+0.125i | 15.5 µs † | 12.7 µs | 13.5 µs | 10.9 µs | 12.7 µs | 22.3 µs |
-| hypergeometric_pFq | 0.7+0.125i, 2.5+0.125i, 0.3+0.125i | 40.6 µs | 36.5 µs | 36.7 µs | 35.1 µs | 28.8 µs | 32.7 µs |
-| hypot | 0.7+0.125i, 1.2+0.125i | 2.8 µs † | 3.8 µs † | 1.7 µs | 1.8 µs | 2.0 µs | 2.7 µs |
-| imag_part | 0.7+0.125i | 110.3 ns | 142.9 ns | 125.7 ns | 96.4 ns | 100.4 ns | 139.1 ns |
-| inv | 0.7+0.125i | 1.2 µs | 1.9 µs † | 1.9 µs | 1.9 µs | 3.8 µs | 9.5 µs |
-| lambert_w0 | 0.7+0.125i | 55.0 µs | 67.9 µs | 91.8 µs | 94.5 µs | 243.4 µs | 994.1 µs |
-| lambert_wm1 | -0.2+0.125i | 52.0 µs | 67.5 µs | 137.0 µs † | 110.3 µs | 239.6 µs | 783.5 µs |
-| lambert_wn | 1, 0.7+0.125i | 28.3 µs | 26.9 µs | 27.3 µs | 25.7 µs | 25.8 µs | 25.9 µs |
-| lauricella_f | 0.5+0.125i, 0.3+0.125i, 2.5+0.125i | 174.4 µs | 137.3 µs | 176.7 µs | 174.9 µs | 217.0 µs † | 145.4 µs |
-| ldexp | 1.23456789+0.125i, 3 | 563.8 ns | 313.4 ns | 240.1 ns | 250.6 ns | 305.5 ns | 257.1 ns |
-| legendre_chi | 2, 0.7+0.125i | 1.880 ms | 4.883 ms | 8.592 ms | 13.877 ms | 65.145 ms | 336.717 ms |
-| lerch_phi | 0.3+0.125i, 2+0.125i, 1.4+0.125i | 1.103 ms † | 645.7 µs | 654.8 µs | 527.2 µs | 639.0 µs | 507.7 µs |
-| lg | 2.345678+0.125i | 26.6 µs | 44.8 µs | 60.1 µs | 61.9 µs | 191.9 µs | 441.1 µs |
-| lgamma | 2.345+0.125i | 26.0 µs † | 24.5 µs † | 12.9 µs | 12.7 µs | 12.6 µs | 12.0 µs |
-| ln | 2.345678+0.125i | 19.9 µs | 25.5 µs | 31.3 µs | 46.1 µs | 122.9 µs | 357.6 µs |
-| log | 2.345678+0.125i | 20.7 µs | 25.3 µs | 33.7 µs | 45.8 µs | 136.5 µs | 334.8 µs |
-| log10 | 2.345678+0.125i | 55.5 µs † | 33.8 µs | 58.3 µs | 79.0 µs | 190.5 µs | 498.7 µs |
-| logbeta | 2.3+0.125i, 4.5+0.125i | 37.5 µs | 29.7 µs | 29.6 µs | 37.4 µs | 30.4 µs | 37.3 µs |
-| logbeta_pdf | 0.5+0.125i, 2.5+0.125i, 3.5+0.125i | 48.4 µs | 40.5 µs | 97.2 µs † | 47.9 µs | 40.7 µs | 48.5 µs |
-| lommel_s | 0.5+0.125i, 0.7+0.125i, 1.2+0.125i | 257.8 µs | 402.7 µs | 630.7 µs | 1.295 ms | 3.999 ms | 18.828 ms |
-| mul | 0.7+0.125i, 0.7+0.125i | 1.5 µs | 1.3 µs | 1.7 µs | 2.8 µs | 3.7 µs | 7.0 µs |
-| mul_long | 17+0.125i, 3 | 3.3 µs | 2.5 µs | 3.1 µs | 2.8 µs | 2.5 µs | 2.7 µs |
-| mul_pow10 | 1.23456789+0.125i, 3 | 2.9 µs | 2.4 µs | 2.6 µs | 2.4 µs | 2.3 µs | 2.6 µs |
-| neg | 0.7+0.125i | 295.7 ns | 224.2 ns | 221.8 ns | 248.8 ns | 223.3 ns | 291.4 ns |
-| normal_cdf | 0.7+0.125i | 168.3 µs † | 278.5 µs † | 639.8 µs † | 800.3 µs † | 2.907 ms † | 17.297 ms † |
-| normal_logpdf | 0.7+0.125i | 8.7 µs † | 9.5 µs † | 15.6 µs † | 15.5 µs † | 35.3 µs † | 123.7 µs † |
-| normal_pdf | 0.7+0.125i | 23.4 µs † | 34.6 µs † | 63.2 µs † | 66.7 µs † | 205.3 µs † | 959.7 µs † |
-| polygamma | 3, 2.345+0.125i | 1.302 ms | 2.404 ms | 4.764 ms | 6.060 ms | 23.295 ms | 176.331 ms |
-| polylog | 2, 0.7+0.125i | 430.2 µs | 1.570 ms † | 2.137 ms | 3.340 ms | 16.910 ms | 91.256 ms |
-| polylog1 | 0.7+0.125i | 29.2 µs | 46.2 µs | 79.7 µs | 58.6 µs | 132.6 µs | 473.1 µs |
-| pow | 1.23456789+0.125i, 3.5+0.125i | 64.9 µs † | 62.7 µs | 97.1 µs | 105.2 µs | 392.9 µs | 1.033 ms |
-| pow10 | 3 | 11.3 µs | 18.5 µs | 22.9 µs | 30.1 µs | 53.5 µs | 152.2 µs |
-| pow_int | 1.23456789+0.125i, 3 | 17.0 µs † | 7.8 µs | 6.1 µs | 6.9 µs | 9.7 µs | 19.4 µs |
-| productlog | 0.7+0.125i | 111.1 µs † | 67.8 µs | 71.1 µs | 95.0 µs | 327.5 µs | 895.1 µs |
-| qdigamma | 0.5+0.125i, 2.3+0.125i | 141.6 µs | 154.2 µs | 181.0 µs | 151.5 µs | 182.6 µs | 171.2 µs |
-| real_part | 0.7+0.125i | 127.1 ns | 284.0 ns | 101.0 ns | 95.9 ns | 101.7 ns | 146.9 ns |
-| rect | 0.7 | 5.4 µs † | 2.5 µs | 3.5 µs † | 2.4 µs | 4.2 µs | 9.0 µs |
-| root | 1.2345+0.125i, 3 | 33.0 µs | 118.9 µs † | 203.4 µs | 284.7 µs | 392.9 µs | 1.483 ms |
-| round | 0.7+0.125i | 9.4 µs | 7.3 µs | 21.8 µs † | 7.1 µs | 7.9 µs | 10.6 µs |
-| roundn | 1.23456789+0.125i, 3 | 36.4 µs † | 12.0 µs | 17.5 µs | 12.6 µs | 15.8 µs | 31.6 µs |
-| rounds | 1.23456789+0.125i, 3 | 74.5 µs † | 62.4 µs | 89.7 µs | 95.8 µs | 159.4 µs | 536.0 µs |
-| sec | 0.7+0.125i | 18.8 µs | 39.1 µs † | 29.0 µs | 32.3 µs | 89.6 µs | 390.0 µs |
-| sech | 0.7+0.125i | 12.1 µs | 17.7 µs | 26.3 µs | 90.3 µs | 70.9 µs | 302.2 µs |
-| sgn | 0.7 | 750.1 ns | 1.3 µs † | 888.7 ns | 623.9 ns | 635.6 ns | 669.0 ns |
-| sin | 0.567+0.125i | 20.5 µs † | 13.2 µs | 19.2 µs | 28.8 µs | 106.1 µs | 293.8 µs |
-| sinc | 0.7+0.125i | 21.0 µs | 21.1 µs | 75.5 µs † | 51.7 µs | 102.2 µs | 336.8 µs |
-| sinh | 0.7+0.125i | 9.3 µs | 25.7 µs † | 38.6 µs † | 68.8 µs | 65.6 µs | 225.2 µs |
-| sqr | 0.7+0.125i | 1.5 µs | 1.7 µs | 2.1 µs | 2.2 µs | 3.3 µs | 5.6 µs |
-| sqrt | 1.23456789+0.125i | 2.7 µs | 2.2 µs | 3.3 µs | 3.2 µs | 5.0 µs | 14.5 µs |
-| step | 0.7 | 948.7 ns | 777.4 ns | 1.5 µs † | 625.6 ns | 625.6 ns | 628.0 ns |
-| struve_h | 2, 0.7+0.125i | 659.5 µs † | 592.7 µs | 1.079 ms | 1.147 ms | 4.362 ms | 18.497 ms |
-| struve_l | 2, 0.7+0.125i | 268.8 µs | 559.2 µs | 955.0 µs | 1.170 ms | 4.086 ms | 21.965 ms |
-| sub | 0.7+0.125i, 0.7+0.125i | 427.4 ns | 371.8 ns | 304.4 ns | 284.2 ns | 313.4 ns | 578.8 ns |
-| tan | 0.7+0.125i | 14.7 µs | 51.6 µs † | 23.8 µs | 34.7 µs | 100.2 µs | 412.0 µs |
-| tanh | 0.7+0.125i | 30.6 µs | 20.6 µs | 94.9 µs † | 33.4 µs | 77.3 µs | 321.7 µs |
-| tetragamma | 2.345+0.125i | 1.204 ms † | 2.962 ms † | 4.341 ms † | 7.242 ms † | 25.777 ms † | 179.401 ms † |
-| tri | 0.7 | 2.3 µs | 2.4 µs | 2.2 µs | 3.0 µs | 3.4 µs | 6.3 µs |
-| trigamma | 2.345+0.125i | 945.0 µs † | 2.400 ms † | 3.702 ms † | 4.796 ms † | 19.422 ms † | 137.650 ms † |
-| vercos | 0.7+0.125i | 22.8 µs | 19.3 µs | 21.3 µs | 82.8 µs † | 85.9 µs | 298.1 µs |
-| versin | 0.7+0.125i | 20.5 µs | 19.8 µs | 27.3 µs | 39.0 µs | 95.1 µs | 299.1 µs |
-| zatahp | 2.3+0.125i, 1.4+0.125i | 6.193 ms | 10.345 ms | 18.520 ms | 32.955 ms | 174.526 ms | 1.346 s |
-| zeta | 2.345+0.125i | 4.857 ms | 8.309 ms | 18.160 ms | 28.883 ms | 150.910 ms | 1.387 s |
-| zetah | 2.3+0.125i, 1.4+0.125i | 5.194 ms | 9.356 ms | 14.706 ms | 28.410 ms | 152.053 ms | 1.510 s |
-| zetap | 2.345+0.125i | 4.655 ms | 7.432 ms | 19.859 ms | 34.716 ms | 164.699 ms | 1.449 s |
+| E1 | 2.345678+0.125i | 87.3 µs | 184.2 µs | 369.4 µs | 570.0 µs | 1.814 ms | 7.771 ms |
+| Ei | 2.345678+0.125i | 74.7 µs | 160.6 µs | 403.7 µs | 508.1 µs | 1.813 ms | 8.889 ms |
+| Li | 2.345+0.125i | 94.2 µs | 163.2 µs | 406.3 µs | 529.5 µs | 1.812 ms | 8.940 ms |
+| abs | 0.7+0.125i | 891.4 ns | 1.2 µs | 1.5 µs | 1.6 µs | 2.5 µs | 6.8 µs |
+| acos | 0.7+0.125i | 56.3 µs | 85.7 µs | 104.1 µs | 80.3 µs | 176.8 µs | 416.3 µs |
+| acosec | 2.345+0.125i | 251.0 µs | 543.0 µs | 1.140 ms | 1.957 ms | 9.310 ms | 49.268 ms |
+| acosech | 0.7+0.125i | 50.0 µs | 75.8 µs | 111.4 µs | 124.1 µs | 294.6 µs | 990.5 µs |
+| acosh | 2.345+0.125i | 45.9 µs | 70.8 µs | 90.2 µs | 71.8 µs | 302.5 µs | 369.6 µs |
+| acot | 0.7+0.125i | 45.1 µs | 76.5 µs | 88.9 µs | 129.7 µs | 287.4 µs | 1.045 ms |
+| acoth | 2.345+0.125i | 33.4 µs | 57.8 µs | 67.9 µs | 105.7 µs | 270.3 µs | 711.7 µs |
+| add | 0.7+0.125i, 0.7+0.125i | 357.7 ns | 409.3 ns | 453.3 ns | 408.1 ns | 502.7 ns | 553.1 ns |
+| add_long | 17+0.125i, 3 | 2.5 µs | 2.8 µs | 2.7 µs | 2.5 µs | 2.7 µs | 2.7 µs |
+| appell_f1 | <span style="display:inline-block;width:40ch;max-width:100%;white-space:normal;overflow-wrap:anywhere">0.5+0.125i, 0.7+0.125i, 0.8+0.125i, 2.5+<br/>0.125i, 0.2+0.125i, 0.3+0.125i</span> | 439.4 µs | 1.589 ms | 2.928 ms | 5.232 ms | 22.536 ms | 124.256 ms |
+| arccovercos | 0.5+0.125i | 50.3 µs | 86.9 µs | 54.6 µs | 138.1 µs | 169.7 µs | 389.4 µs |
+| arccoversin | 0.5+0.125i | 50.8 µs | 48.0 µs | 46.0 µs | 129.9 µs | 161.6 µs | 462.4 µs |
+| archacovercos | 0.5+0.125i | 15.0 µs | 17.2 µs | 21.1 µs | 23.7 µs | 48.1 µs | 129.0 µs |
+| archacoversin | 0.5+0.125i | 34.5 µs † | 18.1 µs | 20.1 µs | 21.7 µs | 55.0 µs | 119.0 µs |
+| archavercos | 0.5+0.125i | 16.8 µs | 17.7 µs | 22.0 µs | 20.7 µs | 47.8 µs | 132.0 µs |
+| archaversin | 0.5+0.125i | 20.6 µs † | 16.0 µs | 18.9 µs | 26.0 µs | 44.8 µs | 107.3 µs |
+| arcvercos | 0.5+0.125i | 62.3 µs | 46.2 µs | 98.5 µs | 82.1 µs | 167.9 µs | 445.8 µs |
+| arcversin | 0.5+0.125i | 28.6 µs | 42.4 µs | 101.8 µs | 74.4 µs | 161.9 µs | 415.5 µs |
+| arg | 0.7+0.125i | 12.6 µs | 24.0 µs | 32.2 µs | 41.2 µs | 115.4 µs | 301.0 µs |
+| asec | 2.345+0.125i | 221.4 µs | 506.6 µs | 1.052 ms | 2.142 ms | 10.458 ms | 44.522 ms |
+| asech | 0.7+0.125i | 24.6 µs | 46.0 µs | 58.6 µs | 69.4 µs | 160.7 µs | 469.7 µs |
+| asin | 0.7+0.125i | 51.3 µs | 81.2 µs | 97.1 µs | 140.7 µs | 346.3 µs | 483.1 µs |
+| asinh | 0.7+0.125i | 46.5 µs | 80.3 µs | 91.7 µs | 139.9 µs | 340.3 µs | 836.9 µs |
+| atan | 0.7+0.125i | 44.3 µs | 65.1 µs | 87.9 µs | 124.0 µs | 325.9 µs | 858.9 µs |
+| atan2 | 0.5+0.125i, -0.75+0.125i | 10.6 µs | 9.6 µs | 10.6 µs | 11.7 µs | 11.8 µs | 11.1 µs |
+| atanh | 0.7+0.125i | 38.0 µs | 61.1 µs | 82.9 µs | 125.2 µs | 274.3 µs | 760.2 µs |
+| bessel_i | 2, 0.7+0.125i | 188.8 µs | 432.6 µs | 643.9 µs | 1.103 ms | 3.880 ms | 16.831 ms |
+| bessel_j | 2, 0.7+0.125i | 186.5 µs | 346.3 µs | 681.3 µs | 927.7 µs | 4.045 ms | 15.440 ms |
+| bessel_k | 2, 0.7+0.125i | 106.6 µs | 221.2 µs | 372.8 µs | 697.3 µs | 2.940 ms | 9.566 ms |
+| bessel_y | 2, 0.7+0.125i | 167.1 µs | 332.5 µs | 685.2 µs | 980.7 µs | 3.945 ms | 16.382 ms |
+| beta | 2.3+0.125i, 4.5+0.125i | 35.5 µs | 39.1 µs | 40.5 µs | 40.2 µs | 37.7 µs | 41.5 µs |
+| beta_pdf | 0.5+0.125i, 2.5+0.125i, 3.5+0.125i | 48.5 µs | 71.1 µs | 56.5 µs | 60.7 µs | 62.9 µs | 60.3 µs |
+| binomial | 5+0.125i, 2+0.125i | 27.2 µs | 38.7 µs | 29.7 µs | 26.1 µs | 27.4 µs | 27.5 µs |
+| ceil | 0.7+0.125i | 1.6 µs | 1.7 µs | 1.6 µs | 1.4 µs | 1.4 µs | 1.7 µs |
+| chebyshev_t | 2, 0.7+0.125i | 9.0 µs | 10.8 µs | 11.5 µs | 10.0 µs | 11.5 µs | 15.7 µs |
+| chebyshev_u | 2, 0.7+0.125i | 17.5 µs | 11.7 µs | 13.9 µs | 13.3 µs | 14.7 µs | 21.0 µs |
+| circ | 0.7 | 2.8 µs | 2.2 µs | 2.5 µs | 3.0 µs | 4.2 µs | 7.9 µs |
+| clausen | 3, 0.7+0.125i | 153.0 µs | 361.0 µs | 678.7 µs | 1.494 ms | 4.604 ms | 23.685 ms |
+| clausen2 | 0.7+0.125i | 127.2 µs | 318.6 µs | 596.0 µs | 1.420 ms | 4.482 ms | 28.917 ms |
+| conj | 0.7+0.125i | 496.1 ns | 280.0 ns | 260.3 ns | 310.9 ns | 271.1 ns | 351.2 ns |
+| cos | 0.7+0.125i | 22.2 µs | 14.2 µs | 23.2 µs | 41.6 µs | 93.1 µs | 333.4 µs |
+| cosec | 0.7+0.125i | 25.9 µs | 18.0 µs | 26.8 µs | 47.9 µs | 112.1 µs | 338.8 µs |
+| cosech | 0.7+0.125i | 32.8 µs † | 16.9 µs | 26.9 µs | 88.2 µs | 81.9 µs | 253.2 µs |
+| cosh | 0.7+0.125i | 30.9 µs † | 15.1 µs | 19.8 µs | 81.4 µs | 79.8 µs | 292.5 µs |
+| cot | 0.7+0.125i | 45.5 µs † | 34.2 µs | 49.8 µs | 75.5 µs | 199.2 µs | 677.1 µs |
+| coth | 0.7+0.125i | 25.9 µs | 27.3 µs | 44.3 µs | 149.3 µs | 170.9 µs | 601.8 µs |
+| covercos | 0.7+0.125i | 25.1 µs | 17.9 µs | 23.8 µs | 38.2 µs | 101.5 µs | 319.1 µs |
+| coversin | 0.7+0.125i | 24.3 µs | 16.3 µs | 25.0 µs | 36.6 µs | 104.3 µs | 348.6 µs |
+| cubrt | 0.7+0.125i | 45.4 µs | 70.4 µs | 84.5 µs | 140.9 µs | 386.7 µs | 1.358 ms |
+| digamma | 2.345+0.125i | 226.1 µs | 500.6 µs | 784.5 µs | 1.382 ms | 4.275 ms | 21.954 ms |
+| dilog | 0.7+0.125i | 180.9 µs | 419.6 µs | 819.6 µs | 1.452 ms | 5.954 ms | 25.303 ms |
+| div | 0.7+0.125i, 0.7+0.125i | 8.2 µs | 11.2 µs | 15.3 µs | 20.4 µs | 39.5 µs | 115.1 µs |
+| erf | 0.7+0.125i | 87.1 µs | 200.4 µs | 316.3 µs | 474.8 µs | 2.041 ms | 8.131 ms |
+| erfc | 0.7+0.125i | 85.1 µs | 170.2 µs | 281.8 µs | 522.3 µs | 2.033 ms | 8.449 ms |
+| erfcinv | 0.5+0.125i | 927.7 µs | 1.487 ms | 2.069 ms | 4.143 ms | 11.672 ms | 49.067 ms |
+| erfinv | 0.5+0.125i | 799.4 µs | 1.393 ms | 1.999 ms | 3.964 ms | 11.354 ms | 55.857 ms |
+| exp | 1.23456789+0.125i | 10.5 µs | 21.4 µs | 33.5 µs | 47.6 µs | 174.8 µs | 549.4 µs |
+| floor | 0.7+0.125i | 266.3 ns | 268.1 ns | 276.1 ns | 298.2 ns | 280.9 ns | 308.0 ns |
+| gamma | 2.345+0.125i | 13.4 µs | 13.7 µs | 14.1 µs | 15.7 µs | 14.6 µs | 16.6 µs |
+| gammainc_P | 2.3+0.125i, 1.4+0.125i | 71.7 µs | 67.4 µs | 77.8 µs | 74.2 µs | 60.6 µs | 61.2 µs |
+| gammainc_Q | 2.3+0.125i, 1.4+0.125i | 63.8 µs | 60.3 µs | 70.1 µs | 59.7 µs | 64.6 µs | 65.8 µs |
+| gammainc_lower | 2.3+0.125i, 1.4+0.125i | 46.6 µs | 55.2 µs | 56.3 µs | 45.7 µs | 49.5 µs | 52.3 µs |
+| gammainc_upper | 2.3+0.125i, 1.4+0.125i | 62.1 µs | 69.6 µs | 64.7 µs | 64.9 µs | 60.2 µs | 62.1 µs |
+| gammainv | 9.5+0.125i | 129.6 µs | 139.2 µs | 138.4 µs | 164.9 µs | 140.6 µs | 164.6 µs |
+| hacovercos | 0.7+0.125i | 23.0 µs | 21.3 µs | 25.9 µs | 42.4 µs | 105.9 µs | 371.6 µs |
+| hacoversin | 0.7+0.125i | 23.5 µs | 19.9 µs | 32.3 µs | 44.8 µs | 117.4 µs | 410.0 µs |
+| harmonic_poly | 2, 0.7+0.125i | 14.3 µs | 18.1 µs | 19.2 µs | 21.1 µs | 30.5 µs | 81.1 µs |
+| havercos | 0.7+0.125i | 25.4 µs | 22.6 µs | 29.4 µs | 44.8 µs | 111.8 µs | 350.9 µs |
+| haversin | 0.7+0.125i | 23.8 µs | 21.4 µs | 31.3 µs | 45.9 µs | 109.1 µs | 383.4 µs |
+| hermite_h | 2, 0.7+0.125i | 11.8 µs | 12.9 µs | 13.0 µs | 14.0 µs | 17.1 µs | 19.4 µs |
+| hypergeometric_pFq | 0.7+0.125i, 2.5+0.125i, 0.3+0.125i | 38.0 µs | 36.0 µs | 35.4 µs | 33.7 µs | 36.2 µs | 35.2 µs |
+| hypot | 0.7+0.125i, 1.2+0.125i | 2.2 µs | 2.0 µs | 2.2 µs | 2.2 µs | 2.2 µs | 2.4 µs |
+| imag_part | 0.7+0.125i | 117.1 ns | 148.7 ns | 121.2 ns | 140.2 ns | 132.0 ns | 165.6 ns |
+| inv | 0.7+0.125i | 1.2 µs | 1.5 µs | 1.9 µs | 2.2 µs | 4.5 µs | 12.2 µs |
+| lambert_w0 | 0.7+0.125i | 53.7 µs | 63.9 µs | 82.3 µs | 106.0 µs | 300.6 µs | 955.5 µs |
+| lambert_wm1 | -0.2+0.125i | 50.6 µs | 65.4 µs | 82.4 µs | 114.4 µs | 297.0 µs | 977.0 µs |
+| lambert_wn | 1, 0.7+0.125i | 37.4 µs | 33.3 µs | 33.8 µs | 29.3 µs | 31.3 µs | 34.3 µs |
+| lauricella_f | 0.5+0.125i, 0.3+0.125i, 2.5+0.125i | 153.7 µs | 181.3 µs | 153.8 µs | 166.1 µs | 171.1 µs | 219.5 µs |
+| ldexp | 1.23456789+0.125i, 3 | 387.3 ns | 379.7 ns | 334.1 ns | 332.0 ns | 337.8 ns | 498.3 ns |
+| legendre_chi | 2, 0.7+0.125i | 323.9 µs | 615.5 µs | 1.260 ms | 2.579 ms | 10.872 ms | 72.436 ms |
+| lerch_phi | 0.3+0.125i, 2+0.125i, 1.4+0.125i | 808.9 µs | 1.063 ms † | 621.3 µs | 579.9 µs | 600.0 µs | 849.8 µs † |
+| lg | 2.345678+0.125i | 33.5 µs | 49.6 µs | 60.3 µs | 67.9 µs | 191.1 µs | 640.5 µs |
+| lgamma | 2.345+0.125i | 19.5 µs † | 12.7 µs | 13.3 µs | 12.5 µs | 12.7 µs | 15.4 µs |
+| ln | 2.345678+0.125i | 23.5 µs | 33.9 µs | 43.2 µs | 49.5 µs | 149.3 µs | 483.4 µs |
+| log | 2.345678+0.125i | 19.6 µs | 30.1 µs | 38.9 µs | 59.7 µs | 146.2 µs | 425.4 µs |
+| log10 | 2.345678+0.125i | 24.8 µs | 42.7 µs | 48.5 µs | 68.3 µs | 163.5 µs | 567.1 µs |
+| logbeta | 2.3+0.125i, 4.5+0.125i | 38.1 µs | 47.2 µs | 34.5 µs | 36.2 µs | 37.2 µs | 41.1 µs |
+| logbeta_pdf | 0.5+0.125i, 2.5+0.125i, 3.5+0.125i | 48.6 µs | 57.1 µs | 42.9 µs | 42.0 µs | 41.7 µs | 57.5 µs |
+| lommel_s | 0.5+0.125i, 0.7+0.125i, 1.2+0.125i | 210.1 µs | 595.9 µs | 696.4 µs | 1.344 ms | 4.645 ms | 22.537 ms |
+| mul | 0.7+0.125i, 0.7+0.125i | 1.7 µs | 1.7 µs | 2.2 µs | 2.9 µs | 4.1 µs | 9.0 µs |
+| mul_long | 17+0.125i, 3 | 3.4 µs | 3.3 µs | 3.7 µs | 3.2 µs | 3.6 µs | 4.2 µs |
+| mul_pow10 | 1.23456789+0.125i, 3 | 3.2 µs | 2.8 µs | 3.6 µs | 3.0 µs | 2.9 µs | 4.0 µs |
+| neg | 0.7+0.125i | 277.9 ns | 282.6 ns | 308.7 ns | 284.9 ns | 333.5 ns | 386.4 ns |
+| normal_cdf | 0.7+0.125i | 89.1 µs | 194.8 µs | 330.3 µs | 508.7 µs | 2.310 ms | 9.186 ms |
+| normal_logpdf | 0.7+0.125i | 7.4 µs | 12.1 µs | 15.4 µs | 19.3 µs | 55.6 µs | 141.5 µs |
+| normal_pdf | 0.7+0.125i | 20.7 µs | 32.6 µs | 49.2 µs | 82.0 µs | 327.1 µs † | 1.088 ms |
+| polygamma | 3, 2.345+0.125i | 334.4 µs | 736.3 µs | 1.117 ms | 1.619 ms | 5.894 ms | 42.202 ms |
+| polylog | 2, 0.7+0.125i | 233.2 µs | 434.5 µs | 855.3 µs | 1.476 ms | 6.465 ms | 29.221 ms |
+| polylog1 | 0.7+0.125i | 33.5 µs | 39.0 µs | 47.6 µs | 83.3 µs | 151.7 µs | 488.7 µs |
+| pow | 1.23456789+0.125i, 3.5+0.125i | 42.1 µs | 56.2 µs | 102.3 µs | 129.6 µs | 393.5 µs | 1.415 ms |
+| pow10 | 3 | 11.1 µs | 15.2 µs | 26.3 µs | 33.3 µs | 63.7 µs | 186.1 µs |
+| pow_int | 1.23456789+0.125i, 3 | 6.5 µs | 7.6 µs | 8.2 µs | 8.5 µs | 13.4 µs | 24.0 µs |
+| productlog | 0.7+0.125i | 53.8 µs | 59.2 µs | 84.7 µs | 123.3 µs | 285.5 µs | 1.113 ms |
+| qdigamma | 0.5+0.125i, 2.3+0.125i | 199.9 µs | 167.3 µs | 172.1 µs | 164.2 µs | 151.5 µs | 194.5 µs |
+| real_part | 0.7+0.125i | 163.0 ns | 136.1 ns | 138.2 ns | 121.9 ns | 133.0 ns | 166.1 ns |
+| rect | 0.7 | 2.7 µs | 2.7 µs | 2.4 µs | 3.4 µs | 4.3 µs | 8.5 µs |
+| root | 1.2345+0.125i, 3 | 40.8 µs | 72.1 µs | 169.5 µs | 247.5 µs | 375.2 µs | 1.410 ms |
+| round | 0.7+0.125i | 9.3 µs | 9.1 µs | 9.6 µs | 9.5 µs | 9.4 µs | 10.0 µs |
+| roundn | 1.23456789+0.125i, 3 | 15.4 µs | 18.1 µs | 17.1 µs | 17.1 µs | 20.7 µs | 33.6 µs |
+| rounds | 1.23456789+0.125i, 3 | 46.5 µs | 64.9 µs | 79.6 µs | 96.1 µs | 191.8 µs | 629.8 µs |
+| sec | 0.7+0.125i | 16.5 µs | 17.8 µs | 25.9 µs | 34.7 µs | 101.1 µs | 341.1 µs |
+| sech | 0.7+0.125i | 12.7 µs | 16.8 µs | 23.0 µs | 80.9 µs | 83.9 µs | 367.0 µs |
+| sgn | 0.7 | 743.0 ns | 788.4 ns | 809.3 ns | 814.2 ns | 937.6 ns | 862.8 ns |
+| sin | 0.567+0.125i | 16.4 µs | 14.2 µs | 22.1 µs | 34.9 µs | 94.3 µs | 457.2 µs |
+| sinc | 0.7+0.125i | 19.0 µs | 28.7 µs | 38.0 µs | 47.7 µs | 128.3 µs | 496.7 µs |
+| sinh | 0.7+0.125i | 7.8 µs | 14.1 µs | 20.4 µs | 86.6 µs | 68.8 µs | 338.1 µs |
+| sqr | 0.7+0.125i | 1.5 µs | 1.8 µs | 2.4 µs | 2.8 µs | 4.3 µs | 7.7 µs |
+| sqrt | 1.23456789+0.125i | 7.4 µs † | 2.9 µs | 3.4 µs | 3.6 µs | 6.8 µs | 17.1 µs |
+| step | 0.7 | 1.3 µs † | 807.3 ns | 759.7 ns | 798.0 ns | 1.0 µs | 1.1 µs |
+| struve_h | 2, 0.7+0.125i | 239.3 µs | 484.6 µs | 889.7 µs | 1.362 ms | 4.855 ms | 24.368 ms |
+| struve_l | 2, 0.7+0.125i | 256.0 µs | 546.4 µs | 833.7 µs | 1.228 ms | 4.959 ms | 23.051 ms |
+| sub | 0.7+0.125i, 0.7+0.125i | 344.1 ns | 335.6 ns | 390.6 ns | 384.2 ns | 436.8 ns | 648.9 ns |
+| tan | 0.7+0.125i | 11.3 µs | 19.5 µs | 28.8 µs | 37.3 µs | 101.4 µs | 418.0 µs |
+| tanh | 0.7+0.125i | 28.5 µs | 16.2 µs | 63.8 µs | 41.1 µs | 97.7 µs | 383.0 µs |
+| tetragamma | 2.345+0.125i | 334.2 µs | 692.7 µs | 1.281 ms | 2.070 ms | 6.995 ms | 39.360 ms |
+| tri | 0.7 | 2.3 µs | 2.4 µs | 2.8 µs | 3.1 µs | 4.6 µs | 10.4 µs |
+| trigamma | 2.345+0.125i | 466.8 µs † | 583.0 µs | 1.112 ms | 1.469 ms | 5.144 ms | 25.445 ms |
+| vercos | 0.7+0.125i | 18.2 µs | 17.7 µs | 28.2 µs | 34.5 µs | 101.7 µs | 343.9 µs |
+| versin | 0.7+0.125i | 21.4 µs | 17.8 µs | 29.5 µs | 34.8 µs | 108.9 µs | 319.7 µs |
+| zatahp | 2.3+0.125i, 1.4+0.125i | 2.211 ms | 4.462 ms | 8.566 ms | 16.518 ms | 106.725 ms | 472.295 ms |
+| zeta | 2.345+0.125i | 587.5 µs | 1.168 ms | 2.690 ms | 3.825 ms | 21.074 ms | 114.240 ms |
+| zetah | 2.3+0.125i, 1.4+0.125i | 2.064 ms | 3.771 ms | 9.478 ms | 14.282 ms | 78.827 ms | 531.778 ms |
+| zetap | 2.345+0.125i | 623.6 µs | 1.313 ms | 3.191 ms | 5.783 ms | 22.846 ms | 128.182 ms |
 
 ### number / multi-precision integer
 
 | Operation | Inputs | Exact |
 |---|---|---:|
-| bit_and | 17, 5 | 209.5 ns |
-| bit_length | 17 | 139.0 ns |
-| bit_not | 17 | 191.8 ns |
-| bit_or | 17, 5 | 192.8 ns |
-| bit_xor | 17, 5 | 213.3 ns |
-| clear_bit | 17, 3 | 263.4 ns |
-| divmod | 17, 5 | 123.6 ns |
-| factorial | 17 | 222.5 ns |
-| factors | 17 | 255.8 ns |
-| fibonacci | 17 | 173.1 ns |
-| gcd | 17, 5 | 76.4 ns |
-| gcdext | 17, 5 | 490.2 ns |
-| is_prime | 17 | 121.3 ns |
-| isqrt | 17 | 101.5 ns |
-| lcm | 17, 5 | 69.9 ns |
-| mod | 17, 5 | 81.7 ns |
-| modinv | 17, 5 | 236.9 ns |
-| next_prime | 17 | 123.2 ns |
-| partition | 17 | 1.3 µs |
-| powmod | 7, 5, 13 | 152.2 ns |
-| prev_prime | 17 | 223.5 ns |
-| prove_prime | 17 | 111.4 ns |
-| set_bit | 17, 3 | 238.5 ns |
-| shl | 17, 3 | 186.8 ns |
-| shr | 17, 3 | 252.3 ns |
-| test_bit | 17, 3 | 266.9 ns |
+| bit_and | <span style="display:inline-block;width:80ch;max-width:100%;white-space:normal;overflow-wrap:anywhere">97128534091520311412078115857277804694847051212062325796074342369690095336188259<br/>72019189714991570566406054322696914278072582233749672788465961948345240051163361<br/>75148822936232722767648574748304016264158410359714586574421333707776078034640711<br/>01158385124186229995073045427448918227959893082282919863982307657776, <br/>12498846048367045926370716602609982839721641429222959125376462582674869403443996<br/>972648628699047686839582654905384579341977328653591547736951147466435189662</span> | 206.0 ns |
+| bit_length | <span style="display:inline-block;width:80ch;max-width:100%;white-space:normal;overflow-wrap:anywhere">97128534091520311412078115857277804694847051212062325796074342369690095336188259<br/>72019189714991570566406054322696914278072582233749672788465961948345240051163361<br/>75148822936232722767648574748304016264158410359714586574421333707776078034640711<br/>01158385124186229995073045427448918227959893082282919863982307657776</span> | 167.4 ns |
+| bit_not | <span style="display:inline-block;width:80ch;max-width:100%;white-space:normal;overflow-wrap:anywhere">97128534091520311412078115857277804694847051212062325796074342369690095336188259<br/>72019189714991570566406054322696914278072582233749672788465961948345240051163361<br/>75148822936232722767648574748304016264158410359714586574421333707776078034640711<br/>01158385124186229995073045427448918227959893082282919863982307657776</span> | 298.3 ns |
+| bit_or | <span style="display:inline-block;width:80ch;max-width:100%;white-space:normal;overflow-wrap:anywhere">97128534091520311412078115857277804694847051212062325796074342369690095336188259<br/>72019189714991570566406054322696914278072582233749672788465961948345240051163361<br/>75148822936232722767648574748304016264158410359714586574421333707776078034640711<br/>01158385124186229995073045427448918227959893082282919863982307657776, <br/>12498846048367045926370716602609982839721641429222959125376462582674869403443996<br/>972648628699047686839582654905384579341977328653591547736951147466435189662</span> | 188.2 ns |
+| bit_xor | <span style="display:inline-block;width:80ch;max-width:100%;white-space:normal;overflow-wrap:anywhere">97128534091520311412078115857277804694847051212062325796074342369690095336188259<br/>72019189714991570566406054322696914278072582233749672788465961948345240051163361<br/>75148822936232722767648574748304016264158410359714586574421333707776078034640711<br/>01158385124186229995073045427448918227959893082282919863982307657776, <br/>12498846048367045926370716602609982839721641429222959125376462582674869403443996<br/>972648628699047686839582654905384579341977328653591547736951147466435189662</span> | 180.4 ns |
+| clear_bit | <span style="display:inline-block;width:80ch;max-width:100%;white-space:normal;overflow-wrap:anywhere">97128534091520311412078115857277804694847051212062325796074342369690095336188259<br/>72019189714991570566406054322696914278072582233749672788465961948345240051163361<br/>75148822936232722767648574748304016264158410359714586574421333707776078034640711<br/>01158385124186229995073045427448918227959893082282919863982307657776, <br/>701</span> | 206.2 ns |
+| divmod | <span style="display:inline-block;width:80ch;max-width:100%;white-space:normal;overflow-wrap:anywhere">97128534091520311412078115857277804694847051212062325796074342369690095336188259<br/>72019189714991570566406054322696914278072582233749672788465961948345240051163361<br/>75148822936232722767648574748304016264158410359714586574421333707776078034640711<br/>01158385124186229995073045427448918227959893082282919863982307657776, <br/>12498846048367045926370716602609982839721641429222959125376462582674869403443996<br/>972648628699047686839582654905384579341977328653591547736951147466435189662</span> | 325.7 ns |
+| factorial | 5000 | 111.2 µs |
+| factors | <span style="display:inline-block;width:80ch;max-width:100%;white-space:normal;overflow-wrap:anywhere">54772119019154636339867862041163448790974484131459861520687327809209914339836012<br/>52275954799541486775711126005967382600118182797233708133775335788335658037065081<br/>31569062299976033041302189833215742992653063887339218309467131548996199881113600<br/>00000000000000000000000000000000000000000000000000000000000000000000000000000000<br/>0000000000000000000000000000000000000000000000</span> | 77.1 µs |
+| fibonacci | 10000 | 5.0 µs |
+| gcd | <span style="display:inline-block;width:80ch;max-width:100%;white-space:normal;overflow-wrap:anywhere">97128534091520311412078115857277804694847051212062325796074342369690095336188259<br/>72019189714991570566406054322696914278072582233749672788465961948345240051163361<br/>75148822936232722767648574748304016264158410359714586574421333707776078034640711<br/>01158385124186229995073045427448918227959893082282919863982307657776, <br/>12498846048367045926370716602609982839721641429222959125376462582674869403443996<br/>972648628699047686839582654905384579341977328653591547736951147466435189662</span> | 2.7 µs |
+| gcdext | <span style="display:inline-block;width:80ch;max-width:100%;white-space:normal;overflow-wrap:anywhere">97128534091520311412078115857277804694847051212062325796074342369690095336188259<br/>72019189714991570566406054322696914278072582233749672788465961948345240051163361<br/>75148822936232722767648574748304016264158410359714586574421333707776078034640711<br/>01158385124186229995073045427448918227959893082282919863982307657776, <br/>12498846048367045926370716602609982839721641429222959125376462582674869403443996<br/>972648628699047686839582654905384579341977328653591547736951147466435189662</span> | 3.1 µs |
+| is_prime | <span style="display:inline-block;width:80ch;max-width:100%;white-space:normal;overflow-wrap:anywhere">68647976601306097149819007990813932172694353001433054093944634591855431833976560<br/>52122559640661454554977296311391480858037121987999716643812574028291115057151</span> | 422.7 µs |
+| isqrt | <span style="display:inline-block;width:80ch;max-width:100%;white-space:normal;overflow-wrap:anywhere">97128534091520311412078115857277804694847051212062325796074342369690095336188259<br/>72019189714991570566406054322696914278072582233749672788465961948345240051163361<br/>75148822936232722767648574748304016264158410359714586574421333707776078034640711<br/>01158385124186229995073045427448918227959893082282919863982307657776</span> | 367.6 ns |
+| lcm | <span style="display:inline-block;width:80ch;max-width:100%;white-space:normal;overflow-wrap:anywhere">97128534091520311412078115857277804694847051212062325796074342369690095336188259<br/>72019189714991570566406054322696914278072582233749672788465961948345240051163361<br/>75148822936232722767648574748304016264158410359714586574421333707776078034640711<br/>01158385124186229995073045427448918227959893082282919863982307657776, <br/>12498846048367045926370716602609982839721641429222959125376462582674869403443996<br/>972648628699047686839582654905384579341977328653591547736951147466435189662</span> | 3.2 µs |
+| mod | <span style="display:inline-block;width:80ch;max-width:100%;white-space:normal;overflow-wrap:anywhere">97128534091520311412078115857277804694847051212062325796074342369690095336188259<br/>72019189714991570566406054322696914278072582233749672788465961948345240051163361<br/>75148822936232722767648574748304016264158410359714586574421333707776078034640711<br/>01158385124186229995073045427448918227959893082282919863982307657776, <br/>12498846048367045926370716602609982839721641429222959125376462582674869403443996<br/>972648628699047686839582654905384579341977328653591547736951147466435189662</span> | 246.8 ns |
+| modinv | <span style="display:inline-block;width:80ch;max-width:100%;white-space:normal;overflow-wrap:anywhere">97128534091520311412078115857277804694847051212062325796074342369690095336188259<br/>72019189714991570566406054322696914278072582233749672788465961948345240051163361<br/>75148822936232722767648574748304016264158410359714586574421333707776078034640711<br/>01158385124186229995073045427448918227959893082282919863982307657776, <br/>68647976601306097149819007990813932172694353001433054093944634591855431833976560<br/>52122559640661454554977296311391480858037121987999716643812574028291115057151</span> | 3.3 µs |
+| next_prime | <span style="display:inline-block;width:80ch;max-width:100%;white-space:normal;overflow-wrap:anywhere">12498846048367045926370716602609982839721641429222959125376462582674869403443996<br/>972648628699047686839582654905384579341977328653591547736951147466435189662</span> | 3.750 ms |
+| partition | 5000 | 9.383 ms † |
+| powmod | <span style="display:inline-block;width:80ch;max-width:100%;white-space:normal;overflow-wrap:anywhere">97128534091520311412078115857277804694847051212062325796074342369690095336188259<br/>72019189714991570566406054322696914278072582233749672788465961948345240051163361<br/>75148822936232722767648574748304016264158410359714586574421333707776078034640711<br/>01158385124186229995073045427448918227959893082282919863982307657776, <br/>12498846048367045926370716602609982839721641429222959125376462582674869403443996<br/>972648628699047686839582654905384579341977328653591547736951147466435189662, <br/>68647976601306097149819007990813932172694353001433054093944634591855431833976560<br/>52122559640661454554977296311391480858037121987999716643812574028291115057151</span> | 311.4 µs † |
+| prev_prime | <span style="display:inline-block;width:80ch;max-width:100%;white-space:normal;overflow-wrap:anywhere">12498846048367045926370716602609982839721641429222959125376462582674869403443996<br/>972648628699047686839582654905384579341977328653591547736951147466435189662</span> | 6.642 ms |
+| prove_prime | <span style="display:inline-block;width:80ch;max-width:100%;white-space:normal;overflow-wrap:anywhere">68647976601306097149819007990813932172694353001433054093944634591855431833976560<br/>52122559640661454554977296311391480858037121987999716643812574028291115057151</span> | 3.235 ms |
+| set_bit | <span style="display:inline-block;width:80ch;max-width:100%;white-space:normal;overflow-wrap:anywhere">97128534091520311412078115857277804694847051212062325796074342369690095336188259<br/>72019189714991570566406054322696914278072582233749672788465961948345240051163361<br/>75148822936232722767648574748304016264158410359714586574421333707776078034640711<br/>01158385124186229995073045427448918227959893082282919863982307657776, <br/>700</span> | 231.7 ns |
+| shl | <span style="display:inline-block;width:80ch;max-width:100%;white-space:normal;overflow-wrap:anywhere">97128534091520311412078115857277804694847051212062325796074342369690095336188259<br/>72019189714991570566406054322696914278072582233749672788465961948345240051163361<br/>75148822936232722767648574748304016264158410359714586574421333707776078034640711<br/>01158385124186229995073045427448918227959893082282919863982307657776, <br/>257</span> | 331.3 ns |
+| shr | <span style="display:inline-block;width:80ch;max-width:100%;white-space:normal;overflow-wrap:anywhere">97128534091520311412078115857277804694847051212062325796074342369690095336188259<br/>72019189714991570566406054322696914278072582233749672788465961948345240051163361<br/>75148822936232722767648574748304016264158410359714586574421333707776078034640711<br/>01158385124186229995073045427448918227959893082282919863982307657776, <br/>257</span> | 250.3 ns |
+| test_bit | <span style="display:inline-block;width:80ch;max-width:100%;white-space:normal;overflow-wrap:anywhere">97128534091520311412078115857277804694847051212062325796074342369690095336188259<br/>72019189714991570566406054322696914278072582233749672788465961948345240051163361<br/>75148822936232722767648574748304016264158410359714586574421333707776078034640711<br/>01158385124186229995073045427448918227959893082282919863982307657776, <br/>701</span> | 243.4 ns |
 
 ### number / multi-precision fraction
 
