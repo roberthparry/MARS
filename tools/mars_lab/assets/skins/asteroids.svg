@@ -1,0 +1,138 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1000" fill="none">
+  <title>Sunlit asteroids in deep space</title>
+  <desc>Static vector illustration of weathered, irregular rocky bodies with granular regolith, overlapping impact pits and deep fractures. Warm sunlight falls from the upper left. The shapes are decorative rather than portraits of named asteroids.</desc>
+  <defs>
+    <radialGradient id="stone" cx=".28" cy=".16" r=".88" gradientTransform="translate(0 -.04) scale(1 1.12)">
+      <stop stop-color="#c1b5a1"/>
+      <stop offset=".28" stop-color="#998d7b"/>
+      <stop offset=".56" stop-color="#72685b"/>
+      <stop offset=".78" stop-color="#49453e"/>
+      <stop offset="1" stop-color="#1c1c1b"/>
+    </radialGradient>
+    <radialGradient id="hollow" cx=".66" cy=".72" r=".77">
+      <stop stop-color="#7e7463"/>
+      <stop offset=".5" stop-color="#544d43"/>
+      <stop offset=".8" stop-color="#302f2b"/>
+      <stop offset="1" stop-color="#1e211f"/>
+    </radialGradient>
+    <linearGradient id="rim" x1=".18" y1=".1" x2=".72" y2=".9">
+      <stop stop-color="#655e52"/>
+      <stop offset=".45" stop-color="#887b68"/>
+      <stop offset=".8" stop-color="#a4947c"/>
+      <stop offset="1" stop-color="#6f6659"/>
+    </linearGradient>
+    <radialGradient id="shade" cx=".18" cy=".18" r=".95">
+      <stop offset=".35" stop-color="#101514" stop-opacity="0"/>
+      <stop offset=".67" stop-color="#101514" stop-opacity=".12"/>
+      <stop offset=".86" stop-color="#101514" stop-opacity=".45"/>
+      <stop offset="1" stop-color="#080b0c" stop-opacity=".9"/>
+    </radialGradient>
+    <filter id="regolith" x="-2%" y="-2%" width="104%" height="104%" color-interpolation-filters="sRGB">
+      <feTurbulence type="fractalNoise" baseFrequency=".018 .027" numOctaves="4" seed="9" result="mottle"/>
+      <feColorMatrix in="mottle" type="saturate" values="0"/>
+      <feComponentTransfer result="mottle">
+        <feFuncR type="linear" slope=".45" intercept=".6"/>
+        <feFuncG type="linear" slope=".45" intercept=".6"/>
+        <feFuncB type="linear" slope=".45" intercept=".6"/>
+      </feComponentTransfer>
+      <feComposite in="SourceGraphic" in2="mottle" operator="arithmetic" k1="1" k2="0" k3="0" k4="0" result="rock"/>
+      <feTurbulence type="fractalNoise" baseFrequency=".63" numOctaves="3" seed="23" result="grit"/>
+      <feDiffuseLighting in="grit" surfaceScale=".8" diffuseConstant="1" lighting-color="#e3d6bd" result="relief">
+        <feDistantLight azimuth="225" elevation="48"/>
+      </feDiffuseLighting>
+      <feComposite in="relief" in2="rock" operator="arithmetic" k1=".6" k2="0" k3=".5" k4="0"/>
+      <feComposite in2="SourceAlpha" operator="in"/>
+    </filter>
+    <filter id="soft"><feGaussianBlur stdDeviation="1.3"/></filter>
+    <path id="long-body" d="M-257-28C-263-47-253-70-236-84C-225-93-222-108-209-117C-192-130-173-130-159-139C-146-146-140-158-119-161C-99-165-83-153-68-142C-48-127-30-122-13-127C9-132 22-153 39-157C63-166 77-163 93-159C108-155 125-159 140-148C157-135 168-139 182-127C193-115 207-117 216-102C226-87 239-85 242-65C245-48 257-36 254-18C251-2 260 12 251 28C245 43 248 60 233 73C221 85 223 101 207 111C191 122 184 137 165 141C143 145 134 159 111 157C93 155 79 167 58 161C39 157 28 139 9 131C-11 123-26 136-43 139C-56 144-68 149-86 140C-103 130-118 133-133 122C-147 112-164 113-177 102C-192 90-209 84-218 68C-227 54-242 49-246 31C-251 10-263-6-257-28Z"/>
+    <path id="round-body" d="M-94-21C-96-37-86-46-80-58C-74-69-60-71-50-78C-37-88-25-83-13-89C1-94 12-87 26-85C40-84 45-72 58-68C69-63 70-49 80-41C90-32 84-20 90-7C98 8 90 21 88 34C85 47 74 52 68 64C62 76 47 75 36 82C25 89 12 82-2 87C-17 92-27 83-40 79C-52 75-54 63-66 58C-81 52-77 36-86 26C-96 13-88-4-94-21Z"/>
+    <g id="pit">
+      <path d="M-24-5C-23-18-11-23 1-22C14-23 25-13 25-2C27 9 16 20 3 21C-12 23-25 12-24-5Z" fill="url(#rim)"/>
+      <path d="M-20-5C-18-16-8-20 3-18C16-17 22-9 21 1C20 12 10 17-1 16C-13 15-22 7-20-5Z" fill="url(#hollow)"/>
+      <path d="M-20-7C-19-16-7-21 4-18C12-17 18-12 20-7" stroke="#242823" stroke-opacity=".5" stroke-width="2.4" stroke-linecap="round"/>
+      <path d="M-14 14C-3 22 13 17 20 8" stroke="#c9b79b" stroke-opacity=".24" stroke-width="1.3" stroke-linecap="round"/>
+    </g>
+    <g id="boulder">
+      <path d="M-7 3L-5-3L0-5L5-2L7 3L3 6L-3 6Z" fill="#443f36"/>
+      <path d="M-7 3L-5-3L0-5L2 0L-1 3Z" fill="#b7a68c"/>
+      <path d="M2 0L5-2L7 3L3 6L-1 3Z" fill="#716655"/>
+    </g>
+    <g id="pebble-body">
+      <use href="#round-body" fill="url(#stone)" filter="url(#regolith)"/>
+      <g opacity=".72">
+        <use href="#pit" transform="translate(-19 -28) rotate(-15) scale(.85 .7)"/>
+        <use href="#pit" transform="translate(32 22) rotate(20) scale(.5 .65)"/>
+        <use href="#pit" transform="translate(-43 25) scale(.3)"/>
+        <use href="#pit" transform="translate(24 -45) scale(.25 .35)"/>
+      </g>
+      <path d="M-62-41Q-43-29-35-9L-23 1L-18 21M-35-9L-16-14" stroke="#322f29" stroke-opacity=".5" stroke-width="2" stroke-linecap="round"/>
+      <use href="#round-body" fill="url(#shade)"/>
+    </g>
+  </defs>
+  <g opacity=".72" transform="translate(827 130) rotate(31) scale(.59)">
+    <use href="#pebble-body"/>
+  </g>
+  <g transform="translate(1208 253) rotate(-17)">
+    <use href="#long-body" fill="#0d1110" transform="translate(4 6)" opacity=".35" filter="url(#soft)"/>
+    <use href="#long-body" fill="url(#stone)" filter="url(#regolith)"/>
+    <path d="M-231-69Q-215-87-191-94Q-166-111-145-112M-132-143Q-112-153-94-147M-54-131Q-30-118-8-124M49-154Q75-155 87-143" stroke="#d8c6a6" stroke-opacity=".24" stroke-width="1.6" stroke-linecap="round"/>
+    <path d="M-183-84Q-146-62-130-31Q-110 1-74 18Q-48 28-28 59Q-13 76 8 84Q33 97 46 125" stroke="#242720" stroke-opacity=".64" stroke-width="5" stroke-linecap="round"/>
+    <path d="M-180-86Q-143-64-126-33Q-107-3-71 14Q-43 28-26 54M-127-30Q-99-45-72-41L-54-49M-28 59L-48 78L-57 100" stroke="#b5a183" stroke-opacity=".29" stroke-width="1.8" stroke-linecap="round"/>
+    <path d="M72-132Q56-100 63-71L51-40L59-15M66-71L86-55L91-29M126 25L108 45L110 66L95 91" stroke="#2b2b25" stroke-opacity=".56" stroke-width="3" stroke-linecap="round"/>
+    <path d="M75-133Q59-100 66-73L54-41M129 25L111 46L113 65" stroke="#c3af90" stroke-opacity=".25" stroke-width="1.4" stroke-linecap="round"/>
+    <g opacity=".78">
+      <use href="#pit" transform="translate(-124 -83) rotate(-18) scale(1.5 .95)"/>
+      <use href="#pit" transform="translate(-65 -91) rotate(11) scale(.63 .44)"/>
+      <use href="#pit" transform="translate(4 -73) rotate(-23) scale(1.15 .84)"/>
+      <use href="#pit" transform="translate(125 -49) rotate(26) scale(1.64 1.45)"/>
+      <use href="#pit" transform="translate(141 -42) rotate(35) scale(.57 .46)"/>
+      <use href="#pit" transform="translate(-188 -17) rotate(-18) scale(.63 .9)"/>
+      <use href="#pit" transform="translate(-143 26) rotate(-12) scale(1.08 1.24)"/>
+      <use href="#pit" transform="translate(-108 71) rotate(12) scale(.5 .45)"/>
+      <use href="#pit" transform="translate(-55 63) rotate(-20) scale(.55 .72)"/>
+      <use href="#pit" transform="translate(8 21) rotate(10) scale(1.7 1.35)"/>
+      <use href="#pit" transform="translate(33 34) rotate(10) scale(.47 .6)"/>
+      <use href="#pit" transform="translate(63 98) rotate(30) scale(.8 .48)"/>
+      <use href="#pit" transform="translate(164 71) rotate(30) scale(.95 .76)"/>
+      <use href="#pit" transform="translate(-212 -49) rotate(-25) scale(.27 .38)"/>
+      <use href="#pit" transform="translate(-167 -99) scale(.23 .21)"/>
+      <use href="#pit" transform="translate(-88 -133) scale(.31 .19)"/>
+      <use href="#pit" transform="translate(-32 -119) scale(.2 .16)"/>
+      <use href="#pit" transform="translate(37 -130) scale(.32 .23)"/>
+      <use href="#pit" transform="translate(103 -105) scale(.3 .22)"/>
+      <use href="#pit" transform="translate(170 -85) rotate(20) scale(.39 .3)"/>
+      <use href="#pit" transform="translate(197 -21) rotate(35) scale(.32 .5)"/>
+      <use href="#pit" transform="translate(213 34) scale(.27 .37)"/>
+      <use href="#pit" transform="translate(109 119) scale(.37 .21)"/>
+      <use href="#pit" transform="translate(-15 120) scale(.28 .21)"/>
+      <use href="#pit" transform="translate(-80 104) scale(.25 .18)"/>
+      <use href="#pit" transform="translate(-196 54) rotate(-20) scale(.23 .32)"/>
+      <use href="#pit" transform="translate(-99 -8) scale(.25 .23)"/>
+      <use href="#pit" transform="translate(-47 -19) scale(.18 .24)"/>
+      <use href="#pit" transform="translate(58 -31) scale(.25 .3)"/>
+      <use href="#pit" transform="translate(90 23) scale(.2 .24)"/>
+      <use href="#pit" transform="translate(-19 88) scale(.18 .22)"/>
+    </g>
+    <g opacity=".64">
+      <use href="#boulder" transform="translate(-172 -51) rotate(-20) scale(.9)"/>
+      <use href="#boulder" transform="translate(-81 -67) rotate(60) scale(.58)"/>
+      <use href="#boulder" transform="translate(-28 -111) rotate(18) scale(.48)"/>
+      <use href="#boulder" transform="translate(68 -100) rotate(-10) scale(.55)"/>
+      <use href="#boulder" transform="translate(-181 12) rotate(45) scale(.42)"/>
+      <use href="#boulder" transform="translate(-93 45) rotate(-30) scale(.75)"/>
+      <use href="#boulder" transform="translate(-52 99) rotate(10) scale(.42)"/>
+      <use href="#boulder" transform="translate(25 80) rotate(-40) scale(.67)"/>
+      <use href="#boulder" transform="translate(101 64) rotate(22) scale(.62)"/>
+      <use href="#boulder" transform="translate(190 18) rotate(70) scale(.5)"/>
+      <use href="#boulder" transform="translate(143 98) rotate(-20) scale(.37)"/>
+    </g>
+    <use href="#long-body" fill="url(#shade)"/>
+  </g>
+  <g opacity=".85" transform="translate(1452 650) rotate(46) scale(.64 .83)">
+    <use href="#pebble-body"/>
+  </g>
+  <g opacity=".54" transform="translate(949 543) rotate(-56) scale(.19 .26)"><use href="#pebble-body"/></g>
+  <g opacity=".5" transform="translate(692 709) rotate(24) scale(.105 .15)"><use href="#pebble-body"/></g>
+  <g opacity=".48" transform="translate(1463 62) rotate(-24) scale(.22 .15)"><use href="#pebble-body"/></g>
+  <g opacity=".4" transform="translate(1329 797) rotate(70) scale(.075 .1)"><use href="#pebble-body"/></g>
+</svg>

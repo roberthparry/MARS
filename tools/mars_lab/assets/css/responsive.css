@@ -17,13 +17,26 @@
   }
 
   header {
-    display: block;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
     padding: 1rem 0.75rem 0.45rem;
   }
 
+  header > .skin-picker {
+    position: static;
+    grid-column: 2;
+    grid-row: 1;
+    align-self: start;
+    justify-self: end;
+  }
+
   .header-side {
+    grid-column: 1 / -1;
+    grid-row: 2;
     justify-items: start;
     margin-top: 0.5rem;
+    padding-top: 0;
   }
 
   .status {
@@ -62,7 +75,7 @@
   }
 
   section {
-    border-radius: 17px;
+    --workspace-panel-radius: 17px;
   }
 
   .panel-head {
@@ -691,7 +704,7 @@
 
   section {
     background: rgba(8, 29, 22, 0.94);
-    border-width: 1px;
+    --workspace-panel-border: 1px;
   }
 
   .panel-head {

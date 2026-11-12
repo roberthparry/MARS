@@ -3548,6 +3548,11 @@
                 return;
             }
             initialiseLabTestAdapters();
+            if (new URLSearchParams(location.search).get('appearance-check') === '1') {
+                await runBrowserGroup('appearance skins', window.checkLabAppearance);
+                await report('PASS: local skins preserve worksheets and survive unavailable storage');
+                return;
+            }
             if (new URLSearchParams(location.search).get('ode-check') === '1') {
                 await runBrowserGroup('worksheet input event policy', window.checkLabEvents);
                 await runBrowserGroup('binding DOM controls', window.checkLabBindingDom);
@@ -3710,6 +3715,7 @@
             await runBrowserGroup('checkLabPersistence', window.checkLabPersistence);
             await runBrowserGroup('checkLabStorage', window.checkLabStorage);
             window.checkLabWidgets();
+            await runBrowserGroup('appearance skins', window.checkLabAppearance);
             await runBrowserGroup('checkLabSelects', window.checkLabSelects);
             await runBrowserGroup('checkLabSelectEvents', window.checkLabSelectEvents);
             await runBrowserGroup('checkLabLayout', window.checkLabLayout);

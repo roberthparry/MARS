@@ -1,0 +1,145 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1000" fill="none">
+  <title>Saturn, with fine cloud belts and sunlit rings</title>
+  <desc>Decorative vector interpretation of Saturn's subdued cream and gold clouds, flattened globe, fine concentric rings and dark Cassini Division. The globe and ring plane share one tilted axis; the near rings cross the planet and both cast shadows. Cassini natural-colour reference: NASA/JPL-Caltech/SSI/Cornell, PIA17474, https://www.jpl.nasa.gov/images/pia17474-jewel-of-the-solar-system/ . No embedded bitmap.</desc>
+  <defs>
+    <ellipse id="globe" rx="185" ry="170"/>
+    <clipPath id="disc"><use href="#globe"/></clipPath>
+    <clipPath id="front"><path d="M-440 0H440V180H-440Z"/></clipPath>
+    <clipPath id="annulus">
+      <path clip-rule="evenodd" d="M410 0A410 143.5 0 1 1-410 0A410 143.5 0 1 1 410 0ZM207 0A207 72.45 0 1 0-207 0A207 72.45 0 1 0 207 0Z"/>
+    </clipPath>
+    <linearGradient id="clouds" x1="0" y1="-170" x2="0" y2="170" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#868d7e"/>
+      <stop offset=".055" stop-color="#a6ad95"/>
+      <stop offset=".12" stop-color="#c2c4a7"/>
+      <stop offset=".19" stop-color="#ddd4b3"/>
+      <stop offset=".24" stop-color="#d1c29e"/>
+      <stop offset=".28" stop-color="#c1b08a"/>
+      <stop offset=".32" stop-color="#ddcba6"/>
+      <stop offset=".36" stop-color="#ddc69e"/>
+      <stop offset=".4" stop-color="#cfb58b"/>
+      <stop offset=".44" stop-color="#ead6af"/>
+      <stop offset=".5" stop-color="#f1dfba"/>
+      <stop offset=".55" stop-color="#e8cfa5"/>
+      <stop offset=".59" stop-color="#d3b48a"/>
+      <stop offset=".64" stop-color="#cfb18a"/>
+      <stop offset=".68" stop-color="#e0c69f"/>
+      <stop offset=".73" stop-color="#d9bd93"/>
+      <stop offset=".78" stop-color="#bfa57e"/>
+      <stop offset=".84" stop-color="#c3ad89"/>
+      <stop offset=".9" stop-color="#b8a88b"/>
+      <stop offset="1" stop-color="#9d9784"/>
+    </linearGradient>
+    <radialGradient id="globe-light" cx=".34" cy=".27" r=".76">
+      <stop stop-color="#fff7db" stop-opacity=".16"/>
+      <stop offset=".53" stop-color="#fff7db" stop-opacity="0"/>
+      <stop offset=".8" stop-color="#272a24" stop-opacity=".22"/>
+      <stop offset="1" stop-color="#101a17" stop-opacity=".82"/>
+    </radialGradient>
+    <radialGradient id="ring-colours" cx="0" cy="0" r="410" gradientUnits="userSpaceOnUse" gradientTransform="scale(1 .35)">
+      <stop offset=".5" stop-color="#706f61" stop-opacity=".28"/>
+      <stop offset=".55" stop-color="#8b8675" stop-opacity=".48"/>
+      <stop offset=".595" stop-color="#958b76" stop-opacity=".65"/>
+      <stop offset=".615" stop-color="#827c6b"/>
+      <stop offset=".635" stop-color="#ada28a"/>
+      <stop offset=".665" stop-color="#d0c3a6"/>
+      <stop offset=".71" stop-color="#e5d7b8"/>
+      <stop offset=".745" stop-color="#d7c6a8"/>
+      <stop offset=".78" stop-color="#e0d1b2"/>
+      <stop offset=".82" stop-color="#cab99c"/>
+      <stop offset=".851" stop-color="#b8a88f"/>
+      <stop offset=".861" stop-color="#292b25" stop-opacity=".65"/>
+      <stop offset=".881" stop-color="#292b25" stop-opacity=".48"/>
+      <stop offset=".887" stop-color="#a4967d"/>
+      <stop offset=".91" stop-color="#b6a88e"/>
+      <stop offset=".944" stop-color="#c6b99f"/>
+      <stop offset=".971" stop-color="#b9ac92"/>
+      <stop offset=".979" stop-color="#6b6859"/>
+      <stop offset=".984" stop-color="#6b6859"/>
+      <stop offset=".988" stop-color="#c5baa0"/>
+      <stop offset="1" stop-color="#9b927e"/>
+    </radialGradient>
+    <linearGradient id="ring-light" x1="-410" y1="-80" x2="410" y2="95" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#fff5d6" stop-opacity=".12"/>
+      <stop offset=".4" stop-color="#fff5d6" stop-opacity="0"/>
+      <stop offset="1" stop-color="#101913" stop-opacity=".27"/>
+    </linearGradient>
+    <linearGradient id="cast-shadow" x1="150" y1="20" x2="404" y2="65" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0b1210" stop-opacity=".84"/>
+      <stop offset=".65" stop-color="#0b1210" stop-opacity=".7"/>
+      <stop offset="1" stop-color="#0b1210" stop-opacity=".12"/>
+    </linearGradient>
+    <filter id="cloud-detail" x="-4%" y="-15%" width="108%" height="130%">
+      <feTurbulence type="fractalNoise" baseFrequency=".018 .23" numOctaves="2" seed="12" result="waves"/>
+      <feDisplacementMap in="SourceGraphic" in2="waves" scale="2.5" xChannelSelector="R" yChannelSelector="G"/>
+      <feGaussianBlur stdDeviation=".28"/>
+    </filter>
+    <filter id="shadow-edge"><feGaussianBlur stdDeviation="2"/></filter>
+    <g id="rings">
+      <g clip-path="url(#annulus)">
+        <ellipse rx="410" ry="143.5" fill="url(#ring-colours)"/>
+        <g stroke="#4a493c" stroke-opacity=".27" stroke-width=".75">
+          <ellipse rx="219" ry="76.65"/><ellipse rx="229" ry="80.15"/>
+          <ellipse rx="238" ry="83.3"/><ellipse rx="247" ry="86.45"/>
+          <ellipse rx="252" ry="88.2"/><ellipse rx="260" ry="91"/>
+          <ellipse rx="267" ry="93.45"/><ellipse rx="273" ry="95.55"/>
+          <ellipse rx="281" ry="98.35"/><ellipse rx="288" ry="100.8"/>
+          <ellipse rx="295" ry="103.25"/><ellipse rx="299" ry="104.65"/>
+          <ellipse rx="306" ry="107.1"/><ellipse rx="311" ry="108.85"/>
+          <ellipse rx="317" ry="110.95"/><ellipse rx="321" ry="112.35"/>
+          <ellipse rx="328" ry="114.8"/><ellipse rx="334" ry="116.9"/>
+          <ellipse rx="339" ry="118.65"/><ellipse rx="344" ry="120.4"/>
+          <ellipse rx="349" ry="122.15"/><ellipse rx="367" ry="128.45"/>
+          <ellipse rx="372" ry="130.2"/><ellipse rx="378" ry="132.3"/>
+          <ellipse rx="383" ry="134.05"/><ellipse rx="389" ry="136.15"/>
+          <ellipse rx="394" ry="137.9"/><ellipse rx="398" ry="139.3"/>
+          <ellipse rx="406" ry="142.1"/>
+        </g>
+        <g stroke="#fff1ce" stroke-opacity=".26" stroke-width=".65">
+          <ellipse rx="224" ry="78.4"/><ellipse rx="243" ry="85.05"/>
+          <ellipse rx="263" ry="92.05"/><ellipse rx="277" ry="96.95"/>
+          <ellipse rx="284" ry="99.4"/><ellipse rx="291" ry="101.85"/>
+          <ellipse rx="303" ry="106.05"/><ellipse rx="314" ry="109.9"/>
+          <ellipse rx="325" ry="113.75"/><ellipse rx="331" ry="115.85"/>
+          <ellipse rx="341" ry="119.35"/><ellipse rx="347" ry="121.45"/>
+          <ellipse rx="370" ry="129.5"/><ellipse rx="375" ry="131.25"/>
+          <ellipse rx="385" ry="134.75"/><ellipse rx="392" ry="137.2"/>
+          <ellipse rx="404" ry="141.4"/>
+        </g>
+        <ellipse rx="410" ry="143.5" fill="url(#ring-light)"/>
+        <path d="M143-26Q253-5 431 21L441 101Q273 83 153 62Z" fill="url(#cast-shadow)" filter="url(#shadow-edge)"/>
+      </g>
+      <ellipse rx="420" ry="147" stroke="#b3a78b" stroke-opacity=".21" stroke-width=".75"/>
+      <ellipse rx="422" ry="147.7" stroke="#b3a78b" stroke-opacity=".12" stroke-width=".55"/>
+    </g>
+  </defs>
+  <g transform="translate(1170 257) rotate(-22)">
+    <use href="#rings"/>
+    <g clip-path="url(#disc)">
+      <use href="#globe" fill="url(#clouds)"/>
+      <g filter="url(#cloud-detail)" stroke-linecap="round">
+        <path d="M-160-139Q0-116 160-139" stroke="#a3ab91" stroke-width="5" opacity=".4"/>
+        <path d="M-180-119Q-56-99 13-103T180-119M-188-109Q-58-88 28-92T188-109" stroke="#efe3bd" stroke-width="2" opacity=".43"/>
+        <path d="M-190-92Q-70-72 24-76T190-92" stroke="#a49373" stroke-width="4" opacity=".34"/>
+        <path d="M-195-80Q-103-61-11-64T195-80M-198-71Q-90-51 9-55T198-71" stroke="#ecdbb4" stroke-width="1.6" opacity=".56"/>
+        <path d="M-196-58Q-74-38 18-42T196-58" stroke="#b19b77" stroke-width="4.5" opacity=".35"/>
+        <path d="M-200-42Q-99-25-1-29T200-42M-200-34Q-65-16 32-20T200-34" stroke="#f8e8c5" stroke-width="1.8" opacity=".55"/>
+        <path d="M-201-20Q-60-2 24-7T201-20" stroke="#bca783" stroke-width="3" opacity=".28"/>
+        <path d="M-200-7Q-65 11 26 8T200-7M-200 3Q-70 20 31 17T200 3" stroke="#fff0c9" stroke-width="2.2" opacity=".42"/>
+        <path d="M-200 20Q-85 40 6 36T200 20" stroke="#a68d6b" stroke-width="5" opacity=".3"/>
+        <path d="M-200 37Q-62 57 33 52T200 37M-200 46Q-74 66 14 62T200 46" stroke="#eddbb3" stroke-width="1.7" opacity=".5"/>
+        <path d="M-197 64Q-55 84 25 80T197 64" stroke="#a8916f" stroke-width="3" opacity=".28"/>
+        <path d="M-193 79Q-69 100 18 95T193 79M-190 89Q-72 108 24 104T190 89" stroke="#e9d6af" stroke-width="1.5" opacity=".5"/>
+        <path d="M-187 105Q-51 128 34 122T187 105" stroke="#a18b69" stroke-width="3" opacity=".31"/>
+        <path d="M-180 126Q-60 147 20 143T180 126" stroke="#e4d3ae" stroke-width="2" opacity=".4"/>
+        <path d="M-79-68Q-63-72-45-68T-13-67M15-45Q37-47 55-43T85-42M-104 13Q-85 10-66 14M72 52Q89 48 109 52" stroke="#fff0ca" stroke-width="1.3" opacity=".5"/>
+      </g>
+      <ellipse cx="-2" cy="-153" rx="49" ry="11" fill="#899987" opacity=".28"/>
+      <ellipse cx="-2" cy="-157" rx="18" ry="5" fill="#627b70" opacity=".28"/>
+      <path d="M-190 22Q-45 65 89 30Q145 15 191-6L205 18Q135 39 96 52Q-40 88-190 43Z" fill="#494333" opacity=".22" filter="url(#shadow-edge)"/>
+      <use href="#globe" fill="url(#globe-light)"/>
+    </g>
+    <use href="#globe" stroke="#d4cbb1" stroke-opacity=".2" stroke-width="1"/>
+    <g clip-path="url(#disc)"><g clip-path="url(#front)"><use href="#rings"/></g></g>
+  </g>
+</svg>

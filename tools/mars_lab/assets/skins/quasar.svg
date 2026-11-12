@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1000" fill="none">
+  <defs>
+    <radialGradient id="halo"><stop stop-color="#83e1ed" stop-opacity=".7"/><stop offset=".28" stop-color="#6b8fc4" stop-opacity=".3"/><stop offset="1" stop-color="#5963a4" stop-opacity="0"/></radialGradient>
+    <radialGradient id="disc"><stop stop-color="#fff2d7"/><stop offset=".25" stop-color="#efca9b" stop-opacity=".8"/><stop offset=".8" stop-color="#b98bc6" stop-opacity=".3"/><stop offset="1" stop-color="#b98bc6" stop-opacity="0"/></radialGradient>
+    <linearGradient id="jet" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#80dcea" stop-opacity="0"/><stop offset=".48" stop-color="#c5f6ff"/><stop offset="1" stop-color="#80dcea" stop-opacity="0"/></linearGradient>
+  </defs>
+  <ellipse cx="1120" cy="290" rx="490" ry="460" fill="url(#halo)"/>
+  <g transform="translate(1120 290) rotate(27)">
+    <path d="M-12-650 16-650 9-38-8-38zM-8 35 9 35 28 710-25 710z" fill="url(#jet)" opacity=".6"/>
+    <path d="M-2-650 3-650 3 710-2 710z" fill="url(#jet)"/>
+    <ellipse rx="290" ry="94" fill="url(#disc)"/>
+    <ellipse rx="200" ry="55" stroke="#f7debb" stroke-width="3" opacity=".6"/>
+    <ellipse rx="134" ry="35" stroke="#e3bfa5" stroke-width="6" opacity=".6"/>
+    <circle r="33" fill="#0a1321" stroke="#f3e9cf" stroke-width="5"/>
+    <path d="M-63 0a63 63 0 0 1 126 0" stroke="#f8e5c8" stroke-width="7" opacity=".8"/>
+  </g>
+</svg>

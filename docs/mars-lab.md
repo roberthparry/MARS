@@ -529,6 +529,89 @@ imports and calendar generation remain visibly active. When output is redirected
 plain status lines replace animated bars. Password and selection prompts remain
 unobstructed; a failed stage does not display successful completion.
 
+### Appearance skins
+
+Use **Skin** at the top-right corner of the page header to change the appearance immediately, in any
+mode, including on a phone. **0. Earth (Default)** is the existing green design.
+The other choices use their own palette and static SVG background artwork.
+The skin menu's highlighted options use the current skin's accent colour.
+Variable and constant rows, their badges, input fields and focus highlights use
+the selected palette; the two binding roles retain distinct accent colours.
+Button, plot and globe tooltips also use the selected palette for their text,
+borders and backgrounds.
+Calculations, plot colours, flags, globe imagery and worksheet history retain
+their existing behaviour when a skin changes.
+
+The selection is saved independently for each browser and site address in
+`localStorage`, under `mars.lab.skin.v1`. It is restored before the stylesheet
+loads, avoiding a flash of the default skin, and synchronised between open tabs
+on the same origin. Another device keeps its own choice. If browser storage is
+unavailable, selection still works for the current page; an absent or invalid
+saved value selects Earth. Clearing site storage also restores Earth.
+
+Each link below opens an uncropped, full-page capture of the actual Lab after
+its calculation completed. Backgrounds are decorative SVG illustrations.
+
+| Skin | Full-page preview |
+| :--- | :--- |
+| 0. Earth (Default) | [Existing green design](images/mars-lab/skin-earth.png) |
+| 1. Mars | [Ochre and rust, with canyons and a polar cap](images/mars-lab/skin-mars.png) |
+| 2. Mercury | [Charcoal and silver, with densely cratered terrain](images/mars-lab/skin-mercury.png) |
+| 3. Jupiter | [Cream zones, turbulent cloud belts and the Great Red Spot](images/mars-lab/skin-jupiter.png) |
+| 4. Venus | [Amber and gold](images/mars-lab/skin-venus.png) |
+| 5. Saturn | [Subtle cloud belts, fine ringlets and soft shadows](images/mars-lab/skin-saturn.png) |
+| 6. Neptune | [Deep blue and ice blue](images/mars-lab/skin-neptune.png) |
+| 7. Moon | [Slate and silver, with recognisable lunar seas and craters](images/mars-lab/skin-moon.png) |
+| 8. Galaxy | [The Milky Way, with a central bar and branching spiral arms](images/mars-lab/skin-galaxy.png) |
+| 9. Andromeda | [An inclined elliptical disc, with a warm bulge and soft dust lanes](images/mars-lab/skin-andromeda.png) |
+| 10. Nebula | [Pink and teal](images/mars-lab/skin-nebula.png) |
+| 11. Quasar | [Midnight and cyan](images/mars-lab/skin-quasar.png) |
+| 12. Asteroids | [Weathered rocks, impact pits and warm sunlight](images/mars-lab/skin-asteroids.png) |
+| 13. Exoplanet | [Lavender and turquoise](images/mars-lab/skin-exoplanet.png) |
+
+Authored artwork lives in `tools/mars_lab/assets/skins/`, with the palettes and
+surface overrides in `assets/css/skins.css`. The small `appearance.ts` browser
+adapter handles only selection, optional preference storage and browser theme
+colour. It runs before worksheet restoration and does not enter calculation or
+WASM scheduling. The artwork has no animation or external image dependency.
+The Moon uses simplified vector contours from NASA's north-up full-Moon rendering,
+retaining the familiar lunar seas and crater patterns. The SVG contains no embedded
+bitmap. Reference credit: NASA's Scientific Visualization Studio; LROC WAC mosaic,
+NASA/GSFC/Arizona State University. See [NASA's source and credits](https://svs.gsfc.nasa.gov/5048/).
+Mercury likewise uses simplified SVG contours, based on the MESSENGER globe
+centred at 0° N, 0° E (PIA15160), retaining its smaller craters and bright ray
+patterns. Reference credit: NASA/Johns Hopkins University Applied Physics
+Laboratory/Carnegie Institution of Washington. See [Mercury's source and credits](https://science.nasa.gov/photojournal/mercury-globe-0n-0e/).
+Mars uses simplified SVG contours from NASA's Viking Orbiter colour mosaic
+(PIA00407), preserving the Valles Marineris canyon region, ochre plains, darker
+terrain and north polar cap. Its subtle shading rounds the globe without adding
+a raster texture. The reference has enhanced colour contrast; the skin is a
+decorative interpretation. Reference credit: NASA/JPL/USGS. See [Mars's source and credits](https://science.nasa.gov/photojournal/global-color-views-of-mars/).
+Jupiter's detailed SVG contours follow Hubble's 2019 portrait, rotated to present
+its cloud belts horizontally. Sixty-four colour classes preserve finer filaments,
+oval storms and the Great Red Spot; continuous limb shading and a light blend
+at contour edges soften the transitions. The artwork contains no embedded bitmap.
+Reference credit: NASA, ESA, A. Simon (Goddard Space Flight Center), and M.H. Wong
+(University of California, Berkeley). See [Jupiter's source and credits](https://science.nasa.gov/asset/hubble/jupiter-2019/).
+Saturn has an oblate globe, subdued cream and gold cloud belts and fine ringlets
+separated by the darker Cassini Division. The planet and rings share one tilted
+axis, with the near rings passing in front of the globe and shadows adding depth.
+Its static SVG is a decorative interpretation of Cassini's natural-colour views,
+without an embedded bitmap. Reference credit: NASA/JPL-Caltech/SSI/Cornell.
+See [Saturn's reference and credits](https://www.jpl.nasa.gov/images/pia17474-jewel-of-the-solar-system/).
+Galaxy depicts the Milky Way as a barred spiral, with a warm stellar bar,
+branching blue-white arms, dark dust lanes and scattered starlight. Its static
+SVG contours adapt NASA's external-view artist's concept (PIA10748); this is a
+decorative illustration rather than a photograph or an exact map of our galaxy.
+Reference credit: NASA/JPL-Caltech/R. Hurt (SSC/Caltech). See [the Milky Way reference and credits](https://www.spitzer.caltech.edu/image/ssc2008-10a1-the-milky-way-galaxy).
+Andromeda uses a rounded elliptical disc at an oblique viewing angle, with
+diffuse outer starlight, a warm central bulge, soft near-side dust lanes and
+two faint companion glows.
+Asteroids uses irregular rocky silhouettes, fine regolith, overlapping impact
+pits and fractures, with warm directional lighting and shaded limbs. Reusable
+SVG paths and static surface filters add detail without an embedded bitmap;
+the bodies are decorative rather than portraits of named asteroids.
+
 ### Configuration and relocatable resources
 
 The small bootstrap file `~/.mars/config/mars.json` contains just the `database`

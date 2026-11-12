@@ -3,6 +3,7 @@
   display: grid;
   justify-items: end;
   gap: 0.55rem;
+  padding-top: 3rem;
 }
 
 /* Calendar information and the Mobile disclosure share one top-aligned desktop row. */
@@ -31,6 +32,7 @@
 @media (min-width: 1600px) {
   body:is(.almanac-mode, .datetime-mode) .header-side {
     transform: translateY(4.5rem);
+    padding-top: 0;
   }
 
   body:is(.almanac-mode, .datetime-mode) main {

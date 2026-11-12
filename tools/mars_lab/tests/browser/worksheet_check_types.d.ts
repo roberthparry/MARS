@@ -107,6 +107,9 @@ interface Window {
 
     /** Check isolated widget behaviour. */
     checkLabWidgets(): void;
+
+    /** Check decorative skins, local artwork and optional preference storage without changing worksheets. */
+    checkLabAppearance(): Promise<void>;
 }
 
 /** Deferred fixture value whose settlement is controlled by the check. */

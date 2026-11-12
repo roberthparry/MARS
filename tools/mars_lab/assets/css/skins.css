@@ -1,0 +1,301 @@
+/* Numbered decorative palettes. Zero deliberately retains the original theme's complete cascade. */
+:root[data-skin="1"] {
+  --paper: #1a1010; --panel: #30201d; --ink: #fff4eb; --muted: #dfc4b6;
+  --line: #986a55; --accent: #efb073; --accent-2: #d79b91;
+  --skin-art: url("/skins/mars.svg");
+}
+:root[data-skin="2"] {
+  --paper: #121314; --panel: #242728; --ink: #f5f4ef; --muted: #cbc9c3;
+  --line: #7c807e; --accent: #d4c4a8; --accent-2: #a2bac6;
+  --skin-art: url("/skins/mercury.svg");
+}
+:root[data-skin="3"] {
+  --paper: #19120e; --panel: #30251d; --ink: #fff6e9; --muted: #ddcbb8;
+  --line: #987961; --accent: #edc992; --accent-2: #dca58c;
+  --skin-art: url("/skins/jupiter.svg");
+}
+:root[data-skin="4"] {
+  --paper: #191509; --panel: #302b18; --ink: #fff9e8; --muted: #ded2ac;
+  --line: #968456; --accent: #f2d68c; --accent-2: #ddaf7f;
+  --skin-art: url("/skins/venus.svg");
+}
+:root[data-skin="5"] {
+  --paper: #16150f; --panel: #2b2a20; --ink: #fff9e9; --muted: #d5cfb9;
+  --line: #90866b; --accent: #e6c887; --accent-2: #b0c6b7;
+  --skin-art: url("/skins/saturn.svg");
+}
+:root[data-skin="6"] {
+  --paper: #080f26; --panel: #12213d; --ink: #eef7ff; --muted: #b6caeb;
+  --line: #577ba8; --accent: #93d6f5; --accent-2: #a6b5ff;
+  --skin-art: url("/skins/neptune.svg");
+}
+:root[data-skin="7"] {
+  --paper: #10141c; --panel: #222b37; --ink: #f5f7fc; --muted: #c4cfdd;
+  --line: #77899d; --accent: #d2ddeb; --accent-2: #a5c8dc;
+  --skin-art: url("/skins/moon.svg");
+}
+:root[data-skin="8"] {
+  --paper: #110d23; --panel: #241c3b; --ink: #faf4ff; --muted: #cec0e4;
+  --line: #806b9e; --accent: #d8b6f6; --accent-2: #8dd5eb;
+  --skin-art: url("/skins/galaxy.svg");
+}
+:root[data-skin="9"] {
+  --paper: #160e1c; --panel: #2e1f33; --ink: #fff4fa; --muted: #dfc2d3;
+  --line: #976c91; --accent: #efbcca; --accent-2: #b6b6f2;
+  --skin-art: url("/skins/andromeda.svg");
+}
+:root[data-skin="10"] {
+  --paper: #0e1622; --panel: #202839; --ink: #fff5fb; --muted: #d2c4e1;
+  --line: #877697; --accent: #efafc9; --accent-2: #96d9d0;
+  --skin-art: url("/skins/nebula.svg");
+}
+:root[data-skin="11"] {
+  --paper: #080f1d; --panel: #172436; --ink: #effcff; --muted: #b9d1e1;
+  --line: #5d879d; --accent: #89e5f0; --accent-2: #cfabe7;
+  --skin-art: url("/skins/quasar.svg");
+}
+:root[data-skin="12"] {
+  --paper: #15110e; --panel: #29231e; --ink: #fff6eb; --muted: #d5c8b8;
+  --line: #8b7962; --accent: #dfbf88; --accent-2: #b2c4c8;
+  --skin-art: url("/skins/asteroids.svg");
+}
+:root[data-skin="13"] {
+  --paper: #101524; --panel: #24283e; --ink: #faf5ff; --muted: #d1c7e9;
+  --line: #7b7ea9; --accent: #babcfb; --accent-2: #83d8c8;
+  --skin-art: url("/skins/exoplanet.svg");
+}
+
+.skin-picker {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: .6rem;
+  min-width: 0;
+  font: .76rem/1.3 system-ui, sans-serif;
+  color: var(--muted);
+}
+.skin-picker label {
+  margin: 0;
+  font-size: .7rem;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+.skin-picker select {
+  max-width: min(14rem, calc(100vw - 5.5rem));
+  min-height: 2.4rem;
+  padding: .4rem .65rem;
+  border: 1px solid var(--line);
+  border-radius: .7rem;
+  background: var(--panel);
+  color: var(--ink);
+  color-scheme: dark;
+  font: inherit;
+  cursor: pointer;
+}
+.skin-picker select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+.skin-picker option { background: var(--panel); color: var(--ink); }
+.skin-picker option:is(:checked, :hover, :focus-visible) {
+  background: var(--accent);
+  color: #10151e;
+}
+
+/* Shared skin surfaces replace the original green fills without changing charts, flags or photography. */
+:root[data-skin]:not([data-skin="0"]) {
+  color-scheme: dark;
+  --code: var(--ink);
+  --stone: var(--panel);
+  --mist: var(--ink);
+  --torc: var(--accent);
+  --oak: var(--paper);
+}
+:root[data-skin]:not([data-skin="0"]) body {
+  background: radial-gradient(ellipse at 85% 0, var(--panel), var(--paper) 75%);
+}
+:root[data-skin]:not([data-skin="0"]) body::before {
+  opacity: .65;
+  mask: none;
+  background:
+    radial-gradient(1px 1px at 4% 12%, #fff 50%, transparent),
+    radial-gradient(2px 2px at 13% 39%, #dae9ff 50%, transparent),
+    radial-gradient(1px 1px at 22% 6%, #fff 50%, transparent),
+    radial-gradient(1px 1px at 36% 22%, #d3e4ff 50%, transparent),
+    radial-gradient(2px 2px at 45% 8%, #fff 50%, transparent),
+    radial-gradient(1px 1px at 55% 43%, #fff 50%, transparent),
+    radial-gradient(1px 1px at 62% 17%, #fff 50%, transparent),
+    radial-gradient(2px 2px at 75% 4%, #e0eaff 50%, transparent),
+    radial-gradient(1px 1px at 86% 41%, #fff 50%, transparent),
+    radial-gradient(1px 1px at 94% 14%, #fff 50%, transparent),
+    radial-gradient(2px 2px at 8% 81%, #dbe9ff 50%, transparent),
+    radial-gradient(1px 1px at 32% 93%, #fff 50%, transparent),
+    radial-gradient(1px 1px at 69% 86%, #fff 50%, transparent),
+    radial-gradient(2px 2px at 91% 73%, #e4ddff 50%, transparent);
+}
+:root[data-skin]:not([data-skin="0"]) body::after { display: none; }
+:root[data-skin]:not([data-skin="0"]) .celtic-backdrop {
+  background: linear-gradient(180deg, transparent, var(--paper)), var(--skin-art) center top / cover no-repeat;
+  opacity: .72;
+}
+:root[data-skin]:not([data-skin="0"]) .celtic-backdrop > * { display: none; }
+:root[data-skin]:not([data-skin="0"]) :is(section, .card, .help-menu, .sky-status-strip) {
+  background: color-mix(in srgb, var(--panel) 88%, transparent);
+  border-color: var(--line);
+}
+:root[data-skin]:not([data-skin="0"]) :is(.panel-head, .card-title) {
+  background: color-mix(in srgb, var(--accent) 7%, var(--panel));
+  border-color: var(--line);
+}
+:root[data-skin]:not([data-skin="0"]) :is(h2, .card-action, button.secondary, .mode-tab, .select-button) {
+  color: var(--ink);
+}
+:root[data-skin]:not([data-skin="0"]) :is(.card-action, button.secondary, .mode-tab, .select-button) {
+  background: color-mix(in srgb, var(--accent-2) 12%, var(--panel));
+  border-color: var(--line);
+}
+:root[data-skin]:not([data-skin="0"]) .mode-tab.active {
+  color: #10151e;
+  background: linear-gradient(120deg, var(--accent), var(--accent-2));
+  border-color: var(--accent);
+}
+:root[data-skin]:not([data-skin="0"]) :is(.select-menu, .precision-custom-panel, .history-editor,
+    .mars-date-picker, .mars-button-tooltip, .globe-grid-tooltip, .plot-pointer-tip, .surface-pointer-tip,
+    .mars-flag-viewer, .mobile-panel, .history-dragging) {
+  background: var(--panel);
+  color: var(--ink);
+  border-color: var(--line);
+}
+:root[data-skin]:not([data-skin="0"]) :is(.mars-button-tooltip, .globe-grid-tooltip,
+    .plot-pointer-tip, .surface-pointer-tip) {
+  border-color: color-mix(in srgb, var(--accent) 60%, var(--line));
+  box-shadow: 0 .4rem 1rem #0006, inset 0 0 0 1px color-mix(in srgb, var(--accent-2) 12%, transparent);
+}
+:root[data-skin]:not([data-skin="0"]) :is(.mode-panel select, .target-row select, .mars-date-picker-title select) {
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--ink) 50%),
+    linear-gradient(135deg, var(--ink) 50%, transparent 50%),
+    linear-gradient(var(--panel), var(--panel));
+}
+:root[data-skin]:not([data-skin="0"]) :is(.mode-panel select option, .target-row select option,
+    .mars-date-picker-title select option) {
+  background: var(--panel);
+  color: var(--ink);
+}
+:root[data-skin]:not([data-skin="0"]) :is(.almanac-sheet-header, .almanac-summary,
+    .datetime-field-group, .datetime-local, .datetime-section, .almanac-grid-table,
+    .almanac-visibility-toggle, .history-entry-open) {
+  background: color-mix(in srgb, var(--paper) 60%, var(--panel));
+  border-color: var(--line);
+}
+:root[data-skin]:not([data-skin="0"]) :is(.history-current, .history-drag-handle,
+    .history-editor h2, .almanac-sheet-title, .almanac-section-title, .datetime-field-group-title,
+    .datetime-local-title, .almanac-grid-table thead th) { color: var(--accent); }
+:root[data-skin]:not([data-skin="0"]) :is(.almanac-grid-table thead th, .datetime-section summary,
+    .mars-date-picker-day.selected) {
+  background: color-mix(in srgb, var(--accent) 12%, var(--panel));
+}
+:root[data-skin]:not([data-skin="0"]) .mars-date-picker-day.today { color: var(--accent-2); }
+:root[data-skin]:not([data-skin="0"]) :is(.history-entry[aria-current], .select-option:hover,
+    .select-option:focus-visible) { background: color-mix(in srgb, var(--accent) 15%, var(--panel)); }
+:root[data-skin]:not([data-skin="0"]) :is(.select-option.selected, button[aria-pressed="true"], .card-action.copied) {
+  background: var(--accent);
+  color: #10151e;
+}
+
+/* Binding roles share the palette, including their nested input and focus states. */
+:root[data-skin]:not([data-skin="0"]) .variable-value-box {
+  --binding-accent: var(--accent);
+  border-color: color-mix(in srgb, var(--binding-accent) 40%, var(--line));
+  background: linear-gradient(135deg, var(--paper), color-mix(in srgb, var(--binding-accent) 8%, var(--panel)));
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--ink) 10%, transparent);
+}
+:root[data-skin]:not([data-skin="0"]) .constant-value-box { --binding-accent: var(--accent-2); }
+:root[data-skin]:not([data-skin="0"]) .variable-value-name {
+  color: #10151e;
+  background: var(--binding-accent);
+}
+:root[data-skin]:not([data-skin="0"]) :is(.variable-value-text, .select-search, #precisionCustomInput,
+    .target-row input:not([type="range"]):not([type="radio"]):not([type="checkbox"]),
+    .mode-panel input:not([type="range"]):not([type="radio"]):not([type="checkbox"]),
+    .plot-slice input[type="text"], .mars-date-picker-title input) {
+  color: var(--ink);
+  caret-color: var(--ink);
+  background: color-mix(in srgb, var(--paper) 65%, var(--panel));
+  border-color: var(--line);
+}
+:root[data-skin]:not([data-skin="0"]) :is(.binding-value-input, .select-search, #precisionCustomInput,
+    .target-row input:not([type="range"]):not([type="radio"]):not([type="checkbox"]),
+    .mode-panel input:not([type="range"]):not([type="radio"]):not([type="checkbox"]),
+    .plot-slice input[type="text"], .mars-date-picker-title input):focus {
+  border-color: var(--binding-accent, var(--accent));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--binding-accent, var(--accent)) 20%, transparent);
+}
+:root[data-skin]:not([data-skin="0"]) :is(.target-row, .integrator-bound-field) input:is(:autofill, :-webkit-autofill) {
+  -webkit-text-fill-color: var(--ink);
+  box-shadow: 0 0 0 1000px var(--panel) inset;
+}
+:root[data-skin]:not([data-skin="0"]) :is(.target-row, .integrator-bound-field) input:is(:autofill, :-webkit-autofill):focus {
+  box-shadow: 0 0 0 1000px var(--panel) inset, 0 0 0 3px color-mix(in srgb, var(--accent) 20%, transparent);
+}
+:root[data-skin]:not([data-skin="0"]) .binding-value-clear { color: var(--ink); }
+:root[data-skin]:not([data-skin="0"]) .binding-value-clear:is(:hover, :focus-visible) {
+  background: color-mix(in srgb, var(--binding-accent) 20%, transparent);
+}
+:root[data-skin]:not([data-skin="0"]) :is(.binding-value-clear, #precisionCustomToggle,
+    .precision-custom-panel button, .precision-custom-panel input):focus-visible {
+  outline-color: var(--binding-accent, var(--accent));
+}
+:root[data-skin]:not([data-skin="0"]) #precisionCustomApply {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #10151e;
+}
+:root[data-skin]:not([data-skin="0"]) #precisionCustomInput[aria-invalid="true"] { border-color: #ffbdac; }
+:root[data-skin]:not([data-skin="0"]) :is(.mode-panel label, .target-row label, #plotCamera label) {
+  color: var(--muted);
+}
+:root[data-skin]:not([data-skin="0"]) #plotRange .plot-choices label:has(:checked) {
+  background: color-mix(in srgb, var(--accent-2) 15%, var(--panel));
+}
+:root[data-skin]:not([data-skin="0"]) :is(.select-button:focus-visible, .select-shell.open .select-button) {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 20%, transparent);
+}
+:root[data-skin]:not([data-skin="0"]) .select-search::placeholder {
+  color: color-mix(in srgb, var(--muted) 55%, transparent);
+}
+:root[data-skin]:not([data-skin="0"]) .mobile-card summary {
+  background: var(--accent);
+  color: #10151e;
+}
+:root[data-skin]:not([data-skin="0"]) .mobile-card summary::before {
+  background: var(--accent-2);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent-2) 18%, transparent);
+}
+:root[data-skin]:not([data-skin="0"]) :is(.mobile-copy strong, .mars-date-picker-nav, .mars-date-button) {
+  color: var(--accent);
+}
+:root[data-skin]:not([data-skin="0"]) input { accent-color: var(--accent); }
+:root[data-skin]:not([data-skin="0"]) input[type="range"]::-moz-range-track {
+  background: color-mix(in srgb, var(--accent-2) 40%, var(--panel));
+}
+:root[data-skin]:not([data-skin="0"]) input[type="range"]::-webkit-slider-runnable-track {
+  background: color-mix(in srgb, var(--accent-2) 40%, var(--panel));
+}
+:root[data-skin]:not([data-skin="0"]) input[type="range"]::-moz-range-thumb { border-color: var(--ink); }
+:root[data-skin]:not([data-skin="0"]) input[type="range"]::-webkit-slider-thumb { border-color: var(--ink); }
+:root[data-skin]:not([data-skin="0"]) h1 { text-shadow: 0 0 1.8rem color-mix(in srgb, var(--accent-2) 35%, transparent); }
+:root[data-skin]:not([data-skin="0"]) * { scrollbar-color: var(--accent) var(--panel); }
+
+/* Small touch screens retain the selector even when the mobile-access card is hidden. */
+@media (max-width: 600px) {
+  .skin-picker { gap: .35rem; }
+  .skin-picker label { display: none; }
+  .skin-picker select {
+    max-width: min(11rem, 44vw);
+    min-height: 2.75rem;
+  }
+  :root[data-skin]:not([data-skin="0"]) .celtic-backdrop {
+    background-position: center, right top;
+  }
+}

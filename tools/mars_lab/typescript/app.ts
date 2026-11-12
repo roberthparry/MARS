@@ -579,6 +579,7 @@ class LabApplication {
     }
 
     private disposeControllers(): void {
+        WorksheetAppearance.controller.dispose();
         WorksheetRequests.plots.dispose();
         WorksheetRequests.presentation.dispose();
         WorksheetRequests.solver.dispose();

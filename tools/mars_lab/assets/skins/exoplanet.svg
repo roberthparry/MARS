@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1000" fill="none">
+  <defs>
+    <radialGradient id="halo"><stop stop-color="#86d8cb" stop-opacity=".35"/><stop offset="1" stop-color="#86d8cb" stop-opacity="0"/></radialGradient>
+    <radialGradient id="surface" cx=".25" cy=".18" r=".9"><stop stop-color="#bad8dd"/><stop offset=".4" stop-color="#6888a1"/><stop offset=".75" stop-color="#64557f"/><stop offset="1" stop-color="#20243e"/></radialGradient>
+    <radialGradient id="moon"><stop stop-color="#d5c7e5"/><stop offset="1" stop-color="#594d75"/></radialGradient>
+    <clipPath id="disc"><circle cx="1200" cy="240" r="225"/></clipPath>
+  </defs>
+  <ellipse cx="1200" cy="240" rx="490" ry="425" fill="url(#halo)"/>
+  <circle cx="1200" cy="240" r="230" stroke="#a4e3db" stroke-opacity=".26" stroke-width="4"/>
+  <g clip-path="url(#disc)">
+    <circle cx="1200" cy="240" r="225" fill="url(#surface)"/>
+    <path d="m1043 14 86 33 19 48 67 43-25 54-45-8-18 62-64 7-43-45-35-66zM1255 219l44-34 69 13 57 46-23 65-62 8-36 56-55-16-25-58zM1040 345l74-37 38 18 19 57-52 31-44-3z" fill="#6ab5a0" opacity=".6"/>
+    <path d="M983 114q99 72 206 48t236 97M971 271q104 55 190 6t245 81" stroke="#e5e6fc" stroke-width="17" stroke-linecap="round" opacity=".27"/>
+    <path d="M1065 28q92 94 178 80" stroke="#e7ecfc" stroke-width="11" stroke-linecap="round" opacity=".3"/>
+  </g>
+  <circle cx="860" cy="77" r="40" fill="url(#moon)"/>
+  <circle cx="1450" cy="555" r="17" fill="url(#moon)"/>
+  <path d="M210 975q507-501 1390-424" stroke="#b1a5de" stroke-opacity=".13"/>
+</svg>

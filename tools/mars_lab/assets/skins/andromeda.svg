@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1000" fill="none">
+  <title>Andromeda, an inclined elliptical disc</title>
+  <desc>A decorative view of Andromeda's inclined spiral disc, with a rounded elliptical silhouette,
+    diffuse outer starlight, warm central bulge, near-side dust lanes and two faint companion glows.</desc>
+  <defs>
+    <filter id="soft-dust" x="-5%" y="-10%" width="110%" height="120%"
+      color-interpolation-filters="sRGB"><feGaussianBlur stdDeviation="2.2"/></filter>
+    <radialGradient id="halo">
+      <stop stop-color="#d6b9d0" stop-opacity=".22"/>
+      <stop offset=".55" stop-color="#8983ad" stop-opacity=".08"/>
+      <stop offset="1" stop-color="#77749e" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="disc">
+      <stop stop-color="#f7ead5" stop-opacity=".93"/>
+      <stop offset=".19" stop-color="#ded1cd" stop-opacity=".83"/>
+      <stop offset=".43" stop-color="#b4acc4" stop-opacity=".6"/>
+      <stop offset=".72" stop-color="#8686ac" stop-opacity=".37"/>
+      <stop offset=".9" stop-color="#7b7ba3" stop-opacity=".15"/>
+      <stop offset="1" stop-color="#77749e" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="bulge">
+      <stop stop-color="#fff8dd" stop-opacity=".96"/>
+      <stop offset=".22" stop-color="#f4dfbc" stop-opacity=".85"/>
+      <stop offset=".56" stop-color="#d8baa9" stop-opacity=".43"/>
+      <stop offset="1" stop-color="#c9a8a6" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="nucleus">
+      <stop stop-color="#fffbea"/>
+      <stop offset=".3" stop-color="#fff2ce" stop-opacity=".8"/>
+      <stop offset="1" stop-color="#f4dfbc" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="dust" x1="0" y1="-120" x2="0" y2="145" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#302837" stop-opacity="0"/>
+      <stop offset=".4" stop-color="#302837" stop-opacity=".08"/>
+      <stop offset=".68" stop-color="#2e2633" stop-opacity=".58"/>
+      <stop offset="1" stop-color="#302837" stop-opacity=".12"/>
+    </linearGradient>
+    <radialGradient id="cloud">
+      <stop stop-color="#c4d0e6" stop-opacity=".2"/>
+      <stop offset="1" stop-color="#c4d0e6" stop-opacity="0"/>
+    </radialGradient>
+    <clipPath id="disc-edge"><ellipse rx="555" ry="155"/></clipPath>
+  </defs>
+  <g transform="translate(1080 325) rotate(-25)">
+    <ellipse rx="650" ry="225" fill="url(#halo)"/>
+    <ellipse rx="555" ry="155" fill="url(#disc)"/>
+    <g clip-path="url(#disc-edge)">
+      <g filter="url(#soft-dust)">
+        <ellipse rx="462" ry="117" stroke="url(#dust)" stroke-width="12"/>
+        <ellipse cx="-8" cy="3" rx="359" ry="89" stroke="url(#dust)" stroke-width="8"/>
+        <path d="M-406 39C-313 86-236 103-141 108S68 114 163 101 326 66 408 34"
+          stroke="#362938" stroke-width="3" stroke-opacity=".2"/>
+      </g>
+      <ellipse cx="-341" cy="-49" rx="101" ry="26" fill="url(#cloud)"/>
+      <ellipse cx="-194" cy="-88" rx="85" ry="18" fill="url(#cloud)"/>
+      <ellipse cx="174" cy="-81" rx="116" ry="24" fill="url(#cloud)"/>
+      <ellipse cx="353" cy="-31" rx="83" ry="24" fill="url(#cloud)"/>
+      <ellipse cx="279" cy="75" rx="99" ry="19" fill="url(#cloud)"/>
+      <ellipse cx="-223" cy="79" rx="90" ry="20" fill="url(#cloud)"/>
+    </g>
+    <ellipse rx="199" ry="86" fill="url(#bulge)"/>
+    <ellipse rx="63" ry="39" fill="url(#nucleus)"/>
+  </g>
+  <ellipse cx="735" cy="597" rx="30" ry="23" transform="rotate(-25 735 597)"
+    fill="url(#bulge)" opacity=".65"/>
+  <ellipse cx="1438" cy="336" rx="43" ry="32" transform="rotate(-25 1438 336)"
+    fill="url(#bulge)" opacity=".55"/>
+</svg>

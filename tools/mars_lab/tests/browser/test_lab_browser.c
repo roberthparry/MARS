@@ -103,7 +103,7 @@ static bool lab_browser_prepare(const char *directory)
                                           "globe_flight_checks.js", "globe_photo_checks.js", "globe_surface_checks.js",
                                           "image_checks.js", "globe_atlas_checks.js",
                                           "surface_math_checks.js", "history_checks.js",
-                                          "memory_checks.js", "protobuf_wire_checks.js"};
+                                          "memory_checks.js", "protobuf_wire_checks.js", "appearance_checks.js"};
     for (size_t i = 0; script && i < sizeof modules / sizeof *modules; ++i) {
         file_t *module = lab_browser_file("tools/mars_lab/build/typescript_checks/tests/browser", modules[i]);
         string_t *text = module ? file_read_all_text(module) : NULL;
@@ -182,9 +182,11 @@ static bool lab_browser_run(const char *directory)
     bool history_check = getenv("MARS_LAB_HISTORY_CHECKS") && !strcmp(getenv("MARS_LAB_HISTORY_CHECKS"), "1");
     bool evaluation_check = getenv("MARS_LAB_EVALUATION_CHECKS") && !strcmp(getenv("MARS_LAB_EVALUATION_CHECKS"), "1");
     bool ode_check = getenv("MARS_LAB_ODE_CHECKS") && !strcmp(getenv("MARS_LAB_ODE_CHECKS"), "1");
+    bool appearance_check = getenv("MARS_LAB_APPEARANCE_CHECKS") && !strcmp(getenv("MARS_LAB_APPEARANCE_CHECKS"), "1");
     string_t *url =
         server ? string_sprintf("http://127.0.0.1:%u/%s", lab_svr_port(server),
-                                startup_check ? "?startup-check=1" : ode_check ? "?ode-check=1" :
+                                startup_check ? "?startup-check=1" : appearance_check ? "?appearance-check=1" :
+                                ode_check ? "?ode-check=1" :
                                 evaluation_check ? "?evaluation-check=1" :
                                 history_check ? "?history-check=1" :
                                 country_check ? "?country-check=1" : select_check ? "?select-check=1" :

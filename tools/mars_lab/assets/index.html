@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" data-starting="true">
+<html lang="en" data-starting="true" data-skin="0">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -11,9 +11,10 @@
   <link rel="manifest" href="/manifest.webmanifest">
   <meta name="theme-color" content="__THEME_COLOR__">
   <style>
-    html { background: #071913; color: #f3f8f2; }
+    html { background: var(--paper, #071913); color: var(--ink, #f3f8f2); }
     html[data-starting] #labWorkspace, html[data-starting] #subtitle { visibility: hidden; }
   </style>
+  <script src="/js/appearance.js"></script>
   <link rel="stylesheet" href="/index.css">
 </head>
 <body>
@@ -33,6 +34,25 @@
     <div>
       <h1>__LAB_NAME__</h1>
       <p class="subtitle" id="subtitle">__LAB_SUBTITLE__</p>
+    </div>
+    <div class="skin-picker">
+      <label for="skinSelect">Skin</label>
+      <select id="skinSelect" aria-label="Appearance skin">
+        <option value="0" selected>0. Earth (Default)</option>
+        <option value="1">1. Mars</option>
+        <option value="2">2. Mercury</option>
+        <option value="3">3. Jupiter</option>
+        <option value="4">4. Venus</option>
+        <option value="5">5. Saturn</option>
+        <option value="6">6. Neptune</option>
+        <option value="7">7. Moon</option>
+        <option value="8">8. Galaxy</option>
+        <option value="9">9. Andromeda</option>
+        <option value="10">10. Nebula</option>
+        <option value="11">11. Quasar</option>
+        <option value="12">12. Asteroids</option>
+        <option value="13">13. Exoplanet</option>
+      </select>
     </div>
     <div class="header-side">
       <div class="status" id="status" role="status">Restoring your worksheet…</div>
