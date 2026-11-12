@@ -3125,7 +3125,11 @@ are already supplied. Constant bindings remain parameters, never automatic axes.
 #### Parameter slices
 
 Up to eight additional unset parameters share a compact vertical slider panel
-to the right of the chart, keeping the surface visible while adjusting a slice.
+to the right of the chart, keeping the curve or surface visible while adjusting a slice.
+For a 2-D expression curve, unset constant bindings receive these controls too:
+`@S 1/sqrt(2e^y+C) dy` plots against `y` with a labelled `C` slider to explore
+the family of curves. Its elementary closed forms avoid repeated quadrature.
+Unset free variables are not silently treated as constants in an explicitly selected 2-D plot.
 Vertically stacked radio buttons select the parameter when there is more than one; only
 one slider is visible at a time. Switching preserves each parameter's value and
 limits without resampling. The panel is hidden when there are no extra parameters.
@@ -3137,6 +3141,9 @@ within them and otherwise choosing the native starting value. Range mode is
 remembered independently for each parameter. Supplied
 worksheet bindings remain fixed; slice controls never rewrite the worksheet.
 The plot title identifies the current parameter values, including in exports.
+Native results with no supported numerical form omit the Plot card. A failed
+automatic range search still leaves the range controls available for a manual
+retry, because a failed search does not prove that no plot exists.
 
 Native C selects initial limits. A limited structural domain analysis handles
 principal inverse sine and cosine with affine parameter dependence and bounded

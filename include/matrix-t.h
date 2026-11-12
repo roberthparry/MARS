@@ -1655,14 +1655,32 @@ matrix_t *mat_polylog1(const matrix_t *A);
  */
 matrix_t *mat_harmonic_poly(const matrix_t *A, unsigned int degree);
 
-/** @brief Evaluate the first-kind Chebyshev polynomial of non-negative integral degree. */
-matrix_t *mat_chebyshev_t(const matrix_t *A, unsigned int degree);
+/**
+ * @brief Evaluate the first-kind Chebyshev matrix polynomial @f$T_n(A)@f$ using matrix products.
+ * @param[in] A Borrowed square matrix, valid throughout the call; neither modified nor consumed.
+ * @param[in] degree Non-negative integral polynomial degree; zero returns the identity matrix.
+ * @return Owned matrix released with mat_free(), or NULL for a null/non-square argument or allocation failure.
+ * Evaluation is a matrix polynomial, not an entrywise function; arithmetic follows the matrix's numeric backend.
+ */
+matrix_t *mat_chebyshev_Tn(const matrix_t *A, unsigned int degree);
 
-/** @brief Evaluate the second-kind Chebyshev polynomial of non-negative integral degree. */
-matrix_t *mat_chebyshev_u(const matrix_t *A, unsigned int degree);
+/**
+ * @brief Evaluate the second-kind Chebyshev matrix polynomial @f$U_n(A)@f$ using matrix products.
+ * @param[in] A Borrowed square matrix, valid throughout the call; neither modified nor consumed.
+ * @param[in] degree Non-negative integral polynomial degree; zero returns the identity matrix.
+ * @return Owned matrix released with mat_free(), or NULL for a null/non-square argument or allocation failure.
+ * Evaluation is a matrix polynomial, not an entrywise function; arithmetic follows the matrix's numeric backend.
+ */
+matrix_t *mat_chebyshev_Un(const matrix_t *A, unsigned int degree);
 
-/** @brief Evaluate the physicists' Hermite polynomial of non-negative integral degree. */
-matrix_t *mat_hermite_h(const matrix_t *A, unsigned int degree);
+/**
+ * @brief Evaluate the physicists' Hermite matrix polynomial @f$H_n(A)@f$, with @f$H_1(A)=2A@f$.
+ * @param[in] A Borrowed square matrix, valid throughout the call; neither modified nor consumed.
+ * @param[in] degree Non-negative integral polynomial degree; zero returns the identity matrix.
+ * @return Owned matrix released with mat_free(), or NULL for a null/non-square argument or allocation failure.
+ * Evaluation is a matrix polynomial, not an entrywise function; arithmetic follows the matrix's numeric backend.
+ */
+matrix_t *mat_hermite_Hn(const matrix_t *A, unsigned int degree);
 
 /**
  * @brief Evaluate the Lerch matrix function Phi(Z,s,a) by its convergent power series.

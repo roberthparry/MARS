@@ -10,6 +10,7 @@
 #include "lab_dom.h"
 #include "lab_requests.h"
 #include "lab_plot_slices.h"
+#include "lab_layout.h"
 #include "lab_flow.h"
 #define MARS_LAB_FLOW_REQUEST_INTERNAL_ACCESS
 #include "lab_flow_request_internal.h"
@@ -227,6 +228,10 @@ static jsref lab_flow_request_calculus_accept(struct lab_flow_request_calculus_c
     lab_request_outcome_t outcome = (lab_request_outcome_t)(unsigned)lab_dom_number(lab_dom_get(ctx->frame, "outcome"));
     if (outcome == LAB_REQUEST_OUTCOME_STALE)
         return lab_flow_done(0);
+    if (ctx->plot && lab_dom_equal(lab_dom_get(ctx->data, "plot_available"), lab_dom_string("no"))) {
+        lab_layout_plot_unavailable();
+        return lab_flow_request_current(ctx->frame, flow_request_calculus_stage_plot_commit);
+    }
     if (ctx->plot && (lab_dom_truth(lab_dom_get(ctx->data, "plot_slices")) || outcome != LAB_REQUEST_OUTCOME_FAILURE))
         lab_plot_slices_apply(lab_dom_get(ctx->data, "plot_slices"), lab_dom_get(ctx->request, "sliceInput"));
     if (outcome == LAB_REQUEST_OUTCOME_FAILURE) {

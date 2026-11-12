@@ -304,16 +304,7 @@ static jsref lab_flow_evaluation_weather_state(struct lab_flow_evaluation_contex
         int unavailable = lab_dom_equal(lab_dom_get(ctx->data, "plot_available"), lab_dom_string("no"));
         if (lab_dom_number(ctx->mode) == 0 &&
             (unavailable || !lab_dom_count(lab_dom_get(range, "marsPlotNames")))) {
-            lab_plot_slices_clear();
-            lab_layout_plot_camera(1);
-            int plot = lab_dom_id("plotRendered");
-            lab_dom_write(plot, LAB_DOM_TEXT, "", lab_dom_string(""));
-            lab_dom_remove(plot, "data-plot-pending");
-            lab_dom_remove(plot, "data-display-svg");
-            lab_dom_remove(plot, "data-display-tex");
-            lab_dom_write(plot, LAB_DOM_ATTRIBUTE, "aria-busy", lab_dom_string("false"));
-            lab_dom_class(plot, "error", 0);
-            lab_dom_class(lab_dom_id("plotCard"), "hidden", 1);
+            lab_layout_plot_unavailable();
             return lab_flow_eval_current(ctx->frame, lab_flow_eval_finish);
         }
         lab_layout_plot(0, 0);

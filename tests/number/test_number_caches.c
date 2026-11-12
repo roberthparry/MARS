@@ -1,11 +1,14 @@
 /**
  * @file test_number_caches.c
- * @brief Stateful checks of private numeric logarithm reuse and directed complex bounds.
+ * @brief Stateful checks of private logarithm and Dirichlet-power reuse and directed complex bounds.
  *
  * These number-module white-box fixtures compare cached logarithms with independent MPC evaluations across keys,
  * signed branch-cut zeros, precision changes and uncached indices. Integer logarithms also cover precision reuse,
  * direct calculation beyond the cache limits and invalid input. Concurrent callers exercise copied ownership
  * without running independent test cases or suites in parallel. Ordinary mathematical input cases remain in SQL.
+ * Dirichlet powers are checked against higher-precision MPC evaluations across both keys, signed branch-cut zeros,
+ * precision changes, uncached indices and competing threads.
+ * Cloned mathematical constants retain the identity needed to recompute them at a higher precision.
  */
 #include <mpc.h>
 #include <pthread.h>
@@ -15,6 +18,36 @@
 #include "number/number_internal.h"
 #include "test_harness.h"
 #include "test_number.h"
+
+static bool cloned_constant_precision_is_preserved(void)
+{
+    const number_t constants[] = {NUM_PI, NUM_E, NUM_EULER_MASCHERONI};
+    const size_t precisions[][2] = {{160u, 84u}, {512u, 128u}};
+    bool ok = true;
+
+    for (size_t p = 0; p < sizeof precisions / sizeof *precisions; ++p) {
+        for (size_t c = 0; c < sizeof constants / sizeof *constants; ++c) {
+            number_t high = num_const_prec(constants[c], precisions[p][0]);
+            number_t constant = num_const_prec(constants[c], precisions[p][1]);
+            number_t low = num_clone(constant);
+            ok = num_get_prec_bits(low) == precisions[p][1] && ok;
+            ok = !num_set_prec_bits(&low, precisions[p][0]) && ok;
+            ok = mpfr_equal_p(number_mpfr_value(number_impl_const(&low)->value.mpfr),
+                              number_mpfr_value(number_impl_const(&high)->value.mpfr)) && ok;
+            number_t sum = num_add(low, low);
+            number_t reference = num_add(high, high);
+            number_t scaled = num_const_prec(sum, precisions[p][0] * 2u);
+            ok = num_eq(scaled, reference) && ok;
+            num_destroy(&scaled);
+            num_destroy(&reference);
+            num_destroy(&sum);
+            num_destroy(&low);
+            num_destroy(&constant);
+            num_destroy(&high);
+        }
+    }
+    return ok;
+}
 
 static bool cache_log_matches(mpc_srcptr offset, unsigned long index, mpfr_prec_t precision)
 {
@@ -55,17 +88,40 @@ static bool cache_integer_log_matches(unsigned long input, mpfr_prec_t precision
     return ok;
 }
 
+static bool cache_power_matches(mpc_srcptr offset, mpc_srcptr exponent, unsigned long index, mpfr_prec_t precision)
+{
+    mpc_t value, reference, negative;
+    mpc_init2(value, precision); mpc_init2(reference, precision + 64); mpc_init2(negative, precision + 64);
+    mpfr_t error, bound;
+    mpfr_inits2(precision + 64, error, bound, (mpfr_ptr)0);
+    number_dirichlet_power(value, offset, exponent, index);
+    mpc_add_ui(reference, offset, index, MPC_RNDNN);
+    mpc_neg(negative, exponent, MPC_RNDNN); mpc_pow(reference, reference, negative, MPC_RNDNN);
+    mpc_sub(negative, value, reference, MPC_RNDNN);
+    mpc_abs(error, negative, MPFR_RNDU); mpc_abs(bound, reference, MPFR_RNDD);
+    mpfr_mul_2si(bound, bound, -(long)precision + 4, MPFR_RNDD);
+    bool ok = mpfr_number_p(error) && mpfr_lessequal_p(error, bound);
+    mpfr_clears(error, bound, (mpfr_ptr)0);
+    mpc_clear(value); mpc_clear(reference); mpc_clear(negative);
+    return ok;
+}
+
 static void *cache_log_thread(void *data)
 {
     cache_job_t *job = data;
     mpc_t offset;
+    mpc_t exponent;
     mpc_init2(offset, 256);
+    mpc_init2(exponent, 256);
+    mpc_set_d_d(exponent, 1.25, 0.125 * job->index, MPC_RNDNN);
     mpc_set_d_d(offset, 0.75 + job->index, 0.125, MPC_RNDNN);
     job->ok = true;
     for (unsigned i = 0; i < 24 && job->ok; ++i)
         job->ok = cache_log_matches(offset, i, i & 1u ? 128 : 256) &&
-                  cache_integer_log_matches(i + 1u, i & 1u ? 128 : 256);
+                  cache_integer_log_matches(i + 1u, i & 1u ? 128 : 256) &&
+                  cache_power_matches(offset, exponent, i, i & 1u ? 128 : 256);
     mpc_clear(offset);
+    mpc_clear(exponent);
     mpfr_free_cache();
     return NULL;
 }
@@ -73,23 +129,38 @@ static void *cache_log_thread(void *data)
 /* Verify cache keys, precision upgrades, bounded fallbacks and concurrent copied ownership. */
 void run_number_cache_tests(void)
 {
+    ASSERT_TRUE(cloned_constant_precision_is_preserved());
     mpc_t offset;
+    mpc_t exponent;
     mpc_init2(offset, 512);
+    mpc_init2(exponent, 512);
+    mpc_set_d_d(exponent, 0.75, 0.125, MPC_RNDNN);
     mpc_set_d_d(offset, -1.25, 0.0, MPC_RNDNN);
     bool ok = cache_log_matches(offset, 0, 128);
+    ok = cache_power_matches(offset, exponent, 0, 128) && ok;
     mpfr_set_zero(mpc_imagref(offset), -1);
     ok = cache_log_matches(offset, 0, 128) && ok;
+    ok = cache_power_matches(offset, exponent, 0, 128) && ok;
     mpfr_set_zero(mpc_imagref(offset), 1);
     ok = cache_log_matches(offset, 0, 256) && ok;
     ok = cache_log_matches(offset, 0, 128) && ok;
+    ok = cache_power_matches(offset, exponent, 0, 256) && ok;
+    ok = cache_power_matches(offset, exponent, 0, 128) && ok;
     mpc_set_d_d(offset, 0.75, 0.125, MPC_RNDNN);
     ok = cache_log_matches(offset, 511, 4096) && ok;
     ok = cache_log_matches(offset, 511, 256) && ok;
     ok = cache_log_matches(offset, 5000, 256) && ok;
+    ok = cache_power_matches(offset, exponent, 511, 4096) && ok;
+    ok = cache_power_matches(offset, exponent, 511, 256) && ok;
+    ok = cache_power_matches(offset, exponent, 5000, 256) && ok;
+    mpc_set_d_d(exponent, 1.5, -0.125, MPC_RNDNN);
+    ok = cache_power_matches(offset, exponent, 0, 256) && ok;
     mpc_set_prec(offset, 32768);
     mpc_set_d_d(offset, 0.75, 0.125, MPC_RNDNN);
     ok = cache_log_matches(offset, 0, 256) && ok;
+    ok = cache_power_matches(offset, exponent, 0, 32768) && ok;
     mpc_clear(offset);
+    mpc_clear(exponent);
 
     ok = cache_integer_log_matches(1, 128) && ok;
     ok = cache_integer_log_matches(577, 128) && ok;

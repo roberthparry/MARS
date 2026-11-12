@@ -731,7 +731,7 @@ additional special functions, parameter conditions or continuation machinery.
 | `zetah`, `zatahp` | Varying the order or the offset gives different convergence and pole conditions. |
 | `lerch_phi`, `lommel_s`, `appell_f1`, `lauricella_f`, `hypergeometric_pFq` | Parameter-dependent growth, cuts and singularities prevent a universal formula for arbitrary argument placement. |
 | `beta`, `logbeta`, `beta_pdf`, `logbeta_pdf`, `binomial`, `harmonic_poly` | Parameter positions matter. Polynomial specialisations may reduce to existing rules. The current beta-density constructor is an analytic expression, not an automatically compactly supported density. |
-| `chebyshev_t`, `chebyshev_u`, `hermite_h` | Fixed non-negative integral degrees give polynomials with ordinary Laplace transforms. Direct named-polynomial Laplace rules are not yet implemented; their Fourier pairs are documented separately. |
+| `chebyshev_Tn`, `chebyshev_Un`, `hermite_Hn` | Fixed non-negative integral degrees give polynomials with ordinary Laplace transforms. Direct named-polynomial Laplace rules are not yet implemented; their Fourier pairs are documented separately. |
 
 The `causal_convolve` constructor implements the unilateral convolution theorem:
 its transform is the product of the operands' transforms, combining known
@@ -1415,17 +1415,17 @@ The names distinguish the existing harmonic polynomial from Hermite:
 
 | Input name | Mathematical notation | Convention | Other spellings |
 | :--- | :---: | :--- | :--- |
-| `Tn(n,x)` | $T_n(x)$ | Chebyshev, first kind; $T_0=1$, $T_1=x$ | `chebyshev_t`, `ChebyshevT`, indexed `T_n(x)` |
-| `Un(n,x)` | $U_n(x)$ | Chebyshev, second kind; $U_0=1$, $U_1=2x$ | `chebyshev_u`, `ChebyshevU`, indexed `U_n(x)` |
-| `ℋ(n,x)` | $\mathcal H_n(x)$ | Physicists' Hermite; $\mathcal H_0=1$, $\mathcal H_1=2x$ | `hermite_h`, `HermiteH`, indexed `ℋ_n(x)` |
+| `chebyshev_Tn(n,x)` | $T_n(x)$ | Chebyshev, first kind; $T_0=1$, $T_1=x$ | `Tn`, `ChebyshevT`, indexed `T_n(x)` |
+| `chebyshev_Un(n,x)` | $U_n(x)$ | Chebyshev, second kind; $U_0=1$, $U_1=2x$ | `Un`, `ChebyshevU`, indexed `U_n(x)` |
+| `hermite_Hn(n,x)` | $\mathcal H_n(x)$ | Physicists' Hermite; $\mathcal H_0=1$, $\mathcal H_1=2x$ | `ℋ`, `HermiteH`, indexed `ℋ_n(x)` |
 | `Hn(n,x)` | $H_n(x)$ | Existing harmonic polynomial; unchanged | `harmonic_poly`, `harmonicpoly` |
 
 The three orthogonal-polynomial families use non-negative integral degrees.
 Real and complex arguments are evaluated by polynomial recurrence, without
 inverse-trigonometric branch choices. The number backend retains its working
 precision and exact arithmetic; matrix APIs evaluate matrix polynomials, not
-entrywise values. C constructors use the names `expr_chebyshev_t`,
-`expr_chebyshev_u` and `expr_hermite_h`.
+entrywise values. C constructors use the names `expr_chebyshev_Tn`,
+`expr_chebyshev_Un` and `expr_hermite_Hn`.
 
 Differentiation uses $T_n'=nU_{n-1}$ and
 $\mathcal H_n'=2n\mathcal H_{n-1}$. Second-kind derivatives use polynomial
@@ -1441,9 +1441,9 @@ README examples (Value-card output):
 
 | Input | Output |
 | :--- | ---: |
-| `Tn(3,2)` | `26` |
-| `Un(3,2)` | `56` |
-| `ℋ(3,2)` | `40` |
+| `chebyshev_Tn(3,2)` | `26` |
+| `chebyshev_Un(3,2)` | `56` |
+| `hermite_Hn(3,2)` | `40` |
 | `sum(k,0,3,Tn(k,2))` | `36` |
 | `sum(k,0,3,ℋ(k,2))` | `59` |
 
@@ -1798,6 +1798,27 @@ The integration variable remains local, the original symbolic expression is
 unchanged, and later binding edits are honoured. Infinite endpoints are supported
 when the antiderivative evaluation yields a convergent result; the general
 quadrature fallback still requires finite endpoints.
+
+Reciprocal square roots of affine exponentials, `k/sqrt(a*exp(b*x+d)+c)`, have a
+direct elementary numerical path. It handles positive, zero and negative real
+`c`, reversed finite endpoints and live parameter changes, provided the radicand
+is positive throughout the interval. Positive constant-base powers are recognised
+as exponentials too. The closed forms avoid repeatedly seeking an antiderivative
+or performing quadrature at every plot sample; the authored expression remains
+unchanged. For `1/sqrt(2*exp(y)+C)`, put `u = sqrt(2*exp(y)+C)`. Local primitives are
+
+$\quad\begin{array}{l}\displaystyle F(y)=\begin{cases}\displaystyle \frac{1}{\sqrt C}\ln\!\left|\frac{u-\sqrt C}{u+\sqrt C}\right|,& C>0,\\\displaystyle -\sqrt{2}\,e^{-y/2},& C=0,\\\displaystyle \frac{2}{\sqrt{-C}}\arctan\!\frac{u}{\sqrt{-C}},& C<0.\end{cases}\end{array}$
+
+Numerical retained-integral values use `F(upper) - F(lower)` with the same
+zero anchor described above. Each primitive also permits an arbitrary additive
+constant when used as an indefinite integral.
+An integrable zero of the radicand at an endpoint is accepted for non-zero offsets.
+Symbolic integration recognises fixed literal radicand coefficients too, using
+the logarithmic positive-offset form above with explicit domain conditions.
+Zero and negative offsets use separate elementary forms. Symbolic coefficients
+retain the integral, so replacing it with a formula requiring non-zero parameters
+does not silently exclude valid zero-offset, amplitude or rate members;
+numerical plotting still uses the closed forms for every supported real offset.
 
 For example, evaluating this input in MARS Lab at 40 digits:
 
@@ -2723,8 +2744,8 @@ These function names are resolved by the native expression parser's
 collision-free lookup tables rather than by a client-side rewrite.
 
 The function registry remains an inline, one-entry-per-line table in
-`src/expression/expr_stringin.c`. Its 326 registered spellings occupy 326
-distinct slots. Lookup samples six fixed byte positions, reads one
+`src/expression/expr_stringin.c`. Its 359 registered spellings occupy 359
+distinct slots. Lookup samples seven fixed byte positions, reads one
 displacement and probes one entry; it does not scan the registry, follow
 collision chains or retry neighbouring slots. The final exact spelling
 comparison rejects unregistered names even when their sampled characters

@@ -1453,7 +1453,7 @@ expr_t *expr_harmonic_poly(const expr_t *degree, const expr_t *argument);
  * @param argument Borrowed function argument expression; retained, not consumed.
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
-expr_t *expr_chebyshev_t(const expr_t *degree, const expr_t *argument);
+expr_t *expr_chebyshev_Tn(const expr_t *degree, const expr_t *argument);
 
 /**
  * @brief Construct the second-kind Chebyshev polynomial of non-negative integral degree.
@@ -1462,7 +1462,7 @@ expr_t *expr_chebyshev_t(const expr_t *degree, const expr_t *argument);
  * @param argument Borrowed function argument expression; retained, not consumed.
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
-expr_t *expr_chebyshev_u(const expr_t *degree, const expr_t *argument);
+expr_t *expr_chebyshev_Un(const expr_t *degree, const expr_t *argument);
 
 /**
  * @brief Construct the physicists' Hermite polynomial of non-negative integral degree.
@@ -1471,7 +1471,7 @@ expr_t *expr_chebyshev_u(const expr_t *degree, const expr_t *argument);
  * @param argument Borrowed function argument expression; retained, not consumed.
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
-expr_t *expr_hermite_h(const expr_t *degree, const expr_t *argument);
+expr_t *expr_hermite_Hn(const expr_t *degree, const expr_t *argument);
 
 /**
  * @brief Construct the whole-line convolution of two expressions in a common coordinate.

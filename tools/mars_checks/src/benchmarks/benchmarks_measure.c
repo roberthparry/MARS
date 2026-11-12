@@ -31,6 +31,8 @@ typedef struct {
     volatile double sink;
     bool exact;
     bool integer;
+    unsigned bits;
+    bool precision_limited;
 } benchmark_state_t;
 
 static bool benchmark_now(uint64_t *value)
@@ -79,6 +81,10 @@ static bool benchmark_batch_number(benchmark_state_t *state, unsigned iterations
         ok = num_is_finite(output[i]) && ok;
         if (state->exact)
             ok = num_is_exact(output[i]) && num_is_integer(output[i]) == state->integer && ok;
+        else if (num_is_finite(output[i]) && !num_is_exact(output[i]) && num_get_prec_bits(output[i]) < state->bits) {
+            state->precision_limited = true;
+            ok = false;
+        }
         num_destroy(output + i);
     }
     *duration = end - start;
@@ -226,7 +232,7 @@ int benchmark_measure(const string_t *root, int argc, char **argv)
     struct timespec resolution;
     /* Keep these bounded exact workloads below the library's rational rounding threshold. */
     if (clock_getres(CLOCK_MONOTONIC, &resolution) || num_set_default_prec_bits(bits ? bits : 16384)) return 1;
-    benchmark_state_t state = {.operation = op, .exact = exact, .integer = integer};
+    benchmark_state_t state = {.operation = op, .exact = exact, .integer = integer, .bits = bits};
     bool ok = benchmark_prepare(&state, backend, bits, argc == 5 ? argv[4] : NULL);
     bool (*chunk)(benchmark_state_t *, unsigned, uint64_t *) =
         real ? benchmark_batch_real : complex_backend ? benchmark_batch_complex : benchmark_batch_number;
@@ -249,6 +255,10 @@ int benchmark_measure(const string_t *root, int argc, char **argv)
     }
     for (unsigned i = 0; i < op->arity; ++i) num_destroy(state.number + i);
     if (!ok) {
+        if (state.precision_limited) {
+            fputs("The result backend does not preserve the requested precision.\n", stderr);
+            return 3;
+        }
         if (errno == ENOTSUP) return 3;
         fputs("Non-finite mathematical result or monotonic clock failure.\n", stderr);
         return 1;

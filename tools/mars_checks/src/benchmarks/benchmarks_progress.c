@@ -14,6 +14,7 @@
 #include <time.h>
 #include <unistd.h>
 
+#include "checks_process.h"
 #define MARS_BENCHMARKS_INTERNAL_ACCESS
 #include "benchmarks_internal.h"
 
@@ -220,7 +221,8 @@ void benchmark_progress_finish(benchmark_progress_t *progress, bool complete)
     if (!progress) return;
     benchmark_progress_clock(progress);
     benchmark_progress_clear(progress);
-    fprintf(stderr, "Benchmarks %s: %zu/%zu; ", complete ? "complete" : "interrupted",
+    const char *state = complete ? "complete" : checks_process_interrupt_signal() ? "interrupted" : "stopped";
+    fprintf(stderr, "Benchmarks %s: %zu/%zu; ", state,
             benchmark_progress_completed(progress), progress->counts.total);
     benchmark_progress_counts(progress, SIZE_MAX);
     fprintf(stderr, "; elapsed %.1fs\n", progress->elapsed);

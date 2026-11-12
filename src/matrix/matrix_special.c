@@ -45,11 +45,11 @@ static matrix_t *polynomial(const matrix_t *a, unsigned int degree, unsigned fam
 }
 
 /* Evaluate a first-kind Chebyshev matrix polynomial, not an entrywise function. */
-matrix_t *mat_chebyshev_t(const matrix_t *a, unsigned int n) { return polynomial(a, n, 0u); }
+matrix_t *mat_chebyshev_Tn(const matrix_t *a, unsigned int n) { return polynomial(a, n, 0u); }
 /* Evaluate a second-kind Chebyshev matrix polynomial. */
-matrix_t *mat_chebyshev_u(const matrix_t *a, unsigned int n) { return polynomial(a, n, 1u); }
+matrix_t *mat_chebyshev_Un(const matrix_t *a, unsigned int n) { return polynomial(a, n, 1u); }
 /* Evaluate a physicists' Hermite matrix polynomial. */
-matrix_t *mat_hermite_h(const matrix_t *a, unsigned int n) { return polynomial(a, n, 2u); }
+matrix_t *mat_hermite_Hn(const matrix_t *a, unsigned int n) { return polynomial(a, n, 2u); }
 
 /* Evaluate the finite logarithmic matrix polynomial by repeated multiplication. */
 matrix_t *mat_harmonic_poly(const matrix_t *A, unsigned int degree)

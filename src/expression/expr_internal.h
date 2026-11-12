@@ -643,7 +643,7 @@ extern const expr_ops_t ops_dilog;
 extern const expr_ops_t ops_polylog1;
 extern const expr_ops_t ops_polylog;
 extern const expr_ops_t ops_harmonic_poly;
-extern const expr_ops_t ops_chebyshev_t, ops_chebyshev_u, ops_hermite_h;
+extern const expr_ops_t ops_chebyshev_Tn, ops_chebyshev_Un, ops_hermite_Hn;
 expr_t *expr_orthopoly_expand(const expr_t *expr);
 extern const expr_ops_t ops_convolution, ops_causal_convolution;
 expr_t *expr_convolution_from_args(size_t count, expr_t *const *args);
@@ -917,6 +917,7 @@ expr_t *expr_make_const_num(number_t x);
 expr_t *expr_make_var_num(number_t x);
 int expr_get_default_constant_num(const char *name, number_t *value_out);
 int expr_get_default_constant_num_text(const string_t *name, number_t *value_out);
+
 void expr_store_const_num(expr_t *expr, number_t value);
 void expr_store_value_num(expr_t *expr, number_t value);
 /** @brief Initialise expression's immutable mathematical constants before rendering. */

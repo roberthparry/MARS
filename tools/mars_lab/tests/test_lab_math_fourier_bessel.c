@@ -96,7 +96,7 @@ static void test_bessel_specialised_order_simplifies_absolute_value(void)
                 order), target);
             lab_math_contains(math_fourier_text(r, "tex"), "T_{3}", true);
             lab_math_contains(math_fourier_text(r, "expression"), "Tn(3,", true);
-            lab_math_contains(math_fourier_text(r, "function"), "chebyshev_t(3,", true);
+            lab_math_contains(math_fourier_text(r, "function"), "chebyshev_Tn(3,", true);
             lab_math_contains(math_fourier_text(r, "transform_identity_TeX"), "T_{\\left|", false);
         }
         lab_math_contains(math_fourier_text(math_fourier_fields(lab_math_format("%s{J_n(%s)}", op, source), target),

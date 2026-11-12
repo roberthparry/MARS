@@ -781,7 +781,10 @@ number_t *number_clone_mpfr(const number_t *number)
 {
     if (!number || !number_impl_const(number)->value.mpfr)
         return NULL;
-    return number_wrap_mpfr(number_mpfr_clone(number_impl_const(number)->value.mpfr));
+    const number_mpfr_t *value = number_impl_const(number)->value.mpfr;
+    if (value->constant_id != NUMBER_CONST_COUNT)
+        return number_wrap_mpfr(number_mpfr_from_const_id(value->constant_id, number_get_precision_mpfr(number)));
+    return number_wrap_mpfr(number_mpfr_clone(value));
 }
 
 number_t *number_neg_mpfr(const number_t *number)

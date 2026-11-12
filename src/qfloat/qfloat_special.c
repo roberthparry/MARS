@@ -28,13 +28,13 @@ static qfloat_t polynomial(unsigned long degree, qfloat_t x, unsigned family)
 }
 
 /* Evaluate the first-kind Chebyshev polynomial by its three-term recurrence. */
-qfloat_t qf_chebyshev_t(unsigned long degree, qfloat_t x) { return polynomial(degree, x, 0u); }
+qfloat_t qf_chebyshev_Tn(unsigned long degree, qfloat_t x) { return polynomial(degree, x, 0u); }
 
 /* Evaluate the second-kind Chebyshev polynomial by its three-term recurrence. */
-qfloat_t qf_chebyshev_u(unsigned long degree, qfloat_t x) { return polynomial(degree, x, 1u); }
+qfloat_t qf_chebyshev_Un(unsigned long degree, qfloat_t x) { return polynomial(degree, x, 1u); }
 
 /* Evaluate the physicists' Hermite polynomial by its three-term recurrence. */
-qfloat_t qf_hermite_h(unsigned long degree, qfloat_t x) { return polynomial(degree, x, 2u); }
+qfloat_t qf_hermite_Hn(unsigned long degree, qfloat_t x) { return polynomial(degree, x, 2u); }
 
 /* Evaluate real signum, preserving NaN and treating both signed zeros as zero. */
 qfloat_t qf_sgn(qfloat_t x)

@@ -5,6 +5,44 @@
  * Uses actual local photographs, OffscreenCanvas, ImageBitmap and IndexedDB in the disposable browser profile.
  * Only river HTTP responses are controlled, so codecs and rasterisation remain the production implementation.
  */
+async function checkGlobeCachePolicy(check: (condition: boolean, message: string) => void): Promise<void> {
+    const databaseName = 'mars.globe.surface.policy-test.v1';
+    const cache = new GlobeSurfaceCache(2048, 2048, databaseName);
+    await cache.get('initialise');
+    const database = await new Promise<IDBDatabase>((resolve, reject) => {
+        const request = indexedDB.open(databaseName, 4);
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+    });
+    const clear = () => new Promise<void>((resolve, reject) => {
+        const transaction = database.transaction(['tiles', 'metadata', 'state'], 'readwrite');
+        for (const name of ['tiles', 'metadata', 'state']) transaction.objectStore(name).clear();
+        transaction.oncomplete = () => resolve();
+        transaction.onabort = () => reject(transaction.error);
+    });
+    try {
+        await clear();
+        const raw = new Blob([new Uint8Array(2048 * 2048 * 4)], {type: 'application/octet-stream'});
+        for (let i = 0; i < GlobeSurfaceCache.maximumBytes / GlobeSurfaceCache.tileBytes; ++i)
+            await cache.put(`tile-${i}`, raw);
+        await new Promise(resolve => setTimeout(resolve, 5));
+        check(Boolean(await cache.get('tile-0')), 'a raw cache hit refreshes its recency');
+        await cache.put('newest', raw);
+        const saved = await new Promise<GlobeSurfaceRecord[]>((resolve, reject) => {
+            const request = database.transaction('tiles').objectStore('tiles').getAll();
+            request.onsuccess = () => resolve(request.result as GlobeSurfaceRecord[]);
+            request.onerror = () => reject(request.error);
+        });
+        check(saved.length === 32 && saved.reduce((sum, item) => sum + item.size, 0) === 512 * 1024 * 1024 &&
+              Boolean(await cache.get('tile-0')) && !await cache.get('tile-1'),
+              'raw disk cache retains 32 views within 512 MiB and evicts the least recently used tile');
+        await cache.put('invalid-size', new Blob(['short'], {type: 'application/octet-stream'}));
+        await cache.put('invalid-type', new Blob([raw], {type: 'image/png'}));
+        check(!await cache.get('invalid-size') && !await cache.get('invalid-type'),
+              'raw tiles require the exact pixel count and format');
+    } finally { await clear(); database.close(); }
+}
+
 async function checkGlobeSurface(check: (condition: boolean, message: string) => void): Promise<void> {
     await new Promise<void>((resolve, reject) => {
         const script = document.createElement('script');
@@ -13,6 +51,8 @@ async function checkGlobeSurface(check: (condition: boolean, message: string) =>
         script.onerror = () => reject(new Error('Surface cache script unavailable'));
         document.head.appendChild(script);
     });
+    // Live globe workers must not compete with the deterministic eviction-policy fixture.
+    await checkGlobeCachePolicy(check);
     const cache = new GlobeSurfaceCache();
     await cache.get('initialise');
     const database = await new Promise<IDBDatabase>((resolve, reject) => {
@@ -26,26 +66,7 @@ async function checkGlobeSurface(check: (condition: boolean, message: string) =>
         transaction.oncomplete = () => resolve();
         transaction.onabort = () => reject(transaction.error);
     });
-    const records = () => new Promise<GlobeSurfaceRecord[]>((resolve, reject) => {
-        const request = database.transaction('tiles').objectStore('tiles').getAll();
-        request.onsuccess = () => resolve(request.result as GlobeSurfaceRecord[]);
-        request.onerror = () => reject(request.error);
-    });
     try {
-        await clear();
-        const raw = new Blob([new Uint8Array(2048 * 2048 * 4)], {type: 'application/octet-stream'});
-        for (let i = 0; i < GlobeSurfaceCache.maximumBytes / GlobeSurfaceCache.tileBytes; ++i) await cache.put(`tile-${i}`, raw);
-        await new Promise(resolve => setTimeout(resolve, 5));
-        check(Boolean(await cache.get('tile-0')), 'a raw cache hit refreshes its recency');
-        await cache.put('newest', raw);
-        const saved = await records();
-        check(saved.length === 32 && saved.reduce((sum, item) => sum + item.size, 0) === 512 * 1024 * 1024 &&
-              Boolean(await cache.get('tile-0')) && !await cache.get('tile-1'),
-              'raw disk cache retains 32 views within 512 MiB and evicts the least recently used tile');
-        await cache.put('invalid-size', new Blob(['short'], {type: 'application/octet-stream'}));
-        await cache.put('invalid-type', new Blob([raw], {type: 'image/png'}));
-        check(!await cache.get('invalid-size') && !await cache.get('invalid-type'),
-              'raw tiles require the exact pixel count and format');
         await clear();
         const tilesURL = '/js/globe_surface_tiles.js';
         const {GlobeSurfaceTiles} = await import(tilesURL) as typeof import('../../typescript/globe_surface_tiles.js');

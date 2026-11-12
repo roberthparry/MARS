@@ -132,6 +132,50 @@ INSERT OR IGNORE INTO number_cases(name, operation, input, expected, precision) 
     ('double_clausen_small', 'double_clausen', '0.75', '0', 19),
     ('double_clausen_reflected', 'double_clausen', '2.5', '0', 19);
 
+WITH precisions(digits) AS (VALUES(34),(80),(300),(1234)),
+cases(name, operation, input) AS (VALUES
+    ('reciprocal_asin_upper', 'acosec', '2.5+0.125i'),
+    ('reciprocal_asin_lower', 'acosec', '-0.5-0.125i'),
+    ('reciprocal_asin_imaginary', 'acosec', '0.125i'),
+    ('reciprocal_asin_small_component', 'acosec', '0.5+1e-80i'),
+    ('reciprocal_acos_upper', 'asec', '2.5+0.125i'),
+    ('reciprocal_acos_lower', 'asec', '-0.5-0.125i'),
+    ('reciprocal_acos_imaginary', 'asec', '-0.125i'),
+    ('reciprocal_acos_small_component', 'asec', '0.5-1e-80i'),
+    ('gamma_native_recurrence', 'gamma_recurrence', '0.75+0.125i'),
+    ('gamma_native_reflection', 'gamma_reflection', '-2.75+0.125i'),
+    ('gamma_native_turns', 'gamma_recurrence', '0.75+8.125i'),
+    ('gamma_native_inverse', 'gamma_inverse_complex', '9.5+0.125i'),
+    ('gamma_native_inverse_lower', 'gamma_inverse_complex', '0.75-0.125i'),
+    ('gamma_native_lower', 'gamma_lower_one', '0.75+0.125i'),
+    ('gamma_native_upper', 'gamma_upper_one', '0.75+0.125i'),
+    ('gamma_native_upper_large', 'gamma_upper_one', '30+0.125i'),
+    ('gamma_native_regularised', 'gamma_regularised', '2.5+0.125i;0.75+0.125i'),
+    ('gamma_native_recurrence_upper', 'gamma_upper_recurrence', '2.5+0.125i;0.75+0.125i'),
+    ('gamma_fast_recurrence_upper', 'gamma_upper_recurrence', '2.3;1.4'),
+    ('gamma_fast_regularised', 'gamma_regularised', '2.3;1.4'),
+    ('hypergeometric_native_real', 'hypergeometric_exp', '0.75'),
+    ('hypergeometric_exact_argument', 'hypergeometric_exact', '1'),
+    ('hypergeometric_native_complex', 'hypergeometric_exp', '0.75+0.125i'),
+    ('hypergeometric_native_binomial', 'hypergeometric_binomial', '1.25+0.125i;0.5+0.125i'),
+    ('hypergeometric_native_polynomial', 'hypergeometric_terminating', '1.25+0.125i;2+0.125i'),
+    ('hypergeometric_native_polynomial_zero', 'hypergeometric_terminating', '1.25+0.125i;1'),
+    ('lerch_native_log', 'lerch_log', '0.5+0.125i'),
+    ('lerch_exact_argument', 'lerch_exact', '2'),
+    ('lerch_native_real', 'lerch_shift', '0.75;2;1.25'),
+    ('lerch_native_complex', 'lerch_shift', '0.5+0.125i;1.25+0.125i;0.75+0.125i')
+)
+INSERT OR REPLACE INTO number_cases(name, operation, input, expected, precision)
+SELECT cases.name || '_' || precisions.digits, operation, input, '0', precisions.digits
+FROM cases CROSS JOIN precisions;
+
+INSERT OR REPLACE INTO number_cases(name, operation, input, expected, precision) VALUES
+    ('inverse_erf_double_small', 'double_erfinv', '0.00001', '0', 20),
+    ('inverse_erf_double', 'double_erfinv', '0.5', '0', 20),
+    ('inverse_erf_double_negative', 'double_erfinv', '-0.875', '0', 20),
+    ('inverse_erfc_double', 'double_erfcinv', '0.5', '0', 20),
+    ('inverse_erfc_double_reflected', 'double_erfcinv', '1.875', '0', 20);
+
 INSERT INTO test_case_runner(module, source, parent, table_name, operation) VALUES (
     'number.benchmark_regressions', 'tests/number/test_number_special_regressions.c',
     'tests.run_number_benchmark_regressions', 'number_cases', NULL)

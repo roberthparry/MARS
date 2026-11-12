@@ -4,8 +4,8 @@
  *
  * Uses the entire Kummer series for complex erf and erfc, with additional precision for exponential cancellation.
  * Real forward values use MPFR directly. Inverses use a seed followed by checked Halley iteration at increasing
- * working precision; approximate starting values never determine the returned accuracy. No fixed-precision Faddeeva
- * approximation or double-precision inverse result is used as the final answer.
+ * working precision; approximate starting values never determine multiprecision accuracy. Binary64 inverses use
+ * libc refinement directly; multiprecision answers never accept a fixed-precision approximation as their result.
  */
 #include <math.h>
 
@@ -161,12 +161,70 @@ int number_mpc_normal_pdf(mpc_ptr out, mpc_srcptr input, mpc_rnd_t rounding)
     return status;
 }
 
+/* Obtain a cheap real seed without first solving the same problem in qfloat. */
+static double error_inverse_real_seed(double probability)
+{
+    double logarithm = log(probability) + log(2.0 - probability);
+    double centre = 2.0 / (3.14159265358979323846 * 0.147) + logarithm / 2.0;
+    return sqrt(-logarithm / (0.147 * (sqrt(centre * centre - logarithm / 0.147) + centre)));
+}
+
+static double error_inverse_double(double input, bool complement)
+{
+    if (isnan(input) || (complement ? input < 0.0 || input > 2.0 : fabs(input) > 1.0)) return NAN;
+    double probability = complement ? (input <= 1.0 ? input : 2.0 - input) : 1.0 - fabs(input);
+    double sign = complement ? (input <= 1.0 ? 1.0 : -1.0) : copysign(1.0, input);
+    if (!probability) return copysign(INFINITY, sign);
+    if (probability == 1.0) return copysign(0.0, sign);
+    double value = error_inverse_real_seed(probability);
+    for (unsigned i = 0; i < 8; ++i) {
+        double residual = erfc(value) - probability;
+        double derivative = -1.12837916709551257390 * exp(-value * value);
+        double correction = residual / (derivative + value * residual);
+        if (!isfinite(correction)) break;
+        double next = value - correction;
+        if (next == value) break;
+        value = next;
+    }
+    return sign * value;
+}
+
+/* Evaluate the real inverse at binary64 precision; extreme tails retain MPFR refinement. */
+double number_double_erfinv(double value)
+{
+    if (fabs(value) < 0.25) {
+        double result = value * 0.88622692545275801365;
+        for (unsigned i = 0; i < 5; ++i) {
+            double residual = erf(result) - value;
+            double derivative = 1.12837916709551257390 * exp(-result * result);
+            result -= residual / (derivative + result * residual);
+        }
+        return result;
+    }
+    return error_inverse_double(value, false);
+}
+
+/* Refine ordinary complementary probabilities with libc and subnormal tails with MPFR. */
+double number_double_erfcinv(double value)
+{
+    if (value > 0.75 && value < 1.25) return number_double_erfinv(1.0 - value);
+    if (value > 0.0 && value < 1e-280) {
+        mpfr_t temporary;
+        mpfr_init2(temporary, 80);
+        mpfr_set_d(temporary, value, MPFR_RNDN);
+        number_mpfr_erfcinv_mut(temporary);
+        double result = mpfr_get_d(temporary, MPFR_RNDN);
+        mpfr_clear(temporary);
+        return result;
+    }
+    return error_inverse_double(value, true);
+}
+
 static bool error_inverse_seed(mpc_ptr out, mpc_srcptr input, bool complement)
 {
     if (mpfr_zero_p(mpc_imagref(input))) {
         double x = mpfr_get_d(mpc_realref(input), MPFR_RNDN);
-        qfloat_t initial = complement ? qf_erfcinv(qf_from_double(x)) : qf_erfinv(qf_from_double(x));
-        double value = qf_to_double(initial);
+        double value = complement ? error_inverse_double(x, true) : number_double_erfinv(x);
         if (isfinite(value)) { mpc_set_d(out, value, MPC_RNDNN); return true; }
     }
     mpfr_prec_t work = mpc_get_prec(out);

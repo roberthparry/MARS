@@ -162,12 +162,26 @@ string_t *benchmark_argument_literal(const char *real, bool complex_value, bool 
 string_t *benchmark_arguments_text(const char *arguments, const char *backend, unsigned complex_mask);
 
 /**
+ * @brief Format saved operands for display, using Unicode numerator and denominator scripts for exact fractions.
+ * @param[in] arguments Borrowed comma-separated input literals; retained unchanged by the caller.
+ * @param[in] backend Borrowed profile name; exact-fraction enables scripted fraction digits.
+ * @param complex_mask Saved mask for reconstructing complex operands in other profiles.
+ * @return Owned display string released with string_free(), or NULL on invalid input or allocation failure.
+ * No arithmetic is evaluated, no shared state changes, and authored signs and digits are retained.
+ */
+string_t *benchmark_arguments_display(const char *arguments, const char *backend, unsigned complex_mask);
+
+/**
  * @brief Format an Inputs cell for Markdown with a bounded display width and optional exact-argument layout.
  * @param[in] inputs Borrowed display text, valid throughout the call; never changed or evaluated.
  * @param[in] exact_layout True uses an 80-character width and starts each comma-separated integer or fraction on a new
  * line; false retains the ordinary 40-character width and inline argument separators.
  * @return Owned Markdown released with string_free(), or NULL for null input or allocation failure.
- * Wrapped cells use an inline span and explicit line breaks, including when a reader strips inline styles.
+ * Wrapped literal cells use an inline span and explicit line breaks, including when a reader strips inline styles.
+ * Exact fractions use unwrapped Markdown math containing TeX-module notation with a stacked fraction bar and bounded
+ * numerator and denominator rows. Multiple operands have numbered input labels and a blank line between them.
+ * HTML containers must not surround these formulae: some readers leave their
+ * contents unparsed. Font sizing belongs to the reader's stylesheet rather than the mathematical source.
  * Escaping preserves literal text and UTF-8 boundaries. Stored operands, numerical values and other exports
  * are unaffected; this function has no shared mutable state.
  */
@@ -213,12 +227,30 @@ int benchmark_measure(const string_t *root, int argc, char **argv);
  * @param[in] create True initialises schema and merges all known operations without deleting historical cases.
  * @return Owned plaintext connection released with sqlite_close(), or NULL on absence or failure.
  * @note A false create flag checks file existence first and never creates a database.
+ * Each connection waits at most five seconds for an ordinary SQLite lock; this wait is outside measured work.
  */
 sqlite_t *benchmark_database_open(const string_t *root, bool create);
 
 /**
+ * @brief Report a storage failure with its operation and SQLite diagnostic before any rollback can replace it.
+ * @param[in] db Borrowed live connection; no ownership is transferred and no statement is executed.
+ * @param[in] operation Borrowed description of the failed database operation, valid for this call.
+ * @return Always false, for propagation by the caller. Writes to standard error without changing storage.
+ */
+bool benchmark_database_error(sqlite_t *db, const char *operation);
+
+/**
+ * @brief Fill missing operand display text for catalogue workloads and retained observations.
+ * @param[in,out] db Borrowed writable schema-version-four connection, held in the caller's transaction.
+ * @return True after all missing displays are written; false on query, formatting or update failure.
+ * Uses indexed missing-display groups, preserves raw operands and timings, and releases all temporary strings.
+ * The caller must roll back its transaction on failure; the function does not begin or commit one itself.
+ */
+bool benchmark_store_displays(sqlite_t *db);
+
+/**
  * @brief Apply stored age, run-count, raw-sample and file-size limits transactionally.
- * @param[in,out] db Borrowed writable benchmark connection with schema version two.
+ * @param[in,out] db Borrowed writable connection using the current benchmark schema.
  * @param[in] protected_run Current or requested resumable run which must survive cleanup; zero protects none.
  * @param[in] headroom True attempts to leave one quarter of the configured capacity available for new checkpoints.
  * @return True after pruning, necessary compaction and installation of the SQLite page cap; false on failure.
@@ -240,7 +272,7 @@ bool benchmark_retention_checkpoint(sqlite_t *db, long protected_run);
 /**
  * @brief Display, configure or explicitly apply the persisted benchmark retention policy.
  * @param[in] root Borrowed repository root locating the benchmark database file used for writer exclusion.
- * @param[in,out] db Borrowed open benchmark connection; configuration and pruning require schema version two.
+ * @param[in,out] db Borrowed open benchmark connection; configuration and pruning require the current schema.
  * @param[in] argc Number of literal policy options; zero displays settings unless prune is true.
  * @param[in] argv Borrowed --max-mib, --keep-runs, --max-days and --raw-runs value pairs, valid during the call.
  * @param[in] prune True applies the current policy without changing it; no options are accepted in this mode.

@@ -587,9 +587,9 @@ expr_t *expr_clausen_sum_closed_form(const expr_t *expr)
 
 typedef number_t (*orthopoly_numeric_fn)(number_t, number_t);
 static const orthopoly_numeric_fn s_orthopoly_numeric[EXPR_KIND_COUNT] = {
-    [EXPR_KIND_CHEBYSHEV_T] = num_chebyshev_t,
-    [EXPR_KIND_CHEBYSHEV_U] = num_chebyshev_u,
-    [EXPR_KIND_HERMITE_H]   = num_hermite_h,
+    [EXPR_KIND_CHEBYSHEV_T] = num_chebyshev_Tn,
+    [EXPR_KIND_CHEBYSHEV_U] = num_chebyshev_Un,
+    [EXPR_KIND_HERMITE_H]   = num_hermite_Hn,
 };
 
 static number_t orthopoly_eval(expr_t *e)
@@ -620,9 +620,9 @@ expr_t *expr_orthopoly_expand(const expr_t *e)
         return NULL;
     expr_t *previous = expr_const_one(), *two = expr_const_long(2);
     expr_t *twice_x = expr_mul(two, e->b);
-    expr_t *current = expr_clone(e->ops == &ops_chebyshev_t ? e->b : twice_x);
+    expr_t *current = expr_clone(e->ops == &ops_chebyshev_Tn ? e->b : twice_x);
     for (long k = 1; k < n; ++k) {
-        expr_t *factor = expr_const_long(e->ops == &ops_hermite_h ? 2 * k : 1);
+        expr_t *factor = expr_const_long(e->ops == &ops_hermite_Hn ? 2 * k : 1);
         expr_t *front = expr_mul(twice_x, current), *back = expr_mul(factor, previous);
         expr_t *raw = expr_sub(front, back), *next = expr_simplify(raw);
         expr_free(factor);
@@ -652,7 +652,7 @@ static expr_t *orthopoly_deriv(expr_t *e)
     }
     if (expr_const_is_zero(e->a))
         return expr_const_zero();
-    if (e->ops == &ops_chebyshev_u) {
+    if (e->ops == &ops_chebyshev_Un) {
         expr_t *expanded = expr_orthopoly_expand(e);
         if (expanded) {
             expr_t *out = expr_create_deriv(expanded, wrt);
@@ -669,7 +669,7 @@ static expr_t *orthopoly_deriv(expr_t *e)
         expr_t *two = expr_const_long(2), *zero = expr_const_zero();
         expr_t *twice_index = expr_mul(two, index), *order = expr_sub(e->a, twice_index);
         expr_t *previous = expr_add_long(order, -1);
-        expr_t *poly = expr_chebyshev_u(previous, e->b), *weighted = expr_mul(order, poly);
+        expr_t *poly = expr_chebyshev_Un(previous, e->b), *weighted = expr_mul(order, poly);
         expr_t *term = expr_mul(two, weighted), *last = expr_add_long(e->a, -1);
         expr_t *half = expr_div(last, two), *upper = expr_floor(half);
         expr_t *sum = expr_new_finite_summation_range(term, index, zero, upper);
@@ -691,9 +691,9 @@ static expr_t *orthopoly_deriv(expr_t *e)
         return out;
     }
     expr_t *previous = expr_add_long(e->a, -1);
-    expr_t *poly = e->ops == &ops_chebyshev_t ? expr_chebyshev_u(previous, e->b)
-                                            : expr_hermite_h(previous, e->b);
-    expr_t *factor = e->ops == &ops_chebyshev_t ? expr_clone(e->a) : expr_add(e->a, e->a);
+    expr_t *poly = e->ops == &ops_chebyshev_Tn ? expr_chebyshev_Un(previous, e->b)
+                                            : expr_hermite_Hn(previous, e->b);
+    expr_t *factor = e->ops == &ops_chebyshev_Tn ? expr_clone(e->a) : expr_add(e->a, e->a);
     expr_t *local = expr_mul(factor, poly), *chain = expr_create_deriv(e->b, wrt);
     expr_t *out = chain ? expr_mul(local, chain) : NULL;
     expr_free(previous);
@@ -708,7 +708,7 @@ static expr_t *orthopoly_integrate(const expr_t *e, const expr_t *wrt)
 {
     if (special_uses_variable(e->a, wrt))
         return NULL;
-    if (e->ops == &ops_chebyshev_t) {
+    if (e->ops == &ops_chebyshev_Tn) {
         expr_t *expanded = expr_orthopoly_expand(e);
         expr_t *out = expanded ? expr_integrate(expanded, wrt) : NULL;
         expr_free(expanded);
@@ -720,8 +720,8 @@ static expr_t *orthopoly_integrate(const expr_t *e, const expr_t *wrt)
         return NULL;
     }
     expr_t *next = expr_add_long(e->a, 1);
-    expr_t *poly = e->ops == &ops_hermite_h ? expr_hermite_h(next, e->b) : expr_chebyshev_t(next, e->b);
-    expr_t *twice = e->ops == &ops_hermite_h ? expr_add(next, next) : expr_clone(next);
+    expr_t *poly = e->ops == &ops_hermite_Hn ? expr_hermite_Hn(next, e->b) : expr_chebyshev_Tn(next, e->b);
+    expr_t *twice = e->ops == &ops_hermite_Hn ? expr_add(next, next) : expr_clone(next);
     expr_t *denominator = expr_mul(twice, rate), *out = expr_div(poly, denominator);
     expr_free(next);
     expr_free(poly);
@@ -741,38 +741,38 @@ static expr_t *orthopoly_simplify(const expr_t *e, expr_t *a, expr_t *b)
     return expr_simplify_binary_operator(e, a, b);
 }
 
-const expr_ops_t ops_chebyshev_t = {
+const expr_ops_t ops_chebyshev_Tn = {
     .eval = orthopoly_eval,
     .deriv = orthopoly_deriv,
     .kind = EXPR_KIND_CHEBYSHEV_T,
     .arity = EXPR_OP_BINARY,
     .expression_name = "Tn",
-    .function_name = "chebyshev_t",
-    .apply_binary = expr_chebyshev_t,
+    .function_name = "chebyshev_Tn",
+    .apply_binary = expr_chebyshev_Tn,
     .simplify = orthopoly_simplify,
     .integrate = orthopoly_integrate
 };
 
-const expr_ops_t ops_chebyshev_u = {
+const expr_ops_t ops_chebyshev_Un = {
     .eval = orthopoly_eval,
     .deriv = orthopoly_deriv,
     .kind = EXPR_KIND_CHEBYSHEV_U,
     .arity = EXPR_OP_BINARY,
     .expression_name = "Un",
-    .function_name = "chebyshev_u",
-    .apply_binary = expr_chebyshev_u,
+    .function_name = "chebyshev_Un",
+    .apply_binary = expr_chebyshev_Un,
     .simplify = orthopoly_simplify,
     .integrate = orthopoly_integrate
 };
 
-const expr_ops_t ops_hermite_h = {
+const expr_ops_t ops_hermite_Hn = {
     .eval = orthopoly_eval,
     .deriv = orthopoly_deriv,
     .kind = EXPR_KIND_HERMITE_H,
     .arity = EXPR_OP_BINARY,
     .expression_name = "ℋ",
-    .function_name = "hermite_h",
-    .apply_binary = expr_hermite_h,
+    .function_name = "hermite_Hn",
+    .apply_binary = expr_hermite_Hn,
     .simplify = orthopoly_simplify,
     .integrate = orthopoly_integrate
 };
@@ -787,17 +787,17 @@ static expr_t *orthopoly_new(const expr_ops_t *ops, const expr_t *n, const expr_
 }
 
 /* Construct a first-kind Chebyshev polynomial. */
-expr_t *expr_chebyshev_t(const expr_t *n, const expr_t *x)
+expr_t *expr_chebyshev_Tn(const expr_t *n, const expr_t *x)
 {
-    return orthopoly_new(&ops_chebyshev_t, n, x);
+    return orthopoly_new(&ops_chebyshev_Tn, n, x);
 }
 /* Construct a second-kind Chebyshev polynomial. */
-expr_t *expr_chebyshev_u(const expr_t *n, const expr_t *x)
+expr_t *expr_chebyshev_Un(const expr_t *n, const expr_t *x)
 {
-    return orthopoly_new(&ops_chebyshev_u, n, x);
+    return orthopoly_new(&ops_chebyshev_Un, n, x);
 }
 /* Construct a physicists' Hermite polynomial without reusing the harmonic Hn alias. */
-expr_t *expr_hermite_h(const expr_t *n, const expr_t *x)
+expr_t *expr_hermite_Hn(const expr_t *n, const expr_t *x)
 {
-    return orthopoly_new(&ops_hermite_h, n, x);
+    return orthopoly_new(&ops_hermite_Hn, n, x);
 }

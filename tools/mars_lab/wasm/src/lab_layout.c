@@ -13,7 +13,24 @@
 #include "lab_result.h"
 #include "lab_plot_controls.h"
 #include "lab_plot_pointer.h"
+#include "lab_plot_slices.h"
 #include "lab_layout.h"
+
+/* Remove unusable geometry while preserving all independent mathematical result cards. */
+void lab_layout_plot_unavailable(void)
+{
+    lab_plot_slices_clear();
+    lab_layout_plot_camera(true);
+    int plot = lab_dom_id("plotRendered");
+    lab_dom_write(plot, LAB_DOM_TEXT, "", lab_dom_string(""));
+    lab_dom_remove(plot, "data-plot-pending");
+    lab_dom_remove(plot, "data-display-svg");
+    lab_dom_remove(plot, "data-display-tex");
+    lab_dom_write(plot, LAB_DOM_ATTRIBUTE, "aria-busy", lab_dom_string("false"));
+    lab_dom_class(plot, "error", 0);
+    lab_dom_class(lab_dom_id("plotFeedback"), "hidden", 1);
+    lab_dom_class(lab_dom_id("plotCard"), "hidden", 1);
+}
 
 static jsref lab_layout_read(node_jsref node, const char *key)
 {

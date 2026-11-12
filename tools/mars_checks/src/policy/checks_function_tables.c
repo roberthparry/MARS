@@ -110,7 +110,7 @@ static uint32_t policy_inline_hash(const string_t *keyword, uint32_t seed)
 {
     size_t length = string_byte_length(keyword);
     uint32_t value = (seed ^ (uint32_t)length) * UINT32_C(16777619);
-    const size_t positions[] = {0, length - 1, length - 3, 1, 3, 2};
+    const size_t positions[] = {0, length - 1, length - 2, length - 3, 1, 3, 2};
     for (size_t i = 0; i < sizeof(positions) / sizeof(*positions); ++i)
         value = (value ^ policy_sample(keyword, positions[i])) * UINT32_C(16777619);
     return value;

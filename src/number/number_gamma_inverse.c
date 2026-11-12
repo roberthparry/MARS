@@ -16,7 +16,7 @@
 /* Refine the existing real inverse-gamma branch without doing early iterations at the final precision. */
 int number_mpfr_gammainv_mut(mpfr_t value)
 {
-    mpfr_prec_t target = mpfr_get_prec(value), final = target + (target > 256 ? target / 4 : 64);
+    mpfr_prec_t target = mpfr_get_prec(value), final = target + 96;
     if (!mpfr_number_p(value) || mpfr_sgn(value) <= 0) { mpfr_set_nan(value); return 0; }
     mpfr_t source, minimum, x, log_y, log_gamma, derivative, residual, step, bound;
     mpfr_inits2(final, source, minimum, (mpfr_ptr)0);
@@ -77,5 +77,62 @@ int number_mpfr_gammainv_mut(mpfr_t value)
     if (complete) mpfr_set(value, x, MPFR_RNDN);
     else mpfr_set_nan(value);
     mpfr_clears(source, minimum, x, log_y, log_gamma, derivative, residual, step, bound, (mpfr_ptr)0);
+    return complete ? 0 : -1;
+}
+
+/* Refine the logarithmic branch at increasing precision and verify the final defining residual. */
+int number_mpc_gammainv(mpc_ptr out, mpc_srcptr input, mpc_rnd_t rounding)
+{
+    mpfr_prec_t target = mpc_get_prec(out), final = target + 128, stage = 128;
+    if (final > 65536 || !mpfr_number_p(mpc_realref(input)) || !mpfr_number_p(mpc_imagref(input)) ||
+        (mpfr_zero_p(mpc_realref(input)) && mpfr_zero_p(mpc_imagref(input)))) {
+        mpc_set_nan(out);
+        return -1;
+    }
+    if (stage > final) stage = final;
+    mpc_t value, logarithm, residual, derivative, step;
+    mpc_init2(value, stage); mpc_init2(logarithm, stage); mpc_init2(residual, stage);
+    mpc_init2(derivative, stage); mpc_init2(step, stage);
+    mpfr_t magnitude, scale;
+    mpfr_inits2(stage, magnitude, scale, (mpfr_ptr)0);
+    mpc_log(value, input, MPC_RNDNN);
+    mpfr_add_d(mpc_realref(value), mpc_realref(value), 1.5, MPFR_RNDN);
+    bool complete = false;
+    for (;;) {
+        mpc_log(logarithm, input, MPC_RNDNN);
+        bool converged = false;
+        for (unsigned i = 0; i < 48; ++i) {
+            if (number_mpc_lgamma(residual, value, MPC_RNDNN) ||
+                number_mpc_digamma_mut(derivative, value, MPC_RNDNN)) break;
+            mpc_sub(residual, residual, logarithm, MPC_RNDNN);
+            mpc_div(step, residual, derivative, MPC_RNDNN);
+            mpc_sub(value, value, step, MPC_RNDNN);
+            number_mpc_abs_upper(magnitude, step);
+            number_mpc_abs_lower(scale, value);
+            if (mpfr_cmp_ui(scale, 1u) < 0) mpfr_set_ui(scale, 1u, MPFR_RNDN);
+            mpfr_mul_2si(scale, scale, stage == final ? -target - 24 : -stage + 32, MPFR_RNDD);
+            if (mpfr_number_p(magnitude) && mpfr_lessequal_p(magnitude, scale)) { converged = true; break; }
+        }
+        if (!converged) break;
+        if (stage == final) {
+            if (number_mpc_lgamma(residual, value, MPC_RNDNN)) break;
+            mpc_sub(residual, residual, logarithm, MPC_RNDNN);
+            number_mpc_abs_upper(magnitude, residual);
+            number_mpc_abs_lower(scale, logarithm);
+            if (mpfr_cmp_ui(scale, 1u) < 0) mpfr_set_ui(scale, 1u, MPFR_RNDN);
+            mpfr_mul_2si(scale, scale, -target - 16, MPFR_RNDD);
+            complete = mpfr_lessequal_p(magnitude, scale);
+            break;
+        }
+        stage = stage > final / 2 ? final : stage * 2;
+        mpfr_prec_round(mpc_realref(value), stage, MPFR_RNDN);
+        mpfr_prec_round(mpc_imagref(value), stage, MPFR_RNDN);
+        mpc_set_prec(logarithm, stage); mpc_set_prec(residual, stage); mpc_set_prec(derivative, stage);
+        mpc_set_prec(step, stage); mpfr_set_prec(magnitude, stage); mpfr_set_prec(scale, stage);
+    }
+    if (complete) mpc_set(out, value, rounding);
+    else mpc_set_nan(out);
+    mpc_clear(value); mpc_clear(logarithm); mpc_clear(residual); mpc_clear(derivative); mpc_clear(step);
+    mpfr_clears(magnitude, scale, (mpfr_ptr)0);
     return complete ? 0 : -1;
 }

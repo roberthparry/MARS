@@ -1091,14 +1091,63 @@ static int number_mpc_coth(mpc_ptr out, mpc_srcptr in, mpc_rnd_t rnd)
     return 0;
 }
 
+/* The logarithmic identity avoids MPC's slow inverse-trigonometric series on dense reciprocals. */
+static int number_mpc_inverse_reciprocal(mpc_ptr out, mpc_srcptr in, mpc_rnd_t rnd, bool cosine)
+{
+    if (!mpfr_number_p(mpc_realref(in)) || !mpfr_number_p(mpc_imagref(in)) ||
+        (mpfr_zero_p(mpc_realref(in)) && mpfr_zero_p(mpc_imagref(in)))) {
+        mpc_set_nan(out);
+        return 0;
+    }
+    mpfr_exp_t exponent = 0;
+    const mpfr_srcptr components[] = {mpc_realref(in), mpc_imagref(in)};
+    for (size_t i = 0; i < 2; ++i) {
+        if (mpfr_zero_p(components[i])) continue;
+        mpfr_exp_t part = mpfr_get_exp(components[i]);
+        if (part > exponent) exponent = part;
+        if (part < -exponent) exponent = -part;
+    }
+    mpfr_prec_t target = mpc_get_prec(out), work = target + target / 2 + 128;
+    if (exponent > target || exponent > 16000) {
+        /* MPC's component-aware algorithm is preferable for severely unequal component scales. */
+        mpc_t reciprocal;
+        mpc_init2(reciprocal, 2 * target + 128);
+        mpc_ui_div(reciprocal, 1u, in, MPC_RNDNN);
+        if (cosine) mpc_acos(out, reciprocal, rnd);
+        else mpc_asin(out, reciprocal, rnd);
+        mpc_clear(reciprocal);
+        return 0;
+    }
+    work += 2 * exponent;
+    mpc_t z, left, right, value;
+    mpc_init2(z, work); mpc_init2(left, work); mpc_init2(right, work); mpc_init2(value, work);
+    mpc_ui_div(z, 1u, in, MPC_RNDNN);
+    mpc_ui_sub(left, 1u, z, MPC_RNDNN); mpc_add_ui(right, z, 1u, MPC_RNDNN);
+    mpc_sqrt(left, left, MPC_RNDNN); mpc_sqrt(right, right, MPC_RNDNN);
+    mpc_mul(left, left, right, MPC_RNDNN);
+    mpc_mul_i(right, z, 1, MPC_RNDNN); mpc_add(value, left, right, MPC_RNDNN);
+    mpc_log(value, value, MPC_RNDNN); mpc_mul_i(value, value, -1, MPC_RNDNN);
+    if (cosine) {
+        mpc_neg(value, value, MPC_RNDNN);
+        mpfr_t half_pi;
+        mpfr_init2(half_pi, work); mpfr_const_pi(half_pi, MPFR_RNDN);
+        mpfr_div_2ui(half_pi, half_pi, 1u, MPFR_RNDN);
+        mpfr_add(mpc_realref(value), mpc_realref(value), half_pi, MPFR_RNDN);
+        mpfr_clear(half_pi);
+    }
+    mpc_set(out, value, rnd);
+    mpc_clear(z); mpc_clear(left); mpc_clear(right); mpc_clear(value);
+    return 0;
+}
+
 static int number_mpc_asec(mpc_ptr out, mpc_srcptr in, mpc_rnd_t rnd)
 {
-    return number_mpc_unary_after_recip(out, in, rnd, mpc_acos);
+    return number_mpc_inverse_reciprocal(out, in, rnd, true);
 }
 
 static int number_mpc_acosec(mpc_ptr out, mpc_srcptr in, mpc_rnd_t rnd)
 {
-    return number_mpc_unary_after_recip(out, in, rnd, mpc_asin);
+    return number_mpc_inverse_reciprocal(out, in, rnd, false);
 }
 
 static int number_mpc_acot(mpc_ptr out, mpc_srcptr in, mpc_rnd_t rnd)
@@ -1318,6 +1367,24 @@ static int number_mpfr_gammainc_mut(mpfr_t value, const mpfr_t other, number_mpf
     if (mpfr_get_prec(other) > prec)
         prec = mpfr_get_prec(other);
     mpfr_inits2(prec, gamma_a, upper, tmp, (mpfr_ptr)0);
+    if ((mode == NUMBER_MPFR_GAMMAINC_UPPER || mode == NUMBER_MPFR_GAMMAINC_Q) &&
+        mpfr_number_p(value) && mpfr_sgn(value) > 0 && mpfr_number_p(other) && mpfr_sgn(other) >= 0) {
+        mpfr_add_ui(tmp, value, 1u, MPFR_RNDN);
+        if (mpfr_cmp(other, tmp) <= 0) {
+            mpfr_set_prec(gamma_a, prec + 64); mpfr_set_prec(upper, prec + 64);
+            int status = number_mpfr_gammainc_lower_series(upper, value, other, false);
+            if (!status) {
+                mpfr_gamma(gamma_a, value, MPFR_RNDN);
+                mpfr_sub(upper, gamma_a, upper, MPFR_RNDN);
+                if (mpfr_sgn(upper) > 0 && mpfr_get_exp(upper) > mpfr_get_exp(gamma_a) - 32) {
+                    if (mode == NUMBER_MPFR_GAMMAINC_Q) mpfr_div(upper, upper, gamma_a, MPFR_RNDN);
+                    mpfr_set(value, upper, MPFR_RNDN);
+                    mpfr_clears(gamma_a, upper, tmp, (mpfr_ptr)0);
+                    return 0;
+                }
+            }
+        }
+    }
     if ((mode == NUMBER_MPFR_GAMMAINC_LOWER || mode == NUMBER_MPFR_GAMMAINC_P) &&
         mpfr_number_p(value) && mpfr_sgn(value) > 0 && mpfr_number_p(other) && mpfr_sgn(other) >= 0) {
         mpfr_add_ui(tmp, value, 1u, MPFR_RNDN);
@@ -1327,7 +1394,7 @@ static int number_mpfr_gammainc_mut(mpfr_t value, const mpfr_t other, number_mpf
             return status;
         }
     }
-    mpfr_gamma(gamma_a, value, MPFR_RNDN);
+    if (mode != NUMBER_MPFR_GAMMAINC_UPPER) mpfr_gamma(gamma_a, value, MPFR_RNDN);
     mpfr_gamma_inc(upper, value, other, MPFR_RNDN);
     if (mode == NUMBER_MPFR_GAMMAINC_LOWER) {
         mpfr_sub(value, gamma_a, upper, MPFR_RNDN);
@@ -1361,6 +1428,26 @@ static int number_mpfr_gammainc_p_mut(mpfr_t value, const mpfr_t other)
 static int number_mpfr_gammainc_q_mut(mpfr_t value, const mpfr_t other)
 {
     return number_mpfr_gammainc_mut(value, other, NUMBER_MPFR_GAMMAINC_Q);
+}
+
+static int number_mpc_gammainc_lower(mpc_ptr out, mpc_srcptr a, mpc_srcptr z, mpc_rnd_t rounding)
+{
+    return number_mpc_gammainc(out, a, z, NUMBER_GAMMA_LOWER, rounding);
+}
+
+static int number_mpc_gammainc_upper(mpc_ptr out, mpc_srcptr a, mpc_srcptr z, mpc_rnd_t rounding)
+{
+    return number_mpc_gammainc(out, a, z, NUMBER_GAMMA_UPPER, rounding);
+}
+
+static int number_mpc_gammainc_p(mpc_ptr out, mpc_srcptr a, mpc_srcptr z, mpc_rnd_t rounding)
+{
+    return number_mpc_gammainc(out, a, z, NUMBER_GAMMA_P, rounding);
+}
+
+static int number_mpc_gammainc_q(mpc_ptr out, mpc_srcptr a, mpc_srcptr z, mpc_rnd_t rounding)
+{
+    return number_mpc_gammainc(out, a, z, NUMBER_GAMMA_Q, rounding);
 }
 
 
@@ -1669,7 +1756,7 @@ static int number_mpc_digamma_positive(mpc_ptr out, mpc_srcptr z, mpc_rnd_t rnd)
     return rc;
 }
 
-static int number_mpc_digamma_mut(mpc_ptr out, mpc_srcptr z, mpc_rnd_t rnd)
+int number_mpc_digamma_mut(mpc_ptr out, mpc_srcptr z, mpc_rnd_t rnd)
 {
     mpfr_prec_t target_prec = mpc_get_prec(out);
     mpfr_prec_t work_prec = target_prec + NUMBER_POLYGAMMA_GUARD_BITS;
@@ -4781,16 +4868,18 @@ number_t num_acoth(const number_t number)
                                                           number_mpfr_acoth_mut, number_mpc_acoth);
 }
 
+/* Preserve the selected real or complex precision when evaluating gamma. */
 number_t num_gamma(const number_t number)
 {
     return number_apply_nonreal_complex_unary_or_dispatch(number, tgamma, qf_gamma, qc_gamma, number_mpfr_gamma_mut,
-                                                          NULL);
+                                                          number_mpc_gamma);
 }
 
+/* Evaluate real or analytic complex log gamma without a fixed-precision fallback. */
 number_t num_lgamma(const number_t number)
 {
     return number_apply_nonreal_complex_unary_or_dispatch(number, lgamma, qf_lgamma, qc_lgamma, number_mpfr_lgamma_mut,
-                                                          NULL);
+                                                          number_mpc_lgamma);
 }
 
 number_t num_digamma(const number_t number)
@@ -4924,24 +5013,6 @@ number_t num_zetah(const number_t s, const number_t a)
     }
     return number_apply_binary_math_with_double(s, a, number_double_zetah, qf_zetah, qc_zetah,
                                                 number_mpfr_zetah_mut, number_mpc_zetah_mut);
-}
-
-/* Evaluate the Lerch transcendent using the widest participating backend. */
-number_t number_lerch_phi(const number_t z, const number_t s, const number_t a)
-{
-    if (num_is_nan(z) || num_is_nan(s) || num_is_nan(a))
-        return num_clone(NUM_NAN);
-    if (!num_is_real(z) || !num_is_real(s) || !num_is_real(a))
-        return num_create_from_qcomplex(qc_lerch_phi(number_value_to_qcomplex(&z), number_value_to_qcomplex(&s),
-                                                     number_value_to_qcomplex(&a)));
-    return num_create_from_qfloat(qf_lerch_phi(number_value_to_qfloat(&z), number_value_to_qfloat(&s),
-                                               number_value_to_qfloat(&a)));
-}
-
-/* Preserve the established num_* spelling alongside the requested public family name. */
-number_t num_lerch_phi(const number_t z, const number_t s, const number_t a)
-{
-    return number_lerch_phi(z, s, a);
 }
 
 /* Evaluate the first Riemann zeta derivative while preserving the selected numeric backend. */
@@ -5682,71 +5753,6 @@ number_t num_appell_f1(const number_t a, const number_t b1, const number_t b2, c
     return num_lauricella_f(a, b, c, variables, 2u);
 }
 
-number_t num_hypergeometric_pFq(const number_t *upper, size_t upper_count, const number_t *lower, size_t lower_count,
-                                const number_t argument)
-{
-    qfloat_t *upper_qf = NULL;
-    qfloat_t *lower_qf = NULL;
-    qcomplex_t *upper_qc = NULL;
-    qcomplex_t *lower_qc = NULL;
-    bool any_complex = !num_is_real(argument);
-
-    if ((upper_count > 0u && !upper) || (lower_count > 0u && !lower))
-        return NUM_NAN;
-
-    for (size_t i = 0u; i < upper_count; ++i)
-        any_complex = any_complex || !num_is_real(upper[i]);
-    for (size_t i = 0u; i < lower_count; ++i)
-        any_complex = any_complex || !num_is_real(lower[i]);
-
-    if (any_complex) {
-        if (upper_count > 0u) {
-            upper_qc = malloc(upper_count * sizeof(*upper_qc));
-            if (!upper_qc)
-                return NUM_NAN;
-        }
-        if (lower_count > 0u) {
-            lower_qc = malloc(lower_count * sizeof(*lower_qc));
-            if (!lower_qc) {
-                free(upper_qc);
-                return NUM_NAN;
-            }
-        }
-        for (size_t i = 0u; i < upper_count; ++i)
-            upper_qc[i] = number_value_to_qcomplex(&upper[i]);
-        for (size_t i = 0u; i < lower_count; ++i)
-            lower_qc[i] = number_value_to_qcomplex(&lower[i]);
-
-        qcomplex_t result =
-            qc_hypergeometric_pFq(upper_qc, upper_count, lower_qc, lower_count, number_value_to_qcomplex(&argument));
-        free(lower_qc);
-        free(upper_qc);
-        return num_create_from_qcomplex(result);
-    }
-
-    if (upper_count > 0u) {
-        upper_qf = malloc(upper_count * sizeof(*upper_qf));
-        if (!upper_qf)
-            return NUM_NAN;
-    }
-    if (lower_count > 0u) {
-        lower_qf = malloc(lower_count * sizeof(*lower_qf));
-        if (!lower_qf) {
-            free(upper_qf);
-            return NUM_NAN;
-        }
-    }
-    for (size_t i = 0u; i < upper_count; ++i)
-        upper_qf[i] = number_value_to_qfloat(&upper[i]);
-    for (size_t i = 0u; i < lower_count; ++i)
-        lower_qf[i] = number_value_to_qfloat(&lower[i]);
-
-    qfloat_t result =
-        qf_hypergeometric_pFq(upper_qf, upper_count, lower_qf, lower_count, number_value_to_qfloat(&argument));
-    free(lower_qf);
-    free(upper_qf);
-    return num_create_from_qfloat(result);
-}
 
 number_t num_legendre_chi(const number_t order, const number_t number)
 {
@@ -5804,10 +5810,11 @@ number_t num_legendre_chi(const number_t order, const number_t number)
     return out;
 }
 
+/* Refine the established real or complex inverse-gamma branch at the participating precision. */
 number_t num_gammainv(const number_t number)
 {
     return number_apply_nonreal_complex_unary_or_dispatch(number, NULL, qf_gammainv, qc_gammainv,
-                                                          number_mpfr_gammainv_mut, NULL);
+                                                          number_mpfr_gammainv_mut, number_mpc_gammainv);
 }
 
 static number_t number_error_math(number_t number, number_double_unary_fn fast,
@@ -5836,13 +5843,13 @@ number_t num_erfc(const number_t number)
 /* Refine an inverse error-function seed at the selected real or complex precision. */
 number_t num_erfinv(const number_t number)
 {
-    return number_error_math(number, NULL, qf_erfinv, number_mpfr_erfinv_mut, number_mpc_erfinv);
+    return number_error_math(number, number_double_erfinv, qf_erfinv, number_mpfr_erfinv_mut, number_mpc_erfinv);
 }
 
 /* Refine inverse erfc directly and verify its defining residual. */
 number_t num_erfcinv(const number_t number)
 {
-    return number_error_math(number, NULL, qf_erfcinv, number_mpfr_erfcinv_mut, number_mpc_erfcinv);
+    return number_error_math(number, number_double_erfcinv, qf_erfcinv, number_mpfr_erfcinv_mut, number_mpc_erfcinv);
 }
 
 number_t num_lambert_w0(const number_t number)
@@ -5996,24 +6003,32 @@ number_t num_productlog(const number_t number)
                                                           number_mpfr_productlog_mut, NULL);
 }
 
+/* Evaluate the lower incomplete gamma with native guarded real or complex arithmetic. */
 number_t num_gammainc_lower(const number_t a, const number_t b)
 {
-    return number_apply_binary_math(a, b, qf_gammainc_lower, qc_gammainc_lower, number_mpfr_gammainc_lower_mut, NULL);
+    return number_apply_binary_math(a, b, qf_gammainc_lower, qc_gammainc_lower,
+                                    number_mpfr_gammainc_lower_mut, number_mpc_gammainc_lower);
 }
 
+/* Evaluate the upper incomplete gamma, choosing a guarded complement when appropriate. */
 number_t num_gammainc_upper(const number_t a, const number_t b)
 {
-    return number_apply_binary_math(a, b, qf_gammainc_upper, qc_gammainc_upper, number_mpfr_gammainc_upper_mut, NULL);
+    return number_apply_binary_math(a, b, qf_gammainc_upper, qc_gammainc_upper,
+                                    number_mpfr_gammainc_upper_mut, number_mpc_gammainc_upper);
 }
 
+/* Preserve native precision while normalising the lower gamma tail. */
 number_t num_gammainc_P(const number_t a, const number_t b)
 {
-    return number_apply_binary_math(a, b, qf_gammainc_P, qc_gammainc_P, number_mpfr_gammainc_p_mut, NULL);
+    return number_apply_binary_math(a, b, qf_gammainc_P, qc_gammainc_P,
+                                    number_mpfr_gammainc_p_mut, number_mpc_gammainc_p);
 }
 
+/* Preserve native precision while normalising the upper gamma tail. */
 number_t num_gammainc_Q(const number_t a, const number_t b)
 {
-    return number_apply_binary_math(a, b, qf_gammainc_Q, qc_gammainc_Q, number_mpfr_gammainc_q_mut, NULL);
+    return number_apply_binary_math(a, b, qf_gammainc_Q, qc_gammainc_Q,
+                                    number_mpfr_gammainc_q_mut, number_mpc_gammainc_q);
 }
 
 number_t num_Ei(const number_t number)

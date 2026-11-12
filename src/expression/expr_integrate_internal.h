@@ -33,6 +33,32 @@
 /** Detect imaginary-unit constants recursively within an expression. */
 bool expr_integrate_contains_imaginary_unit(const expr_t *expr);
 
+/**
+ * @brief Attempt real definite integration of k/sqrt(a*exp(b*x+d)+c) using its elementary substitution.
+ * @param integrand Borrowed integrand; independent finite bindings are read without modification.
+ * @param wrt Borrowed integration variable, whose current value is ignored.
+ * @param lower Borrowed finite real lower endpoint.
+ * @param upper Borrowed finite real upper endpoint; reversed intervals retain their sign.
+ * @param matched_out Required output, set true once the supported finite real coefficient family is recognised.
+ * @return An owned number, released with num_destroy(), or NaN when recognition or real-domain checks fail.
+ *         A recognised invalid real interval must not be retried with numerical quadrature.
+ *         Uses the calling thread's numerical precision and never modifies either expression or its bindings.
+ */
+number_t expr_integral_exp_root_definite(const expr_t *integrand, const expr_t *wrt, number_t lower, number_t upper,
+                                        bool *matched_out);
+
+/**
+ * @brief Construct a local elementary primitive of a reciprocal affine-exponential square root.
+ * @param expr Borrowed integrand; its independent coefficients retain their live bindings.
+ * @param wrt Borrowed variable of integration, kept symbolic regardless of its current numerical value.
+ * @return Owned primitive released with expr_free(), or NULL when the structural family is not recognised.
+ * Radicand coefficients must be fixed literals: symbolic coefficients retain their integral so degenerate cases
+ * such as a zero offset, amplitude or rate are not lost.
+ * A non-zero rate and non-negative radicand are required; a zero offset requires a strictly positive radicand.
+ * Zero and negative offsets use separate elementary forms. No input is consumed or modified.
+ */
+expr_t *integrate_exp_root_rule(const expr_t *expr, const expr_t *wrt);
+
 /* Shared ownership, simplification and dispatch helpers. */
 expr_t *simplify_owned(expr_t *expr);
 bool depends_on_wrt(const expr_t *expr, const expr_t *wrt);

@@ -76,7 +76,7 @@ void number_zeta_logarithm(mpc_ptr out, mpc_srcptr offset, unsigned long index)
         size_t bytes = 2u * mpfr_custom_get_size(precision);
         size_t previous = entry->precision ? 2u * mpfr_custom_get_size(entry->precision) : 0;
         size_t budget = ZETA_LOG_BYTES - 2u * mpfr_custom_get_size(mpc_get_prec(zeta_log_offset));
-        if (bytes - previous <= budget - zeta_log_bytes) {
+        if (zeta_log_bytes <= budget && bytes - previous <= budget - zeta_log_bytes) {
             if (!entry->precision) {
                 mpc_init2(entry->value, precision);
                 zeta_log_owned[zeta_log_count++] = entry;

@@ -212,8 +212,11 @@ static bool benchmark_stats_load(sqlite_t *db, const benchmark_stats_options_t *
         }
         row.outlier = sqlite_stmt_column_int(query, 10) != 0;
         row.cells[SAMPLES] = measured ? string_sprintf("%d", sqlite_stmt_column_int(query, 9)) : string_new_with("-");
-        string_t *inputs = benchmark_arguments_text(sqlite_stmt_column_text(query, 11),
-            sqlite_stmt_column_text(query, 0), (unsigned)sqlite_stmt_column_int(query, 17));
+        bool grid = !strcmp(options->format, "grid");
+        string_t *inputs = grid ? benchmark_arguments_display(sqlite_stmt_column_text(query, 11),
+            sqlite_stmt_column_text(query, 0), (unsigned)sqlite_stmt_column_int(query, 17)) :
+            benchmark_arguments_text(sqlite_stmt_column_text(query, 11),
+                sqlite_stmt_column_text(query, 0), (unsigned)sqlite_stmt_column_int(query, 17));
         row.cells[ARGUMENTS] = inputs ? benchmark_stats_text(string_c_str(inputs)) : NULL;
         string_t *detail = string_sprintf("finished: %s; ",
             sqlite_stmt_column_is_null(query, 12) ? "pending" : sqlite_stmt_column_text(query, 12));

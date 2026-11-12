@@ -138,9 +138,12 @@ static void test_lab_extra_plot(void)
     json_free(fields);
     TEST_ASSERT_TRUE(ok, "reversed plot ranges produce a useful error");
     fields = request("/eval", "{\"expression\":\"x+a\",\"action\":\"plot\",\"plot_kind\":\"curve\"}", &status);
-    ok = !test_lab_ok(fields, true) && contains(fields, "error", "Automatic range selection failed");
+    ok = test_lab_ok(fields, true) && contains(fields, "plot_slices", "a\t") &&
+         contains(fields, "plot_title", "a = ") && contains(fields, "expression", "a = ?");
+    if (!ok)
+        show_failure(fields);
     json_free(fields);
-    TEST_ASSERT_TRUE(ok, "unset parameters never become invented plotted values");
+    TEST_ASSERT_TRUE(ok, "unset constants receive labelled plot-local controls without changing worksheet values");
     fields = request("/eval", "{\"expression\":\"zeta(x)\",\"action\":\"plot\",\"precision\":40}", &status);
     ok = test_lab_ok(fields, true) && contains(fields, "plot_svg", "data-series") &&
          !contains(fields, "plot_svg", "Vertical range clipped") && !contains(fields, "plot_svg", "<rect") &&
@@ -167,6 +170,28 @@ static void test_lab_extra_plot(void)
     ok = !test_lab_ok(fields, true) && contains(fields, "error", "manual bounds");
     json_free(fields);
     TEST_ASSERT_TRUE(ok, "invalid vertical bounds are rejected before sampling");
+}
+
+static void test_lab_extra_integral_curve_slices(void)
+{
+    const char *requests[] = {
+        "{\"expression\":\"@S 1/sqrt(2e^y+C) dy\",\"wrt\":\"y\",\"action\":\"plot\",\"precision\":101}",
+        "{\"expression\":\"@S 1/sqrt(2e^y+C) dy\",\"wrt\":\"y\",\"action\":\"plot\","
+        "\"plot_slices\":\"C\\t-2\\t2\\t1\\t750\"}",
+        "{\"expression\":\"@S 1/sqrt(2e^y+C) dy\",\"wrt\":\"y\",\"action\":\"plot\","
+        "\"plot_slices\":\"C\\t-2\\t2\\t-1\\t250\"}"
+    };
+    for (size_t i = 0; i < sizeof requests / sizeof *requests; ++i) {
+        unsigned status = 0;
+        json_t *fields = request("/eval", requests[i], &status);
+        bool ok = status == 200 && contains(fields, "plot_svg", "data-series") &&
+                  contains(fields, "plot_slices", "C\t-2\t2\t") &&
+                  contains(fields, "plot_title", "C = ") && contains(fields, "expression", "C = ?");
+        if (!ok)
+            show_failure(fields);
+        json_free(fields);
+        TEST_ASSERT_TRUE(ok, "elementary integral curves explore constant slices without changing symbolic bindings");
+    }
 }
 
 static bool paired_mesh_edges(const char *svg, bool open);
@@ -2173,8 +2198,10 @@ static void test_lab_extra_gaussian_derivative_round_trip(void)
                       contains(run, "output", "½·√π·erf(x) + C |") && !contains(run, "output", "exp");
         if (!ok)
             show_failure(result);
-        if (!run_ok)
+        if (!run_ok) {
+            show_failure(result);
             show_failure(run);
+        }
         json_free(run);
         json_free(input);
         string_free(key);
@@ -2238,6 +2265,8 @@ static void test_lab_extra_exact_derivative_round_trip(void)
 
 static void test_lab_extra_repeated_gaussian_integral(void)
 {
+    /* An earlier, higher-precision request must not turn a later rounded pi into a user parameter. */
+    expect_response("/eval", "{\"expression\":\"{x^2 | x=3}\",\"precision\":40}", 200u, "value", "9");
     static const unsigned precisions[] = {17u, 78u, 155u};
     for (size_t i = 0u; i < sizeof precisions / sizeof *precisions; ++i) {
         unsigned status = 0u;
@@ -2259,8 +2288,10 @@ static void test_lab_extra_repeated_gaussian_integral(void)
                       !contains(run, "output", "/√π");
         if (!ok)
             show_failure(result);
-        if (!run_ok)
+        if (!run_ok) {
+            show_failure(result);
             show_failure(run);
+        }
         json_free(run);
         json_free(input);
         string_free(key);
@@ -2307,8 +2338,10 @@ static void test_lab_extra_gaussian_integral(void)
                       contains(run, "output", "erfc") && contains(run, "output", "σ") &&
                       !contains(run, "output", "Re(") && !contains(run, "output", "where") &&
                       !contains(run, "output", "√(σ²)") && !contains(run, "output", "√(2·σ²)");
-        if (!run_ok)
+        if (!run_ok) {
+            show_failure(result);
             show_failure(run);
+        }
         json_free(run);
         json_free(precision);
         string_free(precision_text);
@@ -3277,6 +3310,7 @@ static void test_lab_extra_equation_greek_binding(void)
 void test_lab_evaluation_extra_cases(void)
 {
     TEST_RUN_IN_GROUP(test_lab_extra_plot, tests, NULL);
+    TEST_RUN_IN_GROUP(test_lab_extra_integral_curve_slices, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_surface, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_surface_continuity, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_surface_refinement, tests, NULL);

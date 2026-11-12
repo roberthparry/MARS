@@ -388,9 +388,28 @@ int lab_worker_plot_request(const char *source, const expr_t *expression, expr_b
         const char *plane_bounds[4] = {"", "", "", ""};
         for (unsigned i = 0; i < 4 && argc >= 24; ++i)
             plane_bounds[i] = argv[20 + i];
-        return lab_worker_plot(source, expression, variable, argc > 5 ? argv[5] : "", argc > 6 ? argv[6] : "",
+        bool slices = false, free_parameter = false;
+        for (size_t i = 0; i < expr_bindings_count(bindings); ++i) {
+            expr_t *binding = expr_bindings_expr_at(bindings, i);
+            if (binding == variable)
+                continue;
+            number_t value = expr_get_val(binding);
+            bool unset = num_is_nan(value);
+            num_destroy(&value);
+            slices |= unset && expr_bindings_is_constant_at(bindings, i);
+            free_parameter |= unset && !expr_bindings_is_constant_at(bindings, i);
+        }
+        /* Authored constants describe a family; expose labelled plot-only slices without inventing free axes. */
+        char *sliced = slices && !free_parameter ?
+            lab_worker_surface_slice(source, expr_symbol_name(variable), NULL, argc > 19 ? argv[19] : "") : NULL;
+        if (slices && !free_parameter && !sliced)
+            return 1;
+        int result = lab_worker_plot(sliced ? sliced : source, expression, variable,
+                                argc > 5 ? argv[5] : "", argc > 6 ? argv[6] : "",
                                 argc > 7 ? argv[7] : "auto", argc > 8 ? argv[8] : "", argc > 9 ? argv[9] : "",
                                 plane_bounds, !strcmp(quality, "preview"), force_complex);
+        free(sliced);
+        return result;
     }
     /* At most count + 1 candidates can be occupied; each lookup uses the native binding index. */
     char name[64] = "u";

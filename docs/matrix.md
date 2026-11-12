@@ -2207,9 +2207,9 @@ whether a matrix uses sparse storage.
 
 | API | Family |
 | :--- | :--- |
-| `mat_chebyshev_t` | First-kind Chebyshev, $T_0=1$, $T_1=x$ |
-| `mat_chebyshev_u` | Second-kind Chebyshev, $U_0=1$, $U_1=2x$ |
-| `mat_hermite_h` | Physicists' Hermite, $H_0=1$, $H_1=2x$ |
+| `mat_chebyshev_Tn` | First-kind Chebyshev, $T_0=1$, $T_1=x$ |
+| `mat_chebyshev_Un` | Second-kind Chebyshev, $U_0=1$, $U_1=2x$ |
+| `mat_hermite_Hn` | Physicists' Hermite, $H_0=1$, $H_1=2x$ |
 
 These APIs take a square matrix followed by an unsigned integral degree and
 return a newly allocated matrix polynomial, not entrywise values. Non-square
@@ -2229,7 +2229,7 @@ int main(void)
 {
     number_t values[] = {NUM_ZERO, NUM_ONE, NUM_ZERO, NUM_ZERO};
     matrix_t *a = mat_create(2, 2, values);
-    matrix_t *t = mat_chebyshev_t(a, 3);
+    matrix_t *t = mat_chebyshev_Tn(a, 3);
     mat_printf("T3((0, 1; 0, 0)) = %m\n", t);
     mat_free(t);
     mat_free(a);

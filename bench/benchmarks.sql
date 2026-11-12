@@ -1,6 +1,8 @@
 -- Persistent benchmark definitions and observations; created only by explicit benchmark commands.
+-- Allow short-lived readers and report writers to finish before a checkpoint fails.
+PRAGMA busy_timeout = 5000;
 PRAGMA application_id = 1296126546;
-PRAGMA user_version = 3;
+PRAGMA user_version = 4;
 
 CREATE TABLE IF NOT EXISTS benchmark_operation (
     name TEXT PRIMARY KEY,
@@ -26,6 +28,7 @@ CREATE TABLE IF NOT EXISTS benchmark_workload (
     operation TEXT NOT NULL REFERENCES benchmark_operation(name),
     backend TEXT NOT NULL CHECK (backend IN ('exact-integer', 'exact-fraction')),
     arguments TEXT NOT NULL,
+    arguments_display TEXT,
     PRIMARY KEY (operation, backend)
 ) WITHOUT ROWID;
 
@@ -69,12 +72,17 @@ CREATE TABLE IF NOT EXISTS benchmark_result (
     timing_outlier INTEGER NOT NULL DEFAULT 0 CHECK (timing_outlier IN (0, 1)),
     baseline_median_ns REAL,
     detail TEXT NOT NULL DEFAULT '',
+    arguments_display TEXT,
     PRIMARY KEY (run_id, operation, backend, bits),
     FOREIGN KEY (backend, bits) REFERENCES benchmark_profile(backend, bits)
 ) WITHOUT ROWID;
 CREATE INDEX IF NOT EXISTS benchmark_result_comparison
     ON benchmark_result(operation, backend, bits, run_id);
 CREATE INDEX IF NOT EXISTS benchmark_result_pending ON benchmark_result(run_id, outcome, sequence);
+CREATE INDEX IF NOT EXISTS benchmark_result_missing_display
+    ON benchmark_result(arguments, backend, complex_mask) WHERE arguments_display IS NULL;
+CREATE INDEX IF NOT EXISTS benchmark_workload_missing_display
+    ON benchmark_workload(arguments, backend) WHERE arguments_display IS NULL;
 
 CREATE TABLE IF NOT EXISTS benchmark_sample (
     run_id INTEGER NOT NULL,

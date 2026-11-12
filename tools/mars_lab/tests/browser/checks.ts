@@ -1472,6 +1472,21 @@
             await WorksheetRequests.evaluation.evaluateExpression();
             for (let i = 0; i < 100 && !started; ++i)
                 await LabTestBrowser.wait(10);
+            check(started, 'A numerical attempt precedes a definitive unavailable response');
+            const unavailableMathematics = WorksheetContext.rendered.innerHTML;
+            const unavailable = {ok: false, plot_available: 'no', error: 'No supported numerical form'};
+            release!({response: Object.assign(new Response(), {labData: async () => unavailable}), data: unavailable});
+            await waitForAutomaticPlot();
+            check(document.getElementById('plotCard')!.classList.contains('hidden') &&
+                  !(document.getElementById('plotRendered')! as LabTestPlotHost).textContent &&
+                  WorksheetContext.rendered.innerHTML === unavailableMathematics,
+                  'Native structural unavailability hides the Plot card without changing the successful mathematics: ' +
+                  document.getElementById('plotCard')!.className + ' / ' +
+                  (document.getElementById('plotRendered')! as LabTestPlotHost).textContent);
+            started = false;
+            await WorksheetRequests.evaluation.evaluateExpression();
+            for (let i = 0; i < 100 && !started; ++i)
+                await LabTestBrowser.wait(10);
             check(started, 'A fresh evaluation starts a fresh plot');
             WorksheetWorkspace.presentation.saveCurrentModeResultState();
             WorksheetWorkspace.mode.setMode('matrix');
@@ -3560,6 +3575,7 @@
                 await runBrowserGroup('checkLabLocationFlow', window.checkLabLocationFlow);
                 await runBrowserGroup('checkLabLocationDom', window.checkLabLocationDom);
                 await runBrowserGroup('checkLabRequests', window.checkLabRequests);
+                await runBrowserGroup('checkAsynchronousPlot', checkAsynchronousPlot);
                 await runBrowserGroup('zeta root viewport expansion', checkZetaPlotExpansion);
                 await runBrowserGroup('incremental solution card', checkIncrementalSolutionCard, 120000);
                 await report('PASS: asynchronous result installation, drawing opportunities and stale-request rejection');

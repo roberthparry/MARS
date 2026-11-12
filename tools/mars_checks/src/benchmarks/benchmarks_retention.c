@@ -154,12 +154,17 @@ static bool benchmark_retention_apply_policy(sqlite_t *db, long protected_run, b
 {
     benchmark_retention_policy_t policy = {0};
     if (replacement) policy = *replacement;
-    else if (!benchmark_retention_policy(db, &policy)) return false;
+    else if (!benchmark_retention_policy(db, &policy))
+        return benchmark_database_error(db, "reading benchmark retention policy");
     int64_t page_size = benchmark_retention_integer(db, "PRAGMA page_size");
     int64_t cap = page_size > 0 ? (int64_t)policy.max_mib * 1048576 / page_size : 0;
     int64_t runs = benchmark_retention_integer(db, "SELECT count(*) FROM benchmark_run");
     int64_t samples = benchmark_retention_integer(db, "SELECT count(*) FROM benchmark_sample");
-    bool ok = cap > 0 && runs >= 0 && samples >= 0 && sqlite_exec_cstr(db, "BEGIN IMMEDIATE");
+    if (cap <= 0 || runs < 0 || samples < 0)
+        return benchmark_database_error(db, "reading benchmark retention limits and counts");
+    if (!sqlite_exec_cstr(db, "BEGIN IMMEDIATE"))
+        return benchmark_database_error(db, "starting benchmark retention");
+    bool ok = true;
     if (ok && replacement) ok = benchmark_retention_write(db, &policy);
     ok = ok && sqlite_exec_cstr(db,
         "UPDATE benchmark_retention\n"
@@ -167,16 +172,24 @@ static bool benchmark_retention_apply_policy(sqlite_t *db, long protected_run, b
         "WHERE singleton = 1") && benchmark_retention_expire(db, protected_run, &policy) &&
         benchmark_retention_fit(db, protected_run, headroom ? cap * 3 / 4 : cap, cap);
     if (ok) ok = sqlite_exec_cstr(db, "COMMIT");
-    if (!ok) { (void)sqlite_exec_cstr(db, "ROLLBACK"); return false; }
+    if (!ok) {
+        benchmark_database_error(db, "applying benchmark retention");
+        (void)sqlite_exec_cstr(db, "ROLLBACK");
+        return false;
+    }
     int64_t remaining_runs = benchmark_retention_integer(db, "SELECT count(*) FROM benchmark_run");
     int64_t remaining_samples = benchmark_retention_integer(db, "SELECT count(*) FROM benchmark_sample");
+    if (remaining_runs < 0 || remaining_samples < 0)
+        return benchmark_database_error(db, "reading retained benchmark counts");
     bool removed = remaining_runs < runs || remaining_samples < samples;
     if (removed || benchmark_retention_integer(db, "PRAGMA page_count") > cap)
         ok = sqlite_exec_cstr(db, "VACUUM");
+    if (!ok) return benchmark_database_error(db, "compacting benchmark storage");
     string_t *limit = string_sprintf("PRAGMA max_page_count = %lld", (long long)cap);
     int64_t installed = ok && limit ? benchmark_retention_integer(db, string_c_str(limit)) : -1;
     string_free(limit);
     ok = ok && installed > 0 && installed <= cap && remaining_runs >= 0 && remaining_samples >= 0;
+    if (!ok) benchmark_database_error(db, "enforcing the benchmark storage cap");
     if (ok && removed)
         fprintf(stderr, "Benchmark retention: removed %lld old runs and %lld raw samples; "
                 "retained summaries and outlier flags are unchanged.\n",
@@ -196,11 +209,14 @@ bool benchmark_retention_apply(sqlite_t *db, long protected_run, bool headroom)
 bool benchmark_retention_checkpoint(sqlite_t *db, long protected_run)
 {
     benchmark_retention_policy_t policy = {0};
-    if (!benchmark_retention_policy(db, &policy)) return false;
+    if (!benchmark_retention_policy(db, &policy))
+        return benchmark_database_error(db, "reading retention policy before a checkpoint");
     int64_t page_size = benchmark_retention_integer(db, "PRAGMA page_size");
     int64_t used = benchmark_retention_used_pages(db);
     int64_t cap = page_size > 0 ? (int64_t)policy.max_mib * 1048576 / page_size : 0;
-    return used >= 0 && cap > 0 && (used + 64 < cap || benchmark_retention_apply(db, protected_run, true));
+    if (used < 0 || cap <= 0)
+        return benchmark_database_error(db, "checking benchmark capacity before a checkpoint");
+    return used + 64 < cap || benchmark_retention_apply(db, protected_run, true);
 }
 
 static bool benchmark_retention_options(benchmark_retention_policy_t *policy, int argc, char **argv)

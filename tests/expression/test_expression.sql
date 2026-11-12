@@ -6,7 +6,66 @@ CREATE TABLE IF NOT EXISTS expression_cases (
 ) WITHOUT ROWID;
 CREATE INDEX IF NOT EXISTS expression_cases_operation ON expression_cases(operation, name);
 
+-- Canonical polynomial names work in expressions and in binding values, with the same real/complex conventions.
+INSERT OR IGNORE INTO expression_cases(name, operation, input, expected) VALUES
+    ('poly_chebyshev_Tn_direct', 'numeric_callable', 'chebyshev_Tn(3,2)', '26'),
+    ('poly_chebyshev_Un_direct', 'numeric_callable', 'chebyshev_Un(3,2)', '56'),
+    ('poly_hermite_Hn_direct', 'numeric_callable', 'hermite_Hn(3,2)', '40'),
+    ('poly_chebyshev_Tn_binding', 'numeric_callable', '{x|x=chebyshev_Tn(3,2)}', '26'),
+    ('poly_chebyshev_Un_binding', 'numeric_callable', '{x|x=chebyshev_Un(3,2)}', '56'),
+    ('poly_hermite_Hn_binding', 'numeric_callable', '{x|x=hermite_Hn(3,2)}', '40'),
+    ('poly_chebyshev_Tn_complex', 'numeric_callable', 'chebyshev_Tn(3,i)', '-7i'),
+    ('poly_chebyshev_Un_complex', 'numeric_callable', 'chebyshev_Un(3,i)', '-12i'),
+    ('poly_hermite_Hn_complex', 'numeric_callable', 'hermite_Hn(3,i)', '-20i');
+
 -- Numeric callable coverage includes exact-width operands, aliases and preserved binding function calls.
+INSERT INTO test_case_runner(module, source, parent, table_name, operation) VALUES (
+    'expression.integral_exp_root_primitive', 'tests/expression/test_expr_numeric.c', 'tests.test_expr_numeric_callables',
+    'expression_cases', 'integral_exp_root_primitive')
+ON CONFLICT(module) DO UPDATE SET table_name=excluded.table_name, operation=excluded.operation;
+INSERT OR IGNORE INTO expression_cases(name, operation, input, expected) VALUES
+    ('exp_root_primitive_symbolic_positive', 'integral_exp_root_primitive', '{1/sqrt(2exp(y)+C)|y=1;C=1}', 'formal'),
+    ('exp_root_primitive_symbolic_negative', 'integral_exp_root_primitive', '{1/sqrt(2exp(y)+C)|y=1;C=-1}', 'formal'),
+    ('exp_root_primitive_positive', 'integral_exp_root_primitive', '{1/sqrt(2exp(y)+1)|y=1}', 'derivative'),
+    ('exp_root_primitive_parameter_rate', 'integral_exp_root_primitive', '{1/sqrt(2exp(b*y)+1)|y=1;b=2}', 'formal'),
+    ('exp_root_primitive_zero', 'integral_exp_root_primitive', '{1/sqrt(2exp(y))|y=1}', 'derivative'),
+    ('exp_root_primitive_negative_literal', 'integral_exp_root_primitive', '{1/sqrt(2exp(y)-1)|y=1}', 'derivative'),
+    ('exp_root_primitive_scaled_rate', 'integral_exp_root_primitive', '{3/sqrt(4exp(2y+1)+2)|y=1}', 'derivative')
+ON CONFLICT(name) DO UPDATE SET input=excluded.input, expected=excluded.expected;
+INSERT INTO expression_cases(name, operation, input, expected, precision) VALUES
+    ('exp_root_small_positive_tail', 'integral_exp_root', '{ @S 1/sqrt(A*exp(y)+C) dy | y=1; A=1e80; C=1 }',
+     '2*(atanh(1/sqrt(1e80+1))-atanh(1/sqrt(1e80*exp(1)+1)))', 53),
+    ('exp_root_small_negative_tail', 'integral_exp_root', '{ @S 1/sqrt(A*exp(y)+C) dy | y=1; A=1e80; C=-1 }',
+     '2*(atan(1/sqrt(1e80-1))-atan(1/sqrt(1e80*exp(1)-1)))', 53)
+ON CONFLICT(name) DO UPDATE SET input=excluded.input, expected=excluded.expected, precision=excluded.precision;
+INSERT INTO test_case_runner(module, source, parent, table_name, operation) VALUES (
+    'expression.integral_exp_root', 'tests/expression/test_expr_numeric.c', 'tests.test_expr_numeric_callables',
+    'expression_cases', 'integral_exp_root')
+ON CONFLICT(module) DO UPDATE SET table_name=excluded.table_name, operation=excluded.operation;
+INSERT OR IGNORE INTO expression_cases(name, operation, input, expected) VALUES
+    ('exp_root_zero_offset', 'integral_exp_root', '{ @S 1/sqrt(2e^y+C) dy | y=1; C=0 }',
+     'sqrt(2)*(1-exp(-1/2))'),
+    ('exp_root_positive_offset', 'integral_exp_root', '{ @S 1/sqrt(2e^y+C) dy | y=1; C=1 }',
+     'ln((sqrt(2*exp(1)+1)-1)/(sqrt(2*exp(1)+1)+1))-ln((sqrt(3)-1)/(sqrt(3)+1))'),
+    ('exp_root_negative_offset', 'integral_exp_root', '{ @S 1/sqrt(2e^y+C) dy | y=1; C=-1 }',
+     '2*(atan(sqrt(2*exp(1)-1))-atan(1))'),
+    ('exp_root_reversed_interval', 'integral_exp_root', '@S_1^0 1/sqrt(2e^y+1) dy',
+     'ln((sqrt(3)-1)/(sqrt(3)+1))-ln((sqrt(2*exp(1)+1)-1)/(sqrt(2*exp(1)+1)+1))'),
+    ('exp_root_shifted_scaled', 'integral_exp_root', '@S_0^1 3/sqrt(4exp(2y+1)+2) dy',
+     '3/sqrt(2)*(atanh(sqrt(2)/sqrt(4*exp(1)+2))-atanh(sqrt(2)/sqrt(4exp(3)+2)))'),
+    ('exp_root_constant_base', 'integral_exp_root', '@S_0^1 1/sqrt(3*2^y) dy',
+     '2/(sqrt(3)*ln(2))*(1-1/sqrt(2))'),
+    ('exp_root_negative_amplitude', 'integral_exp_root', '@S_0^1 1/sqrt(10-exp(y)) dy',
+     '(ln((sqrt(10)-sqrt(10-exp(1)))/(sqrt(10)+sqrt(10-exp(1))))-ln((sqrt(10)-3)/(sqrt(10)+3)))/sqrt(10)'),
+    ('exp_root_negative_rate', 'integral_exp_root', '@S_0^1 1/sqrt(2exp(-y)) dy',
+     'sqrt(2)*(exp(1/2)-1)'),
+    ('exp_root_integrable_endpoint', 'integral_exp_root', '@S_0^1 1/sqrt(2exp(y)-2) dy',
+     'sqrt(2)*atan(sqrt(exp(1)-1))'),
+    ('exp_root_improper_zero_offset', 'integral_exp_root', '@S_0^inf 1/sqrt(2exp(y)) dy', 'sqrt(2)'),
+    ('exp_root_improper_negative_offset', 'integral_exp_root', '@S_0^inf 1/sqrt(2exp(y)-1) dy', '@pi/2')
+ON CONFLICT(name) DO UPDATE SET input=excluded.input, expected=excluded.expected;
+-- This operation stores working bits; the small-tail cases deliberately exercise double precision.
+UPDATE expression_cases SET precision=256 WHERE operation='integral_exp_root' AND precision<>53;
 INSERT INTO test_case_runner(module, source, parent, table_name, operation) VALUES (
     'expression.numeric_callables', 'tests/expression/test_expr_numeric.c', 'tests.test_expr_numeric_callables',
     'expression_cases', 'numeric_callable')

@@ -120,6 +120,18 @@ int number_zeta_tail(mpc_ptr sum, mpc_ptr derivative, mpc_srcptr argument, mpc_s
 void number_zeta_logarithm(mpc_ptr out, mpc_srcptr offset, unsigned long index);
 
 /**
+ * @brief Copy (offset+index)^(-exponent), retaining bounded exact-key Dirichlet powers between evaluations.
+ * @param[out] out Initialised caller-owned MPC destination selecting precision; must not alias either key.
+ * @param[in] offset Borrowed finite complex offset selecting the principal logarithm branch.
+ * @param[in] exponent Borrowed finite complex exponent.
+ * @param index Non-negative integer shift, used as a direct cache index when eligible.
+ * @return Nothing; out receives the value or propagated non-finite arithmetic. Cache failures use direct evaluation.
+ * The eight-MiB cache copies values under a mutex, retains at most one exact key pair and never exposes ownership.
+ * Both keys remain valid throughout this call; the caller clears out normally. Independent calls are thread-safe.
+ */
+void number_dirichlet_power(mpc_ptr out, mpc_srcptr offset, mpc_srcptr exponent, unsigned long index);
+
+/**
  * @brief Bound a complex modulus from above using |real| + |imag| and upward rounding.
  * @param[out] out Caller-owned initialised MPFR destination, distinct from both components of value.
  * @param[in] value Borrowed complex input, valid during this call.
@@ -161,6 +173,67 @@ bool number_series_small(mpfr_srcptr term_upper, mpfr_srcptr sum_lower, mpfr_pre
  * calls use local temporaries and are thread-safe subject to the ordinary fixed-precision seed's contract.
  */
 int number_mpfr_gammainv_mut(mpfr_t value);
+
+/**
+ * @brief Evaluate complex gamma with guarded recurrence and a bounded Stirling remainder.
+ * @param[out] out Initialised caller-owned destination, selecting precision; may alias input.
+ * @param[in] input Borrowed finite complex argument outside gamma's poles.
+ * @param rounding Final rounding mode.
+ * @return Zero on success, minus one with NaN on invalid input or exhausted working limits.
+ * No ownership transfers. Local temporaries are released; coefficient-cache access is synchronised.
+ */
+int number_mpc_gamma(mpc_ptr out, mpc_srcptr input, mpc_rnd_t rounding);
+
+/**
+ * @brief Evaluate the analytic logarithm of gamma on the plane cut along the non-positive real axis.
+ * @param[out] out Initialised caller-owned destination, selecting precision; may alias input.
+ * @param[in] input Borrowed finite argument, retained throughout the call.
+ * @param rounding Final rounding mode.
+ * @return Zero on success, minus one with NaN at poles or when bounded refinement cannot finish.
+ * Local temporaries are released and shared coefficient access is synchronised; no pointers escape.
+ */
+int number_mpc_lgamma(mpc_ptr out, mpc_srcptr input, mpc_rnd_t rounding);
+
+/**
+ * @brief Evaluate complex digamma using recurrence, reflection and cached asymptotic coefficients.
+ * @param[out] out Initialised caller-owned destination selecting precision; may alias z.
+ * @param[in] z Borrowed argument outside the digamma poles.
+ * @param rnd Final rounding mode.
+ * @return Zero on success or minus one if convergence or cache access fails.
+ * No ownership transfers; local temporaries and synchronised coefficients permit independent calls.
+ */
+int number_mpc_digamma_mut(mpc_ptr out, mpc_srcptr z, mpc_rnd_t rnd);
+
+/**
+ * @brief Refine the complex inverse-gamma branch selected by its logarithmic starting estimate.
+ * @param[out] out Initialised caller-owned destination selecting precision; may alias input.
+ * @param[in] input Borrowed finite, non-zero complex gamma value.
+ * @param rounding Final rounding mode.
+ * @return Zero after a checked logarithmic residual, minus one with NaN on unresolved refinement.
+ * Seeds determine the branch only. No storage escapes and independent calls are thread-safe.
+ */
+int number_mpc_gammainv(mpc_ptr out, mpc_srcptr input, mpc_rnd_t rounding);
+
+/** @brief Requested incomplete-gamma quantity; the dispatcher supplies the same mode to all complex inputs. */
+typedef enum {
+    NUMBER_GAMMA_LOWER, /**< Unregularised lower gamma. */
+    NUMBER_GAMMA_UPPER, /**< Unregularised upper gamma. */
+    NUMBER_GAMMA_P,     /**< Lower gamma divided by complete gamma. */
+    NUMBER_GAMMA_Q      /**< Upper gamma divided by complete gamma. */
+} number_gamma_mode_t;
+
+/**
+ * @brief Evaluate the principal incomplete-gamma series without fixed-precision conversion.
+ * @param[out] out Initialised caller-owned destination, selecting precision; may alias either input.
+ * @param[in] order Borrowed gamma order, excluding lower-gamma poles at non-positive integers.
+ * @param[in] argument Borrowed finite argument for the principal power, non-zero unless Re(order)>0.
+ * @param mode Requested lower, upper or regularised value.
+ * @param rounding Final rounding mode.
+ * @return Zero on a tail- and cancellation-checked value; minus one with NaN outside supported working limits.
+ * Local storage is released. Shared Bernoulli coefficients are accessed under their cache lock.
+ */
+int number_mpc_gammainc(mpc_ptr out, mpc_srcptr order, mpc_srcptr argument,
+                        number_gamma_mode_t mode, mpc_rnd_t rounding);
 
 /**
  * @brief Sum the real non-negative integer-order Legendre chi series on |z| < 0.95.
@@ -607,6 +680,21 @@ int number_mpfr_erfinv_mut(mpfr_t value);
  * The caller remains responsible for clearing value; no shared mutable storage is used.
  */
 int number_mpfr_erfcinv_mut(mpfr_t value);
+
+/**
+ * @brief Evaluate inverse erf for a binary64 argument using a checked libc refinement.
+ * @param value Real argument in [-1,1]; endpoints return signed infinity.
+ * @return Inverse value, or NaN outside the real domain. No allocation or shared state is retained.
+ */
+double number_double_erfinv(double value);
+
+/**
+ * @brief Evaluate inverse erfc for binary64, preserving subnormal tail probabilities.
+ * @param value Real probability in [0,2]; endpoints return signed infinity.
+ * @return Inverse value, or NaN outside the real domain. Extreme tails use local MPFR temporaries,
+ * which are released before return; independent calls are thread-safe.
+ */
+double number_double_erfcinv(double value);
 
 /**
  * @brief Evaluate principal complex Lommel s with a guarded power series.

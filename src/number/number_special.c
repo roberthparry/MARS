@@ -46,13 +46,13 @@ static number_t polynomial(number_t degree, number_t x, unsigned family)
 }
 
 /* Evaluate the first-kind Chebyshev polynomial with precision-preserving number arithmetic. */
-number_t num_chebyshev_t(number_t n, number_t x) { return polynomial(n, x, 0u); }
+number_t num_chebyshev_Tn(number_t n, number_t x) { return polynomial(n, x, 0u); }
 
 /* Evaluate the second-kind Chebyshev polynomial with precision-preserving number arithmetic. */
-number_t num_chebyshev_u(number_t n, number_t x) { return polynomial(n, x, 1u); }
+number_t num_chebyshev_Un(number_t n, number_t x) { return polynomial(n, x, 1u); }
 
 /* Evaluate the physicists' Hermite polynomial with precision-preserving number arithmetic. */
-number_t num_hermite_h(number_t n, number_t x) { return polynomial(n, x, 2u); }
+number_t num_hermite_Hn(number_t n, number_t x) { return polynomial(n, x, 2u); }
 
 /* Return the exact real sign without reducing the input's numeric precision. */
 number_t num_sgn(number_t x)

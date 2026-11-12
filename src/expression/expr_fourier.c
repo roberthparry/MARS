@@ -312,10 +312,10 @@ static expr_t *formula(fourier_context_t *c, const expr_t *f, const expr_t *x, c
                                  numerator->ops == &ops_mul ? numerator->b : numerator};
         for (unsigned side = 0u; side < 2u; ++side) {
             const expr_t *poly = pair[side], *window = pair[!side];
-            if (window->ops != &ops_rect || (poly->ops != &ops_chebyshev_t && !expr_const_is_one(poly)))
+            if (window->ops != &ops_rect || (poly->ops != &ops_chebyshev_Tn && !expr_const_is_one(poly)))
                 continue;
-            const expr_t *n = poly->ops == &ops_chebyshev_t ? poly->a : integer(c, 0);
-            expr_t *coordinate = poly->ops == &ops_chebyshev_t ? expr_fourier_keep(c, expr_clone(poly->b))
+            const expr_t *n = poly->ops == &ops_chebyshev_Tn ? poly->a : integer(c, 0);
+            expr_t *coordinate = poly->ops == &ops_chebyshev_Tn ? expr_fourier_keep(c, expr_clone(poly->b))
                                                                : ft_mul(c, two, window->a);
             expr_t *window_check = clean(c, ft_sub(c, window->a, ft_div(c, coordinate, two)));
             expr_t *denominator_check = clean(c, ft_sub(c, f->b,
@@ -340,7 +340,7 @@ static expr_t *formula(fourier_context_t *c, const expr_t *f, const expr_t *x, c
         const expr_t *pair[2] = {f->a, f->b};
         for (unsigned side = 0u; side < 2u; ++side) {
             const expr_t *h = pair[side], *phase = expr_fourier_exponent(pair[!side]);
-            if (h->ops != &ops_hermite_h || !phase || expr_fourier_uses(h->a, x))
+            if (h->ops != &ops_hermite_Hn || !phase || expr_fourier_uses(h->a, x))
                 continue;
             expr_t *rate = NULL, *offset = NULL;
             if (!expr_fourier_affine(c, h->b, x, &rate, &offset))
@@ -359,7 +359,7 @@ static expr_t *formula(fourier_context_t *c, const expr_t *f, const expr_t *x, c
                                                ft_div(c, ft_mul(c, coordinate, coordinate), two)));
             expr_t *coefficient = ft_div(c, ft_mul(c, ft_sqrt(c, two_pi),
                                                    ft_pow_xp(c, ft_neg(c, i), h->a)), expr_fourier_abs(c, rate));
-            return ft_mul(c, coefficient, ft_mul(c, gaussian, ft_hermite_h(c, h->a, coordinate)));
+            return ft_mul(c, coefficient, ft_mul(c, gaussian, ft_hermite_Hn(c, h->a, coordinate)));
         }
     }
     /* DLMF 10.9.2: integer-order Bessel functions have a compactly supported spectrum. */
@@ -378,7 +378,7 @@ static expr_t *formula(fourier_context_t *c, const expr_t *f, const expr_t *x, c
         expr_t *radicand = ft_sub(c, one, ft_pow_xp(c, coordinate, two));
         if (!expr_fourier_positive(c, expr_fourier_abs(c, radicand)))
             return NULL;
-        expr_t *polynomial = ft_chebyshev_t(c, expr_fourier_abs(c, f->a), coordinate);
+        expr_t *polynomial = ft_chebyshev_Tn(c, expr_fourier_abs(c, f->a), coordinate);
         expr_t *window = ft_rect(c, ft_div(c, coordinate, two));
         expr_t *spectrum = ft_div(c, ft_mul(c, window, polynomial), ft_sqrt(c, radicand));
         expr_t *phase = ft_exp(c, ft_mul(c, ft_mul(c, i, coordinate), offset));

@@ -15,7 +15,8 @@ class GlobeSurfaceCache {
     readonly tileBytes: number;
     private database: Promise<IDBDatabase | null> | null = null;
 
-    constructor(readonly width = 2048, readonly height = width) {
+    constructor(readonly width = 2048, readonly height = width,
+                private readonly databaseName = 'mars.globe.surface.v1') {
         if (![512, 514, 2048].includes(width) || height !== width) throw new Error('Invalid raw cache dimensions');
         this.tileBytes = width * height * 4;
     }
@@ -24,7 +25,7 @@ class GlobeSurfaceCache {
         return this.database ??= new Promise(resolve => {
             let unavailable = false;
             try {
-                const request = indexedDB.open('mars.globe.surface.v1', 4);
+                const request = indexedDB.open(this.databaseName, 4);
                 request.onupgradeneeded = () => {
                     for (const name of ['tiles', 'metadata', 'state'])
                         if (request.result.objectStoreNames.contains(name)) request.result.deleteObjectStore(name);

@@ -324,6 +324,7 @@ static const expr_integrate_div_rule_feature_entry_t integrate_div_rule_feature_
 
 static const expr_integrate_binary_rule_fn integrate_div_initial_rules[] = {
     integrate_scaled_rule,
+    integrate_exp_root_rule,
     integrate_rational_partial_fractions,
     integrate_div_quotient_derivative,
     integrate_div_rule_by_numerator_distribution,

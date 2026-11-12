@@ -57,34 +57,34 @@ static qcomplex_t benchmark_c_harmonic_poly(qcomplex_t a, qcomplex_t b)
     return qc_harmonic_poly((unsigned long)qf_to_double(a.re), b);
 }
 
-static qfloat_t benchmark_r_chebyshev_t(qfloat_t a, qfloat_t b)
+static qfloat_t benchmark_r_chebyshev_Tn(qfloat_t a, qfloat_t b)
 {
-    return qf_chebyshev_t((unsigned long)qf_to_double(a), b);
+    return qf_chebyshev_Tn((unsigned long)qf_to_double(a), b);
 }
 
-static qcomplex_t benchmark_c_chebyshev_t(qcomplex_t a, qcomplex_t b)
+static qcomplex_t benchmark_c_chebyshev_Tn(qcomplex_t a, qcomplex_t b)
 {
-    return qc_chebyshev_t((unsigned long)qf_to_double(a.re), b);
+    return qc_chebyshev_Tn((unsigned long)qf_to_double(a.re), b);
 }
 
-static qfloat_t benchmark_r_chebyshev_u(qfloat_t a, qfloat_t b)
+static qfloat_t benchmark_r_chebyshev_Un(qfloat_t a, qfloat_t b)
 {
-    return qf_chebyshev_u((unsigned long)qf_to_double(a), b);
+    return qf_chebyshev_Un((unsigned long)qf_to_double(a), b);
 }
 
-static qcomplex_t benchmark_c_chebyshev_u(qcomplex_t a, qcomplex_t b)
+static qcomplex_t benchmark_c_chebyshev_Un(qcomplex_t a, qcomplex_t b)
 {
-    return qc_chebyshev_u((unsigned long)qf_to_double(a.re), b);
+    return qc_chebyshev_Un((unsigned long)qf_to_double(a.re), b);
 }
 
-static qfloat_t benchmark_r_hermite_h(qfloat_t a, qfloat_t b)
+static qfloat_t benchmark_r_hermite_Hn(qfloat_t a, qfloat_t b)
 {
-    return qf_hermite_h((unsigned long)qf_to_double(a), b);
+    return qf_hermite_Hn((unsigned long)qf_to_double(a), b);
 }
 
-static qcomplex_t benchmark_c_hermite_h(qcomplex_t a, qcomplex_t b)
+static qcomplex_t benchmark_c_hermite_Hn(qcomplex_t a, qcomplex_t b)
 {
-    return qc_hermite_h((unsigned long)qf_to_double(a.re), b);
+    return qc_hermite_Hn((unsigned long)qf_to_double(a.re), b);
 }
 
 static qfloat_t benchmark_r_root(qfloat_t a, qfloat_t b)
@@ -529,13 +529,13 @@ static const benchmark_operation_t operations[] = {
      {.n2 = num_bit_xor}, {0}, {0}, {benchmark_integer_wide, benchmark_integer_divisor}, 0, true},
     {"ceil", 1,
      {.n1 = num_ceil}, {0}, {0}, {"0.7"}, 1, false},
-    {"chebyshev_t", 2,
-     {.n2 = num_chebyshev_t},
-     {.r2 = benchmark_r_chebyshev_t}, {.c2 = benchmark_c_chebyshev_t},
+    {"chebyshev_Tn", 2,
+     {.n2 = num_chebyshev_Tn},
+     {.r2 = benchmark_r_chebyshev_Tn}, {.c2 = benchmark_c_chebyshev_Tn},
      {"2", "0.7"}, 2, false},
-    {"chebyshev_u", 2,
-     {.n2 = num_chebyshev_u},
-     {.r2 = benchmark_r_chebyshev_u}, {.c2 = benchmark_c_chebyshev_u},
+    {"chebyshev_Un", 2,
+     {.n2 = num_chebyshev_Un},
+     {.r2 = benchmark_r_chebyshev_Un}, {.c2 = benchmark_c_chebyshev_Un},
      {"2", "0.7"}, 2, false},
     {"circ", 1,
      {.n1 = num_circ},
@@ -685,9 +685,9 @@ static const benchmark_operation_t operations[] = {
      {.n1 = num_haversin},
      {.r1 = qf_haversin}, {.c1 = qc_haversin},
      {"0.7"}, 1, false},
-    {"hermite_h", 2,
-     {.n2 = num_hermite_h},
-     {.r2 = benchmark_r_hermite_h}, {.c2 = benchmark_c_hermite_h},
+    {"hermite_Hn", 2,
+     {.n2 = num_hermite_Hn},
+     {.r2 = benchmark_r_hermite_Hn}, {.c2 = benchmark_c_hermite_Hn},
      {"2", "0.7"}, 2, false},
     {"hypergeometric_pFq", 3,
      {.n3 = benchmark_n_hypergeometric_pFq},

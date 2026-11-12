@@ -147,7 +147,7 @@ static long benchmark_start(sqlite_t *db, const benchmark_options_t *options,
         "UPDATE benchmark_retention\n"
         "SET last_run_id = max(last_run_id, (SELECT max(id) FROM benchmark_run))\n"
         "WHERE singleton = 1");
-    if (ok) ok = sqlite_exec_cstr(db, "COMMIT");
+    if (ok) ok = benchmark_store_displays(db) && sqlite_exec_cstr(db, "COMMIT");
     if (!ok) { (void)sqlite_exec_cstr(db, "ROLLBACK"); return 0; }
     return run;
 }
@@ -200,7 +200,8 @@ static bool benchmark_save(sqlite_t *db, long run, const char *operation, const 
         for (unsigned i = 0; i < count; ++i) deviations[i] = fabs(samples[i] - median);
         mad = benchmark_median(deviations, count);
     }
-    if (!sqlite_exec_cstr(db, "BEGIN IMMEDIATE")) return false;
+    if (!sqlite_exec_cstr(db, "BEGIN IMMEDIATE"))
+        return benchmark_database_error(db, "starting a benchmark checkpoint");
     sqlite_stmt_t *write = measured ? sqlite_stmt_prepare(db,
         "INSERT INTO benchmark_sample(run_id, operation, backend, bits, ordinal, nanoseconds_per_call) "
         "VALUES (?1, ?2, ?3, ?4, ?5, ?6)") : NULL;
@@ -257,7 +258,10 @@ static bool benchmark_save(sqlite_t *db, long run, const char *operation, const 
         sqlite_stmt_step(write) == SQLITE_STEP_DONE;
     sqlite_stmt_finalize(write);
     if (ok) ok = sqlite_exec_cstr(db, "COMMIT");
-    if (!ok) (void)sqlite_exec_cstr(db, "ROLLBACK");
+    if (!ok) {
+        benchmark_database_error(db, "saving a benchmark checkpoint");
+        (void)sqlite_exec_cstr(db, "ROLLBACK");
+    }
     return ok;
 }
 
@@ -291,6 +295,7 @@ int benchmark_run(const string_t *root, sqlite_t *db, int argc, char **argv)
         "FROM benchmark_run AS b LEFT JOIN benchmark_result AS r ON r.run_id = b.id\n"
         "WHERE b.id = ?1 GROUP BY b.id");
     bool ok = metadata && sqlite_stmt_bind_int64(metadata, 1, run) && sqlite_stmt_step(metadata) == SQLITE_STEP_ROW;
+    if (!ok) benchmark_database_error(db, "reading benchmark run metadata");
     unsigned samples = ok ? (unsigned)sqlite_stmt_column_int(metadata, 0) : 0;
     double timeout = ok ? sqlite_stmt_column_double(metadata, 1) : 0;
     benchmark_progress_counts_t counts = {0};
@@ -322,6 +327,7 @@ int benchmark_run(const string_t *root, sqlite_t *db, int argc, char **argv)
         sqlite_step_result_t step = ok ? sqlite_stmt_step(pending) : SQLITE_STEP_ERROR;
         if (step != SQLITE_STEP_ROW) {
             ok = step == SQLITE_STEP_DONE;
+            if (!ok) benchmark_database_error(db, "selecting the next pending benchmark");
             sqlite_stmt_finalize(pending);
             break;
         }
@@ -354,8 +360,7 @@ int benchmark_run(const string_t *root, sqlite_t *db, int argc, char **argv)
         if (!checks_process_interrupt_signal()) {
             ok = benchmark_save(db, run, string_c_str(operation), string_c_str(backend), bits,
                                 outcome, output, errors, samples);
-            if (!ok) fputs("Cannot save benchmark checkpoint: check the storage cap and database availability. "
-                           "No partial case was committed.\n", stderr);
+            if (!ok) fputs("The benchmark checkpoint was not committed; its case remains pending.\n", stderr);
             if (ok) {
                 benchmark_progress_complete(progress, outcome);
                 if (!strcmp(outcome, "fail") || !strcmp(outcome, "timeout")) ++failures;
@@ -367,9 +372,11 @@ int benchmark_run(const string_t *root, sqlite_t *db, int argc, char **argv)
     }
     sqlite_stmt_t *finish = sqlite_stmt_prepare(db,
         "UPDATE benchmark_run SET status = ?2, finished_utc = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ?1");
-    ok = finish && sqlite_stmt_bind_int64(finish, 1, run) &&
-         sqlite_stmt_bind_text(finish, 2, completed == total && ok ? "complete" : "interrupted") &&
-         sqlite_stmt_step(finish) == SQLITE_STEP_DONE && ok;
+    bool finished = finish && sqlite_stmt_bind_int64(finish, 1, run) &&
+                    sqlite_stmt_bind_text(finish, 2, completed == total && ok ? "complete" : "interrupted") &&
+                    sqlite_stmt_step(finish) == SQLITE_STEP_DONE;
+    if (!finished) benchmark_database_error(db, "recording benchmark completion status");
+    ok = finished && ok;
     sqlite_stmt_finalize(finish);
     benchmark_progress_finish(progress, completed == total && ok);
     finish = sqlite_stmt_prepare(db,
@@ -379,9 +386,12 @@ int benchmark_run(const string_t *root, sqlite_t *db, int argc, char **argv)
         int outliers = sqlite_stmt_column_int(finish, 1);
         if (outliers) fprintf(stderr, "Warning: %d benchmark slowdown outliers retained; inspect this run before "
                               "accepting a performance change.\n", outliers);
-    } else ok = false;
+    } else ok = benchmark_database_error(db, "reading benchmark outcome counts");
     sqlite_stmt_finalize(finish);
     if (!benchmark_retention_apply(db, completed == total && ok ? 0 : run, false)) ok = false;
+    if (completed != total)
+        fprintf(stderr, "Completed checkpoints are preserved. Resume with make bench-db ARGS='run --resume %ld' "
+                "using this same build.\n", run);
     file_free(lock); string_free(self);
     return ok && !failures && completed == total ? 0 : 1;
 }

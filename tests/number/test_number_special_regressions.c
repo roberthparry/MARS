@@ -75,6 +75,146 @@ static number_t regression_qc_erf(const number_t *a)
 
 static number_t regression_erfinv(const number_t *a) { return num_erf(num_erfinv(a[0])); }
 static number_t regression_erfcinv(const number_t *a) { return num_erfc(num_erfcinv(a[0])); }
+
+/* Reject a finite answer whose representation silently narrowed before checking its mathematics. */
+static number_t regression_resolved(number_t value)
+{
+    return num_is_finite(value) && (num_is_exact(value) || num_get_prec_bits(value) >= num_get_default_prec_bits()) ?
+           value : NUM_NAN;
+}
+
+static number_t regression_acosec(const number_t *a)
+{
+    number_t value = regression_resolved(num_acosec(a[0])), reference = num_asin(num_div(NUM_ONE, a[0]));
+    number_t real = num_real_part(reference), imaginary = num_imag_part(reference);
+    number_t real_error = num_sub(num_real_part(value), real);
+    number_t imaginary_error = num_sub(num_imag_part(value), imaginary);
+    if (!num_is_zero(real)) real_error = num_div(real_error, real);
+    if (!num_is_zero(imaginary)) imaginary_error = num_div(imaginary_error, imaginary);
+    return num_add(num_abs(real_error), num_abs(imaginary_error));
+}
+
+static number_t regression_asec(const number_t *a)
+{
+    number_t value = regression_resolved(num_asec(a[0])), reference = num_acos(num_div(NUM_ONE, a[0]));
+    number_t real = num_real_part(reference), imaginary = num_imag_part(reference);
+    number_t real_error = num_sub(num_real_part(value), real);
+    number_t imaginary_error = num_sub(num_imag_part(value), imaginary);
+    if (!num_is_zero(real)) real_error = num_div(real_error, real);
+    if (!num_is_zero(imaginary)) imaginary_error = num_div(imaginary_error, imaginary);
+    return num_add(num_abs(real_error), num_abs(imaginary_error));
+}
+
+static number_t regression_double_erfinv(const number_t *a)
+{
+    number_t value = num_create_from_double(num_to_double(a[0]));
+    return num_sub(num_erf(num_erfinv(value)), value);
+}
+
+static number_t regression_double_erfcinv(const number_t *a)
+{
+    number_t value = num_create_from_double(num_to_double(a[0]));
+    return num_sub(num_erfc(num_erfcinv(value)), value);
+}
+
+static number_t regression_gamma_recurrence(const number_t *a)
+{
+    number_t value = regression_resolved(num_gamma(a[0]));
+    return num_sub(num_gamma(num_add(a[0], NUM_ONE)), num_mul(a[0], value));
+}
+
+static number_t regression_gamma_reflection(const number_t *a)
+{
+    number_t product = num_mul(regression_resolved(num_gamma(a[0])), num_gamma(num_sub(NUM_ONE, a[0])));
+    number_t reference = num_div(num_const(NUM_PI), num_sin(num_mul(num_const(NUM_PI), a[0])));
+    return num_div(num_sub(product, reference), reference);
+}
+
+static number_t regression_gamma_inverse_complex(const number_t *a)
+{
+    number_t value = regression_resolved(num_gammainv(a[0]));
+    return num_sub(num_gamma(value), a[0]);
+}
+
+static number_t regression_gamma_upper_one(const number_t *a)
+{
+    number_t one = num_new_with_prec_bits(num_get_default_prec_bits());
+    one = num_add(one, NUM_ONE);
+    return num_sub(regression_resolved(num_gammainc_upper(one, a[0])), num_exp(num_neg(a[0])));
+}
+
+static number_t regression_gamma_lower_one(const number_t *a)
+{
+    number_t one = num_add(num_new_with_prec_bits(num_get_default_prec_bits()), NUM_ONE);
+    return num_sub(regression_resolved(num_gammainc_lower(one, a[0])),
+                   num_sub(NUM_ONE, num_exp(num_neg(a[0]))));
+}
+
+static number_t regression_gamma_regularised(const number_t *a)
+{
+    number_t p = regression_resolved(num_gammainc_P(a[0], a[1]));
+    number_t q = regression_resolved(num_gammainc_Q(a[0], a[1]));
+    return num_sub(num_add(p, q), NUM_ONE);
+}
+
+static number_t regression_gamma_upper_recurrence(const number_t *a)
+{
+    number_t value = regression_resolved(num_gammainc_upper(a[0], a[1]));
+    number_t next = num_gammainc_upper(num_add(a[0], NUM_ONE), a[1]);
+    number_t tail = num_mul(num_pow(a[1], a[0]), num_exp(num_neg(a[1])));
+    return num_sub(next, num_add(num_mul(a[0], value), tail));
+}
+
+static number_t regression_hypergeometric_exp(const number_t *a)
+{
+    number_t one = num_add(num_new_with_prec_bits(num_get_default_prec_bits()), NUM_ONE);
+    number_t two = num_add(one, NUM_ONE);
+    number_t value = regression_resolved(num_hypergeometric_pFq(&one, 1, &two, 1, a[0]));
+    return num_sub(value, num_div(num_sub(num_exp(a[0]), NUM_ONE), a[0]));
+}
+
+static number_t regression_hypergeometric_exact(const number_t *a)
+{
+    number_t argument = num_create_from_long((long)num_to_double(a[0]));
+    number_t value = regression_resolved(num_hypergeometric_pFq(NULL, 0, NULL, 0, argument));
+    return num_sub(value, num_exp(a[0]));
+}
+
+static number_t regression_hypergeometric_binomial(const number_t *a)
+{
+    number_t value = regression_resolved(num_hypergeometric_pFq(a, 1, NULL, 0, a[1]));
+    return num_sub(value, num_pow(num_sub(NUM_ONE, a[1]), num_neg(a[0])));
+}
+
+static number_t regression_hypergeometric_terminating(const number_t *a)
+{
+    const number_t upper[] = {num_create_from_long(-3), a[0]};
+    number_t value = regression_resolved(num_hypergeometric_pFq(upper, 2, a, 1, a[1]));
+    return num_sub(value, num_pow_int(num_sub(NUM_ONE, a[1]), 3));
+}
+
+static number_t regression_lerch_log(const number_t *a)
+{
+    number_t one = num_add(num_new_with_prec_bits(num_get_default_prec_bits()), NUM_ONE);
+    number_t value = regression_resolved(num_lerch_phi(a[0], one, one));
+    return num_add(value, num_div(num_ln(num_sub(NUM_ONE, a[0])), a[0]));
+}
+
+static number_t regression_lerch_exact(const number_t *a)
+{
+    number_t denominator = num_create_from_long((long)num_to_double(a[0]));
+    number_t z = num_div(NUM_ONE, denominator);
+    number_t value = regression_resolved(num_lerch_phi(z, NUM_ONE, NUM_ONE));
+    number_t argument = num_div(NUM_ONE, a[0]);
+    return num_add(value, num_div(num_ln(num_sub(NUM_ONE, argument)), argument));
+}
+
+static number_t regression_lerch_shift(const number_t *a)
+{
+    number_t value = regression_resolved(num_lerch_phi(a[0], a[1], a[2]));
+    number_t next = num_lerch_phi(a[0], a[1], num_add(a[2], NUM_ONE));
+    return num_sub(num_sub(value, num_mul(a[0], next)), num_pow(a[2], num_neg(a[1])));
+}
 static number_t regression_qc_erfcinv(const number_t *a)
 {
     return num_create_from_qcomplex(qc_erfc(qc_erfcinv(regression_qcomplex(a[0]))));
@@ -386,11 +526,13 @@ typedef struct {
 } regression_operation_t;
 
 static const regression_operation_t regression_operations[] = {
+    {"acosec", 1, regression_acosec},
     {"appell_linear", 6, regression_appell_linear},
     {"appell_log", 6, regression_appell_log},
     {"appell_nan", 6, regression_appell_nan},
     {"appell_product", 6, regression_appell_product},
     {"appell_quadratic", 6, regression_appell_quadratic},
+    {"asec", 1, regression_asec},
     {"bessel_half", 1, regression_bessel_half},
     {"bessel_k", 2, regression_bessel_k},
     {"chi", 2, regression_chi},
@@ -400,6 +542,8 @@ static const regression_operation_t regression_operations[] = {
     {"digamma", 1, regression_digamma},
     {"dilog_diagonal", 1, regression_dilog_diagonal},
     {"double_clausen", 1, regression_double_clausen},
+    {"double_erfcinv", 1, regression_double_erfcinv},
+    {"double_erfinv", 1, regression_double_erfinv},
     {"double_zatahp", 2, regression_double_zatahp},
     {"double_zeta", 1, regression_double_zeta},
     {"double_zetah", 2, regression_double_zetah},
@@ -408,7 +552,21 @@ static const regression_operation_t regression_operations[] = {
     {"erfc", 1, regression_erfc},
     {"erfcinv", 1, regression_erfcinv},
     {"erfinv", 1, regression_erfinv},
+    {"gamma_inverse_complex", 1, regression_gamma_inverse_complex},
+    {"gamma_lower_one", 1, regression_gamma_lower_one},
+    {"gamma_recurrence", 1, regression_gamma_recurrence},
+    {"gamma_reflection", 1, regression_gamma_reflection},
+    {"gamma_regularised", 2, regression_gamma_regularised},
+    {"gamma_upper_one", 1, regression_gamma_upper_one},
+    {"gamma_upper_recurrence", 2, regression_gamma_upper_recurrence},
     {"gammainv", 1, regression_gammainv},
+    {"hypergeometric_binomial", 2, regression_hypergeometric_binomial},
+    {"hypergeometric_exact", 1, regression_hypergeometric_exact},
+    {"hypergeometric_exp", 1, regression_hypergeometric_exp},
+    {"hypergeometric_terminating", 2, regression_hypergeometric_terminating},
+    {"lerch_exact", 1, regression_lerch_exact},
+    {"lerch_log", 1, regression_lerch_log},
+    {"lerch_shift", 3, regression_lerch_shift},
     {"lommel", 1, regression_lommel},
     {"lommel_recurrence", 3, regression_lommel_recurrence},
     {"normal_cdf", 1, regression_normal_cdf},

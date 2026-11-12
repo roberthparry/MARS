@@ -98,6 +98,16 @@ int number_mpc_appell_f1(mpc_ptr out, mpc_srcptr a, mpc_srcptr b1, mpc_srcptr b2
     }
     mpc_abs(radius, y, MPFR_RNDU);
     if (mpfr_cmp_d(radius, 0.95) >= 0) goto done;
+    if (!mpc_cmp(a, c) && !(mpfr_zero_p(mpc_imagref(c)) &&
+        mpfr_integer_p(mpc_realref(c)) && mpfr_sgn(mpc_realref(c)) <= 0) &&
+        !mpc_ui_sub(scratch, 1u, x, MPC_RNDNN) && !mpc_ui_sub(xy, 1u, y, MPC_RNDNN)) {
+        /* F1(a,b1,b2;a;x,y) = (1-x)^(-b1) (1-y)^(-b2). */
+        mpc_neg(next, b1, MPC_RNDNN); mpc_pow(sum, scratch, next, MPC_RNDNN);
+        mpc_neg(next, b2, MPC_RNDNN); mpc_pow(scratch, xy, next, MPC_RNDNN);
+        mpc_mul(sum, sum, scratch, MPC_RNDNN);
+        converged = appell_finite(sum);
+        goto done;
+    }
     mpc_mul(xy, x, y, MPC_RNDNN);
     mpc_add(xy_sum, x, y, MPC_RNDNN);
     mpc_mul(weighted, b1, x, MPC_RNDNN);
@@ -194,6 +204,14 @@ int number_mpfr_appell_f1(mpfr_ptr out, mpfr_srcptr a, mpfr_srcptr b1, mpfr_srcp
     bool converged = false;
     mpfr_set_d(cutoff, 0.95, MPFR_RNDN);
     if (mpfr_cmpabs(x, cutoff) >= 0 || mpfr_cmpabs(y, cutoff) >= 0) goto done;
+    if (mpfr_equal_p(a, c) && !(mpfr_integer_p(c) && mpfr_sgn(c) <= 0) &&
+        !mpfr_ui_sub(scratch, 1u, x, MPFR_RNDN) && !mpfr_ui_sub(xy, 1u, y, MPFR_RNDN)) {
+        mpfr_neg(next, b1, MPFR_RNDN); mpfr_pow(sum, scratch, next, MPFR_RNDN);
+        mpfr_neg(next, b2, MPFR_RNDN); mpfr_pow(scratch, xy, next, MPFR_RNDN);
+        mpfr_mul(sum, sum, scratch, MPFR_RNDN);
+        converged = mpfr_number_p(sum);
+        goto done;
+    }
     mpfr_mul(xy, x, y, MPFR_RNDN);
     mpfr_add(xy_sum, x, y, MPFR_RNDN);
     mpfr_mul(weighted, b1, x, MPFR_RNDN);

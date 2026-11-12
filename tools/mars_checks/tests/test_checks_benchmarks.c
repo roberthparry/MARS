@@ -15,12 +15,14 @@
 #include <string.h>
 #include <sys/ioctl.h>
 #include <sys/wait.h>
+#include <time.h>
 #include <unistd.h>
 
 #include "file-t.h"
 #include "expression-t.h"
 #include "number-t.h"
 #include "sqlite-t.h"
+#include "thread-t.h"
 #include "xml-t.h"
 #include "checks_benchmarks.h"
 #include "checks_controls.h"
@@ -111,7 +113,8 @@ static void test_benchmarks_catalogue(void)
         benchmark_test_integer(db, "SELECT count(*) FROM benchmark_workload") == 45 &&
         sqlite_exec_cstr(db,
             "INSERT INTO benchmark_operation VALUES ('retained_custom_case', 1, '2', 0, 0, 0);\n"
-            "INSERT INTO benchmark_workload VALUES ('retained_custom_case', 'exact-fraction', '2/3');") && ok;
+            "INSERT INTO benchmark_workload(operation, backend, arguments)\n"
+            "VALUES ('retained_custom_case', 'exact-fraction', '2/3');") && ok;
     sqlite_close(db);
     ok = ok && benchmark_test_command(root, sync, 1, 0, NULL);
     db = benchmark_test_open(root);
@@ -119,10 +122,24 @@ static void test_benchmarks_catalogue(void)
         "SELECT count(*) FROM benchmark_operation WHERE name = 'retained_custom_case'") == 1 &&
         benchmark_test_integer(db,
             "SELECT count(*) FROM benchmark_workload\n"
-            "WHERE operation = 'retained_custom_case' AND backend = 'exact-fraction' AND arguments = '2/3'") == 1 && ok;
+        "WHERE operation = 'retained_custom_case' AND backend = 'exact-fraction'\n"
+        "  AND arguments = '2/3' AND arguments_display = '²⁄₃'") == 1 && ok;
     sqlite_close(db);
     ok = test_checks_finish(root) && ok;
     TEST_ASSERT_TRUE(ok, "benchmark storage is explicit, profiles cover every documented precision, and sync preserves cases");
+}
+
+static void test_benchmarks_precision(void)
+{
+    string_t *root = test_checks_root(), *diagnostics = NULL;
+    const char *supported[] = {"measure", "hypergeometric_pFq", "mpc", "256", "3"};
+    const char *limited[] = {"measure", "productlog", "mpc", "256", "3"};
+    bool ok = benchmark_test_command(root, supported, 5, 0, NULL) &&
+        benchmark_test_environment(root, limited, 5, 3, NULL, NULL, 0, &diagnostics) &&
+        diagnostics && strstr(string_c_str(diagnostics), "does not preserve the requested precision");
+    string_free(diagnostics);
+    ok = test_checks_finish(root) && ok;
+    TEST_ASSERT_TRUE(ok, "benchmark timings reject finite results produced by a narrower numeric backend");
 }
 
 static bool benchmark_test_stats_fixture(const string_t *root)
@@ -362,6 +379,19 @@ static void test_benchmarks_stats_default_details(void)
     TEST_ASSERT_TRUE(ok, "default summary retains arguments in every format and explicit details add metadata");
 }
 
+static bool benchmark_test_input_text(const xml_t *parent, string_t *restored, size_t width)
+{
+    bool ok = true;
+    for (size_t i = 0; ok && i < xml_child_count(parent); ++i) {
+        const xml_t *child = xml_child_at(parent, i);
+        if (xml_type(child) == XML_TEXT) {
+            const string_t *part = xml_text(child);
+            ok = string_length(part) <= width && string_append_cstr(restored, string_c_str(part)) >= 0;
+        } else ok = checks_equal(xml_name(child), "br");
+    }
+    return ok;
+}
+
 static bool benchmark_test_wrapped_inputs(const string_t *text, const char *row, const char *expected, size_t width)
 {
     const char *start = strstr(string_c_str(text), row);
@@ -376,16 +406,87 @@ static bool benchmark_test_wrapped_inputs(const string_t *text, const char *row,
     const string_t *style = xml_get_attribute(span, key);
     bool ok = span && checks_equal(xml_name(span), "span") && style && wanted_width &&
               string_find(style, string_c_str(wanted_width)) >= 0 && restored;
-    for (size_t i = 0; ok && i < xml_child_count(span); ++i) {
-        const xml_t *child = xml_child_at(span, i);
-        if (xml_type(child) == XML_TEXT) {
-            const string_t *part = xml_text(child);
-            ok = string_length(part) <= width && string_append_cstr(restored, string_c_str(part)) >= 0;
-        } else ok = checks_equal(xml_name(child), "br");
-    }
-    ok = ok && checks_equal(restored, expected);
+    ok = ok && benchmark_test_input_text(span, restored, width);
+    string_t *wanted = string_new_with(expected);
+    ok = ok && wanted && string_compare(restored, wanted) == 0;
+    string_free(wanted);
     string_free(wanted_width); string_free(restored); string_free(key); string_free(markup);
     xml_free(document);
+    return ok;
+}
+
+/* Recover literal digits independently of TeX layout, checking every numerator and denominator row. */
+static bool benchmark_test_fraction_component(const char **cursor, string_t *restored, size_t width)
+{
+    const char *p = *cursor, *array = "\\begin{array}{l}", *row = " \\\\ ";
+    bool multiline = !strncmp(p, array, strlen(array));
+    if (multiline) p += strlen(array);
+    for (;;) {
+        if (strncmp(p, "\\text{", 6)) return false;
+        p += 6;
+        const char *end = strchr(p, '}');
+        size_t length = end ? (size_t)(end - p) : 0;
+        if (!length || length > width || string_append_bytes(restored, p, length) < 0) return false;
+        p = end + 1;
+        if (!multiline || strncmp(p, row, strlen(row))) break;
+        if (length != width) return false;
+        p += strlen(row);
+    }
+    if (multiline) {
+        if (strncmp(p, "\\end{array}", 11)) return false;
+        p += 11;
+    }
+    *cursor = p;
+    return true;
+}
+
+static bool benchmark_test_fraction_inputs(const string_t *text, const char *row, const char *expected)
+{
+    const char *start = strstr(string_c_str(text), row);
+    start = start ? start + strlen(row) : NULL;
+    const char *end = start ? strstr(start, " |") : NULL;
+    string_t *markup = end ? string_new_with("<span>") : NULL;
+    bool copied = markup && string_append_bytes(markup, start, (size_t)(end - start)) >= 0 &&
+                  string_append_cstr(markup, "</span>") >= 0;
+    xml_t *document = markup ? xml_from_text(markup) : NULL;
+    const xml_t *span = xml_child_at(document, 0);
+    string_t *restored = string_new();
+    bool ok = copied && span && checks_equal(xml_name(span), "span") && restored &&
+              string_find(markup, "<span>") == 0 && string_find(markup, "<span ") < 0 &&
+              string_find(markup, "<sup>") < 0 && string_find(markup, "<sub>") < 0;
+    size_t labels = 0;
+    for (size_t i = 0; ok && i < xml_child_count(span); ++i) {
+        const xml_t *child = xml_child_at(span, i);
+        if (xml_type(child) != XML_TEXT) {
+            ok = checks_equal(xml_name(child), "br");
+            continue;
+        }
+        const char *p = string_c_str(xml_text(child));
+        if (!strncmp(p, "**Input ", 8)) {
+            char label[32];
+            snprintf(label, sizeof label, "**Input %zu**", ++labels);
+            ok = !strcmp(p, label) && (labels == 1 || string_append_cstr(restored, ", ") >= 0);
+            continue;
+        }
+        if (!strncmp(p, "$\\frac{", 7)) {
+            p += 7;
+            ok = benchmark_test_fraction_component(&p, restored, 80) && !strncmp(p, "}{", 2);
+            if (!ok) break;
+            p += 2;
+            ok = string_append_cstr(restored, "/") >= 0 &&
+                 benchmark_test_fraction_component(&p, restored, 80) && !strncmp(p, "}$", 2);
+            if (!ok) break;
+            p += 2;
+        }
+        ok = strlen(p) <= 80 && string_append_cstr(restored, p) >= 0;
+    }
+    bool multiple = strchr(expected, ',') != NULL;
+    ok = ok && (multiple ? labels > 1 : labels == 0) && !strcmp(string_c_str(restored), expected);
+    if (ok && multiple) {
+        const char *second = strstr(start, "<br/><br/>**Input 2**<br/>");
+        ok = second && second < end;
+    }
+    string_free(restored); string_free(markup); xml_free(document);
     return ok;
 }
 
@@ -518,7 +619,7 @@ static void test_benchmarks_integer_inputs(void)
 
 static void test_benchmarks_fraction_inputs(void)
 {
-    string_t *root = test_checks_root(), *out = NULL;
+    string_t *root = test_checks_root(), *out = NULL, *saved_arguments = NULL;
     const char *sync[] = {"sync"};
     bool ok = benchmark_test_fixture(root) && benchmark_test_command(root, sync, 1, 0, NULL);
     sqlite_t *db = benchmark_test_open(root);
@@ -556,6 +657,12 @@ static void test_benchmarks_fraction_inputs(void)
     }
     ok = ok && step == SQLITE_STEP_DONE && count == 10;
     num_set_default_prec_bits(saved);
+    sqlite_stmt_finalize(rows);
+    rows = db ? sqlite_stmt_prepare(db,
+        "SELECT arguments FROM benchmark_workload WHERE operation = 'add' AND backend = 'exact-fraction'") : NULL;
+    if (rows && sqlite_stmt_step(rows) == SQLITE_STEP_ROW)
+        saved_arguments = string_new_with(sqlite_stmt_column_text(rows, 0));
+    ok = ok && saved_arguments;
     sqlite_stmt_finalize(rows); sqlite_close(db);
     const char *run[] = {"run", "--backend", "exact-fraction", "--samples", "3", "--timeout", "3"};
     ok = ok && benchmark_test_command(root, run, 7, 0, NULL);
@@ -566,21 +673,109 @@ static void test_benchmarks_fraction_inputs(void)
         benchmark_test_integer(db,
             "SELECT count(*) FROM benchmark_result AS r\n"
             "LEFT JOIN benchmark_workload AS w ON w.operation = r.operation AND w.backend = r.backend\n"
-            "WHERE r.outcome = 'pass' AND (r.arguments <> w.arguments OR r.bits <> 0 OR r.complex_mask <> 0)") == 0 && ok;
+            "WHERE r.outcome = 'pass' AND (r.arguments <> w.arguments OR r.bits <> 0 OR r.complex_mask <> 0)") == 0 &&
+        benchmark_test_integer(db,
+            "SELECT count(*) FROM benchmark_result\n"
+            "WHERE arguments_display IS NOT NULL AND arguments_display LIKE '%⁄%'\n"
+            "  AND arguments_display LIKE '%⁹⁷¹%' AND arguments LIKE '%/%'") == 10 && ok;
     sqlite_close(db);
     const char *stats[] = {"stats", "--backend", "exact-fraction", "--format=markdown"};
     ok = ok && benchmark_test_command(root, stats, 4, 0, &out) &&
          string_find(out, "number / unrestricted fraction — exact fractions") >= 0 &&
-         string_find(out, "width:80ch") >= 0;
+         string_find(out, "$\\frac{") >= 0 &&
+         benchmark_test_fraction_inputs(out, "| add | ", string_c_str(saved_arguments));
     string_free(out); out = NULL;
     const char *report[] = {"report", "1"};
     ok = ok && benchmark_test_command(root, report, 2, 0, &out) &&
          string_find(out, "### number / unrestricted fraction\n") >= 0 &&
          string_find(out, "| add |") >= 0 && string_find(out, "| div |") >= 0 &&
-         string_find(out, "| inv |") >= 0 && string_find(out, "| mul |") >= 0;
+         string_find(out, "| inv |") >= 0 && string_find(out, "| mul |") >= 0 &&
+         benchmark_test_fraction_inputs(out, "| add | ", string_c_str(saved_arguments)) &&
+         string_find(out, "| pow | ") >= 0 && string_find(out, "**Input 2**<br/>5 |") >= 0;
     string_free(out);
+    out = NULL;
+    const char *grid[] = {"stats", "--backend", "exact-fraction"};
+    const char *plain[] = {"NO_COLOR=1", "COLUMNS=132"};
+    ok = ok && benchmark_test_environment(root, grid, 3, 0, &out, plain, 2, NULL) &&
+         string_find(out, "⁹⁷¹") >= 0 && string_find(out, "₆₈₆") >= 0 &&
+         benchmark_test_grid_width(out, 132);
+    string_free(out); string_free(saved_arguments);
     ok = test_checks_finish(root) && ok;
     TEST_ASSERT_TRUE(ok, "fraction arithmetic times large exact operands and reports the actual persisted workload");
+}
+
+static void test_benchmarks_display_migration(void)
+{
+    string_t *root = test_checks_root();
+    bool ok = benchmark_test_fixture(root);
+    string_t *path = checks_path(root, "bench/benchmarks.sql"), *legacy = checks_read(path);
+    string_free(path);
+    ok = ok && legacy && string_replace(legacy, "    arguments_display TEXT,\n", "") >= 0 &&
+        string_replace(legacy, "CREATE INDEX IF NOT EXISTS benchmark_result_missing_display\n"
+                               "    ON benchmark_result(arguments, backend, complex_mask) WHERE arguments_display IS NULL;\n",
+                       "") >= 0 &&
+        string_replace(legacy, "CREATE INDEX IF NOT EXISTS benchmark_workload_missing_display\n"
+                               "    ON benchmark_workload(arguments, backend) WHERE arguments_display IS NULL;\n", "") >= 0 &&
+        string_find(legacy, "arguments_display") < 0;
+    sqlite_t *db = benchmark_test_open(root);
+    ok = ok && db && sqlite_exec(db, legacy) && sqlite_exec_cstr(db,
+        "INSERT INTO benchmark_operation VALUES ('retained_fraction', 2, '-355/+113, 5', 0, 0, 0);\n"
+        "INSERT INTO benchmark_workload VALUES ('retained_fraction', 'exact-fraction', '-355/+113, 5');\n"
+        "INSERT INTO benchmark_run(id,status,machine,cpu,system,compiler,build_flags,library_sha256,\n"
+        "                          executable_sha256,requested_samples,case_timeout_seconds)\n"
+        "VALUES (1,'complete','fixture','fixture','fixture','fixture','','old library','old executable',3,3);\n"
+        "INSERT INTO benchmark_result(run_id,operation,backend,bits,arguments,complex_mask,sequence,\n"
+        "                             outcome,median_ns,timing_outlier,detail)\n"
+        "VALUES (1,'retained_fraction','exact-fraction',0,'-355/+113, 5',0,1,'pass',12345,1,'retained');\n"
+        "INSERT INTO benchmark_operation VALUES ('chebyshev_t',2,'3,2',0,1,1),\n"
+        "                                       ('chebyshev_u',2,'3,2',0,1,1),\n"
+        "                                       ('hermite_h',2,'3,2',0,1,1);\n"
+        "INSERT INTO benchmark_workload(operation,backend,arguments)\n"
+        "VALUES ('chebyshev_t','exact-integer','3,2');\n"
+        "INSERT INTO benchmark_result(run_id,operation,backend,bits,arguments,sequence,outcome,median_ns,\n"
+        "                             complex_mask,timing_outlier)\n"
+        "VALUES (1,'chebyshev_t','qfloat',106,'3,2',2,'pass',111,0,1),\n"
+        "       (1,'chebyshev_u','qfloat',106,'3,2',3,'pass',222,0,1),\n"
+        "       (1,'hermite_h','qfloat',106,'3,2',4,'pass',333,0,1);\n"
+        "INSERT INTO benchmark_sample VALUES (1,'chebyshev_t','qfloat',106,1,111),\n"
+        "                                    (1,'chebyshev_u','qfloat',106,1,222),\n"
+        "                                    (1,'hermite_h','qfloat',106,1,333);\n"
+        "PRAGMA user_version=3;");
+    string_free(legacy); sqlite_close(db);
+    const char *sync[] = {"sync"};
+    ok = ok && benchmark_test_command(root, sync, 1, 0, NULL);
+    db = benchmark_test_open(root);
+    ok = ok && db && benchmark_test_integer(db,
+        "SELECT count(*) FROM benchmark_result\n"
+        "WHERE run_id=1 AND arguments='-355/+113, 5' AND arguments_display='⁻³⁵⁵⁄₊₁₁₃, 5'\n"
+        "  AND median_ns=12345 AND timing_outlier=1 AND detail='retained'") == 1 &&
+        benchmark_test_integer(db,
+        "SELECT count(*) FROM benchmark_workload\n"
+        "WHERE operation='retained_fraction' AND arguments_display='⁻³⁵⁵⁄₊₁₁₃, 5'") == 1 &&
+        benchmark_test_integer(db,
+        "SELECT count(*) FROM benchmark_result\n"
+        "WHERE operation IN ('chebyshev_Tn','chebyshev_Un','hermite_Hn')\n"
+        "  AND timing_outlier=1 AND arguments='3,2'") == 3 &&
+        benchmark_test_integer(db,
+        "SELECT sum(median_ns) FROM benchmark_result\n"
+        "WHERE operation IN ('chebyshev_Tn','chebyshev_Un','hermite_Hn')") == 666 &&
+        benchmark_test_integer(db,
+        "SELECT sum(nanoseconds_per_call) FROM benchmark_sample\n"
+        "WHERE operation IN ('chebyshev_Tn','chebyshev_Un','hermite_Hn')") == 666 &&
+        benchmark_test_integer(db,
+        "SELECT count(*) FROM benchmark_workload WHERE operation='chebyshev_Tn' AND arguments='3,2'") == 1 &&
+        benchmark_test_integer(db,
+        "SELECT count(*) FROM benchmark_operation WHERE name IN ('chebyshev_t','chebyshev_u','hermite_h')") == 0 &&
+        benchmark_test_integer(db, "PRAGMA user_version") == 4;
+    sqlite_close(db);
+    const char *report[] = {"report", "1"};
+    string_t *out = NULL;
+    ok = ok && benchmark_test_command(root, report, 2, 0, &out) &&
+         string_find(out, "$\\frac{\\text{-355}}{\\text{+113}}$") >= 0 &&
+         benchmark_test_fraction_inputs(out, "| retained_fraction | ", "-355/+113, 5");
+    string_free(out);
+    ok = test_checks_finish(root) && ok;
+    TEST_ASSERT_TRUE(ok, "display migration preserves authored fractions, measurements, outliers and custom workloads");
 }
 
 static void test_benchmarks_measurements(void)
@@ -979,7 +1174,7 @@ static void test_benchmarks_retention_policy(void)
     sqlite_t *db = benchmark_test_open(root);
     ok = db && benchmark_test_integer(db,
         "SELECT count(*) FROM benchmark_retention WHERE max_mib=2 AND keep_runs=3 AND max_days=30 AND raw_runs=3") == 1 &&
-        benchmark_test_integer(db, "PRAGMA user_version") == 3 && ok;
+        benchmark_test_integer(db, "PRAGMA user_version") == 4 && ok;
     sqlite_close(db);
     ok = test_checks_finish(root) && ok;
     TEST_ASSERT_TRUE(ok,
@@ -1023,7 +1218,10 @@ static void test_benchmarks_retention_rollback(void)
         "END;") && ok;
     sqlite_close(db);
     const char *configure[] = {"retention", "--keep-runs", "1", "--raw-runs", "0"};
-    ok = ok && benchmark_test_command(root, configure, 5, 1, NULL);
+    string_t *errors = NULL;
+    ok = ok && benchmark_test_environment(root, configure, 5, 1, NULL, NULL, 0, &errors) &&
+        errors && strstr(string_c_str(errors), "applying benchmark retention: deliberate retention rollback");
+    string_free(errors);
     db = benchmark_test_open(root);
     ok = db && benchmark_test_integer(db, "SELECT count(*) FROM benchmark_run") == 4 &&
         benchmark_test_integer(db, "SELECT count(*) FROM benchmark_result") == 4 &&
@@ -1163,13 +1361,91 @@ static void test_benchmarks_retention_lock_and_migration(void)
     ok = ok && benchmark_test_command(root, configure, 3, 1, NULL) && benchmark_test_command(root, prune, 1, 1, NULL);
     file_free(lock);
     db = benchmark_test_open(root);
-    ok = db && benchmark_test_integer(db, "PRAGMA user_version") == 3 &&
+    ok = db && benchmark_test_integer(db, "PRAGMA user_version") == 4 &&
         benchmark_test_integer(db, "SELECT keep_runs FROM benchmark_retention") == 20 &&
         benchmark_test_integer(db, "SELECT count(*) FROM benchmark_result") == 8 &&
         benchmark_test_integer(db, "SELECT timing_outlier FROM benchmark_result WHERE operation='hypergeometric_pFq'") == 1 && ok;
     sqlite_close(db);
     ok = test_checks_finish(root) && ok;
     TEST_ASSERT_TRUE(ok, "version-one history migrates intact and an active benchmark excludes policy changes and pruning");
+}
+
+typedef struct {
+    const string_t *root;
+    lock_t *ready;
+    bool held;
+    bool released;
+} benchmark_test_reader_t;
+
+static void *benchmark_test_reader(void *argument)
+{
+    benchmark_test_reader_t *reader = argument;
+    sqlite_t *db = benchmark_test_open(reader->root);
+    reader->held = db && sqlite_exec_cstr(db, "BEGIN; SELECT count(*) FROM benchmark_run");
+    (void)lock_signal(reader->ready);
+    struct timespec remaining = {.tv_nsec = 350000000};
+    while (nanosleep(&remaining, &remaining) && errno == EINTR) {}
+    reader->released = db && sqlite_exec_cstr(db, "ROLLBACK");
+    sqlite_close(db);
+    return NULL;
+}
+
+static void test_benchmarks_reader_contention(void)
+{
+    string_t *root = test_checks_root();
+    const char *sync[] = {"sync"};
+    bool ok = benchmark_test_fixture(root) && benchmark_test_command(root, sync, 1, 0, NULL);
+    benchmark_test_reader_t reader = {.root = root, .ready = lock_new(LOCK_EVENT, 0)};
+    thread_t *thread = ok && reader.ready ? thread_new(benchmark_test_reader, &reader) : NULL;
+    ok = thread && lock_wait_for(reader.ready, 5000) && reader.held && ok;
+    const char *run[] = {"run", "--operation", "sin", "--backend", "qfloat", "--samples", "3"};
+    if (ok) ok = benchmark_test_command(root, run, 7, 0, NULL);
+    bool joined = thread && thread_join(thread, NULL);
+    ok = joined && reader.released && ok;
+    (void)thread_free(thread);
+    (void)lock_free(reader.ready);
+    sqlite_t *db = benchmark_test_open(root);
+    ok = db && benchmark_test_integer(db, "SELECT count(*) FROM benchmark_run WHERE status='complete'") == 1 &&
+        benchmark_test_integer(db, "SELECT count(*) FROM benchmark_sample") == 3 &&
+        benchmark_test_integer(db, "SELECT count(*) FROM pragma_foreign_key_check") == 0 && ok;
+    sqlite_close(db);
+    ok = test_checks_finish(root) && ok;
+    TEST_ASSERT_TRUE(ok, "a brief concurrent read transaction delays storage without interrupting the measured run");
+}
+
+static void test_benchmarks_checkpoint_diagnostic(void)
+{
+    string_t *root = test_checks_root(), *errors = NULL;
+    const char *sync[] = {"sync"};
+    bool ok = benchmark_test_fixture(root) && benchmark_test_command(root, sync, 1, 0, NULL);
+    sqlite_t *db = benchmark_test_open(root);
+    ok = db && sqlite_exec_cstr(db,
+        "CREATE TRIGGER reject_checkpoint BEFORE UPDATE ON benchmark_result\n"
+        "WHEN OLD.outcome = 'pending' AND NEW.outcome = 'pass' BEGIN\n"
+        "    SELECT RAISE(ABORT, 'deliberate checkpoint failure');\n"
+        "END") && ok;
+    sqlite_close(db);
+    const char *run[] = {"run", "--operation", "sin", "--backend", "qfloat", "--samples", "3"};
+    ok = ok && benchmark_test_environment(root, run, 7, 1, NULL, NULL, 0, &errors) && errors &&
+        strstr(string_c_str(errors), "saving a benchmark checkpoint: deliberate checkpoint failure") &&
+        strstr(string_c_str(errors), "Benchmarks stopped: 0/1") &&
+        strstr(string_c_str(errors), "run --resume 1");
+    string_free(errors);
+    db = benchmark_test_open(root);
+    ok = db && benchmark_test_integer(db,
+        "SELECT count(*) FROM benchmark_run WHERE status='interrupted' AND finished_utc IS NOT NULL") == 1 &&
+        benchmark_test_integer(db, "SELECT count(*) FROM benchmark_result WHERE outcome='pending'") == 1 &&
+        benchmark_test_integer(db, "SELECT count(*) FROM benchmark_sample") == 0 &&
+        sqlite_exec_cstr(db, "DROP TRIGGER reject_checkpoint") && ok;
+    sqlite_close(db);
+    const char *resume[] = {"run", "--resume", "1"};
+    ok = ok && benchmark_test_command(root, resume, 3, 0, NULL);
+    db = benchmark_test_open(root);
+    ok = db && benchmark_test_integer(db, "SELECT count(*) FROM benchmark_run WHERE status='complete'") == 1 &&
+        benchmark_test_integer(db, "SELECT count(*) FROM benchmark_sample") == 3 && ok;
+    sqlite_close(db);
+    ok = test_checks_finish(root) && ok;
+    TEST_ASSERT_TRUE(ok, "checkpoint errors explain their SQL cause, roll back samples and leave a resumable case");
 }
 
 static void readme_example_benchmark_retention(void)
@@ -1190,11 +1466,13 @@ static void readme_example_benchmark_retention(void)
 void test_checks_benchmark_cases(void)
 {
     TEST_RUN_IN_GROUP(test_benchmarks_catalogue, tests, "benchmark,storage");
+    TEST_RUN_IN_GROUP(test_benchmarks_precision, tests, "benchmark,precision");
     TEST_RUN_IN_GROUP(test_benchmarks_api_coverage, tests, "benchmark,coverage");
     TEST_RUN_IN_GROUP(test_benchmarks_expression_coverage, tests, "benchmark,expression,coverage");
     TEST_RUN_IN_GROUP(test_benchmarks_measurements, tests, "benchmark,timing");
     TEST_RUN_IN_GROUP(test_benchmarks_integer_inputs, tests, "benchmark,integer,timing");
     TEST_RUN_IN_GROUP(test_benchmarks_fraction_inputs, tests, "benchmark,fraction,timing");
+    TEST_RUN_IN_GROUP(test_benchmarks_display_migration, tests, "benchmark,fraction,storage");
     TEST_RUN_IN_GROUP(test_benchmarks_documentation, tests, "benchmark,markdown");
     TEST_RUN_IN_GROUP(test_benchmarks_documentation_supported_rows, tests, "benchmark,markdown");
     TEST_RUN_IN_GROUP(test_benchmarks_stats, tests, "benchmark,statistics");
@@ -1213,6 +1491,8 @@ void test_checks_benchmark_cases(void)
     TEST_RUN_IN_GROUP(test_benchmarks_retention_sequence, tests, "benchmark,retention");
     TEST_RUN_IN_GROUP(test_benchmarks_retention_resume, tests, "benchmark,retention");
     TEST_RUN_IN_GROUP(test_benchmarks_retention_lock_and_migration, tests, "benchmark,retention");
+    TEST_RUN_IN_GROUP(test_benchmarks_reader_contention, tests, "benchmark,storage,concurrency");
+    TEST_RUN_IN_GROUP(test_benchmarks_checkpoint_diagnostic, tests, "benchmark,storage");
 }
 
 /* Run the documented policy display after ordinary benchmark regressions. */

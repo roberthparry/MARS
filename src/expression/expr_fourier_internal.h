@@ -95,12 +95,12 @@ static inline expr_t *ft_pow_xp(fourier_context_t *c, const expr_t *a, const exp
     return expr_fourier_keep(c, expr_pow_xp(a, b));
 }
 
-static inline expr_t *ft_chebyshev_t(fourier_context_t *c, const expr_t *a, const expr_t *b) {
-    return expr_fourier_keep(c, expr_chebyshev_t(a, b));
+static inline expr_t *ft_chebyshev_Tn(fourier_context_t *c, const expr_t *a, const expr_t *b) {
+    return expr_fourier_keep(c, expr_chebyshev_Tn(a, b));
 }
 
-static inline expr_t *ft_hermite_h(fourier_context_t *c, const expr_t *a, const expr_t *b) {
-    return expr_fourier_keep(c, expr_hermite_h(a, b));
+static inline expr_t *ft_hermite_Hn(fourier_context_t *c, const expr_t *a, const expr_t *b) {
+    return expr_fourier_keep(c, expr_hermite_Hn(a, b));
 }
 
 static inline expr_t *ft_beta(fourier_context_t *c, const expr_t *a, const expr_t *b) {

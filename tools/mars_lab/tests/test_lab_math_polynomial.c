@@ -35,11 +35,15 @@ static double lab_math_polynomial_hermite(unsigned n, double x)
 
 static void test_polynomial_names(void)
 {
-    const char *chebyshev[] = {"Tn", "chebyshev_t", "ChebyshevT"};
-    const char *hermites[] = {"ℋ", "hermite_h", "HermiteH"};
+    const char *chebyshev[] = {"Tn", "chebyshev_Tn", "ChebyshevT"};
+    const char *second_kind[] = {"Un", "chebyshev_Un", "ChebyshevU"};
+    const char *hermites[] = {"ℋ", "hermite_Hn", "HermiteH"};
     for (size_t i = 0; i < 3; ++i) {
         lab_math_check(lab_math_polynomial_value(lab_math_format("%s(3,2)", chebyshev[i]), "x") == 26, chebyshev[i]);
+        lab_math_check(lab_math_polynomial_value(lab_math_format("%s(3,2)", second_kind[i]), "x") == 56, second_kind[i]);
         lab_math_check(lab_math_polynomial_value(lab_math_format("%s(3,2)", hermites[i]), "x") == 40, hermites[i]);
+        lab_math_check(lab_math_polynomial_value(lab_math_format("{x | x=%s(3,2)}", chebyshev[i]), "x") == 26, chebyshev[i]);
+        lab_math_check(lab_math_polynomial_value(lab_math_format("{x | x=%s(3,2)}", second_kind[i]), "x") == 56, second_kind[i]);
         lab_math_check(lab_math_polynomial_value(lab_math_format("{x | x=%s(3,2)}", hermites[i]), "x") == 40, hermites[i]);
     }
     lab_math_check(lab_math_polynomial_value("{x | x=Tn(3,2)}", "x") == 26, "polynomial binding");
@@ -48,9 +52,11 @@ static void test_polynomial_names(void)
         lab_math_check(lab_math_polynomial_value(indexed[i], "x") == (i < 2 ? 26 : 40), indexed[i]);
     lab_math_places(creal(lab_math_polynomial_value("Hn(3,2)", "x")), 20.0 / 3, 7);
     lab_math_contains(lab_math_text(lab_math_polynomial_fields("ℋ(n,x)", "x"), "tex"), "\\mathcal{H}", true);
-    const char *sources[] = {"Tn(n,x)", "Un(n,x)", "ℋ(n,x)"};
+    const char *sources[] = {"chebyshev_Tn(n,x)", "chebyshev_Un(n,x)", "hermite_Hn(n,x)"};
+    const char *functions[] = {"chebyshev_Tn(", "chebyshev_Un(", "hermite_Hn("};
     for (size_t i = 0; i < 3; ++i) {
         const json_t *result = lab_math_polynomial_fields(sources[i], "x");
+        lab_math_contains(lab_math_text(result, "function"), functions[i], true);
         lab_math_equal(lab_math_text(lab_math_polynomial_fields(lab_math_text(result, "expression"), "x"), "tex"),
             lab_math_text(result, "tex"));
     }
@@ -167,7 +173,8 @@ static void test_polynomial_convolution(void)
 static void test_polynomial_readme(void)
 {
     /* README examples: docs/expression.md, polynomial and convolution examples. */
-    const char *sources[] = {"Tn(3,2)", "Un(3,2)", "ℋ(3,2)", "sum(k,0,3,Tn(k,2))", "sum(k,0,3,ℋ(k,2))",
+    const char *sources[] = {"chebyshev_Tn(3,2)", "chebyshev_Un(3,2)", "hermite_Hn(3,2)",
+                             "sum(k,0,3,Tn(k,2))", "sum(k,0,3,ℋ(k,2))",
                              "{convolve(rect(t),rect(t),t)|t=1/4}", "{causal_convolve(t,t,t)|t=2}",
                              "{@L{causal_convolve(t,t,t)}|s=2}"};
     const double expected[] = {26, 56, 40, 36, 59, 0.75, 4.0 / 3, 1.0 / 16};

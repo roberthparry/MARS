@@ -116,7 +116,9 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
     document.body.append(previewCard);
     const previewButton = previewCard.querySelector<HTMLButtonElement>('.almanac-location-flag')!;
     const smallFlag = previewButton.querySelector<HTMLImageElement>('img.country-flag')!;
-    smallFlag.src = regionalFlag;
+    // Use a separate resource: the selected-country check has already started its SVG animation clock.
+    const previewFlag = 'data:image/svg+xml;base64,' + btoa(regionalSvg.replace('<svg', '<svg data-preview-clock="1"'));
+    smallFlag.src = previewFlag;
     try {
         previewButton.setAttribute('aria-describedby', 'original-description');
         smallFlag.dispatchEvent(new MouseEvent('pointerover', {bubbles: true}));
@@ -2328,7 +2330,6 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
                 countryShell.classList.remove('open');
                 countryShell.querySelector('.select-menu')!.classList.add('hidden');
                 const flagLoader = WorksheetResults.tooltip as unknown as {
-                    fetchFlag(code: string, signal: AbortSignal): Promise<{name: string; flag: string}>;
                     fillCountryMenu(): Promise<void>;
                     visibleCountries: Set<HTMLElement>;
                     menuRequest: AbortController | null;
@@ -2352,8 +2353,8 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
                 }
                 const firstConsumer = new AbortController(), secondConsumer = new AbortController();
                 const beforeShared = townFlagReplies.length;
-                const firstResult = flagLoader.fetchFlag('FR', firstConsumer.signal).catch(() => null);
-                const secondResult = flagLoader.fetchFlag('FR', secondConsumer.signal);
+                const firstResult = WorksheetResults.tooltip.countryMetadata('FR', firstConsumer.signal).catch(() => null);
+                const secondResult = WorksheetResults.tooltip.countryMetadata('FR', secondConsumer.signal);
                 check(townFlagReplies.length === beforeShared + 1,
                       'concurrent menu and tooltip consumers share one asynchronous country request');
                 firstConsumer.abort();

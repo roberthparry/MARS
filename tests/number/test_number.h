@@ -48,7 +48,9 @@ void run_number_nonfinite_series_tests(void);
 /**
  * @brief Run stateful number-module cache and conservative-magnitude regressions.
  * @return Nothing; records assertion results through the active harness case.
- * @note Tests exact logarithm keys, signed zeros, precision upgrades, uncached indices and concurrent callers.
+ * @note Tests exact logarithm and inverse-power keys, signed zeros, precision upgrades, uncached indices and
+ * concurrent callers, including changes to either Dirichlet-power key. Cloned mathematical constants must
+ * retain their identity through explicit precision changes without mislabelling arithmetic results.
  * Owns and releases all temporary MPC values and joined threads. Reports failures through the ordinary test
  * harness; call sequentially with other test groups. No ownership or scratch pointers escape this void function.
  */

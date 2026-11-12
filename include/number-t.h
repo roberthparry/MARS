@@ -1026,14 +1026,33 @@ number_t num_polylog(const number_t order, const number_t number);
  */
 number_t num_harmonic_poly(const number_t degree, const number_t argument);
 
-/** @brief Evaluate the first-kind Chebyshev polynomial of non-negative integral degree. */
-number_t num_chebyshev_t(number_t degree, number_t argument);
+/**
+ * @brief Evaluate the first-kind Chebyshev polynomial @f$T_n(z)@f$ by its three-term recurrence.
+ * @param[in] degree Borrowed real integer degree between zero and INT_MAX; never consumed.
+ * @param[in] argument Borrowed real or complex argument; never consumed.
+ * @return Owned polynomial value, or NaN for an invalid degree. Release with num_destroy() or a numeric scope.
+ * Arithmetic follows the active numeric precision and preserves exact values where the number backend permits.
+ */
+number_t num_chebyshev_Tn(number_t degree, number_t argument);
 
-/** @brief Evaluate the second-kind Chebyshev polynomial of non-negative integral degree. */
-number_t num_chebyshev_u(number_t degree, number_t argument);
+/**
+ * @brief Evaluate the second-kind Chebyshev polynomial @f$U_n(z)@f$ by its three-term recurrence.
+ * @param[in] degree Borrowed real integer degree between zero and INT_MAX; never consumed.
+ * @param[in] argument Borrowed real or complex argument; never consumed.
+ * @return Owned polynomial value, or NaN for an invalid degree. Release with num_destroy() or a numeric scope.
+ * Arithmetic follows the active numeric precision and preserves exact values where the number backend permits.
+ */
+number_t num_chebyshev_Un(number_t degree, number_t argument);
 
-/** @brief Evaluate the physicists' Hermite polynomial of non-negative integral degree. */
-number_t num_hermite_h(number_t degree, number_t argument);
+/**
+ * @brief Evaluate the physicists' Hermite polynomial @f$H_n(z)@f$, with @f$H_1(z)=2z@f$.
+ * @param[in] degree Borrowed real integer degree between zero and INT_MAX; never consumed.
+ * @param[in] argument Borrowed real or complex argument; never consumed.
+ * @return Owned polynomial value, or NaN for an invalid degree. Release with num_destroy() or a numeric scope.
+ * Arithmetic follows the active numeric precision and preserves exact values where the number backend permits.
+ */
+number_t num_hermite_Hn(number_t degree, number_t argument);
+
 /**
  * @brief Evaluate Appell F1 using a total-degree recurrence for multiprecision real and complex operands.
  * @param a First upper parameter, retained by the caller.

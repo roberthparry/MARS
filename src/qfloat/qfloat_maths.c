@@ -3164,8 +3164,11 @@ qfloat_t qf_lerch_phi(qfloat_t z, qfloat_t s, qfloat_t a)
         return qf_zetah(s, a);
     if (qf_ge(qf_abs(z), QF_ONE))
         return QF_NAN;
+    double order = qf_to_double(s);
+    bool integer_order = order > INT_MIN && order <= INT_MAX && qf_eq(s, qf_floor(s));
     for (long k = 0L; k < QF_POLYLOG_SERIES_MAX_TERMS; ++k) {
-        qfloat_t denominator = qf_pow(qf_add(a, qf_from_double((double)k)), s);
+        qfloat_t base = qf_add(a, qf_from_double((double)k));
+        qfloat_t denominator = integer_order ? qf_pow_int(base, (int)order) : qf_pow(base, s);
         qfloat_t term = qf_div(power, denominator);
 
         sum = qf_add(sum, term);

@@ -562,14 +562,33 @@ qcomplex_t qc_lerch_phi(qcomplex_t z, qcomplex_t s, qcomplex_t a);
  */
 qcomplex_t qc_harmonic_poly(unsigned long degree, qcomplex_t argument);
 
-/** @brief Evaluate the first-kind Chebyshev polynomial of non-negative integral degree. */
-qcomplex_t qc_chebyshev_t(unsigned long degree, qcomplex_t argument);
+/**
+ * @brief Evaluate the first-kind Chebyshev polynomial @f$T_n(z)@f$ by its three-term recurrence.
+ * @param[in] degree Non-negative integral polynomial degree.
+ * @param[in] argument Complex argument, copied by value.
+ * @return Complex polynomial value in qcomplex precision; ordinary NaN and overflow propagation apply.
+ * The result owns no storage and requires no release. No shared state is changed.
+ */
+qcomplex_t qc_chebyshev_Tn(unsigned long degree, qcomplex_t argument);
 
-/** @brief Evaluate the second-kind Chebyshev polynomial of non-negative integral degree. */
-qcomplex_t qc_chebyshev_u(unsigned long degree, qcomplex_t argument);
+/**
+ * @brief Evaluate the second-kind Chebyshev polynomial @f$U_n(z)@f$ by its three-term recurrence.
+ * @param[in] degree Non-negative integral polynomial degree.
+ * @param[in] argument Complex argument, copied by value.
+ * @return Complex polynomial value in qcomplex precision; ordinary NaN and overflow propagation apply.
+ * The result owns no storage and requires no release. No shared state is changed.
+ */
+qcomplex_t qc_chebyshev_Un(unsigned long degree, qcomplex_t argument);
 
-/** @brief Evaluate the physicists' Hermite polynomial of non-negative integral degree. */
-qcomplex_t qc_hermite_h(unsigned long degree, qcomplex_t argument);
+/**
+ * @brief Evaluate the physicists' Hermite polynomial @f$H_n(z)@f$, with @f$H_1(z)=2z@f$.
+ * @param[in] degree Non-negative integral polynomial degree.
+ * @param[in] argument Complex argument, copied by value.
+ * @return Complex polynomial value in qcomplex precision; ordinary NaN and overflow propagation apply.
+ * The result owns no storage and requires no release. No shared state is changed.
+ */
+qcomplex_t qc_hermite_Hn(unsigned long degree, qcomplex_t argument);
+
 qcomplex_t qc_appell_f1(qcomplex_t a, qcomplex_t b1, qcomplex_t b2, qcomplex_t c, qcomplex_t x,
                         qcomplex_t y); /**< Appell F1(a;b1,b2;c;x,y) */
 qcomplex_t qc_lauricella_f(qcomplex_t a, const qcomplex_t *b, qcomplex_t c, const qcomplex_t *x,

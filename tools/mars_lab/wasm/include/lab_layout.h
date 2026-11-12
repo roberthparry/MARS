@@ -81,6 +81,14 @@ void lab_layout_content(jsref svg, jsref fallback);
 void lab_layout_plot(jsref result, jsref error);
 
 /**
+ * @brief Clear and hide a plot that native calculation explicitly declares unavailable.
+ * Removes pending markup, errors, slice controls and transient camera placement without changing mathematical
+ * result cards. Call only for structural unavailability, not a recoverable range or transport failure.
+ * Runs synchronously on the browser thread and retains no scoped handles.
+ */
+void lab_layout_plot_unavailable(void);
+
+/**
  * @brief Move live camera controls beside their curve, or home before replacing or saving plot markup.
  * @param home True parks controls outside the replaceable plot content; false attaches them to the 3-D curve
  * panel when available, otherwise to their home container.

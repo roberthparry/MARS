@@ -395,6 +395,9 @@ static bool number_is_supported_sqrt_power_lift_exponent_local(number_t value)
 
 expr_t *integrate_pow_rule(const expr_t *expr, const expr_t *wrt)
 {
+    expr_t *elementary = integrate_exp_root_rule(expr, wrt);
+    if (elementary)
+        return elementary;
     number_t exponent = num_new();
     expr_t *out;
 
@@ -523,7 +526,11 @@ expr_t *integrate_constant_over_power_denominator(const expr_t *numerator, const
 
 expr_t *integrate_pow_d_rule(const expr_t *expr, const expr_t *wrt)
 {
-    expr_t *out = integrate_matching_squared_unary_affine(expr, wrt);
+    expr_t *out = integrate_exp_root_rule(expr, wrt);
+
+    if (out)
+        return out;
+    out = integrate_matching_squared_unary_affine(expr, wrt);
 
     if (out)
         return out;

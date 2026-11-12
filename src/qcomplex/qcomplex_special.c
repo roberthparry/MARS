@@ -28,13 +28,13 @@ static qcomplex_t polynomial(unsigned long degree, qcomplex_t x, unsigned family
 }
 
 /* Evaluate the first-kind Chebyshev polynomial by its three-term recurrence. */
-qcomplex_t qc_chebyshev_t(unsigned long degree, qcomplex_t x) { return polynomial(degree, x, 0u); }
+qcomplex_t qc_chebyshev_Tn(unsigned long degree, qcomplex_t x) { return polynomial(degree, x, 0u); }
 
 /* Evaluate the second-kind Chebyshev polynomial by its three-term recurrence. */
-qcomplex_t qc_chebyshev_u(unsigned long degree, qcomplex_t x) { return polynomial(degree, x, 1u); }
+qcomplex_t qc_chebyshev_Un(unsigned long degree, qcomplex_t x) { return polynomial(degree, x, 1u); }
 
 /* Evaluate the physicists' Hermite polynomial by its three-term recurrence. */
-qcomplex_t qc_hermite_h(unsigned long degree, qcomplex_t x) { return polynomial(degree, x, 2u); }
+qcomplex_t qc_hermite_Hn(unsigned long degree, qcomplex_t x) { return polynomial(degree, x, 2u); }
 
 /* Real support functions have no ordered complex continuation. */
 static qcomplex_t signal_real(qcomplex_t z, qfloat_t (*function)(qfloat_t))

@@ -21,6 +21,8 @@
 #include "expr_bindings.h"
 #define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_internal.h"
+#define MARS_EXPR_INTEGRATE_INTERNAL_ACCESS
+#include "expr_integrate_internal.h"
 #define MARS_SHARED_NUMBER_INTERNAL_ACCESS
 #include "internal/number_internal.h"
 #define MARS_SHARED_QFLOAT_INTERNAL_ACCESS
@@ -533,6 +535,14 @@ static number_t eval_integral(expr_t *expr)
         return num_clone(NUM_NAN);
     }
 
+    bool elementary = false;
+    result = expr_integral_exp_root_definite(expr->a, dummy_expr, lower, upper, &elementary);
+    if (elementary) {
+        num_destroy(&lower);
+        num_destroy(&upper);
+        return result;
+    }
+    num_destroy(&result);
     result = expr_integrate_Li_definite(expr->a, dummy_expr, lower, upper);
     if (num_is_real(result) && num_is_finite(result)) {
         num_destroy(&lower);

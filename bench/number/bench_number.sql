@@ -28,4 +28,7 @@ SELECT operation, backend,
        CASE WHEN power THEN ', 5' WHEN arity = 2 THEN ', ' || second ELSE '' END
 FROM inputs
 WHERE true
-ON CONFLICT(operation, backend) DO UPDATE SET arguments = excluded.arguments;
+ON CONFLICT(operation, backend) DO UPDATE SET
+    arguments_display = CASE WHEN benchmark_workload.arguments = excluded.arguments
+                             THEN benchmark_workload.arguments_display END,
+    arguments = excluded.arguments;
