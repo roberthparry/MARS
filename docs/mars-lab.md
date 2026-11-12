@@ -534,7 +534,9 @@ unobstructed; a failed stage does not display successful completion.
 Use **Skin** at the top-right corner of the page header to change the appearance immediately, in any
 mode, including on a phone. **0. Earth (Default)** is the existing green design.
 The other choices use their own palette and static SVG background artwork.
-The skin menu's highlighted options use the current skin's accent colour.
+The skin menu uses MARS's accessible C/WASM selection control after startup, so
+its selected, hovered and keyboard-focused options use the current skin's accent
+colour consistently. Arrow keys navigate it; Enter selects and Escape closes it.
 Variable and constant rows, their badges, input fields and focus highlights use
 the selected palette; the two binding roles retain distinct accent colours.
 Button, plot and globe tooltips also use the selected palette for their text,

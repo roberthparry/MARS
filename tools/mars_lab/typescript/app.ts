@@ -689,6 +689,11 @@ class LabApplication {
     /** Browser observers and host callbacks for controls whose policies are native. */
     private initialiseWidgets(): void {
         labDOM.services(labDOM.call('lab_bootstrap_widgets') as NativeServicePlan, {enhance: WorksheetLocations.selects.enhance});
+        const skinPicker = document.getElementById('skinSelect');
+        if (skinPicker instanceof HTMLSelectElement) {
+            const menu = WorksheetLocations.selects.enhance(skinPicker, {searchable: false});
+            if (menu) WorksheetAppearance.controller.connectMenu(menu.sync);
+        }
         for (const mode of ['datetime', 'almanac'] as const) {
             const select = document.getElementById(`${mode}PlaceSearch`) as WorksheetSelect;
             const search = new WorksheetPlaces.SearchController(select, mode);

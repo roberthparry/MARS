@@ -25,16 +25,34 @@ window.checkLabAppearance = async function checkLabAppearance(): Promise<void> {
     const rendered = WorksheetContext.rendered.innerHTML;
     const native = labWire.exports();
     const revisions = Array.from({length: 7}, (_, index) => native.lab_workspace_history_revision(index));
+    const shell = picker.closest<HTMLElement>('.select-shell');
+    const menuButton = shell?.querySelector<HTMLButtonElement>('.select-button');
+    const paletteProbe = document.createElement('span');
+    paletteProbe.hidden = true;
+    document.body.append(paletteProbe);
     try {
+        check(shell && menuButton && picker.classList.contains('select-native-source'),
+            'the skin menu uses native-projected page controls rather than a browser-painted popup');
+        check(menuButton!.getAttribute('aria-labelledby') === 'skinSelectLabel', 'the visible menu button has its Skin label');
         check(picker.options.length === names.length, 'all requested skins have one selector entry');
+        WorksheetAppearance.controller.select('13', false);
         for (let index = 0; index < names.length; ++index) {
             check(picker.options[index].value === String(index) &&
                 picker.options[index].textContent === `${index}. ${names[index]}`, 'numbered skin: ' + names[index]);
-            picker.value = String(index);
-            picker.dispatchEvent(new Event('change', {bubbles: true}));
+            menuButton!.click();
+            check(shell!.classList.contains('open'), 'the visible skin menu opens');
+            const option = shell!.querySelector<HTMLButtonElement>(`.select-option[data-value="${index}"]`)!;
+            check(option && option.getBoundingClientRect().height > 0, 'the skin choice is a visible page control');
+            option.click();
+            await new Promise(requestAnimationFrame);
             check(root.dataset.skin === String(index) &&
                 localStorage.getItem(WorksheetAppearance.storageKey) === String(index), 'selection persists: ' + names[index]);
             const style = getComputedStyle(root);
+            paletteProbe.style.color = style.getPropertyValue('--accent');
+            check(!shell!.classList.contains('open') && menuButton!.textContent === picker.selectedOptions[0].textContent &&
+                option.getAttribute('aria-selected') === 'true', 'visible menu selection follows the current skin');
+            check(getComputedStyle(option).backgroundColor === getComputedStyle(paletteProbe).color,
+                'the rendered selected row uses the current skin accent: ' + names[index]);
             check(document.querySelector<HTMLMetaElement>('meta[name="theme-color"]')?.content ===
                 style.getPropertyValue('--paper').trim(), 'browser chrome follows the palette');
             for (const panel of document.querySelectorAll<HTMLElement>('#workspacePanel, #resultWorkspacePanel')) {
@@ -63,6 +81,28 @@ window.checkLabAppearance = async function checkLabAppearance(): Promise<void> {
                 check(image.naturalWidth > 0 && image.naturalHeight > 0, 'artwork decodes: ' + names[index]);
             }
         }
+        menuButton!.dispatchEvent(new KeyboardEvent('keydown', {key: 'ArrowDown', bubbles: true, cancelable: true}));
+        await new Promise(requestAnimationFrame);
+        check(shell!.classList.contains('open') && document.activeElement === shell!.querySelector('.select-option.selected'),
+            'keyboard opening focuses the selected skin');
+        document.activeElement!.dispatchEvent(new KeyboardEvent('keydown', {key: 'ArrowUp', bubbles: true, cancelable: true}));
+        await new Promise(requestAnimationFrame);
+        const keyboardOption = document.activeElement as HTMLElement;
+        check(keyboardOption.dataset.value === '12' && picker.value === '13', 'arrows move focus without committing a skin');
+        check(getComputedStyle(keyboardOption).backgroundColor === getComputedStyle(paletteProbe).color,
+            'the keyboard highlight uses the current palette');
+        keyboardOption.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape', bubbles: true, cancelable: true}));
+        await new Promise(requestAnimationFrame);
+        check(!shell!.classList.contains('open') && document.activeElement === menuButton, 'Escape closes and restores focus');
+        const beforeExternal = localStorage.getItem(WorksheetAppearance.storageKey);
+        window.dispatchEvent(new StorageEvent('storage', {key: WorksheetAppearance.storageKey, newValue: '8'}));
+        check(picker.value === '8' && menuButton!.textContent === '8. Galaxy' &&
+            shell!.querySelector('.select-option.selected')?.getAttribute('data-value') === '8' &&
+            localStorage.getItem(WorksheetAppearance.storageKey) === beforeExternal,
+            'cross-tab skin changes update the visible menu without echoing storage writes');
+        menuButton!.click();
+        document.body.click();
+        check(!shell!.classList.contains('open'), 'an outside click closes the menu');
         check(editor === WorksheetBindings.editor.currentExpressionText(), 'skin changes preserve the editor');
         check(mode === WorksheetWorkspace.mode.currentMode(), 'skin changes preserve the mode');
         check(rendered === WorksheetContext.rendered.innerHTML, 'skin changes preserve the rendered result');
@@ -78,14 +118,18 @@ window.checkLabAppearance = async function checkLabAppearance(): Promise<void> {
             setItem: (_key, value) => { saved = value; ++writes; }
         });
         try {
+            let projected = '';
             controller.restore();
             controller.mount(select, null, events);
+            controller.connectMenu(() => { projected = select.value; });
             check(controller.current() === '8' && select.value === '8' && writes === 0, 'restore before mounting without rewriting');
+            check(projected === '8', 'connecting a native menu projects the restored choice');
             select.value = '5';
             select.dispatchEvent(new Event('change'));
             check(controller.current() === '5' && saved === '5' && writes === 1, 'selector listener saves once');
             events.dispatchEvent(new StorageEvent('storage', {key: WorksheetAppearance.storageKey, newValue: '10'}));
-            check(controller.current() === '10' && select.value === '10' && writes === 1, 'cross-tab changes do not echo writes');
+            check(controller.current() === '10' && select.value === '10' && projected === '10' && writes === 1,
+                'cross-tab changes project the menu without echoing writes');
             events.dispatchEvent(new StorageEvent('storage', {key: 'unrelated', newValue: '3'}));
             check(controller.current() === '10', 'unrelated storage ignored');
             events.dispatchEvent(new StorageEvent('storage', {key: null, newValue: null}));
@@ -116,6 +160,7 @@ window.checkLabAppearance = async function checkLabAppearance(): Promise<void> {
             denied.dispose();
         }
     } finally {
+        paletteProbe.remove();
         WorksheetAppearance.controller.select(original, false);
         if (stored === null) localStorage.removeItem(WorksheetAppearance.storageKey);
         else localStorage.setItem(WorksheetAppearance.storageKey, stored);

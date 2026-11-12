@@ -66,6 +66,7 @@
 }
 
 .skin-picker {
+  z-index: 60;
   display: flex;
   align-items: center;
   justify-content: flex-end;
@@ -80,7 +81,7 @@
   letter-spacing: .12em;
   text-transform: uppercase;
 }
-.skin-picker select {
+.skin-picker :is(select, .select-button) {
   max-width: min(14rem, calc(100vw - 5.5rem));
   min-height: 2.4rem;
   padding: .4rem .65rem;
@@ -91,17 +92,43 @@
   color-scheme: dark;
   font: inherit;
   cursor: pointer;
+  letter-spacing: normal;
+  white-space: nowrap;
+  box-shadow: none;
 }
-.skin-picker select:focus-visible {
+.skin-picker :is(select, .select-button):focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 3px;
 }
 .skin-picker option { background: var(--panel); color: var(--ink); }
-.skin-picker option:is(:checked, :hover, :focus-visible) {
-  background: var(--accent);
-  color: #10151e;
+.skin-picker .select-shell {
+  width: 11rem;
+  max-width: min(14rem, calc(100vw - 5.5rem));
 }
-
+.skin-picker .select-button { gap: .7rem; }
+.skin-picker .select-button::after {
+  width: .36rem;
+  height: .36rem;
+  border-color: var(--ink);
+}
+.skin-picker .select-menu {
+  left: auto;
+  right: 0;
+  min-width: 100%;
+  width: max-content;
+  max-width: calc(100vw - 1rem);
+  max-height: min(28rem, calc(100dvh - 6rem));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: var(--panel);
+  color: var(--ink);
+  border-color: var(--line);
+}
+.skin-picker .select-option {
+  padding: .55rem .7rem;
+  font: inherit;
+  color: var(--ink);
+}
 /* Shared skin surfaces replace the original green fills without changing charts, flags or photography. */
 :root[data-skin]:not([data-skin="0"]) {
   color-scheme: dark;
@@ -202,6 +229,10 @@
   background: var(--accent);
   color: #10151e;
 }
+:root[data-skin] .skin-picker .select-option:is(.selected, :hover, :focus-visible) {
+  background: var(--accent);
+  color: #10151e;
+}
 
 /* Binding roles share the palette, including their nested input and focus states. */
 :root[data-skin]:not([data-skin="0"]) .variable-value-box {
@@ -291,7 +322,7 @@
 @media (max-width: 600px) {
   .skin-picker { gap: .35rem; }
   .skin-picker label { display: none; }
-  .skin-picker select {
+  .skin-picker :is(select, .select-button, .select-shell) {
     max-width: min(11rem, 44vw);
     min-height: 2.75rem;
   }

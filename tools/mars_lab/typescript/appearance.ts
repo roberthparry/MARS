@@ -15,6 +15,7 @@ namespace WorksheetAppearance {
         private readonly lifetime = new AbortController();
         private picker: HTMLSelectElement | null = null;
         private themeColour: HTMLMetaElement | null = null;
+        private syncMenu: (() => void) | null = null;
 
         /** @brief Retain the appearance root and storage capability without installing listeners. */
         public constructor(
@@ -42,6 +43,7 @@ namespace WorksheetAppearance {
             const identifier = this.identifier(value);
             this.root.dataset.skin = identifier;
             if (this.picker) this.picker.value = identifier;
+            this.syncMenu?.();
             if (this.themeColour) {
                 const colour = getComputedStyle(this.root).getPropertyValue('--paper').trim();
                 if (colour) this.themeColour.content = colour;
@@ -61,11 +63,19 @@ namespace WorksheetAppearance {
             events.addEventListener('storage', this.stored, {signal: this.lifetime.signal});
         }
 
+        /** @brief Project the current choice through the native menu after WASM startup; release on disposal. */
+        public connectMenu(sync: () => void): void {
+            if (!this.picker || this.lifetime.signal.aborted) return;
+            this.syncMenu = sync;
+            sync();
+        }
+
         /** @brief Remove owned subscriptions on permanent page departure; no worksheet state is touched. */
         public dispose(): void {
             this.lifetime.abort();
             this.picker = null;
             this.themeColour = null;
+            this.syncMenu = null;
         }
 
         private identifier(value: unknown): string {
