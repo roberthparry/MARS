@@ -55,7 +55,7 @@ static bool appell_finite(mpc_srcptr value)
 }
 
 /* Evaluate the total-degree recurrence with explicit roundoff and convergence checks. */
-int number_mpc_appell_f1(mpc_ptr out, mpc_srcptr a, mpc_srcptr b1, mpc_srcptr b2, mpc_srcptr c,
+int number_mpc_appell_F1(mpc_ptr out, mpc_srcptr a, mpc_srcptr b1, mpc_srcptr b2, mpc_srcptr c,
                          mpc_srcptr x, mpc_srcptr y, mpc_rnd_t rounding)
 {
     mpfr_prec_t target = mpc_get_prec(out), work = target + 96;
@@ -184,7 +184,7 @@ done:
 }
 
 /* Evaluate real operands directly, retaining the complex kernel's convergence and cancellation guards. */
-int number_mpfr_appell_f1(mpfr_ptr out, mpfr_srcptr a, mpfr_srcptr b1, mpfr_srcptr b2, mpfr_srcptr c,
+int number_mpfr_appell_F1(mpfr_ptr out, mpfr_srcptr a, mpfr_srcptr b1, mpfr_srcptr b2, mpfr_srcptr c,
                           mpfr_srcptr x, mpfr_srcptr y)
 {
     mpfr_prec_t target = mpfr_get_prec(out), work = target + 96;

@@ -12,10 +12,10 @@
 #define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_internal.h"
 
-static number_t struve_h_eval(expr_t *e)
+static number_t struve_H_eval(expr_t *e)
 {
     number_t order = expr_eval(e->a), z = expr_eval(e->b);
-    number_t result = num_struve_h(order, z);
+    number_t result = num_struve_H(order, z);
     num_destroy(&order);
     num_destroy(&z);
     return result;
@@ -56,7 +56,7 @@ static expr_t *literal_argument_derivative(number_t order, const expr_t *z)
     NUM_SCOPE(scope);
     if (num_is_zero(order)) {
         /* DLMF 11.4.32 avoids both division by z and 0^0 at the origin. */
-        expr_t *one = expr_const_one(), *upper = expr_struve_h(one, z), *constant = two_over_pi();
+        expr_t *one = expr_const_one(), *upper = expr_struve_H(one, z), *constant = two_over_pi();
         expr_t *result = expr_sub(constant, upper);
         expr_free(constant); expr_free(upper); expr_free(one);
         return result;
@@ -67,7 +67,7 @@ static expr_t *literal_argument_derivative(number_t order, const expr_t *z)
     number_t lower_value = num_sub(effective, NUM_ONE), upper_value = num_add(effective, NUM_ONE);
     number_t gamma_value = num_add(upper_value, NUM_HALF);
     expr_t *lower_order = expr_new_const(lower_value), *upper_order = expr_new_const(upper_value);
-    expr_t *lower = expr_struve_h(lower_order, z), *upper = expr_struve_h(upper_order, z);
+    expr_t *lower = expr_struve_H(lower_order, z), *upper = expr_struve_H(upper_order, z);
     expr_t *sum = expr_sub(lower, upper), *correction = NULL;
 
     if (nonpositive_integer(gamma_value)) {
@@ -89,7 +89,7 @@ static expr_t *literal_argument_derivative(number_t order, const expr_t *z)
     return result;
 }
 
-static expr_t *struve_h_deriv(expr_t *e)
+static expr_t *struve_H_deriv(expr_t *e)
 {
     const expr_t *x = expr_current_wrt_internal();
     if (!x)
@@ -109,7 +109,7 @@ static expr_t *struve_h_deriv(expr_t *e)
     } else {
         /* DLMF 11.4.27 remains valid for symbolic fixed orders without evaluating gamma at unknown poles.
          * Its quotient is local to z != 0; specialise the order before differentiating at the origin. */
-        expr_t *lower_order = expr_add_long(order, -1), *lower = expr_struve_h(lower_order, e->b);
+        expr_t *lower_order = expr_add_long(order, -1), *lower = expr_struve_H(lower_order, e->b);
         expr_t *scaled = expr_mul(order, e), *quotient = expr_div(scaled, e->b);
         local = expr_sub(lower, quotient);
         expr_free(quotient); expr_free(scaled); expr_free(lower); expr_free(lower_order);
@@ -120,7 +120,7 @@ static expr_t *struve_h_deriv(expr_t *e)
 }
 
 /* Reuse the same guarded argument derivative for the generic reverse-mode vtable dispatch. */
-static void struve_h_reverse(const expr_t *e, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
+static void struve_H_reverse(const expr_t *e, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
 {
     number_t order = expr_eval(e->a);
     expr_t *local = num_is_finite(order) ? literal_argument_derivative(order, e->b) : NULL;
@@ -133,7 +133,7 @@ static void struve_h_reverse(const expr_t *e, const number_t *out_bar, number_t 
 }
 
 /* Expand representable orders without crossing a gamma or hypergeometric denominator pole. */
-expr_t *expr_struve_h_hypergeometric(const expr_t *order, const expr_t *argument)
+expr_t *expr_struve_H_hypergeometric(const expr_t *order, const expr_t *argument)
 {
     NUM_SCOPE(scope);
     if (!order || !argument)
@@ -226,7 +226,7 @@ static expr_t *literal_primitive(number_t order, const expr_t *z)
     return result;
 }
 
-static expr_t *struve_h_integrate(const expr_t *e, const expr_t *x)
+static expr_t *struve_H_integrate(const expr_t *e, const expr_t *x)
 {
     if (uses(e->a, x))
         return NULL;
@@ -247,7 +247,7 @@ static expr_t *struve_h_integrate(const expr_t *e, const expr_t *x)
     return result;
 }
 
-static expr_t *struve_h_simplify(const expr_t *e, expr_t *order, expr_t *z)
+static expr_t *struve_H_simplify(const expr_t *e, expr_t *order, expr_t *z)
 {
     if (order && z && expr_is_const(order) && !order->name && num_is_finite(order->c) &&
         num_is_real(order->c) && !z->name && expr_const_is_zero(z)) {
@@ -264,19 +264,19 @@ static expr_t *struve_h_simplify(const expr_t *e, expr_t *order, expr_t *z)
     return expr_simplify_binary_operator(e, order, z);
 }
 
-const expr_ops_t ops_struve_h = {
-    .eval = struve_h_eval, .deriv = struve_h_deriv, .kind = EXPR_KIND_STRUVE_H, .arity = EXPR_OP_BINARY,
-    .expression_name = "StruveH", .function_name = "struveh", .apply_binary = expr_struve_h,
-    .simplify = struve_h_simplify, .integrate = struve_h_integrate,
-    .reverse = struve_h_reverse,
+const expr_ops_t ops_struve_H = {
+    .eval = struve_H_eval, .deriv = struve_H_deriv, .kind = EXPR_KIND_STRUVE_H, .arity = EXPR_OP_BINARY,
+    .expression_name = "StruveH", .function_name = "struveh", .apply_binary = expr_struve_H,
+    .simplify = struve_H_simplify, .integrate = struve_H_integrate,
+    .reverse = struve_H_reverse,
 };
 
 /* Construct the principal ordinary Struve function with its order and argument retained. */
-expr_t *expr_struve_h(const expr_t *order, const expr_t *argument)
+expr_t *expr_struve_H(const expr_t *order, const expr_t *argument)
 {
     if (!order || !argument)
         return NULL;
     expr_retain(order);
     expr_retain(argument);
-    return expr_new_binary_internal(&ops_struve_h, order, argument);
+    return expr_new_binary_internal(&ops_struve_H, order, argument);
 }

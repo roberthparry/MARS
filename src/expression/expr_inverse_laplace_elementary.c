@@ -369,9 +369,9 @@ static expr_t *elementary_normalise_sums(elementary_pair_t *c, const expr_t *f, 
     if (f->ops == &ops_summation)
         return elementary_keep(c, expr_clone(f));
     static expr_t *(*const expansions[])(const expr_t *, const expr_t *) = {
-        [EXPR_KIND_STRUVE_H] = expr_struve_h_hypergeometric,
-        [EXPR_KIND_STRUVE_L] = expr_struve_l_hypergeometric,
-        [EXPR_KIND_BESSEL_I] = expr_bessel_i_hypergeometric,
+        [EXPR_KIND_STRUVE_H] = expr_struve_H_hypergeometric,
+        [EXPR_KIND_STRUVE_L] = expr_struve_L_hypergeometric,
+        [EXPR_KIND_BESSEL_I] = expr_bessel_I_hypergeometric,
     };
     size_t kind = (size_t)f->ops->kind;
     if (kind < sizeof(expansions) / sizeof(expansions[0]) && expansions[kind]) {
@@ -780,7 +780,7 @@ static expr_t *elementary_inverse_hyperbolic(elementary_pair_t *c, const expr_t 
     expr_t *rate = elementary_clean(c, elementary_div(c, elementary_integer(c, 1), slope));
     if (!elementary_literal_real(rate, true))
         return NULL;
-    bool cosine = node->ops == &ops_bessel_k;
+    bool cosine = node->ops == &ops_bessel_K;
     expr_t *shift = elementary_clean(c, elementary_div(c, offset, slope));
     if (cosine) {
         /* Six bounded alternatives distinguish identical Bessel features by their complete

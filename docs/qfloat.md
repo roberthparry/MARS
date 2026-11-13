@@ -110,7 +110,7 @@ int main(void) {
     };
     for (int i = 0; inputs[i] != NULL; i++) {
         qfloat_t x = qf_from_string(inputs[i]);
-        qfloat_t w = qf_lambert_w0(x);
+        qfloat_t w = qf_lambert_W0(x);
         qf_printf("W0(%s) = %q\n", inputs[i], w);
     }
     return 0;
@@ -371,8 +371,8 @@ not change the fixed truncation or supported domain.
 
 **Bessel functions**
 
-- `qfloat_t qf_bessel_j(qfloat_t order, qfloat_t argument)` — Bessel function of the first kind J_order(argument), for real order and argument
-- `qfloat_t qf_bessel_y(qfloat_t order, qfloat_t argument)` — Bessel function of the second kind Y_order(argument), for real order and argument
+- `qfloat_t qf_bessel_J(qfloat_t order, qfloat_t argument)` — Bessel function of the first kind J_order(argument), for real order and argument
+- `qfloat_t qf_bessel_Y(qfloat_t order, qfloat_t argument)` — Bessel function of the second kind Y_order(argument), for real order and argument
 
 The J function uses qfloat arithmetic. The Y function delegates to the
 [guarded number-layer evaluator](number.md#bessel-y) and rounds its
@@ -381,7 +381,7 @@ non-integer orders use the J/Y connection formula with extra precision near
 integer orders. Orders must have magnitude at most 1000. Non-integer orders
 also require arguments at most 1000; integer orders support larger finite
 positive arguments. Negative arguments return NaN: use
-[`qc_bessel_y`](qcomplex.md#bessel-y) for their principal complex values.
+[`qc_bessel_Y`](qcomplex.md#bessel-y) for their principal complex values.
 At zero argument, negative half-integer orders return zero; other orders,
 including Y₀, return NaN. Non-finite inputs and exhausted numerical guards
 also return NaN.
@@ -392,7 +392,7 @@ also return NaN.
 
 int main(void)
 {
-    qfloat_t value = qf_bessel_y(QF_ZERO, QF_ONE);
+    qfloat_t value = qf_bessel_Y(QF_ZERO, QF_ONE);
     printf("Y_0(1) = %.15f\n", qf_to_double(value));
     return 0;
 }
@@ -404,13 +404,13 @@ Y_0(1) = 0.088256964215677
 
 **Lommel function**
 
-- `qfloat_t qf_lommel_s(qfloat_t mu, qfloat_t nu, qfloat_t argument)` — lower-case Lommel function s_mu,nu(argument), evaluated from its convergent series
+- `qfloat_t qf_lommel_S(qfloat_t mu, qfloat_t nu, qfloat_t argument)` — lower-case Lommel function s_mu,nu(argument), evaluated from its convergent series
 
 **Lambert W**
 
-- `qfloat_t qf_lambert_w0(qfloat_t x)` — principal branch W₀(x)
-- `qfloat_t qf_lambert_wm1(qfloat_t x)` — branch W₋₁(x)
-- `qfloat_t qf_productlog(qfloat_t x)` — alias for `qf_lambert_w0`
+- `qfloat_t qf_lambert_W0(qfloat_t x)` — principal branch W₀(x)
+- `qfloat_t qf_lambert_Wm1(qfloat_t x)` — branch W₋₁(x)
+- `qfloat_t qf_productlog(qfloat_t x)` — alias for `qf_lambert_W0`
 
 **Beta and binomial**
 
@@ -472,8 +472,8 @@ in native real arithmetic. Order zero and non-finite angles return NaN.
 **Hypergeometric families**
 
 - `qfloat_t qf_hypergeometric_pFq(const qfloat_t *upper, size_t upper_count, const qfloat_t *lower, size_t lower_count, qfloat_t argument)` — generalised hypergeometric pFq; either parameter array may be `NULL` when its count is zero
-- `qfloat_t qf_lauricella_f(qfloat_t a, const qfloat_t *b, qfloat_t c, const qfloat_t *x, size_t variable_count)` — Lauricella F_D in the implemented convergence polydisc
-- `qfloat_t qf_appell_f1(qfloat_t a, qfloat_t b1, qfloat_t b2, qfloat_t c, qfloat_t x, qfloat_t y)` — Appell F₁, implemented as the two-variable Lauricella F_D member
+- `qfloat_t qf_lauricella_F(qfloat_t a, const qfloat_t *b, qfloat_t c, const qfloat_t *x, size_t variable_count)` — Lauricella F_D in the implemented convergence polydisc
+- `qfloat_t qf_appell_F1(qfloat_t a, qfloat_t b1, qfloat_t b2, qfloat_t c, qfloat_t x, qfloat_t y)` — Appell F₁, implemented as the two-variable Lauricella F_D member
 
 The defining series use convergence tests and grow temporary storage only as
 needed; they do not reserve a fixed maximum-sized term array. The qfloat
@@ -502,7 +502,7 @@ int main(void)
 
 ### Modified Bessel K
 
-`qf_bessel_k(order, argument)` evaluates K of a finite real order at a positive
+`qf_bessel_K(order, argument)` evaluates K of a finite real order at a positive
 real argument. Both input magnitudes must be at most 1000. Zero or negative
 arguments, non-finite operands and exhausted numerical guards return `QF_NAN`.
 Use [the complex API](qcomplex.md#modified-bessel-k) when a complex branch value
@@ -515,7 +515,7 @@ arbitrary-precision representation.
 
 ### Modified Bessel I
 
-`qf_bessel_i(order, argument)` evaluates the real modified Bessel function of
+`qf_bessel_I(order, argument)` evaluates the real modified Bessel function of
 the first kind, including `I_0(x)` by passing order zero. Positive arguments
 accept any finite real order. Negative arguments require integral order and
 obey `I_n(-x) = (-1)^n I_n(x)`. Negative integer orders satisfy `I_-n(x) = I_n(x)`;
@@ -537,7 +537,7 @@ can overflow to infinity or underflow to zero. There is no asymptotic kernel.
 
 int main(void)
 {
-    qfloat_t bessel = qf_bessel_i(QF_ZERO, QF_ONE);
+    qfloat_t bessel = qf_bessel_I(QF_ZERO, QF_ONE);
     qf_printf("I_0(1) = %.16q\n", bessel);
     return 0;
 }
@@ -549,7 +549,7 @@ I_0(1) = 1.2660658777520083
 
 ### Ordinary Struve H
 
-`qf_struve_h(order, argument)` evaluates the unscaled ordinary Struve function
+`qf_struve_H(order, argument)` evaluates the unscaled ordinary Struve function
 `H_order(argument)`. Positive arguments accept finite real orders. Negative
 arguments require integral orders, with `H_n(-x) = (-1)^(n+1) H_n(x)`; use
 [qcomplex](qcomplex.md#ordinary-struve-h) for other negative arguments.
@@ -575,7 +575,7 @@ input bounds do not guarantee success at every point.
 
 int main(void)
 {
-    qfloat_t ordinary = qf_struve_h(QF_ZERO, QF_ONE);
+    qfloat_t ordinary = qf_struve_H(QF_ZERO, QF_ONE);
     qf_printf("H_0(1) = %.15q\n", ordinary);
     return 0;
 }
@@ -587,7 +587,7 @@ H_0(1) = 0.568656627048288
 
 ### Modified Struve L
 
-`qf_struve_l(order, argument)` evaluates the real modified Struve function
+`qf_struve_L(order, argument)` evaluates the real modified Struve function
 `L_order(argument)`. Positive arguments accept any finite real order; negative
 arguments require integral order, with parity `L_n(-x) = (-1)^(n+1) L_n(x)`.
 Use [the complex API](qcomplex.md#modified-struve-l) for other negative arguments.
@@ -604,7 +604,7 @@ branches, undefined zero limits, exhausted convergence or cancellation guards,
 and number-layer exponent overflow or underflow return NaN. Final conversion
 to qfloat can overflow to infinity or underflow to zero. These are unscaled
 values; there is no asymptotic large-argument implementation. The numerical
-kernel uses MPFR/MPC internally, as does `qf_bessel_k`.
+kernel uses MPFR/MPC internally, as does `qf_bessel_K`.
 
 ```c
 #include <stdio.h>
@@ -612,7 +612,7 @@ kernel uses MPFR/MPC internally, as does `qf_bessel_k`.
 
 int main(void)
 {
-    qfloat_t value = qf_struve_l(QF_ZERO, QF_ONE);
+    qfloat_t value = qf_struve_L(QF_ZERO, QF_ONE);
     qf_printf("L_0(1) = %.16q\n", value);
     return 0;
 }
@@ -637,7 +637,7 @@ Pass `qfloat_t` values **by value** to `%q`/`%Q` specifiers.
 int main(void)
 {
     qfloat_t x = qf_from_string("1");
-    qfloat_t w = qf_lambert_w0(x);
+    qfloat_t w = qf_lambert_W0(x);
     qf_printf("W0(1) = %.34q\n", w);   // 34 significant digits
     qf_printf("W0(1) = %Q\n",   w);    // scientific notation
     return 0;
@@ -770,7 +770,7 @@ Failures and timeouts remain visible. † marks a retained slowdown outlier.
 | acot | 0.7 | 1.5 µs |
 | acoth | 2.345 | 3.6 µs |
 | add | 0.7, 0.7 | 7.9 ns |
-| appell_f1 | 0.5, 0.7, 0.8, 2.5, 0.2, 0.3 | 96.0 µs |
+| appell_F1 | 0.5, 0.7, 0.8, 2.5, 0.2, 0.3 | 96.0 µs |
 | arccovercos | 0.5 | 1.7 µs |
 | arccoversin | 0.5 | 1.5 µs |
 | archacovercos | 0.5 | 31.0 ns |
@@ -786,10 +786,10 @@ Failures and timeouts remain visible. † marks a retained slowdown outlier.
 | atan | 0.7 | 1.3 µs |
 | atan2 | 0.5, -0.75 | 1.3 µs |
 | atanh | 0.7 | 3.4 µs |
-| bessel_i | 2, 0.7 | 64.3 µs |
-| bessel_j | 2, 0.7 | 6.8 µs |
-| bessel_k | 2, 0.7 | 34.2 µs |
-| bessel_y | 2, 0.7 | 30.1 µs |
+| bessel_I | 2, 0.7 | 64.3 µs |
+| bessel_J | 2, 0.7 | 6.8 µs |
+| bessel_K | 2, 0.7 | 34.2 µs |
+| bessel_Y | 2, 0.7 | 30.1 µs |
 | beta | 2.3, 4.5 | 4.9 µs |
 | beta_pdf | 0.5, 2.5, 3.5 | 30.8 µs |
 | binomial | 5, 2 | 30.4 µs |
@@ -830,9 +830,9 @@ Failures and timeouts remain visible. † marks a retained slowdown outlier.
 | hermite_Hn | 2, 0.7 | 51.0 ns |
 | hypergeometric_pFq | 0.7, 2.5, 0.3 | 4.0 µs |
 | hypot | 0.7, 1.2 | 406.3 ns |
-| lambert_w0 | 0.7 | 13.5 µs |
-| lambert_wm1 | -0.2 | 17.0 µs |
-| lauricella_f | 0.5, 0.3, 2.5 | 19.3 µs |
+| lambert_W0 | 0.7 | 13.5 µs |
+| lambert_Wm1 | -0.2 | 17.0 µs |
+| lauricella_F | 0.5, 0.3, 2.5 | 19.3 µs |
 | ldexp | 1.23456789, 3 | 9.9 ns |
 | legendre_chi | 2, 0.7 | 27.9 µs |
 | lerch_phi | 0.3, 2, 1.4 | 8.5 µs |
@@ -843,7 +843,7 @@ Failures and timeouts remain visible. † marks a retained slowdown outlier.
 | log10 | 2.345678 | 2.9 µs |
 | logbeta | 2.3, 4.5 | 30.1 µs |
 | logbeta_pdf | 0.5, 2.5, 3.5 | 32.6 µs |
-| lommel_s | 0.5, 0.7, 1.2 | 7.0 µs |
+| lommel_S | 0.5, 0.7, 1.2 | 7.0 µs |
 | mul | 0.7, 0.7 | 7.6 ns |
 | mul_pow10 | 1.23456789, 3 | 39.7 ns |
 | neg | 0.7 | 2.1 ns |
@@ -872,8 +872,8 @@ Failures and timeouts remain visible. † marks a retained slowdown outlier.
 | sqr | 0.7 | 5.6 ns |
 | sqrt | 1.23456789 | 379.9 ns |
 | step | 0.7 | 9.1 ns |
-| struve_h | 2, 0.7 | 98.5 µs |
-| struve_l | 2, 0.7 | 80.7 µs |
+| struve_H | 2, 0.7 | 98.5 µs |
+| struve_L | 2, 0.7 | 80.7 µs |
 | sub | 0.7, 0.7 | 7.8 ns |
 | tan | 0.7 | 1.9 µs |
 | tanh | 0.7 | 1.7 µs |

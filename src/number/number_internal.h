@@ -593,7 +593,7 @@ size_t number_cylindrical_precision(number_t order, number_t argument);
  * @return Owned value released with num_destroy(), or NaN outside the supported range or on unresolved cancellation.
  * Inputs remain caller-owned. Magnitudes above 1000 or work precision above 65536 bits are unsupported.
  */
-number_t number_bessel_j_complex(number_t order, number_t argument);
+number_t number_bessel_J_complex(number_t order, number_t argument);
 
 /**
  * @brief Evaluate complex erf using a guarded entire series, or MPFR on the real axis.
@@ -706,7 +706,7 @@ double number_double_erfcinv(double value);
  * @return Zero after convergence; -1 with NaN on poles, unsupported arguments or exhausted accuracy guards.
  * The caller retains and releases all MPC operands; no shared mutable storage is used.
  */
-int number_mpc_lommel_s(mpc_ptr out, mpc_srcptr mu, mpc_srcptr nu, mpc_srcptr argument, mpc_rnd_t rounding);
+int number_mpc_lommel_S(mpc_ptr out, mpc_srcptr mu, mpc_srcptr nu, mpc_srcptr argument, mpc_rnd_t rounding);
 
 /**
  * @brief Evaluate the argument derivative of principal complex Lommel s using the same convergent series.
@@ -717,7 +717,7 @@ int number_mpc_lommel_s(mpc_ptr out, mpc_srcptr mu, mpc_srcptr nu, mpc_srcptr ar
  * @return Zero after convergence; -1 with NaN at undefined limits, poles or exhausted numerical guards.
  * All operands remain caller-owned and valid for the duration of the call.
  */
-int number_mpc_lommel_s_derivative(mpc_ptr out, mpc_srcptr mu, mpc_srcptr nu, mpc_srcptr argument,
+int number_mpc_lommel_S_derivative(mpc_ptr out, mpc_srcptr mu, mpc_srcptr nu, mpc_srcptr argument,
                                    mpc_rnd_t rounding);
 
 /**
@@ -732,7 +732,7 @@ int number_mpc_lommel_s_derivative(mpc_ptr out, mpc_srcptr mu, mpc_srcptr nu, mp
  * coefficient recurrences are periodically refreshed and directed exponent checks can only delay acceptance.
  * No ownership transfers; callers initialise and clear their own MPFR values. No shared mutable state is used.
  */
-int number_mpfr_appell_f1(mpfr_ptr out, mpfr_srcptr a, mpfr_srcptr b1, mpfr_srcptr b2, mpfr_srcptr c,
+int number_mpfr_appell_F1(mpfr_ptr out, mpfr_srcptr a, mpfr_srcptr b1, mpfr_srcptr b2, mpfr_srcptr c,
                           mpfr_srcptr x, mpfr_srcptr y);
 
 /**
@@ -748,7 +748,7 @@ int number_mpfr_appell_f1(mpfr_ptr out, mpfr_srcptr a, mpfr_srcptr b1, mpfr_srcp
  * retain complex division. No input or output precision is narrowed by the compact representation.
  * All operands remain caller-owned and valid throughout the call; no internal storage escapes.
  */
-int number_mpc_appell_f1(mpc_ptr out, mpc_srcptr a, mpc_srcptr b1, mpc_srcptr b2, mpc_srcptr c,
+int number_mpc_appell_F1(mpc_ptr out, mpc_srcptr a, mpc_srcptr b1, mpc_srcptr b2, mpc_srcptr c,
                          mpc_srcptr x, mpc_srcptr y, mpc_rnd_t rounding);
 
 #endif

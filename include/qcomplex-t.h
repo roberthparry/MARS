@@ -413,7 +413,7 @@ qcomplex_t qc_gamma(qcomplex_t z);                         /**< gamma function *
  * @return Fixed complex value requiring no release; QC_NAN for unsupported ranges or unresolved cancellation.
  * The negative real axis takes its upper-bank value. Magnitudes above 1000 and work above 65536 bits are unsupported.
  */
-qcomplex_t qc_bessel_j(qcomplex_t order, qcomplex_t argument);
+qcomplex_t qc_bessel_J(qcomplex_t order, qcomplex_t argument);
 
 /**
  * @brief Evaluate principal complex Lommel s using its convergent power series.
@@ -423,7 +423,7 @@ qcomplex_t qc_bessel_j(qcomplex_t order, qcomplex_t argument);
  * @return Fixed complex value requiring no release; QC_NAN at poles or exhausted convergence and cancellation guards.
  * Negative real arguments use the upper bank. Argument modulus above 1000 or work above 65536 bits is unsupported.
  */
-qcomplex_t qc_lommel_s(qcomplex_t mu, qcomplex_t nu, qcomplex_t argument);
+qcomplex_t qc_lommel_S(qcomplex_t mu, qcomplex_t nu, qcomplex_t argument);
 
 /**
  * @brief Evaluate principal Bessel Y for real or complex order and argument, including Y_0.
@@ -431,11 +431,19 @@ qcomplex_t qc_lommel_s(qcomplex_t mu, qcomplex_t nu, qcomplex_t argument);
  * The negative real axis takes its upper-bank value. Evaluation uses guarded arbitrary precision before
  * rounding to qcomplex. Negative half-integer orders return zero at the origin; other zero limits,
  * unsupported numerical ranges and exhausted guards return NaN. See docs/qcomplex.md.
+ * @param[in] order Complex cylinder order, passed by value.
+ * @param[in] argument Complex argument on the principal branch, passed by value.
+ * @return Fixed-precision complex value requiring no release, or QC_NAN for unsupported inputs or non-convergence.
  */
-qcomplex_t qc_bessel_y(qcomplex_t order, qcomplex_t argument);
+qcomplex_t qc_bessel_Y(qcomplex_t order, qcomplex_t argument);
 
-/** @brief Principal modified Bessel K for complex order and non-zero argument; unsupported ranges return NaN. */
-qcomplex_t qc_bessel_k(qcomplex_t order, qcomplex_t argument);
+/**
+ * @brief Evaluate principal modified Bessel K for complex order and non-zero argument.
+ * @param[in] order Complex cylinder order, passed by value.
+ * @param[in] argument Non-zero complex argument on the principal branch, passed by value.
+ * @return Fixed-precision complex value requiring no release, or QC_NAN for unsupported ranges or non-convergence.
+ */
+qcomplex_t qc_bessel_K(qcomplex_t order, qcomplex_t argument);
 
 /**
  * @brief Evaluate principal modified Bessel I for complex order and argument, including I_0.
@@ -443,7 +451,7 @@ qcomplex_t qc_bessel_k(qcomplex_t order, qcomplex_t argument);
  * The negative real axis takes the upper-bank value, and I_-n = I_n for integral n. Input magnitudes
  * above 1000, undefined zero limits and exhausted numerical guards return NaN. See docs/qcomplex.md.
  */
-qcomplex_t qc_bessel_i(qcomplex_t order, qcomplex_t argument);
+qcomplex_t qc_bessel_I(qcomplex_t order, qcomplex_t argument);
 
 /**
  * @brief Evaluate the principal modified Struve function L_order(argument) for complex order and argument.
@@ -451,7 +459,7 @@ qcomplex_t qc_bessel_i(qcomplex_t order, qcomplex_t argument);
  * The negative real axis takes the upper-bank value. Finite inputs with magnitudes at most 1000 are supported;
  * undefined zero limits and exhausted numerical guards return NaN. See docs/qcomplex.md for numerical limits.
  */
-qcomplex_t qc_struve_l(qcomplex_t order, qcomplex_t argument);
+qcomplex_t qc_struve_L(qcomplex_t order, qcomplex_t argument);
 
 /**
  * @brief Evaluate principal ordinary Struve H for complex order and argument.
@@ -460,7 +468,7 @@ qcomplex_t qc_struve_l(qcomplex_t order, qcomplex_t argument);
  * Input magnitudes above 1000, undefined zero limits and exhausted numerical guards return NaN.
  * See docs/qcomplex.md for numerical limits and exceptional negative half-integer orders.
  */
-qcomplex_t qc_struve_h(qcomplex_t order, qcomplex_t argument);
+qcomplex_t qc_struve_H(qcomplex_t order, qcomplex_t argument);
 qcomplex_t qc_lgamma(qcomplex_t z);                        /**< log gamma */
 qcomplex_t qc_digamma(qcomplex_t z);                       /**< digamma */
 
@@ -589,10 +597,30 @@ qcomplex_t qc_chebyshev_Un(unsigned long degree, qcomplex_t argument);
  */
 qcomplex_t qc_hermite_Hn(unsigned long degree, qcomplex_t argument);
 
-qcomplex_t qc_appell_f1(qcomplex_t a, qcomplex_t b1, qcomplex_t b2, qcomplex_t c, qcomplex_t x,
-                        qcomplex_t y); /**< Appell F1(a;b1,b2;c;x,y) */
-qcomplex_t qc_lauricella_f(qcomplex_t a, const qcomplex_t *b, qcomplex_t c, const qcomplex_t *x,
-                           size_t variable_count); /**< Lauricella F_D */
+/**
+ * @brief Evaluate the Appell F1 function in fixed complex precision.
+ * @param[in] a Common upper parameter, passed by value.
+ * @param[in] b1 Upper parameter associated with x, passed by value.
+ * @param[in] b2 Upper parameter associated with y, passed by value.
+ * @param[in] c Lower parameter, passed by value; denominator poles are unsupported.
+ * @param[in] x First complex argument in the supported convergence region.
+ * @param[in] y Second complex argument in the supported convergence region.
+ * @return Complex value requiring no release, or QC_NAN for invalid parameters or non-convergence.
+ */
+qcomplex_t qc_appell_F1(qcomplex_t a, qcomplex_t b1, qcomplex_t b2, qcomplex_t c, qcomplex_t x, qcomplex_t y);
+
+/**
+ * @brief Evaluate the Lauricella F_D series in fixed complex precision.
+ * @param[in] a Common upper parameter, passed by value.
+ * @param[in] b Borrowed array of variable_count upper parameters; valid during the call.
+ * @param[in] c Lower parameter, passed by value; denominator poles are unsupported.
+ * @param[in] x Borrowed array of variable_count complex arguments in the supported convergence region.
+ * @param[in] variable_count Number of entries in each array.
+ * @return Complex value requiring no release, or QC_NAN for invalid parameters or non-convergence.
+ * Array storage is neither retained nor modified.
+ */
+qcomplex_t qc_lauricella_F(qcomplex_t a, const qcomplex_t *b, qcomplex_t c, const qcomplex_t *x,
+                         size_t variable_count);
 qcomplex_t qc_hypergeometric_pFq(const qcomplex_t *upper, size_t upper_count, const qcomplex_t *lower,
                                  size_t lower_count, qcomplex_t argument); /**< Generalised hypergeometric pFq */
 qcomplex_t qc_legendre_chi(qcomplex_t s, qcomplex_t z);                    /**< Legendre chi chi_s(z), integer s */
@@ -611,8 +639,20 @@ qcomplex_t qc_normal_pdf(qcomplex_t z);                                    /**< 
  */
 qcomplex_t qc_normal_cdf(qcomplex_t z);
 qcomplex_t qc_normal_logpdf(qcomplex_t z);                                 /**< normal log PDF */
-qcomplex_t qc_lambert_wn(int branch, qcomplex_t z);                        /**< Lambert W integer branch */
-qcomplex_t qc_lambert_wm1(qcomplex_t z);                                   /**< Lambert W branch -1 */
+/**
+ * @brief Evaluate an integer branch of complex Lambert W.
+ * @param[in] branch Integer branch selector.
+ * @param[in] z Complex argument, passed by value.
+ * @return Fixed-precision complex value requiring no release, or QC_NAN on non-convergence.
+ */
+qcomplex_t qc_lambert_Wn(int branch, qcomplex_t z);
+
+/**
+ * @brief Evaluate the minus-one branch of complex Lambert W.
+ * @param[in] z Complex argument, passed by value.
+ * @return Fixed-precision complex value requiring no release, or QC_NAN on non-convergence.
+ */
+qcomplex_t qc_lambert_Wm1(qcomplex_t z);
 qcomplex_t qc_productlog(qcomplex_t z);                   /**< product log (Lambert W principal branch) */
 qcomplex_t qc_gammainc_lower(qcomplex_t s, qcomplex_t x); /**< lower incomplete gamma */
 qcomplex_t qc_gammainc_upper(qcomplex_t s, qcomplex_t x); /**< upper incomplete gamma */

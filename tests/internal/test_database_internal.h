@@ -27,6 +27,16 @@
 #include "test_database.h"
 
 /**
+ * @brief Commit one completed run and print any preserved timing-outlier warnings.
+ * @param[in,out] database Caller-owned storage with an active reporting transaction.
+ * @param exit_code Completed executable status.
+ * @param elapsed_ms Total non-negative elapsed milliseconds.
+ * @return True after committing and assessing warnings, false on storage failure; close the connection to roll back.
+ * @note Inputs are not consumed; call sequentially. Historical outliers remain recorded and excluded from baselines.
+ */
+bool test_database_report_complete(test_database_t *database, int exit_code, double elapsed_ms);
+
+/**
  * @brief Execute trusted SQL on a test-owned storage connection.
  * @param[in,out] database Borrowed open connection; the caller owns its transaction and lifetime.
  * @param[in] sql Borrowed, trusted SQL text valid until the call returns.

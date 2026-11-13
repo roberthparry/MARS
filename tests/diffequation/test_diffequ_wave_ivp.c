@@ -13,6 +13,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "string-t.h"
 #include "test_diffequ_wave_ivp.h"
 #include "test_harness.h"
 

@@ -313,9 +313,10 @@ class WorksheetHistoryEditor {
     private mode = -1;
     private revision = -1;
     private editing = false;
+    private drag: WorksheetHistoryDrag | null = null;
 
     /** Hold persistence while a native timeline edit is still restoring its browser worksheet. */
-    public get pending(): boolean { return this.editing; }
+    public get pending(): boolean { return this.editing || Boolean(this.drag?.active); }
 
     /** Attach detachable browser listeners after native workspace startup. */
     public start(): void {
@@ -325,7 +326,14 @@ class WorksheetHistoryEditor {
         document.getElementById('historyEdit')?.addEventListener('click', this.open, options);
         document.getElementById('historyEditorClose')?.addEventListener('click', this.close, options);
         document.getElementById('historyEditorEntries')?.addEventListener('click', this.click, options);
-        document.getElementById('historyEditor')?.addEventListener('close', this.cancelArtwork, options);
+        document.getElementById('historyEditor')?.addEventListener('close', this.closed, options);
+        const list = document.getElementById('historyEditorEntries');
+        if (list) this.drag = new WorksheetHistoryDrag(list, this.lifetime.signal,
+            () => !this.editing && this.mode === labWire.exports().lab_workspace_mode() &&
+                this.revision === labWire.exports().lab_workspace_history_revision(this.mode) &&
+                Boolean((document.getElementById('historyEditor') as HTMLDialogElement)?.open),
+            (from, to) => { void this.editPosition(from, 'move', to); }, text => this.status(text),
+            () => queueMicrotask(() => { void worksheetHistoryPersistence.flush(); }));
     }
 
     private readonly open = (): void => {
@@ -343,9 +351,14 @@ class WorksheetHistoryEditor {
     };
 
     private readonly close = (): void => {
-        this.cancelArtwork();
+        this.closed();
         (document.getElementById('historyEditor') as HTMLDialogElement)?.close();
         document.getElementById('historyEdit')?.focus({preventScroll: true});
+    };
+
+    private readonly closed = (): void => {
+        this.drag?.cancel();
+        this.cancelArtwork();
     };
 
     private status(text: string): void {
@@ -365,6 +378,7 @@ class WorksheetHistoryEditor {
         const native = labWire.exports(), buffer = WorksheetWorkspace.labWorkspaceBuffer;
         const list = document.getElementById('historyEditorEntries');
         if (!list || this.mode < 0) return;
+        this.drag?.cancel();
         this.cancelArtwork();
         const current = native.lab_workspace_history_current(this.mode);
         const count = current + 1 + native.lab_workspace_history_count(this.mode, 1);
@@ -422,13 +436,18 @@ class WorksheetHistoryEditor {
     private async edit(event: Event): Promise<void> {
         const button = event.target instanceof Element ? event.target.closest<HTMLButtonElement>('button[data-history-action]') : null;
         const row = button?.closest<HTMLElement>('[data-history-position]');
-        if (!button || button.disabled || !row || this.editing || this.mode !== labWire.exports().lab_workspace_mode()) return;
+        if (!button || button.disabled || !row || this.drag?.active) return;
+        await this.editPosition(Number(row.dataset.historyPosition), button.dataset.historyAction || '');
+    }
+
+    /** Both pointer drops and keyboard buttons submit one native edit and share persistence and error handling. */
+    private async editPosition(position: number, action: string, target?: number): Promise<void> {
+        if (this.editing || this.mode !== labWire.exports().lab_workspace_mode()) return;
         if (this.revision !== labWire.exports().lab_workspace_history_revision(this.mode)) {
             this.render();
             this.status('History changed; choose the entry again.');
             return;
         }
-        const position = Number(row.dataset.historyPosition), action = button.dataset.historyAction;
         this.editing = true;
         try {
             const native = labWire.exports();
@@ -445,7 +464,7 @@ class WorksheetHistoryEditor {
                         if (!native.lab_workspace_history_remove(this.mode, position))
                             throw new Error('Could not remove this history entry');
                     } else {
-                        const destination = position + (action === 'earlier' ? -1 : 1);
+                        const destination = target ?? position + (action === 'earlier' ? -1 : 1);
                         if (!native.lab_workspace_history_move(this.mode, position, destination))
                             throw new Error('This move would exceed the history limit; remove an older entry first');
                     }
@@ -455,7 +474,8 @@ class WorksheetHistoryEditor {
             worksheetHistoryPersistence.changed(this.mode);
             this.render();
             this.status(action === 'remove' ? 'Entry removed.' : 'Entry moved.');
-            const focus = Math.min(position, native.lab_workspace_history_current(this.mode) + native.lab_workspace_history_count(this.mode, 1));
+            const focus = Math.min(target ?? position,
+                native.lab_workspace_history_current(this.mode) + native.lab_workspace_history_count(this.mode, 1));
             const selected = document.querySelector<HTMLElement>(`#historyEditorEntries [data-history-position="${focus}"] button`);
             selected?.focus({preventScroll: true});
             selected?.scrollIntoView({block: 'nearest'});
@@ -468,7 +488,8 @@ class WorksheetHistoryEditor {
 
     /** Release browser listeners and close an open editor without modifying saved history. */
     public dispose(): void {
-        this.cancelArtwork();
+        this.closed();
+        this.drag = null;
         this.lifetime?.abort();
         this.lifetime = null;
         (document.getElementById('historyEditor') as HTMLDialogElement | null)?.close();

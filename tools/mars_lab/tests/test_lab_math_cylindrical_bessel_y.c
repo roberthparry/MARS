@@ -13,45 +13,45 @@
 
 #include "test_lab_math_support.h"
 
-typedef struct lab_math_bessel_y_reference {
+typedef struct lab_math_bessel_Y_reference {
     double complex order;
     double complex argument;
-} lab_math_bessel_y_reference_t;
+} lab_math_bessel_Y_reference_t;
 
-static const json_t *lab_math_bessel_y_fields(const char *source)
+static const json_t *lab_math_bessel_Y_fields(const char *source)
 {
     return lab_math_fields(source, "x", "evaluate", 40);
 }
 
-static double complex lab_math_bessel_y_value(const char *source)
+static double complex lab_math_bessel_Y_value(const char *source)
 {
-    return lab_math_number(lab_math_bessel_y_fields(source), "value");
+    return lab_math_number(lab_math_bessel_Y_fields(source), "value");
 }
 
-static double complex lab_math_bessel_y_first_integrand(double t, void *context)
+static double complex lab_math_bessel_Y_first_integrand(double t, void *context)
 {
-    const lab_math_bessel_y_reference_t *reference = context;
+    const lab_math_bessel_Y_reference_t *reference = context;
     return csin(reference->argument * sin(t) - reference->order * t);
 }
 
-static double complex lab_math_bessel_y_second_integrand(double t, void *context)
+static double complex lab_math_bessel_Y_second_integrand(double t, void *context)
 {
-    const lab_math_bessel_y_reference_t *reference = context;
+    const lab_math_bessel_Y_reference_t *reference = context;
     return (cexp(reference->order * t) + ccos(acos(-1.0) * reference->order) * cexp(-reference->order * t)) *
            cexp(-reference->argument * sinh(t));
 }
 
-static double complex lab_math_bessel_y_reference(double complex order, double complex argument)
+static double complex lab_math_bessel_Y_reference(double complex order, double complex argument)
 {
     /* DLMF 10.9.7: independent Schlaefli integrals for Re(argument) > 0. */
-    lab_math_bessel_y_reference_t context = {order, argument};
+    lab_math_bessel_Y_reference_t context = {order, argument};
     double pi = acos(-1.0);
-    double complex first = lab_math_simpson(lab_math_bessel_y_first_integrand, &context, 0, pi, 8192);
-    double complex second = lab_math_simpson(lab_math_bessel_y_second_integrand, &context, 0, 8, 8192);
+    double complex first = lab_math_simpson(lab_math_bessel_Y_first_integrand, &context, 0, pi, 8192);
+    double complex second = lab_math_simpson(lab_math_bessel_Y_second_integrand, &context, 0, 8, 8192);
     return (first - second) / pi;
 }
 
-static void lab_math_bessel_y_precision_reference(mpfr_t real, mpfr_t imaginary)
+static void lab_math_bessel_Y_precision_reference(mpfr_t real, mpfr_t imaginary)
 {
     mpfr_t pi, gamma, angle, power, logarithm, term_real, term_imaginary, j_real, j_imaginary;
     mpfr_t weighted_real, weighted_imaginary, harmonic, next_real, next_imaginary, temporary;
@@ -127,8 +127,8 @@ static void test_bessel_y_independent_quadrature(void)
     const double complex points[] = {1, 2 + I, 2 - I};
     for (size_t n = 0; n < 6; ++n)
         for (size_t z = 0; z < 3; ++z) {
-            double complex expected = lab_math_bessel_y_reference(order_values[n], points[z]);
-            lab_math_close(lab_math_bessel_y_value(lab_math_format("bessely(%s,%s)", orders[n], arguments[z])),
+            double complex expected = lab_math_bessel_Y_reference(order_values[n], points[z]);
+            lab_math_close(lab_math_bessel_Y_value(lab_math_format("bessely(%s,%s)", orders[n], arguments[z])),
                            expected, 2e-11 * (1 + cabs(expected)));
         }
 }
@@ -137,7 +137,7 @@ static void test_bessel_y_y0_complex_precision(void)
 {
     mpfr_t real, imaginary;
     mpfr_inits2(384, real, imaginary, (mpfr_ptr)NULL);
-    lab_math_bessel_y_precision_reference(real, imaginary);
+    lab_math_bessel_Y_precision_reference(real, imaginary);
     char *real_text = NULL, *imaginary_text = NULL;
     int real_size = mpfr_asprintf(&real_text, "%.105Rg", real);
     int imaginary_size = mpfr_asprintf(&imaginary_text, "%.105Rg", imaginary);
@@ -200,13 +200,13 @@ static void test_bessel_y_tiny_negative_half_order(void)
 static void test_bessel_y_integer_cut_and_parity(void)
 {
     for (int n = 0; n < 4; ++n) {
-        double complex upper = lab_math_bessel_y_value(lab_math_format("bessely(%d,-2)", n));
-        double complex near_upper = lab_math_bessel_y_value(lab_math_format("bessely(%d,-2+i/10^30)", n));
-        double complex lower = lab_math_bessel_y_value(lab_math_format("bessely(%d,-2-i/10^30)", n));
+        double complex upper = lab_math_bessel_Y_value(lab_math_format("bessely(%d,-2)", n));
+        double complex near_upper = lab_math_bessel_Y_value(lab_math_format("bessely(%d,-2+i/10^30)", n));
+        double complex lower = lab_math_bessel_Y_value(lab_math_format("bessely(%d,-2-i/10^30)", n));
         lab_math_close(upper, near_upper, 1e-25);
         lab_math_close(conj(upper), lower, 1e-25);
         const char *source = lab_math_format("bessely(-%d,2+i)-(-1)^%d*bessely(%d,2+i)", n, n, n);
-        lab_math_close(lab_math_bessel_y_value(source), 0, 1e-30);
+        lab_math_close(lab_math_bessel_Y_value(source), 0, 1e-30);
     }
 }
 
@@ -215,9 +215,9 @@ static void test_bessel_y_origin_limits_and_recurrence(void)
     const char *origin_orders[] = {"-1/2", "-3/2", "-5/2"};
     for (size_t i = 0; i < 3; ++i) {
         const char *source = lab_math_format("bessely(%s,0)", origin_orders[i]);
-        lab_math_check(lab_math_bessel_y_value(source) == 0, source);
+        lab_math_check(lab_math_bessel_Y_value(source) == 0, source);
     }
-    lab_math_regex(lab_math_text(lab_math_bessel_y_fields("Y0(0)"), "value"), "[Nn][Aa][Nn]", true);
+    lab_math_regex(lab_math_text(lab_math_bessel_Y_fields("Y0(0)"), "value"), "[Nn][Aa][Nn]", true);
     const char *orders[] = {"0", "2", "1/3", "1/4+i/3"};
     for (size_t i = 0; i < 4; ++i) {
         const char *source = lab_math_format(
@@ -231,20 +231,20 @@ static void test_bessel_y_complex_derivatives_and_finite_sum(void)
 {
     const double orders[] = {0, 1, -0.5, -1.5, -2.5};
     for (size_t i = 0; i < 5; ++i) {
-        double complex actual = lab_math_bessel_y_value(lab_math_format("{Dx(bessely(%g,x))|x=2+i}", orders[i]));
-        double complex expected = (lab_math_bessel_y_reference(orders[i], 2.00001 + I) -
-                                   lab_math_bessel_y_reference(orders[i], 1.99999 + I)) / 0.00002;
+        double complex actual = lab_math_bessel_Y_value(lab_math_format("{Dx(bessely(%g,x))|x=2+i}", orders[i]));
+        double complex expected = (lab_math_bessel_Y_reference(orders[i], 2.00001 + I) -
+                                   lab_math_bessel_Y_reference(orders[i], 1.99999 + I)) / 0.00002;
         lab_math_close(actual, expected, 3e-9);
     }
     const char *origin_orders[] = {"-3/2", "-5/2"};
     for (size_t i = 0; i < 2; ++i) {
         const char *source = lab_math_format("{Dx(bessely(%s,x))|x=0}", origin_orders[i]);
-        lab_math_check(lab_math_bessel_y_value(source) == 0, source);
+        lab_math_check(lab_math_bessel_Y_value(source) == 0, source);
     }
     double complex expected = 0;
     for (int n = 0; n < 4; ++n)
-        expected += lab_math_bessel_y_reference(n, 2 + I);
-    lab_math_close(lab_math_bessel_y_value("sum(n,0,3,bessely(n,2+i))"), expected, 2e-10);
+        expected += lab_math_bessel_Y_reference(n, 2 + I);
+    lab_math_close(lab_math_bessel_Y_value("sum(n,0,3,bessely(n,2+i))"), expected, 2e-10);
 }
 
 static void test_bessel_y_integer_primitives_differentiate_back(void)
@@ -267,14 +267,14 @@ static void test_bessel_y_aliases(void)
 {
     const char *aliases[] = {"Y0", "Y_0", "Y₀"};
     for (size_t i = 0; i < 3; ++i)
-        lab_math_places(creal(lab_math_bessel_y_value(lab_math_format("%s(1)", aliases[i]))), 0.08825696421567696, 15);
+        lab_math_places(creal(lab_math_bessel_Y_value(lab_math_format("%s(1)", aliases[i]))), 0.08825696421567696, 15);
 }
 
 static void test_bessel_y_readme(void)
 {
     /* README example: docs/expression.md; registered after every ordinary mathematical suite. */
-    lab_math_places(creal(lab_math_bessel_y_value("Y0(1)")), 0.088256964215677, 14);
-    lab_math_places(creal(lab_math_bessel_y_value("{Dx(Y0(x))|x=1}")), 0.781212821300289, 14);
+    lab_math_places(creal(lab_math_bessel_Y_value("Y0(1)")), 0.088256964215677, 14);
+    lab_math_places(creal(lab_math_bessel_Y_value("{Dx(Y0(x))|x=1}")), 0.781212821300289, 14);
 }
 
 /* Register all ordinary Bessel Y cases before README examples. */

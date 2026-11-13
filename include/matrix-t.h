@@ -1540,8 +1540,13 @@ matrix_t *mat_erfinv(const matrix_t *A);
 matrix_t *mat_erfcinv(const matrix_t *A);
 matrix_t *mat_gamma(const matrix_t *A);
 
-/** @brief Apply K_order to a diagonalisable numeric square matrix through spectral functional calculus. */
-matrix_t *mat_bessel_k(const matrix_t *A, const number_t *order);
+/**
+ * @brief Apply K_order to a diagonalisable numeric square matrix through spectral functional calculus.
+ * @param[in] A Borrowed numeric square matrix; neither consumed nor modified.
+ * @param[in] order Borrowed scalar order, valid during the call.
+ * @return Owned result requiring mat_free(), or NULL for invalid inputs or unsupported matrix evaluation.
+ */
+matrix_t *mat_bessel_K(const matrix_t *A, const number_t *order);
 
 /**
  * @brief Evaluate the principal modified Bessel matrix function I_order(A), including I_0(A).
@@ -1554,7 +1559,7 @@ matrix_t *mat_bessel_k(const matrix_t *A, const number_t *order);
  * @param order Finite real or complex scalar order.
  * @return A newly allocated matrix, or NULL for invalid inputs or an unsupported matrix evaluation.
  */
-matrix_t *mat_bessel_i(const matrix_t *A, const number_t *order);
+matrix_t *mat_bessel_I(const matrix_t *A, const number_t *order);
 
 /**
  * @brief Evaluate the principal Bessel matrix function Y_order(A), including Y_0(A).
@@ -1567,7 +1572,7 @@ matrix_t *mat_bessel_i(const matrix_t *A, const number_t *order);
  * @param order Finite real or complex scalar order.
  * @return A newly allocated matrix, or NULL for invalid inputs or an unsupported matrix evaluation.
  */
-matrix_t *mat_bessel_y(const matrix_t *A, const number_t *order);
+matrix_t *mat_bessel_Y(const matrix_t *A, const number_t *order);
 
 /**
  * @brief Evaluate the principal ordinary Struve matrix function H_order(A).
@@ -1580,7 +1585,7 @@ matrix_t *mat_bessel_y(const matrix_t *A, const number_t *order);
  * @param order Finite real or complex scalar order.
  * @return A newly allocated matrix, or NULL for invalid inputs, unavailable powers or failed convergence.
  */
-matrix_t *mat_struve_h(const matrix_t *A, const number_t *order);
+matrix_t *mat_struve_H(const matrix_t *A, const number_t *order);
 
 /**
  * @brief Evaluate the principal modified Struve matrix function L_order(A).
@@ -1593,7 +1598,7 @@ matrix_t *mat_struve_h(const matrix_t *A, const number_t *order);
  * @param order Finite real or complex scalar order.
  * @return A newly allocated matrix, or NULL for invalid inputs, unavailable powers or failed convergence.
  */
-matrix_t *mat_struve_l(const matrix_t *A, const number_t *order);
+matrix_t *mat_struve_L(const matrix_t *A, const number_t *order);
 matrix_t *mat_lgamma(const matrix_t *A);
 matrix_t *mat_digamma(const matrix_t *A);
 
@@ -1695,8 +1700,19 @@ matrix_t *mat_gammainv(const matrix_t *A);
 matrix_t *mat_normal_pdf(const matrix_t *A);
 matrix_t *mat_normal_cdf(const matrix_t *A);
 matrix_t *mat_normal_logpdf(const matrix_t *A);
-matrix_t *mat_lambert_w0(const matrix_t *A);
-matrix_t *mat_lambert_wm1(const matrix_t *A);
+/**
+ * @brief Evaluate the principal Lambert W matrix function using the matrix module's supported calculus.
+ * @param[in] A Borrowed matrix; neither consumed nor modified.
+ * @return Owned result requiring mat_free(), or NULL on allocation or evaluation failure.
+ */
+matrix_t *mat_lambert_W0(const matrix_t *A);
+
+/**
+ * @brief Evaluate the minus-one Lambert W matrix function using the matrix module's supported calculus.
+ * @param[in] A Borrowed matrix; neither consumed nor modified.
+ * @return Owned result requiring mat_free(), or NULL on allocation or evaluation failure.
+ */
+matrix_t *mat_lambert_Wm1(const matrix_t *A);
 matrix_t *mat_productlog(const matrix_t *A);
 matrix_t *mat_Ei(const matrix_t *A);
 

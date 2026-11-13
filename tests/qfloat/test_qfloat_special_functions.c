@@ -45,7 +45,7 @@ static void test_qf_productlog_definition(void)
    ------------------------------------------------------------------------- */
 static void test_qf_productlog_consistency(void)
 {
-    printf(C_CYAN "TEST: qf_productlog consistency with qf_lambert_w0\n" C_RESET);
+    printf(C_CYAN "TEST: qf_productlog consistency with qf_lambert_W0\n" C_RESET);
 
     double xs[] = {-0.2, -0.05, 0.0, 0.2, 1.0, 3.0};
 
@@ -54,7 +54,7 @@ static void test_qf_productlog_consistency(void)
         qfloat_t x = qf_from_double(xs[i]);
 
         qfloat_t p = qf_productlog(x);
-        qfloat_t w = qf_lambert_w0(x);
+        qfloat_t w = qf_lambert_W0(x);
 
         TEST_ASSERT_QFLOAT_CLOSE(p, w);
         printf(C_GREEN "  OK: ProductLog(%g) = W(%g)\n" C_RESET, xs[i], xs[i]);
@@ -1038,7 +1038,7 @@ void test_qf_polylog(void)
 
     {
         qfloat_t got =
-            qf_appell_f1(QF_ONE, QF_ONE, QF_ONE, qf_from_double(2.0), qf_from_string("0.1"), qf_from_string("0.2"));
+            qf_appell_F1(QF_ONE, QF_ONE, QF_ONE, qf_from_double(2.0), qf_from_string("0.1"), qf_from_string("0.2"));
         qfloat_t want =
             qf_from_string("1.1778303565638345453879410947052170506848071256473314110734863879480772052813379");
 
@@ -1064,9 +1064,9 @@ void test_qf_polylog(void)
         for (size_t i = 0u; i < 3u; ++i) {
             want = qf_mul(want, qf_pow(qf_sub(QF_ONE, variables[i]), qf_neg(b[i])));
         }
-        TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_lauricella_f(a, b, c, variables, 3u), want, 1e-27);
-        TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_lauricella_f(a, b, c, variables, 2u),
-                                     qf_appell_f1(a, b[0], b[1], c, variables[0], variables[1]), 1e-29);
+        TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_lauricella_F(a, b, c, variables, 3u), want, 1e-27);
+        TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_lauricella_F(a, b, c, variables, 2u),
+                                     qf_appell_F1(a, b[0], b[1], c, variables[0], variables[1]), 1e-29);
     }
 
     {
@@ -1075,7 +1075,7 @@ void test_qf_polylog(void)
         qfloat_t variable = qf_from_string("0.96");
         qfloat_t want = qf_pow(qf_sub(QF_ONE, variable), qf_neg(b));
 
-        TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_lauricella_f(a, &b, a, &variable, 1u), want, 1e-27);
+        TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_lauricella_F(a, &b, a, &variable, 1u), want, 1e-27);
     }
 
     printf("%s  OK: polylogarithmic and hypergeometric identities%s\n\n", C_GREEN, C_RESET);
@@ -1115,18 +1115,18 @@ static void test_qf_bessel_half_order_identities(void)
     qfloat_t want_j_negative_half = qf_mul(scale, qf_cos(x));
     qfloat_t want_y_half = qf_neg(want_j_negative_half);
 
-    TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_bessel_j(half, x), want_j_half, 1e-28);
-    TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_bessel_j(negative_half, x), want_j_negative_half, 1e-28);
-    TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_bessel_y(half, x), want_y_half, 1e-28);
+    TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_bessel_J(half, x), want_j_half, 1e-28);
+    TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_bessel_J(negative_half, x), want_j_negative_half, 1e-28);
+    TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_bessel_Y(half, x), want_y_half, 1e-28);
 }
 
 static void test_qf_bessel_order_recurrence(void)
 {
     qfloat_t order = qf_from_string("1.375");
     qfloat_t argument = qf_from_string("2.25");
-    qfloat_t lower = qf_bessel_j(qf_sub(order, QF_ONE), argument);
-    qfloat_t upper = qf_bessel_j(qf_add(order, QF_ONE), argument);
-    qfloat_t want = qf_mul(qf_div(qf_mul(qf_from_double(2.0), order), argument), qf_bessel_j(order, argument));
+    qfloat_t lower = qf_bessel_J(qf_sub(order, QF_ONE), argument);
+    qfloat_t upper = qf_bessel_J(qf_add(order, QF_ONE), argument);
+    qfloat_t want = qf_mul(qf_div(qf_mul(qf_from_double(2.0), order), argument), qf_bessel_J(order, argument));
 
     TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_add(lower, upper), want, 1e-27);
 }
@@ -1135,13 +1135,13 @@ static void test_qf_bessel_integer_order_values(void)
 {
     qfloat_t argument = QF_ONE;
 
-    TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_bessel_j(QF_ZERO, argument), qf_from_string("0.7651976865579665514497175261026632"),
+    TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_bessel_J(QF_ZERO, argument), qf_from_string("0.7651976865579665514497175261026632"),
                                  1e-28);
-    TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_bessel_j(QF_ONE, argument), qf_from_string("0.4400505857449335159596822037189149"),
+    TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_bessel_J(QF_ONE, argument), qf_from_string("0.4400505857449335159596822037189149"),
                                  1e-28);
-    TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_bessel_y(QF_ZERO, argument),
+    TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_bessel_Y(QF_ZERO, argument),
                                  qf_from_string("0.08825696421567695798292676602351516"), 1e-28);
-    TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_bessel_y(QF_ONE, argument), qf_from_string("-0.7812128213002887165471500000479648"),
+    TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_bessel_Y(QF_ONE, argument), qf_from_string("-0.7812128213002887165471500000479648"),
                                  1e-28);
 }
 
@@ -1149,97 +1149,97 @@ static void test_qf_bessel_i(void)
 {
     qfloat_t x = qf_from_string("1.25");
     qfloat_t scale = qf_sqrt(qf_div(QF_TWO, qf_mul(QF_PI, x)));
-    TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_bessel_i(QF_ZERO, QF_ONE),
+    TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_bessel_I(QF_ZERO, QF_ONE),
                                qf_from_string("1.2660658777520083355982446252147175"), 1e-28);
-    TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_bessel_i(QF_ONE, QF_ONE),
+    TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_bessel_I(QF_ONE, QF_ONE),
                                qf_from_string("0.5651591039924850272076960276098633"), 1e-28);
-    TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_bessel_i(qf_from_double(0.5), x), qf_mul(scale, qf_sinh(x)), 1e-28);
-    TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_bessel_i(qf_from_double(-0.5), x), qf_mul(scale, qf_cosh(x)), 1e-28);
+    TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_bessel_I(qf_from_double(0.5), x), qf_mul(scale, qf_sinh(x)), 1e-28);
+    TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_bessel_I(qf_from_double(-0.5), x), qf_mul(scale, qf_cosh(x)), 1e-28);
     for (int n = 0; n <= 6; ++n) {
         qfloat_t order = qf_from_double(n);
-        qfloat_t value = qf_bessel_i(order, x);
-        TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_bessel_i(qf_neg(order), x), value, 1e-28);
-        TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_bessel_i(order, qf_neg(x)), n % 2 ? qf_neg(value) : value, 1e-28);
-        TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_bessel_i(qf_neg(order), QF_ZERO), n ? QF_ZERO : QF_ONE, 1e-30);
+        qfloat_t value = qf_bessel_I(order, x);
+        TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_bessel_I(qf_neg(order), x), value, 1e-28);
+        TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_bessel_I(order, qf_neg(x)), n % 2 ? qf_neg(value) : value, 1e-28);
+        TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_bessel_I(qf_neg(order), QF_ZERO), n ? QF_ZERO : QF_ONE, 1e-30);
     }
     qfloat_t order = qf_from_string("0.375");
-    qfloat_t difference = qf_sub(qf_bessel_i(qf_sub(order, QF_ONE), x), qf_bessel_i(qf_add(order, QF_ONE), x));
-    qfloat_t reference = qf_mul(qf_div(qf_mul(QF_TWO, order), x), qf_bessel_i(order, x));
+    qfloat_t difference = qf_sub(qf_bessel_I(qf_sub(order, QF_ONE), x), qf_bessel_I(qf_add(order, QF_ONE), x));
+    qfloat_t reference = qf_mul(qf_div(qf_mul(QF_TWO, order), x), qf_bessel_I(order, x));
     TEST_ASSERT_QFLOAT_CLOSE_TOL(difference, reference, 1e-27);
-    TEST_ASSERT_TRUE(qf_isnan(qf_bessel_i(qf_from_double(-0.5), QF_ZERO)), "Bessel I divergent zero limit");
-    TEST_ASSERT_TRUE(qf_isnan(qf_bessel_i(order, qf_neg(x))), "Bessel I non-real branch rejected");
-    TEST_ASSERT_TRUE(qf_isnan(qf_bessel_i(QF_NAN, x)), "Bessel I NaN order rejected");
-    TEST_ASSERT_TRUE(qf_isnan(qf_bessel_i(QF_ZERO, QF_INF)), "Bessel I infinite argument rejected");
-    TEST_ASSERT_TRUE(qf_isnan(qf_bessel_i(QF_ZERO, qf_from_double(1001.0))), "Bessel I argument range guard");
+    TEST_ASSERT_TRUE(qf_isnan(qf_bessel_I(qf_from_double(-0.5), QF_ZERO)), "Bessel I divergent zero limit");
+    TEST_ASSERT_TRUE(qf_isnan(qf_bessel_I(order, qf_neg(x))), "Bessel I non-real branch rejected");
+    TEST_ASSERT_TRUE(qf_isnan(qf_bessel_I(QF_NAN, x)), "Bessel I NaN order rejected");
+    TEST_ASSERT_TRUE(qf_isnan(qf_bessel_I(QF_ZERO, QF_INF)), "Bessel I infinite argument rejected");
+    TEST_ASSERT_TRUE(qf_isnan(qf_bessel_I(QF_ZERO, qf_from_double(1001.0))), "Bessel I argument range guard");
 }
 
 static void test_qf_struve_l(void)
 {
     qfloat_t x = qf_from_string("1.25");
     qfloat_t scale = qf_sqrt(qf_div(QF_TWO, qf_mul(QF_PI, x)));
-    TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_struve_l(qf_from_double(-0.5), x), qf_mul(scale, qf_sinh(x)), 1e-28);
-    TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_struve_l(qf_from_double(0.5), x),
+    TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_struve_L(qf_from_double(-0.5), x), qf_mul(scale, qf_sinh(x)), 1e-28);
+    TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_struve_L(qf_from_double(0.5), x),
                                qf_mul(scale, qf_sub(qf_cosh(x), QF_ONE)), 1e-28);
     qfloat_t previous = qf_mul(scale, qf_sinh(x));
     qfloat_t current = qf_mul(scale, qf_sub(qf_cosh(x), qf_div(qf_sinh(x), x)));
     for (int j = 1; j <= 5; ++j) {
         qfloat_t alpha = qf_from_double(j + 0.5);
-        TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_struve_l(qf_neg(alpha), x), current, 1e-24);
+        TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_struve_L(qf_neg(alpha), x), current, 1e-24);
         qfloat_t next = qf_sub(previous, qf_mul(qf_div(qf_mul(QF_TWO, alpha), x), current));
         previous = current;
         current = next;
     }
-    TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_struve_l(QF_ZERO, QF_ONE),
+    TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_struve_L(QF_ZERO, QF_ONE),
                                qf_from_string("0.7102431859378908887385266778116507"), 1e-28);
     for (int n = -3; n <= 3; ++n) {
         qfloat_t order = qf_from_double(n);
-        qfloat_t positive = qf_struve_l(order, x);
-        qfloat_t negative = qf_struve_l(order, qf_neg(x));
+        qfloat_t positive = qf_struve_L(order, x);
+        qfloat_t negative = qf_struve_L(order, qf_neg(x));
         TEST_ASSERT_QFLOAT_CLOSE_TOL(negative, n % 2 == 0 ? qf_neg(positive) : positive, 1e-28);
     }
-    TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_struve_l(qf_from_double(-1.0), QF_ZERO), qf_div(QF_TWO, QF_PI), 1e-29);
-    TEST_ASSERT_TRUE(qf_eq(qf_struve_l(qf_from_double(-5.5), QF_ZERO), QF_ZERO), "negative half-order zero limit");
-    TEST_ASSERT_TRUE(qf_eq(qf_struve_l(QF_ZERO, QF_ZERO), QF_ZERO), "ordinary zero limit");
-    TEST_ASSERT_TRUE(qf_isnan(qf_struve_l(qf_from_double(-2.0), QF_ZERO)), "singular zero limit");
-    TEST_ASSERT_TRUE(qf_isnan(qf_struve_l(qf_from_double(0.5), qf_neg(x))), "non-real branch rejected");
-    TEST_ASSERT_TRUE(qf_isnan(qf_struve_l(QF_NAN, x)), "NaN order rejected");
-    TEST_ASSERT_TRUE(qf_isnan(qf_struve_l(QF_ZERO, QF_INF)), "infinite argument rejected");
-    TEST_ASSERT_TRUE(qf_isnan(qf_struve_l(QF_ZERO, qf_from_double(1001.0))), "argument range guard");
+    TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_struve_L(qf_from_double(-1.0), QF_ZERO), qf_div(QF_TWO, QF_PI), 1e-29);
+    TEST_ASSERT_TRUE(qf_eq(qf_struve_L(qf_from_double(-5.5), QF_ZERO), QF_ZERO), "negative half-order zero limit");
+    TEST_ASSERT_TRUE(qf_eq(qf_struve_L(QF_ZERO, QF_ZERO), QF_ZERO), "ordinary zero limit");
+    TEST_ASSERT_TRUE(qf_isnan(qf_struve_L(qf_from_double(-2.0), QF_ZERO)), "singular zero limit");
+    TEST_ASSERT_TRUE(qf_isnan(qf_struve_L(qf_from_double(0.5), qf_neg(x))), "non-real branch rejected");
+    TEST_ASSERT_TRUE(qf_isnan(qf_struve_L(QF_NAN, x)), "NaN order rejected");
+    TEST_ASSERT_TRUE(qf_isnan(qf_struve_L(QF_ZERO, QF_INF)), "infinite argument rejected");
+    TEST_ASSERT_TRUE(qf_isnan(qf_struve_L(QF_ZERO, qf_from_double(1001.0))), "argument range guard");
 }
 
 static void test_qf_struve_h(void)
 {
     qfloat_t x = qf_from_string("1.25");
     qfloat_t scale = qf_sqrt(qf_div(QF_TWO, qf_mul(QF_PI, x)));
-    TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_struve_h(qf_from_double(-0.5), x), qf_mul(scale, qf_sin(x)), 1e-28);
-    TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_struve_h(qf_from_double(0.5), x),
+    TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_struve_H(qf_from_double(-0.5), x), qf_mul(scale, qf_sin(x)), 1e-28);
+    TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_struve_H(qf_from_double(0.5), x),
                                qf_mul(scale, qf_sub(QF_ONE, qf_cos(x))), 1e-28);
     qfloat_t previous = qf_mul(scale, qf_sin(x));
     qfloat_t current = qf_mul(scale, qf_sub(qf_cos(x), qf_div(qf_sin(x), x)));
     for (int j = 1; j <= 5; ++j) {
         qfloat_t alpha = qf_from_double(j + 0.5);
-        TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_struve_h(qf_neg(alpha), x), current, 1e-24);
+        TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_struve_H(qf_neg(alpha), x), current, 1e-24);
         qfloat_t next = qf_sub(qf_neg(previous), qf_mul(qf_div(qf_mul(QF_TWO, alpha), x), current));
         previous = current;
         current = next;
     }
     for (int n = -3; n <= 3; ++n) {
         qfloat_t order = qf_from_double(n);
-        qfloat_t positive = qf_struve_h(order, x);
-        TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_struve_h(order, qf_neg(x)),
+        qfloat_t positive = qf_struve_H(order, x);
+        TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_struve_H(order, qf_neg(x)),
                                    n % 2 == 0 ? qf_neg(positive) : positive, 1e-28);
     }
     x = qf_from_double(80.0);
     scale = qf_sqrt(qf_div(QF_TWO, qf_mul(QF_PI, x)));
-    TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_struve_h(qf_from_double(-0.5), x), qf_mul(scale, qf_sin(x)), 1e-28);
-    TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_struve_h(qf_from_double(-1.0), QF_ZERO), qf_div(QF_TWO, QF_PI), 1e-29);
-    TEST_ASSERT_TRUE(qf_eq(qf_struve_h(qf_from_double(-5.5), QF_ZERO), QF_ZERO), "H exceptional zero limit");
-    TEST_ASSERT_TRUE(qf_eq(qf_struve_h(QF_ZERO, QF_ZERO), QF_ZERO), "H ordinary zero limit");
-    TEST_ASSERT_TRUE(qf_isnan(qf_struve_h(qf_from_double(-2.0), QF_ZERO)), "H singular zero limit");
-    TEST_ASSERT_TRUE(qf_isnan(qf_struve_h(qf_from_double(0.5), qf_neg(x))), "H non-real branch rejected");
-    TEST_ASSERT_TRUE(qf_isnan(qf_struve_h(QF_NAN, x)), "H NaN order rejected");
-    TEST_ASSERT_TRUE(qf_isnan(qf_struve_h(QF_ZERO, QF_INF)), "H infinite argument rejected");
-    TEST_ASSERT_TRUE(qf_isnan(qf_struve_h(QF_ZERO, qf_from_double(1001.0))), "H argument range guard");
+    TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_struve_H(qf_from_double(-0.5), x), qf_mul(scale, qf_sin(x)), 1e-28);
+    TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_struve_H(qf_from_double(-1.0), QF_ZERO), qf_div(QF_TWO, QF_PI), 1e-29);
+    TEST_ASSERT_TRUE(qf_eq(qf_struve_H(qf_from_double(-5.5), QF_ZERO), QF_ZERO), "H exceptional zero limit");
+    TEST_ASSERT_TRUE(qf_eq(qf_struve_H(QF_ZERO, QF_ZERO), QF_ZERO), "H ordinary zero limit");
+    TEST_ASSERT_TRUE(qf_isnan(qf_struve_H(qf_from_double(-2.0), QF_ZERO)), "H singular zero limit");
+    TEST_ASSERT_TRUE(qf_isnan(qf_struve_H(qf_from_double(0.5), qf_neg(x))), "H non-real branch rejected");
+    TEST_ASSERT_TRUE(qf_isnan(qf_struve_H(QF_NAN, x)), "H NaN order rejected");
+    TEST_ASSERT_TRUE(qf_isnan(qf_struve_H(QF_ZERO, QF_INF)), "H infinite argument rejected");
+    TEST_ASSERT_TRUE(qf_isnan(qf_struve_H(QF_ZERO, qf_from_double(1001.0))), "H argument range guard");
 }
 
 void test_bessel_functions(void)
@@ -1253,8 +1253,8 @@ void test_bessel_functions(void)
 
     {
         qfloat_t argument = qf_from_double(1.25);
-        qfloat_t got = qf_lommel_s(QF_ONE, QF_ZERO, argument);
-        qfloat_t want = qf_sub(QF_ONE, qf_bessel_j(QF_ZERO, argument));
+        qfloat_t got = qf_lommel_S(QF_ONE, QF_ZERO, argument);
+        qfloat_t want = qf_sub(QF_ONE, qf_bessel_J(QF_ZERO, argument));
 
         TEST_ASSERT_QFLOAT_CLOSE_TOL(got, want, 1e-28);
     }

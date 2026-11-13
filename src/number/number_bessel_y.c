@@ -17,7 +17,7 @@
 enum { BESSEL_Y_MAX_WORK_BITS = 65536, BESSEL_Y_MAX_TERMS = 20000 };
 
 /* Exact components must reach the working precision before any inexact conversion. */
-static bool bessel_y_set_real(mpfr_ptr out, number_t value)
+static bool bessel_Y_set_real(mpfr_ptr out, number_t value)
 {
     const number_private_t *impl = number_impl_const(&value);
     if (impl->kind == NUMBER_MPZ) {
@@ -36,20 +36,20 @@ static bool bessel_y_set_real(mpfr_ptr out, number_t value)
     return mpfr_number_p(out);
 }
 
-static bool bessel_y_set_complex(mpc_ptr out, number_t value)
+static bool bessel_Y_set_complex(mpc_ptr out, number_t value)
 {
     NUM_SCOPE(scope);
-    return bessel_y_set_real(mpc_realref(out), num_real_part(value)) &&
-           bessel_y_set_real(mpc_imagref(out), num_imag_part(value));
+    return bessel_Y_set_real(mpc_realref(out), num_real_part(value)) &&
+           bessel_Y_set_real(mpc_imagref(out), num_imag_part(value));
 }
 
-static bool bessel_y_finite(mpc_srcptr value)
+static bool bessel_Y_finite(mpc_srcptr value)
 {
     return mpfr_number_p(mpc_realref(value)) && mpfr_number_p(mpc_imagref(value));
 }
 
 /* A conservative accumulated-roundoff allowance must fit well inside the requested precision. */
-static bool bessel_y_resolved(mpc_srcptr value, mpfr_srcptr absolute_sum, size_t precision)
+static bool bessel_Y_resolved(mpc_srcptr value, mpfr_srcptr absolute_sum, size_t precision)
 {
     mpfr_prec_t work = mpc_get_prec(value);
     mpfr_t error, threshold;
@@ -57,13 +57,13 @@ static bool bessel_y_resolved(mpc_srcptr value, mpfr_srcptr absolute_sum, size_t
     mpfr_mul_2si(error, absolute_sum, -work + 32, MPFR_RNDU);
     mpc_abs(threshold, value, MPFR_RNDD);
     mpfr_mul_2si(threshold, threshold, -(long)precision - 16, MPFR_RNDD);
-    bool ok = bessel_y_finite(value) && mpfr_lessequal_p(error, threshold);
+    bool ok = bessel_Y_finite(value) && mpfr_lessequal_p(error, threshold);
     mpfr_clears(error, threshold, (mpfr_ptr)0);
     return ok;
 }
 
 /* DLMF 10.8.1: combine the logarithmic J series with its harmonic-number weights. */
-static bool bessel_y_integer(mpc_ptr out, unsigned long n, mpc_srcptr z, size_t precision)
+static bool bessel_Y_integer(mpc_ptr out, unsigned long n, mpc_srcptr z, size_t precision)
 {
     mpfr_prec_t work = mpc_get_prec(out);
     mpc_t half_z, square, term, weight, contribution;
@@ -120,7 +120,7 @@ static bool bessel_y_integer(mpc_ptr out, unsigned long n, mpc_srcptr z, size_t 
     for (unsigned long k = 0; k < BESSEL_Y_MAX_TERMS; ++k) {
         mpc_mul(contribution, term, weight, MPC_RNDNN);
         mpc_add(out, out, contribution, MPC_RNDNN);
-        if (!bessel_y_finite(out) || !bessel_y_finite(term))
+        if (!bessel_Y_finite(out) || !bessel_Y_finite(term))
             goto done;
         mpc_abs(magnitude, term, MPFR_RNDU);
         mpfr_mul(scratch, magnitude, weight_bound, MPFR_RNDU);
@@ -136,7 +136,7 @@ static bool bessel_y_integer(mpc_ptr out, unsigned long n, mpc_srcptr z, size_t 
         mpc_abs(threshold, out, MPFR_RNDD);
         mpfr_mul_2si(threshold, threshold, -(long)precision - 32, MPFR_RNDD);
         if (mpfr_cmp_d(ratio, 0.5) <= 0 && mpfr_lessequal_p(tail, threshold)) {
-            ok = bessel_y_resolved(out, absolute_sum, precision);
+            ok = bessel_Y_resolved(out, absolute_sum, precision);
             break;
         }
         mpc_mul(term, term, square, MPC_RNDNN);
@@ -152,7 +152,7 @@ static bool bessel_y_integer(mpc_ptr out, unsigned long n, mpc_srcptr z, size_t 
         mpfr_add(weight_bound, weight_bound, scratch, MPFR_RNDU);
     }
     mpc_div_fr(out, out, pi, MPC_RNDNN);
-    ok = ok && bessel_y_finite(out);
+    ok = ok && bessel_Y_finite(out);
 done:
     mpfr_clears(pi, scratch, magnitude, absolute_sum, weight_bound, square_size, ratio, tail, threshold, (mpfr_ptr)0);
     mpc_clear(half_z);
@@ -165,7 +165,7 @@ done:
 
 /* Recover J from the native arbitrary-precision I kernel without fixed-precision complex gamma.
  * Rotate towards the right half-plane, so the phase correction is always +/- i*pi/2. */
-static bool bessel_y_j(mpc_ptr out, mpc_srcptr nu, mpc_srcptr z)
+static bool bessel_Y_j(mpc_ptr out, mpc_srcptr nu, mpc_srcptr z)
 {
     NUM_SCOPE(scope);
     mpfr_prec_t work = mpc_get_prec(out);
@@ -176,8 +176,8 @@ static bool bessel_y_j(mpc_ptr out, mpc_srcptr nu, mpc_srcptr z)
     mpc_mul_i(rotated, z, rotation, MPC_RNDNN);
     number_t order = number_take(number_wrap_complex_mpc(nu, (size_t)work));
     number_t argument = number_take(number_wrap_complex_mpc(rotated, (size_t)work));
-    number_t value = num_bessel_i(order, argument);
-    bool ok = !num_is_nan(value) && bessel_y_set_complex(out, value);
+    number_t value = num_bessel_I(order, argument);
+    bool ok = !num_is_nan(value) && bessel_Y_set_complex(out, value);
     if (ok) {
         mpc_set_ui(phase, 0u, MPC_RNDNN);
         mpfr_const_pi(mpc_imagref(phase), MPFR_RNDN);
@@ -187,7 +187,7 @@ static bool bessel_y_j(mpc_ptr out, mpc_srcptr nu, mpc_srcptr z)
         mpc_mul(phase, phase, nu, MPC_RNDNN);
         mpc_exp(phase, phase, MPC_RNDNN);
         mpc_mul(out, out, phase, MPC_RNDNN);
-        ok = bessel_y_finite(out);
+        ok = bessel_Y_finite(out);
     }
     mpc_clear(rotated);
     mpc_clear(phase);
@@ -195,7 +195,7 @@ static bool bessel_y_j(mpc_ptr out, mpc_srcptr nu, mpc_srcptr z)
 }
 
 /* DLMF 10.2.3, with a cancellation check before dividing by sin(pi*nu). */
-static bool bessel_y_connection(mpc_ptr out, mpc_srcptr nu, mpc_srcptr z, size_t precision, bool half_integral)
+static bool bessel_Y_connection(mpc_ptr out, mpc_srcptr nu, mpc_srcptr z, size_t precision, bool half_integral)
 {
     mpfr_prec_t work = mpc_get_prec(out);
     mpc_t opposite, positive, negative, sine, cosine;
@@ -210,7 +210,7 @@ static bool bessel_y_connection(mpc_ptr out, mpc_srcptr nu, mpc_srcptr z, size_t
     if (half_integral) {
         /* cos(pi*nu) is exactly zero. In particular, tiny negative-half-order values must not
          * inherit a spurious cos(pi*nu)*J_nu term which can be arbitrarily larger than Y_nu. */
-        bool ok = bessel_y_j(out, opposite, z);
+        bool ok = bessel_Y_j(out, opposite, z);
         mpfr_mul_2ui(pi, mpc_realref(nu), 1u, MPFR_RNDN);
         long twice = mpfr_get_si(pi, MPFR_RNDN);
         if (twice % 4 == 1 || twice % 4 == -3)
@@ -223,7 +223,7 @@ static bool bessel_y_connection(mpc_ptr out, mpc_srcptr nu, mpc_srcptr z, size_t
         mpc_clear(cosine);
         return ok;
     }
-    bool ok = bessel_y_j(positive, nu, z) && bessel_y_j(negative, opposite, z);
+    bool ok = bessel_Y_j(positive, nu, z) && bessel_Y_j(negative, opposite, z);
     if (ok) {
         mpfr_const_pi(pi, MPFR_RNDN);
         mpc_mul_fr(opposite, nu, pi, MPC_RNDNN);
@@ -236,9 +236,9 @@ static bool bessel_y_connection(mpc_ptr out, mpc_srcptr nu, mpc_srcptr z, size_t
         mpc_abs(magnitude, negative, MPFR_RNDU);
         mpfr_add(absolute_sum, absolute_sum, magnitude, MPFR_RNDU);
         mpc_sub(out, positive, negative, MPC_RNDNN);
-        ok = bessel_y_resolved(out, absolute_sum, precision);
+        ok = bessel_Y_resolved(out, absolute_sum, precision);
         mpc_div(out, out, sine, MPC_RNDNN);
-        ok = ok && bessel_y_finite(out);
+        ok = ok && bessel_Y_finite(out);
     }
     mpfr_clears(pi, magnitude, absolute_sum, (mpfr_ptr)0);
     mpc_clear(opposite);
@@ -250,7 +250,7 @@ static bool bessel_y_connection(mpc_ptr out, mpc_srcptr nu, mpc_srcptr z, size_t
 }
 
 /* Evaluate principal Bessel Y at the widest input precision, including integer and complex orders. */
-number_t num_bessel_y(const number_t order, const number_t argument)
+number_t num_bessel_Y(const number_t order, const number_t argument)
 {
     NUM_SCOPE(scope);
     if (!num_is_finite(order) || !num_is_finite(argument))
@@ -295,7 +295,7 @@ number_t num_bessel_y(const number_t order, const number_t argument)
     mpc_init2(nu, work);
     mpc_init2(z, work);
     mpc_init2(result, work);
-    bool ok = bessel_y_set_complex(nu, order) && bessel_y_set_complex(z, argument);
+    bool ok = bessel_Y_set_complex(nu, order) && bessel_Y_set_complex(z, argument);
     number_t value = num_clone(NUM_NAN);
     if (mpfr_zero_p(mpc_imagref(z)))
         mpfr_set_zero(mpc_imagref(z), 1);
@@ -313,15 +313,15 @@ number_t num_bessel_y(const number_t order, const number_t argument)
         } else {
             mpfr_set_zero(mpc_imagref(result), 1);
         }
-        ok = bessel_y_finite(result);
+        ok = bessel_Y_finite(result);
     } else if (ok && integral) {
         long n = mpfr_get_si(mpc_realref(nu), MPFR_RNDN);
-        ok = bessel_y_integer(result, (unsigned long)(n < 0 ? -n : n), z, precision);
+        ok = bessel_Y_integer(result, (unsigned long)(n < 0 ? -n : n), z, precision);
         if (n < 0 && n % 2 != 0)
             mpc_neg(result, result, MPC_RNDNN);
     } else if (ok) {
         bool half_integral = num_is_real(order) && num_is_integer(num_mul(NUM_TWO, order));
-        ok = bessel_y_connection(result, nu, z, precision, half_integral);
+        ok = bessel_Y_connection(result, nu, z, precision, half_integral);
     }
     if (ok) {
         if (num_is_real(order) && real_argument && num_gt(argument, NUM_ZERO))

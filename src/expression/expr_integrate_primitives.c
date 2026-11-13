@@ -143,8 +143,8 @@ static expr_t *bessel_lommel_primitive(number_t mu, const expr_t *order, const e
     expr_t *upper_order = expr_add_long(order, 1), *c = builder(order, z);
     expr_t *lower = builder(lower_order, z), *upper = builder(upper_order, z);
     expr_t *difference = expr_sub(lower, upper), *derivative = expr_div_num(difference, &NUM_TWO);
-    expr_t *lommel = expr_lommel_s(mu_expr, order, z);
-    expr_t *lommel_derivative = expr_lommel_s_argument_derivative_expansion(mu_expr, order, z);
+    expr_t *lommel = expr_lommel_S(mu_expr, order, z);
+    expr_t *lommel_derivative = expr_lommel_S_argument_derivative_expansion(mu_expr, order, z);
     expr_t *left = expr_mul(c, lommel_derivative), *right = expr_mul(derivative, lommel);
     expr_t *wronskian = expr_sub(left, right), *result = expr_mul(z, wronskian);
     expr_free(wronskian); expr_free(right); expr_free(left); expr_free(lommel_derivative); expr_free(lommel);
@@ -158,7 +158,7 @@ static expr_t *bessel_zero_primitive(const expr_t *z, expr_t *(*builder)(const e
 {
     expr_t *zero = expr_const_zero(), *one = expr_const_one(), *minus_one = expr_const_long(-1);
     expr_t *c0 = builder(zero, z), *c1 = builder(one, z);
-    expr_t *h0 = expr_struve_h(zero, z), *hm1 = expr_struve_h(minus_one, z);
+    expr_t *h0 = expr_struve_H(zero, z), *hm1 = expr_struve_H(minus_one, z);
     expr_t *left = expr_mul(c0, hm1), *right = expr_mul(c1, h0), *sum = expr_add(left, right);
     expr_t *pi = expr_new_named_const(NUM_PI, "@pi"), *pi_z = expr_mul(pi, z);
     expr_t *scale = expr_div_num(pi_z, &NUM_TWO), *result = expr_mul(scale, sum);
@@ -241,17 +241,17 @@ static expr_t *integrate_bessel_kind_rule(const expr_t *expr, const expr_t *wrt,
     return simplify_owned(result);
 }
 
-expr_t *integrate_bessel_j_rule(const expr_t *expr, const expr_t *wrt)
+expr_t *integrate_bessel_J_rule(const expr_t *expr, const expr_t *wrt)
 {
-    return integrate_bessel_kind_rule(expr, wrt, &ops_bessel_j, expr_bessel_j);
+    return integrate_bessel_kind_rule(expr, wrt, &ops_bessel_J, expr_bessel_J);
 }
 
-expr_t *integrate_bessel_y_rule(const expr_t *expr, const expr_t *wrt)
+expr_t *integrate_bessel_Y_rule(const expr_t *expr, const expr_t *wrt)
 {
-    return integrate_bessel_kind_rule(expr, wrt, &ops_bessel_y, expr_bessel_y);
+    return integrate_bessel_kind_rule(expr, wrt, &ops_bessel_Y, expr_bessel_Y);
 }
 
-expr_t *integrate_lommel_s_rule(const expr_t *expr, const expr_t *wrt)
+expr_t *integrate_lommel_S_rule(const expr_t *expr, const expr_t *wrt)
 {
     NUM_SCOPE(scope);
     const expr_t *mu_expr_source = NULL;
@@ -293,7 +293,7 @@ expr_t *integrate_lommel_s_rule(const expr_t *expr, const expr_t *wrt)
     number_t three = num_create_from_long(3);
     number_t four = num_create_from_long(4);
 
-    if (!expr || !wrt || !expr_lommel_s_unpack(expr, &mu_expr_source, &nu_expr_source, &argument) ||
+    if (!expr || !wrt || !expr_lommel_S_unpack(expr, &mu_expr_source, &nu_expr_source, &argument) ||
         !expr_match_const_value(mu_expr_source, &mu) || !expr_match_const_value(nu_expr_source, &nu) ||
         !num_is_exact(mu) || !num_is_real(mu) || !num_is_exact(nu) || !num_is_real(nu) ||
         !match_numeric_wrt_monomial_primitives(argument, wrt, &coefficient, &power) ||

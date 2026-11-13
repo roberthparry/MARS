@@ -11,6 +11,7 @@
  */
 #include <errno.h>
 #include <signal.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/wait.h>
@@ -20,18 +21,28 @@
 /* Create one persistent descendant and expose its PID to the owning test. */
 int main(int argc, char **argv)
 {
-    if (argc > 1 && !strcmp(argv[1], "--suite")) {
+    if (argc > 1 && (!strcmp(argv[1], "--suite") || !strcmp(argv[1], "--suite-unknown"))) {
+        bool discovery = !strcmp(argv[1], "--suite-unknown");
+        unsigned total = argc > 2 ? 5 : 4;
+        if (discovery) puts("PLAN: discovery");
+        else printf("PLAN: %u tests\n", total);
+        fputs("RUN: first\n", stdout);
         fputs("\033[32mPA", stdout);
         fflush(stdout);
-        struct timespec pause = {.tv_nsec = 300000000};
+        struct timespec pause = {.tv_nsec = discovery ? 10000000 : 300000000};
         while (nanosleep(&pause, &pause) && errno == EINTR) {}
         fputs("SS: first\033[0m\n", stdout);
+        if (!discovery) printf("PROGRESS: 1/%u\n", total);
         for (unsigned i = 0; i < 70000; ++i)
             putchar('x');
         fputs("\nPASS: second\n", stdout);
+        fputs("OUTPUT: readme_example\n", stdout);
         fputs("fixture diagnostic\n", stderr);
         if (argc > 2)
             fputs("\033[31mFAIL: third\033[0m\n", stdout);
+        fputs("unterminated diagnostic: PASS: fourth\n", stdout);
+        printf("PROGRESS: %u/%u\n", total, total);
+        printf("COUNTS: 4 passed, %u failed\n", argc > 2 ? 1 : 0);
         return argc > 2 ? 7 : 0;
     }
     int ready[2];

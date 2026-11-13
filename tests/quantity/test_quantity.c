@@ -10,6 +10,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "string-t.h"
 #include "quantity-t.h"
 #include "test_harness.h"
 

@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "string-t.h"
 #include "expression-t.h"
 #include "matrix-t.h"
 #include "test_harness.h"

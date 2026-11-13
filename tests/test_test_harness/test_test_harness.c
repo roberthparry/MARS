@@ -1,6 +1,6 @@
 /**
- * @file test_test_config.c
- * @brief Regression tests for the test configuration system.
+ * @file test_test_harness.c
+ * @brief Regression entry point for harness execution, configuration and database facilities.
  *
  * Checks configuration inheritance, group behaviour and JSON escaping. These tests validate the harness's
  * selection machinery rather than a public MARS module.
@@ -10,20 +10,25 @@
  */
 
 #include <stdbool.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 
-#define MARS_TEST_CONFIG_INTERNAL_ACCESS
-#include "test_config/test_config_internal.h"
-#include "test_harness.h"
 #include "string-t.h"
+#include "test_harness.h"
+#include "test_config.h"
+#include "test_database.h"
+#define MARS_SHARED_TEST_CONFIG_INTERNAL_ACCESS
+#include "internal/test_config_internal.h"
+#define MARS_TEST_TEST_HARNESS_INTERNAL_ACCESS
+#include "test_test_harness.h"
 
 TEST_SUITE_CONFIG(TEST_CONFIG_LOCAL);
 
 static int int_validity_equal(const void *got, const void *want, void *ctx);
-static int int_validity_format(const void *value, string_t *out, void *ctx);
+static int int_validity_format(const void *value, test_text_t *out, void *ctx);
 static bool test_fixture_setup_impl(void);
 static bool test_fixture_teardown_impl(void);
 
@@ -70,7 +75,7 @@ static void test_json_string_escapes_are_written(void);
 
 static const char *test_local_config_path(void)
 {
-    return "tests/test_test_config/test_test_config.json";
+    return "tests/test_test_harness/test_test_harness.json";
 }
 
 static void test_tool_suite_paths_remain_distinct(void)
@@ -175,10 +180,10 @@ static int int_validity_equal(const void *got, const void *want, void *ctx)
     return *(const int *)got == *(const int *)want;
 }
 
-static int int_validity_format(const void *value, string_t *out, void *ctx)
+static int int_validity_format(const void *value, test_text_t *out, void *ctx)
 {
     (void)ctx;
-    return string_append_format(out, "%d", *(const int *)value);
+    return test_text_append_format(out, "%d", *(const int *)value);
 }
 
 static bool test_fixture_setup_impl(void)
@@ -471,6 +476,41 @@ static void test_parent_group(void)
     TEST_RUN_SUBTEST(test_subtest_grouping, NULL);
 }
 
+static bool test_plan_override(const string_t *source, const string_t *path, bool enabled)
+{
+    (void)source;
+    (void)path;
+    return !enabled;
+}
+
+static void test_config_progress_row(const void *data)
+{
+    const test_database_case_t *row = data;
+    json_t *input = json_from_text(row->input);
+    string_t *configuration_key = string_new_with("configuration"), *source_key = string_new_with("source");
+    const json_t *configuration = input && configuration_key ? json_object_get(input, configuration_key) : NULL;
+    const json_t *file = input && source_key ? json_object_get(input, source_key) : NULL;
+    const string_t *text = file ? json_string_value(file) : NULL;
+    string_t *source = text ? string_clone(text) : NULL;
+    bool local = !strcmp(string_c_str(row->operation), "local");
+    bool override = !strcmp(string_c_str(row->operation), "override");
+    size_t count = SIZE_MAX;
+    bool known = source && test_config_count_enabled(configuration, source,
+        local ? TEST_CONFIG_LOCAL : TEST_CONFIG_GLOBAL, override ? test_plan_override : NULL, &count);
+    bool unavailable = !strcmp(string_c_str(row->expected), "unknown");
+    string_t *actual = known ? string_sprintf("%zu", count) : string_new_with("unknown");
+    bool ok = actual && !string_compare(actual, row->expected) && (known || (unavailable && count == 0));
+    string_free(actual); string_free(source); json_free(input);
+    string_free(source_key); string_free(configuration_key);
+    TEST_ASSERT_TRUE(ok, "module plans count enabled leaves, exclude groups and preserve unknown totals");
+}
+
+static void test_config_progress_plans(void)
+{
+    test_run_database_cases(__FILE__, __LINE__, "test_test_config", "test_config_progress_plans",
+                            test_config_progress_row);
+}
+
 /* ------------------------------------------------------------------------- */
 /* Main                                                                      */
 /* ------------------------------------------------------------------------- */
@@ -483,6 +523,7 @@ int tests_main(void)
     TEST_SECTION("Configuration");
 
     TEST_RUN_CASE(test_tool_suite_paths_remain_distinct, "config,paths");
+    TEST_RUN_CASE(test_config_progress_plans, "config,progress,database-cases");
     TEST_RUN_CASE(test_top_level_default_true, "config,defaults");
     TEST_RUN_IN_GROUP(test_subtest_default_true, test_top_level_default_true, "config,defaults,group");
     TEST_RUN_CASE(test_repeat_lookup_same_value, "config,regeneration");
@@ -505,5 +546,6 @@ int tests_main(void)
     TEST_RUN_CASE(test_builtin_string_validity_contract_success, "config,validation");
     TEST_RUN_CASE(test_explicit_skip_example, "config,skip");
     TEST_RUN_CASE(test_prunes_stale_keys_and_old_nesting, "config,regeneration");
+    test_harness_database_cases();
     return TEST_EXIT_CODE();
 }

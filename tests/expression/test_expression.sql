@@ -6,6 +6,34 @@ CREATE TABLE IF NOT EXISTS expression_cases (
 ) WITHOUT ROWID;
 CREATE INDEX IF NOT EXISTS expression_cases_operation ON expression_cases(operation, name);
 
+-- Mathematical letter case is significant in the canonical special-function names.
+INSERT INTO expression_cases(name, operation, input, expected) VALUES
+    ('named_appell_F1_direct', 'numeric_callable', 'appell_F1(1,1,1,2,0,0)', '1'),
+    ('named_bessel_I_direct', 'numeric_callable', 'bessel_I(0,0)', '1'),
+    ('named_bessel_J_direct', 'numeric_callable', 'bessel_J(0,0)', '1'),
+    ('named_bessel_K_direct', 'numeric_callable', 'bessel_K(0,1)', 'besselk(0,1)'),
+    ('named_bessel_Y_direct', 'numeric_callable', 'bessel_Y(0,1)', 'bessely(0,1)'),
+    ('named_lambert_W0_direct', 'numeric_callable', 'lambert_W0(0)', '0'),
+    ('named_lambert_Wm1_direct', 'numeric_callable', 'lambert_Wm1(-0.2)', 'lambertwm1(-0.2)'),
+    ('named_lambert_Wn_direct', 'numeric_callable', 'lambert_Wn(0,0.7)', 'lambertwn(0,0.7)'),
+    ('named_lauricella_F_direct', 'numeric_callable', 'lauricella_F(1,1,1,2,0)', '1'),
+    ('named_struve_H_direct', 'numeric_callable', 'struve_H(0,0)', '0'),
+    ('named_struve_L_direct', 'numeric_callable', 'struve_L(0,0)', '0'),
+    ('named_lommel_S_direct', 'numeric_callable', 'lommel_S(1,0,1)', 'lommels(1,0,1)'),
+    ('named_appell_F1_binding', 'numeric_callable', '{x|x=appell_F1(1,1,1,2,0,0)}', '1'),
+    ('named_bessel_I_binding', 'numeric_callable', '{x|x=bessel_I(0,0)}', '1'),
+    ('named_bessel_J_binding', 'numeric_callable', '{x|x=bessel_J(0,0)}', '1'),
+    ('named_bessel_K_binding', 'numeric_callable', '{x|x=bessel_K(0,1)}', 'besselk(0,1)'),
+    ('named_bessel_Y_binding', 'numeric_callable', '{x|x=bessel_Y(0,1)}', 'bessely(0,1)'),
+    ('named_lambert_W0_binding', 'numeric_callable', '{x|x=lambert_W0(0)}', '0'),
+    ('named_lambert_Wm1_binding', 'numeric_callable', '{x|x=lambert_Wm1(-0.2)}', 'lambertwm1(-0.2)'),
+    ('named_lambert_Wn_binding', 'numeric_callable', '{x|x=lambert_Wn(0,0.7)}', 'lambertwn(0,0.7)'),
+    ('named_lauricella_F_binding', 'numeric_callable', '{x|x=lauricella_F(1,1,1,2,0)}', '1'),
+    ('named_struve_H_binding', 'numeric_callable', '{x|x=struve_H(0,0)}', '0'),
+    ('named_struve_L_binding', 'numeric_callable', '{x|x=struve_L(0,0)}', '0'),
+    ('named_lommel_S_binding', 'numeric_callable', '{x|x=lommel_S(1,0,1)}', 'lommels(1,0,1)')
+ON CONFLICT(name) DO UPDATE SET input=excluded.input, expected=excluded.expected;
+
 -- Canonical polynomial names work in expressions and in binding values, with the same real/complex conventions.
 INSERT OR IGNORE INTO expression_cases(name, operation, input, expected) VALUES
     ('poly_chebyshev_Tn_direct', 'numeric_callable', 'chebyshev_Tn(3,2)', '26'),
@@ -225,13 +253,13 @@ INSERT OR IGNORE INTO expression_cases(name, operation, input, expected) VALUES 
 INSERT OR IGNORE INTO expression_cases(name, operation, input, expected) VALUES ('case_dcec89f7b82b6bfd', 'test_to_string_function_uses_lowercase_builtin_names_cases', '{ BesselY(n, x) }', 'return bessely(');
 INSERT OR IGNORE INTO expression_cases(name, operation, input, expected) VALUES ('case_597a802907b56437', 'test_to_string_function_uses_lowercase_builtin_names_cases', '{ BesselK(n, x) }', 'return besselk(');
 INSERT OR IGNORE INTO expression_cases(name, operation, input, expected) VALUES ('case_68c2a39d23dce7cd', 'test_to_string_function_uses_lowercase_builtin_names_cases', '{ BesselI(n, x) }', 'return besseli(');
-INSERT OR IGNORE INTO expression_cases(name, operation, input, expected) VALUES ('case_63be85e777c932ce', 'test_to_string_function_uses_lowercase_builtin_names_cases', '{ bessel_i(n, x) }', 'return besseli(');
+INSERT INTO expression_cases(name, operation, input, expected) VALUES ('case_63be85e777c932ce', 'test_to_string_function_uses_lowercase_builtin_names_cases', '{ bessel_I(n, x) }', 'return besseli(') ON CONFLICT(name) DO UPDATE SET input=excluded.input, expected=excluded.expected;
 INSERT OR IGNORE INTO expression_cases(name, operation, input, expected) VALUES ('case_fb16fa830d81068d', 'test_to_string_function_uses_lowercase_builtin_names_cases', '{ besseli(n, x) }', 'return besseli(');
 INSERT OR IGNORE INTO expression_cases(name, operation, input, expected) VALUES ('case_dc094e68f032d2a5', 'test_to_string_function_uses_lowercase_builtin_names_cases', '{ StruveH(n, x) }', 'return struveh(');
-INSERT OR IGNORE INTO expression_cases(name, operation, input, expected) VALUES ('case_8f7d671c94fb4584', 'test_to_string_function_uses_lowercase_builtin_names_cases', '{ struve_h(n, x) }', 'return struveh(');
+INSERT INTO expression_cases(name, operation, input, expected) VALUES ('case_8f7d671c94fb4584', 'test_to_string_function_uses_lowercase_builtin_names_cases', '{ struve_H(n, x) }', 'return struveh(') ON CONFLICT(name) DO UPDATE SET input=excluded.input, expected=excluded.expected;
 INSERT OR IGNORE INTO expression_cases(name, operation, input, expected) VALUES ('case_6c862ab491091a65', 'test_to_string_function_uses_lowercase_builtin_names_cases', '{ struveh(n, x) }', 'return struveh(');
 INSERT OR IGNORE INTO expression_cases(name, operation, input, expected) VALUES ('case_be86657e82588c59', 'test_to_string_function_uses_lowercase_builtin_names_cases', '{ StruveL(n, x) }', 'return struvel(');
-INSERT OR IGNORE INTO expression_cases(name, operation, input, expected) VALUES ('case_7bb6f7b390a07568', 'test_to_string_function_uses_lowercase_builtin_names_cases', '{ struve_l(n, x) }', 'return struvel(');
+INSERT INTO expression_cases(name, operation, input, expected) VALUES ('case_7bb6f7b390a07568', 'test_to_string_function_uses_lowercase_builtin_names_cases', '{ struve_L(n, x) }', 'return struvel(') ON CONFLICT(name) DO UPDATE SET input=excluded.input, expected=excluded.expected;
 INSERT OR IGNORE INTO expression_cases(name, operation, input, expected) VALUES ('case_49af4a2058eb6519', 'test_to_string_function_uses_lowercase_builtin_names_cases', '{ struvel(n, x) }', 'return struvel(');
 INSERT OR IGNORE INTO expression_cases(name, operation, input, expected) VALUES ('case_be3027136363ae4a', 'test_to_string_function_uses_lowercase_builtin_names_cases', '{ harmonic_poly(n, x) }', 'return harmonicpoly(');
 INSERT OR IGNORE INTO expression_cases(name, operation, input, expected) VALUES ('case_5da5ce73765ed956', 'test_to_string_function_uses_lowercase_builtin_names_cases', '{ legendre_chi(s, x) }', 'return legendrechi(');
@@ -244,8 +272,8 @@ INSERT OR IGNORE INTO expression_cases(name, operation, input, expected) VALUES 
 INSERT OR IGNORE INTO expression_cases(name, operation, input, expected) VALUES ('case_da4989c5c3123c7f', 'test_to_string_function_uses_lowercase_builtin_names_cases', '{ W0(x) }', 'return w0(');
 INSERT OR IGNORE INTO expression_cases(name, operation, input, expected) VALUES ('case_736acd8aa9275507', 'test_to_string_function_uses_lowercase_builtin_names_cases', '{ W-1(x) }', 'return wm1(');
 INSERT OR IGNORE INTO expression_cases(name, operation, input, expected) VALUES ('case_f33d0d5e5bb9fc81', 'test_to_string_function_uses_lowercase_builtin_names_cases', '{ Wn(n, x) }', 'return wn(');
-INSERT OR IGNORE INTO expression_cases(name, operation, input, expected) VALUES ('case_9ca4f291410444e8', 'test_to_string_function_uses_lowercase_builtin_names_cases', '{ appell_f1(a, b1, b2, c, x, y) }', 'return appellf1(');
-INSERT OR IGNORE INTO expression_cases(name, operation, input, expected) VALUES ('case_1d01b335bc0d20d5', 'test_to_string_function_uses_lowercase_builtin_names_cases', '{ lauricella_f(2, a, b1, b2, c, x, y) }', 'return lauricellaf(');
+INSERT INTO expression_cases(name, operation, input, expected) VALUES ('case_9ca4f291410444e8', 'test_to_string_function_uses_lowercase_builtin_names_cases', '{ appell_F1(a, b1, b2, c, x, y) }', 'return appellf1(') ON CONFLICT(name) DO UPDATE SET input=excluded.input, expected=excluded.expected;
+INSERT INTO expression_cases(name, operation, input, expected) VALUES ('case_1d01b335bc0d20d5', 'test_to_string_function_uses_lowercase_builtin_names_cases', '{ lauricella_F(2, a, b1, b2, c, x, y) }', 'return lauricellaf(') ON CONFLICT(name) DO UPDATE SET input=excluded.input, expected=excluded.expected;
 INSERT OR IGNORE INTO expression_cases(name, operation, input, expected) VALUES ('case_db2f3559f8284cc0', 'test_to_string_function_uses_lowercase_builtin_names_cases', '{ hypergeometric_pFq(1, 1, a, b, x) }', 'return hypergeometricpfq(');
 
 INSERT INTO test_case_runner(module, source, parent, table_name, operation) VALUES (
@@ -630,7 +658,7 @@ INSERT INTO test_case_runner(module, source, parent, table_name, operation) VALU
 ON CONFLICT(module) DO UPDATE SET table_name=excluded.table_name, operation=excluded.operation;
 INSERT OR IGNORE INTO expression_cases(name, operation, input, expected) VALUES ('W(x) infers x binding', 'test_from_string_special_functions_check_parse_expr_3', '{ W(x) }', '{ W(x) | x = ? }');
 INSERT OR IGNORE INTO expression_cases(name, operation, input, expected) VALUES ('W_0(x) infers x binding', 'test_from_string_special_functions_check_parse_expr_3', '{ W_0(x) }', '{ W₀(x) | x = ? }');
-INSERT OR IGNORE INTO expression_cases(name, operation, input, expected) VALUES ('lambert_wn parses branch-aware Lambert W', 'test_from_string_special_functions_check_parse_expr_3', '{ lambert_wn(2, x) | x = ? }', '{ Wₙ(2, x) | x = ? }');
+INSERT INTO expression_cases(name, operation, input, expected) VALUES ('lambert_wn parses branch-aware Lambert W', 'test_from_string_special_functions_check_parse_expr_3', '{ lambert_Wn(2, x) | x = ? }', '{ Wₙ(2, x) | x = ? }') ON CONFLICT(name) DO UPDATE SET input=excluded.input, expected=excluded.expected;
 INSERT OR IGNORE INTO expression_cases(name, operation, input, expected) VALUES ('Wn parses branch-aware Lambert W', 'test_from_string_special_functions_check_parse_expr_3', '{ Wn(2, x) | x = ? }', '{ Wₙ(2, x) | x = ? }');
 INSERT OR IGNORE INTO expression_cases(name, operation, input, expected) VALUES ('W_n parses branch-aware Lambert W', 'test_from_string_special_functions_check_parse_expr_3', '{ W_n(2, x) | x = ? }', '{ Wₙ(2, x) | x = ? }');
 INSERT OR IGNORE INTO expression_cases(name, operation, input, expected) VALUES ('Wₙ parses branch-aware Lambert W', 'test_from_string_special_functions_check_parse_expr_3', '{ Wₙ(2, x) | x = ? }', '{ Wₙ(2, x) | x = ? }');

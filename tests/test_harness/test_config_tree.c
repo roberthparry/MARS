@@ -11,6 +11,7 @@
 
 /* test_config_tree.c - hierarchical test configuration tree helpers */
 
+#include "string-t.h"
 #define MARS_TEST_CONFIG_INTERNAL_ACCESS
 #include "test_config_internal.h"
 

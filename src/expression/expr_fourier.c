@@ -331,7 +331,7 @@ static expr_t *formula(fourier_context_t *c, const expr_t *f, const expr_t *x, c
                 return NULL;
             expr_t *frequency = ft_div(c, w, rate);
             expr_t *phase = ft_exp(c, ft_mul(c, ft_mul(c, i, frequency), offset));
-            expr_t *bessel = expr_fourier_keep(c, expr_bessel_j(n, frequency));
+            expr_t *bessel = expr_fourier_keep(c, expr_bessel_J(n, frequency));
             expr_t *coefficient = ft_mul(c, pi, ft_pow_xp(c, ft_neg(c, i), n));
             return ft_div(c, ft_mul(c, coefficient, ft_mul(c, phase, bessel)), expr_fourier_abs(c, rate));
         }
@@ -363,7 +363,7 @@ static expr_t *formula(fourier_context_t *c, const expr_t *f, const expr_t *x, c
         }
     }
     /* DLMF 10.9.2: integer-order Bessel functions have a compactly supported spectrum. */
-    if (f->ops == &ops_bessel_j && !expr_fourier_uses(f->a, x)) {
+    if (f->ops == &ops_bessel_J && !expr_fourier_uses(f->a, x)) {
         expr_t *rate = NULL, *offset = NULL;
         if (!expr_fourier_affine(c, f->b, x, &rate, &offset) || expr_const_is_zero(rate) ||
             !expr_fourier_real_parameter(c, rate) || !expr_fourier_real_parameter(c, offset) ||

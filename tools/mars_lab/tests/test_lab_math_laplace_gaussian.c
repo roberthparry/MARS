@@ -188,7 +188,7 @@ static void test_laplace_gaussian_values(void)
         lab_math_contains(lab_math_text(lab_math_gaussian_fields(lab_math_format("@L(%s)", divergent[i]), "evaluate"),
                                         "value_note"), "No ordinary Laplace transform", true);
     lab_math_contains(lab_math_text(lab_math_gaussian_fields("@L(lgamma(t))", "evaluate"), "value_note"), "does not imply", true);
-    const char *derivatives[] = {"E1(t)", "bessel_j(1,t)", "floor(t)"};
+    const char *derivatives[] = {"E1(t)", "bessel_J(1,t)", "floor(t)"};
     const double expected[] = {0.5 - log(2), -1 / (2 * sqrt(2)), -1 / (exp(1) - 1) - exp(1) / pow(exp(1) - 1, 2)};
     for (size_t i = 0; i < 3; ++i)
         lab_math_places(lab_math_number(lab_math_gaussian_fields(lab_math_format("{@L(%s) | s=1}", derivatives[i]),
@@ -199,7 +199,7 @@ static void test_laplace_gaussian_readme(void)
 {
     /* README examples: docs/expression.md, Laplace function coverage. */
     const char *sources[] = {"{@L(exp(-t^2)) | s=0}", "{@L(normal_pdf(t)) | s=0}", "{@L(floor(t)) | s=1}",
-                             "{@L(sech(t)) | s=1}", "{@L(E1(t)) | s=1}", "{@L(bessel_j(1,t)) | s=1}",
+                             "{@L(sech(t)) | s=1}", "{@L(E1(t)) | s=1}", "{@L(bessel_J(1,t)) | s=1}",
                              "{@L(atanh(t)) | s=1}"};
     const double complex expected[] = {0.886226925452758, 0.5, 0.581976706869326, 0.693147180559945,
                                        0.693147180559945, 0.292893218813452, 0.646761122779130 + 0.577863674895461 * I};

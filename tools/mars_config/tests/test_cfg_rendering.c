@@ -3,7 +3,7 @@
  * @brief Independent SQL calendar rendering and field regressions for native configuration tests.
  *
  * Exercises locale rendering and the pure calendar_local projections independently.
- * Disposable encrypted databases load the real
+ * Disposable plaintext databases load the real
  * locale and view SQL through the native streaming importer, including bounded recursive SQL includes. Expected labels are
  * fixed references, including a pinned Babel/CLDR fixture; Gregorian arithmetic and
  * civil Hijri expectations are independent of the SQL view. Optional ICU C calls
@@ -148,11 +148,9 @@ static bool test_cfg_rendering_load_sql(sqlite_t *db, const char *path)
 static sqlite_t *test_cfg_rendering_database(const char *directory)
 {
     string_t *path = string_sprintf("%s/rendering.db", directory);
-    string_t *key = string_new_with("calendar-rendering-regression-only");
-    sqlite_t *db = path && key ? sqlite_open_encrypted(path, key) : NULL;
+    sqlite_t *db = path ? sqlite_open_plain(path) : NULL;
     string_free(path);
-    string_free(key);
-    bool ok = db && sqlite_exec_cstr(db, "PRAGMA cache_size=-512; PRAGMA temp.cache_size=-512;") &&
+    bool ok = db && sqlite_exec_cstr(db, "PRAGMA cache_size=-8192; PRAGMA temp.cache_size=-512;") &&
               test_cfg_rendering_load_sql(db, "packaging/jurisdiction-db/mars_calendar_locale_names.sql") &&
               test_cfg_rendering_load_sql(db, "packaging/jurisdiction-db/mars_calendar_local.sql") &&
               test_cfg_rendering_sql_ok(db, "INSERT INTO calendar_local_settings VALUES"

@@ -1133,7 +1133,7 @@ cleanup:
     return raw;
 }
 
-expr_t *integrate_inverse_quartic_appell_f1(const expr_t *expr, const expr_t *wrt)
+expr_t *integrate_inverse_quartic_appell_F1(const expr_t *expr, const expr_t *wrt)
 {
     number_t numerator = num_new();
     expr_t *raw = NULL;

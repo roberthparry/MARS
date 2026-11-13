@@ -2279,7 +2279,7 @@ qfloat_t qf_gammainv(qfloat_t y)
            x ~= log(y) / W(log(y)/e). This is much closer than log(y)
            on the increasing branch. */
         if (logy.hi > 1.0) {
-            qfloat_t w = qf_lambert_w0(qf_div(logy, QF_E));
+            qfloat_t w = qf_lambert_W0(qf_div(logy, QF_E));
             x = qf_div(logy, w);
         } else {
             /* Small y > 1 stays close to the minimum; keep a simple
@@ -2382,7 +2382,7 @@ static qfloat_t qf_lambert_halley(qfloat_t x, qfloat_t w0)
 
 /* Principal branch W0(x) */
 
-qfloat_t qf_lambert_w0(qfloat_t x)
+qfloat_t qf_lambert_W0(qfloat_t x)
 {
     qfloat_t zero = QF_ZERO;
     qfloat_t one = QF_ONE;
@@ -2442,7 +2442,7 @@ qfloat_t qf_lambert_w0(qfloat_t x)
 
 /* Lower branch W_{-1}(x) */
 
-qfloat_t qf_lambert_wm1(qfloat_t x)
+qfloat_t qf_lambert_Wm1(qfloat_t x)
 {
     qfloat_t zero = QF_ZERO;
     qfloat_t one = QF_ONE;
@@ -2666,7 +2666,7 @@ qfloat_t qf_normal_logpdf(qfloat_t x)
 qfloat_t qf_productlog(qfloat_t x)
 {
     /* principal branch */
-    return qf_lambert_w0(x);
+    return qf_lambert_W0(x);
 }
 
 /* Incomplete gamma: lower γ(s,x), upper Γ(s,x), and P/Q */
@@ -3272,7 +3272,7 @@ static int qf_lauricella_factor(qfloat_t parameter, qfloat_t variable, qfloat_t 
     return 0;
 }
 
-qfloat_t qf_lauricella_f(qfloat_t a, const qfloat_t *b, qfloat_t c, const qfloat_t *x, size_t variable_count)
+qfloat_t qf_lauricella_F(qfloat_t a, const qfloat_t *b, qfloat_t c, const qfloat_t *x, size_t variable_count)
 {
     qfloat_t *coefficients = NULL;
     qfloat_t sum = QF_ONE;
@@ -3348,12 +3348,12 @@ qfloat_t qf_lauricella_f(qfloat_t a, const qfloat_t *b, qfloat_t c, const qfloat
     return sum;
 }
 
-qfloat_t qf_appell_f1(qfloat_t a, qfloat_t b1, qfloat_t b2, qfloat_t c, qfloat_t x, qfloat_t y)
+qfloat_t qf_appell_F1(qfloat_t a, qfloat_t b1, qfloat_t b2, qfloat_t c, qfloat_t x, qfloat_t y)
 {
     const qfloat_t b[2] = {b1, b2};
     const qfloat_t variables[2] = {x, y};
 
-    return qf_lauricella_f(a, b, c, variables, 2u);
+    return qf_lauricella_F(a, b, c, variables, 2u);
 }
 
 qfloat_t qf_hypergeometric_pFq(const qfloat_t *upper, size_t upper_count, const qfloat_t *lower, size_t lower_count,
@@ -3435,7 +3435,7 @@ static int qf_bessel_series_converged(qfloat_t term, qfloat_t sum)
     return qf_le(qf_abs(term), scale);
 }
 
-static qfloat_t qf_bessel_j_series(qfloat_t order, qfloat_t argument)
+static qfloat_t qf_bessel_J_series(qfloat_t order, qfloat_t argument)
 {
     qfloat_t half_argument = qf_mul_double(argument, 0.5);
     qfloat_t square = qf_mul(half_argument, half_argument);
@@ -3464,7 +3464,7 @@ static qfloat_t qf_bessel_j_series(qfloat_t order, qfloat_t argument)
     return QF_NAN;
 }
 
-qfloat_t qf_bessel_j(qfloat_t order, qfloat_t argument)
+qfloat_t qf_bessel_J(qfloat_t order, qfloat_t argument)
 {
     int integer_order = 0;
     int sign = 1;
@@ -3497,7 +3497,7 @@ qfloat_t qf_bessel_j(qfloat_t order, qfloat_t argument)
         return QF_NAN;
     }
 
-    qfloat_t result = qf_bessel_j_series(order, argument);
+    qfloat_t result = qf_bessel_J_series(order, argument);
     return sign < 0 ? qf_neg(result) : result;
 }
 
@@ -3579,12 +3579,12 @@ static qfloat_t qf_lommel_series(qfloat_t mu, qfloat_t nu, qfloat_t argument, in
     return QF_NAN;
 }
 
-qfloat_t qf_lommel_s(qfloat_t mu, qfloat_t nu, qfloat_t argument)
+qfloat_t qf_lommel_S(qfloat_t mu, qfloat_t nu, qfloat_t argument)
 {
     return qf_lommel_series(mu, nu, argument, 0);
 }
 
-qfloat_t qf_lommel_s_derivative_internal(qfloat_t mu, qfloat_t nu, qfloat_t argument)
+qfloat_t qf_lommel_S_derivative_internal(qfloat_t mu, qfloat_t nu, qfloat_t argument)
 {
     return qf_lommel_series(mu, nu, argument, 1);
 }

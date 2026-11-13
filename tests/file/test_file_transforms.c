@@ -15,6 +15,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "string-t.h"
 #include "file-t.h"
 #include "array-t.h"
 #include "test_harness.h"

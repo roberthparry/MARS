@@ -1329,7 +1329,7 @@ qfloat_t qf_hermite_Hn(unsigned long degree, qfloat_t argument);
  * @param y Second variable.
  * @return F1(a; b1, b2; c; x, y), or NaN outside implemented coverage.
  */
-qfloat_t qf_appell_f1(qfloat_t a, qfloat_t b1, qfloat_t b2, qfloat_t c, qfloat_t x, qfloat_t y);
+qfloat_t qf_appell_F1(qfloat_t a, qfloat_t b1, qfloat_t b2, qfloat_t c, qfloat_t x, qfloat_t y);
 
 /**
  * @brief Compute the Lauricella hypergeometric function F_D in n variables.
@@ -1337,8 +1337,15 @@ qfloat_t qf_appell_f1(qfloat_t a, qfloat_t b1, qfloat_t b2, qfloat_t c, qfloat_t
  * The b and x arrays must each contain variable_count values.  The defining
  * multivariate series is used in the polydisc max |x_i| < 1.  Appell F1 is
  * the variable_count == 2 member of this family.
+ * @param[in] a Common upper parameter, passed by value.
+ * @param[in] b Borrowed array of variable_count upper parameters; valid during the call.
+ * @param[in] c Lower parameter, passed by value; denominator poles are unsupported.
+ * @param[in] x Borrowed array of variable_count real arguments in the supported convergence region.
+ * @param[in] variable_count Number of entries in each array.
+ * @return Fixed-precision value requiring no release, or QF_NAN for invalid parameters or non-convergence.
+ * Array storage is neither retained nor modified.
  */
-qfloat_t qf_lauricella_f(qfloat_t a, const qfloat_t *b, qfloat_t c, const qfloat_t *x, size_t variable_count);
+qfloat_t qf_lauricella_F(qfloat_t a, const qfloat_t *b, qfloat_t c, const qfloat_t *x, size_t variable_count);
 
 /**
  * @brief Compute the generalised hypergeometric function pFq.
@@ -1363,7 +1370,7 @@ qfloat_t qf_hypergeometric_pFq(const qfloat_t *upper, size_t upper_count, const 
 qfloat_t qf_legendre_chi(qfloat_t s, qfloat_t x);
 
 /** @brief Bessel function of the first kind J_order(argument), for real order. */
-qfloat_t qf_bessel_j(qfloat_t order, qfloat_t argument);
+qfloat_t qf_bessel_J(qfloat_t order, qfloat_t argument);
 
 /**
  * @brief Evaluate the real modified Bessel function I_order(argument), including I_0.
@@ -1372,10 +1379,15 @@ qfloat_t qf_bessel_j(qfloat_t order, qfloat_t argument);
  * at most 1000 are supported. Undefined zero limits and exhausted numerical guards return NaN.
  * See docs/qfloat.md for precision and range limits.
  */
-qfloat_t qf_bessel_i(qfloat_t order, qfloat_t argument);
+qfloat_t qf_bessel_I(qfloat_t order, qfloat_t argument);
 
-/** @brief Modified Bessel K for real order and positive argument; unsupported ranges return NaN. */
-qfloat_t qf_bessel_k(qfloat_t order, qfloat_t argument);
+/**
+ * @brief Evaluate modified Bessel K for real order and positive argument.
+ * @param[in] order Real cylinder order, passed by value.
+ * @param[in] argument Positive real argument, passed by value.
+ * @return Fixed-precision value requiring no release, or QF_NAN outside supported ranges or on non-convergence.
+ */
+qfloat_t qf_bessel_K(qfloat_t order, qfloat_t argument);
 
 /**
  * @brief Evaluate the real modified Struve function L_order(argument).
@@ -1384,7 +1396,7 @@ qfloat_t qf_bessel_k(qfloat_t order, qfloat_t argument);
  * singular zero limits, non-real results and exhausted numerical guards return NaN. Negative half-integer
  * orders include their vanishing reciprocal-gamma coefficients. See docs/qfloat.md for numerical limits.
  */
-qfloat_t qf_struve_l(qfloat_t order, qfloat_t argument);
+qfloat_t qf_struve_L(qfloat_t order, qfloat_t argument);
 
 /**
  * @brief Evaluate the real ordinary Struve function H_order(argument).
@@ -1393,7 +1405,7 @@ qfloat_t qf_struve_l(qfloat_t order, qfloat_t argument);
  * reciprocal-gamma coefficients. Input magnitudes above 1000, undefined zero limits and exhausted
  * numerical guards return NaN. See docs/qfloat.md for precision and range limits.
  */
-qfloat_t qf_struve_h(qfloat_t order, qfloat_t argument);
+qfloat_t qf_struve_H(qfloat_t order, qfloat_t argument);
 
 /**
  * @brief Evaluate Bessel Y_order(argument) for real order and non-negative argument, including Y_0.
@@ -1402,7 +1414,7 @@ qfloat_t qf_struve_h(qfloat_t order, qfloat_t argument);
  * origin. Other zero limits, negative arguments, non-finite inputs and exhausted guards return NaN.
  * See docs/qfloat.md for numerical range limits.
  */
-qfloat_t qf_bessel_y(qfloat_t order, qfloat_t argument);
+qfloat_t qf_bessel_Y(qfloat_t order, qfloat_t argument);
 
 /**
  * @brief Lower-case Lommel function s_(mu,nu)(argument), for real parameters.
@@ -1410,7 +1422,7 @@ qfloat_t qf_bessel_y(qfloat_t order, qfloat_t argument);
  * This evaluates the convergent defining series. Singular parameter pairs and
  * real-domain violations return NaN.
  */
-qfloat_t qf_lommel_s(qfloat_t mu, qfloat_t nu, qfloat_t argument);
+qfloat_t qf_lommel_S(qfloat_t mu, qfloat_t nu, qfloat_t argument);
 
 /**
  * @brief Compute the main branch of the inverse of the gamma function.
@@ -1426,7 +1438,7 @@ qfloat_t qf_gammainv(qfloat_t y);
  * @param x Input value.
  * @return W0(x) (double-double precision).
  */
-qfloat_t qf_lambert_w0(qfloat_t x);
+qfloat_t qf_lambert_W0(qfloat_t x);
 
 /**
  * @brief Compute the -1 branch of the Lambert W function.
@@ -1434,7 +1446,7 @@ qfloat_t qf_lambert_w0(qfloat_t x);
  * @param x Input value.
  * @return W_{-1}(x) (double-double precision).
  */
-qfloat_t qf_lambert_wm1(qfloat_t x);
+qfloat_t qf_lambert_Wm1(qfloat_t x);
 
 /**
  * @brief Compute the beta function for two qfloat_t arguments.

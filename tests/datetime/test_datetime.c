@@ -25,7 +25,7 @@
 
 TEST_SUITE_CONFIG(TEST_CONFIG_GLOBAL);
 static int datetime_validity_equal(const void *got_input, const void *want_input, void *ctx);
-static int datetime_validity_format(const void *value, string_t *out, void *ctx);
+static int datetime_validity_format(const void *value, test_text_t *out, void *ctx);
 static bool test_datetime_suite_setup(void);
 
 static const test_validity_contract_t datetime_exact_contract =
@@ -52,7 +52,7 @@ static int datetime_validity_equal(const void *got_input, const void *want_input
            fabs(datetime_second(*got) - datetime_second(*want)) < 1e-4;
 }
 
-static int datetime_validity_format(const void *value, string_t *out, void *ctx)
+static int datetime_validity_format(const void *value, test_text_t *out, void *ctx)
 {
     const datetime_t *const *dt = (const datetime_t *const *)value;
 
@@ -60,7 +60,7 @@ static int datetime_validity_format(const void *value, string_t *out, void *ctx)
     if (!out)
         return -1;
 
-    return string_append_format(out, "%04d-%02d-%02d %02d:%02d:%09.6f", datetime_year(*dt), (int)datetime_month(*dt),
+    return test_text_append_format(out, "%04d-%02d-%02d %02d:%02d:%09.6f", datetime_year(*dt), (int)datetime_month(*dt),
                                 (int)datetime_day(*dt), datetime_hour(*dt), datetime_minute(*dt), datetime_second(*dt));
 }
 

@@ -12,6 +12,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "string-t.h"
 #include "diffequation-t.h"
 #define MARS_SHARED_EXPR_INTERNAL_ACCESS
 #include "internal/expr_internal.h"

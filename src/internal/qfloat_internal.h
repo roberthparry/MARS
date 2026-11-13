@@ -84,6 +84,6 @@ qfloat_t qf_clausen_reduce(qfloat_t theta);
  * @param argument Double-double function argument, passed by value.
  * @return Double-double numeric result, with no separate storage to release.
  */
-qfloat_t qf_lommel_s_derivative_internal(qfloat_t mu, qfloat_t nu, qfloat_t argument);
+qfloat_t qf_lommel_S_derivative_internal(qfloat_t mu, qfloat_t nu, qfloat_t argument);
 
 #endif

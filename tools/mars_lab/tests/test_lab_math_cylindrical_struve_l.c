@@ -13,17 +13,17 @@
 
 #include "test_lab_math_support.h"
 
-static const json_t *lab_math_struve_l_fields(const char *source)
+static const json_t *lab_math_struve_L_fields(const char *source)
 {
     return lab_math_fields(source, "x", "evaluate", 40);
 }
 
-static double complex lab_math_struve_l_value(const char *source)
+static double complex lab_math_struve_L_value(const char *source)
 {
-    return lab_math_number(lab_math_struve_l_fields(source), "value");
+    return lab_math_number(lab_math_struve_L_fields(source), "value");
 }
 
-static double complex lab_math_struve_l_reference(double order, double complex argument)
+static double complex lab_math_struve_L_reference(double order, double complex argument)
 {
     double complex total = 0;
     for (unsigned k = 0; k < 150; ++k) {
@@ -46,8 +46,8 @@ static void test_struve_l_real_orders_and_complex_arguments(void)
     const char *arguments[] = {"2/5", "2", "1+i/2"};
     for (size_t n = 0; n < 9; ++n)
         for (size_t z = 0; z < 3; ++z) {
-            double complex expected = lab_math_struve_l_reference(orders[n], points[z]);
-            lab_math_close(lab_math_struve_l_value(lab_math_format("struve_l(%g,%s)", orders[n], arguments[z])),
+            double complex expected = lab_math_struve_L_reference(orders[n], points[z]);
+            lab_math_close(lab_math_struve_L_value(lab_math_format("struve_L(%g,%s)", orders[n], arguments[z])),
                            expected, 3e-12 * (1 + cabs(expected)));
         }
 }
@@ -56,16 +56,16 @@ static void test_struve_l_integer_parity_and_origin(void)
 {
     const int orders[] = {0, 1, 2, -1, -2};
     for (size_t i = 0; i < 5; ++i) {
-        double complex positive = lab_math_struve_l_value(lab_math_format("struve_l(%d,1)", orders[i]));
-        double complex negative = lab_math_struve_l_value(lab_math_format("struve_l(%d,-1)", orders[i]));
+        double complex positive = lab_math_struve_L_value(lab_math_format("struve_L(%d,1)", orders[i]));
+        double complex negative = lab_math_struve_L_value(lab_math_format("struve_L(%d,-1)", orders[i]));
         lab_math_close(negative, (orders[i] % 2 ? 1 : -1) * positive, 2e-12);
     }
     const double origin_orders[] = {0, 1, 2, -0.5, -1.5, -2.5};
     for (size_t i = 0; i < 6; ++i) {
-        const char *source = lab_math_format("struve_l(%g,0)", origin_orders[i]);
-        lab_math_check(lab_math_struve_l_value(source) == 0, source);
+        const char *source = lab_math_format("struve_L(%g,0)", origin_orders[i]);
+        lab_math_check(lab_math_struve_L_value(source) == 0, source);
     }
-    lab_math_places(creal(lab_math_struve_l_value("struve_l(-1,0)")), 2 / acos(-1.0), 13);
+    lab_math_places(creal(lab_math_struve_L_value("struve_L(-1,0)")), 2 / acos(-1.0), 13);
 }
 
 static void test_struve_l_half_integer_closed_forms(void)
@@ -79,7 +79,7 @@ static void test_struve_l_half_integer_closed_forms(void)
             lab_math_format("%s*(cosh(%s)-1)", common, argument),
             lab_math_format("%s*(cosh(%s)-sinh(%s)/(%s))", common, argument, argument, argument)};
         for (size_t n = 0; n < 3; ++n) {
-            const char *source = lab_math_format("struve_l(%s,%s)-(%s)", orders[n], argument, formulas[n]);
+            const char *source = lab_math_format("struve_L(%s,%s)-(%s)", orders[n], argument, formulas[n]);
             lab_math_close(lab_math_number(lab_math_fields(source, "x", "evaluate", 80), "value"), 0, 1e-65);
         }
     }
@@ -98,7 +98,7 @@ static void test_struve_l_precision(void)
         mpfr_div_ui(term, term, (2u * k + 1) * (2u * k + 1), MPFR_RNDN);
         mpfr_add(total, total, term, MPFR_RNDN);
     }
-    const json_t *result = lab_math_fields("struve_l(0,1)", "x", "evaluate", 80);
+    const json_t *result = lab_math_fields("struve_L(0,1)", "x", "evaluate", 80);
     const char *text = lab_math_replace(lab_math_text(result, "value"), "−", "-");
     bool parsed = mpfr_set_str(actual, text, 10, MPFR_RNDN) == 0;
     mpfr_sub(error, actual, total, MPFR_RNDN);
@@ -111,17 +111,17 @@ static void test_struve_l_precision(void)
 
 static void test_struve_l_aliases_and_rendering(void)
 {
-    const char *aliases[] = {"struve_l", "struvel", "StruveL", "𝐋"};
+    const char *aliases[] = {"struve_L", "struvel", "StruveL", "𝐋"};
     const char *zero_aliases[] = {"L0", "L_0", "L₀", "𝐋₀"};
-    const char *sources[] = {"L_n(x)", "L_{n}(x)", "𝐋_n(x)", "struve_l(n,x)"};
+    const char *sources[] = {"L_n(x)", "L_{n}(x)", "𝐋_n(x)", "struve_L(n,x)"};
     for (size_t i = 0; i < 4; ++i) {
-        lab_math_close(lab_math_struve_l_value(lab_math_format("%s(0,1)", aliases[i])), lab_math_struve_l_reference(0, 1), 2e-13);
-        lab_math_close(lab_math_struve_l_value(lab_math_format("%s(1)", zero_aliases[i])),
-                       lab_math_struve_l_reference(0, 1), 2e-13);
-        const json_t *result = lab_math_struve_l_fields(sources[i]);
+        lab_math_close(lab_math_struve_L_value(lab_math_format("%s(0,1)", aliases[i])), lab_math_struve_L_reference(0, 1), 2e-13);
+        lab_math_close(lab_math_struve_L_value(lab_math_format("%s(1)", zero_aliases[i])),
+                       lab_math_struve_L_reference(0, 1), 2e-13);
+        const json_t *result = lab_math_struve_L_fields(sources[i]);
         lab_math_contains(lab_math_text(result, "tex"), "\\mathbf{L}_{n}", true);
         lab_math_contains(lab_math_text(result, "function"), "struvel(n, x)", true);
-        lab_math_equal(lab_math_text(lab_math_struve_l_fields(lab_math_text(result, "expression")), "unbound"),
+        lab_math_equal(lab_math_text(lab_math_struve_L_fields(lab_math_text(result, "expression")), "unbound"),
                        lab_math_text(result, "unbound"));
     }
 }
@@ -130,60 +130,60 @@ static void test_struve_l_derivative_and_sum(void)
 {
     const double orders[] = {0, 1, 2, -1, -1.5};
     for (size_t i = 0; i < 5; ++i) {
-        double complex actual = lab_math_struve_l_value(lab_math_format("{Dx(struve_l(%g,2*x)) | x=1/2}", orders[i]));
+        double complex actual = lab_math_struve_L_value(lab_math_format("{Dx(struve_L(%g,2*x)) | x=1/2}", orders[i]));
         double h = 1e-5;
-        double complex expected = (lab_math_struve_l_reference(orders[i], 1 + h) -
-                                   lab_math_struve_l_reference(orders[i], 1 - h)) / h;
+        double complex expected = (lab_math_struve_L_reference(orders[i], 1 + h) -
+                                   lab_math_struve_L_reference(orders[i], 1 - h)) / h;
         lab_math_close(actual, expected, 2e-9);
     }
-    lab_math_places(creal(lab_math_struve_l_value("{Dx(L0(x)) | x=0}")), 2 / acos(-1.0), 12);
+    lab_math_places(creal(lab_math_struve_L_value("{Dx(L0(x)) | x=0}")), 2 / acos(-1.0), 12);
     double complex expected = 0;
     for (int n = 0; n < 4; ++n)
-        expected += lab_math_struve_l_reference(n, 1);
-    lab_math_close(lab_math_struve_l_value("sum(n,0,3,struve_l(n,1))"), expected, 2e-12);
+        expected += lab_math_struve_L_reference(n, 1);
+    lab_math_close(lab_math_struve_L_value("sum(n,0,3,struve_L(n,1))"), expected, 2e-12);
 }
 
 static void test_struve_l_affine_primitives_differentiate_back(void)
 {
     const double orders[] = {0, 1, 2, -0.5, -1.5};
     for (size_t i = 0; i < 5; ++i) {
-        const json_t *result = lab_math_fields(lab_math_format("struve_l(%g,2*x+1)", orders[i]), "x", "integral", 40);
+        const json_t *result = lab_math_fields(lab_math_format("struve_L(%g,2*x+1)", orders[i]), "x", "integral", 40);
         lab_math_contains(lab_math_text(result, "integral_function"), "return integral(struvel(", true);
         const char *primitive = lab_math_after(lab_math_text(result, "integral"), " = ");
         lab_math_contains(primitive, "∫", false);
         primitive = lab_math_replace(primitive, "x = ?", "x = 1");
         const json_t *derivative = lab_math_fields(primitive, "x", "derivative", 40);
-        lab_math_close(lab_math_number(derivative, "derivative_value"), lab_math_struve_l_reference(orders[i], 3), 2e-10);
+        lab_math_close(lab_math_number(derivative, "derivative_value"), lab_math_struve_L_reference(orders[i], 3), 2e-10);
     }
 }
 
 static void test_struve_l_laplace_notation_and_round_trip(void)
 {
-    const json_t *result = lab_math_struve_l_fields("@L{acosh(t)}");
+    const json_t *result = lab_math_struve_L_fields("@L{acosh(t)}");
     lab_math_contains(lab_math_text(result, "tex"), "\\mathbf{L}_{0}", true);
     lab_math_contains(lab_math_text(result, "tex"), "I_{0}", true);
     lab_math_contains(lab_math_text(result, "tex"), "F_{", false);
     lab_math_contains(lab_math_text(result, "function"), "struvel(0,", true);
-    const json_t *inverse = lab_math_struve_l_fields(lab_math_format("InverseLaplace(%s,s,t)", lab_math_algebra(result)));
+    const json_t *inverse = lab_math_struve_L_fields(lab_math_format("InverseLaplace(%s,s,t)", lab_math_algebra(result)));
     lab_math_contains(lab_math_text(inverse, "function"), "inverselaplace(", false);
     lab_math_contains(lab_math_text(inverse, "function"), "acosh(t)", true);
 }
 
 static void test_struve_l_general_hypergeometric_notation(void)
 {
-    const json_t *ordinary = lab_math_struve_l_fields("2*x*hypergeometricpfq(1,2,2,3,4,x)");
+    const json_t *ordinary = lab_math_struve_L_fields("2*x*hypergeometricpfq(1,2,2,3,4,x)");
     lab_math_contains(lab_math_text(ordinary, "tex"), "2\\mkern-2mu x\\mkern-2mu", true);
     lab_math_contains(lab_math_text(ordinary, "tex"), "F_{2}", true);
-    lab_math_contains(lab_math_text(lab_math_struve_l_fields("I0(x)"), "tex"), "I_{0}", true);
-    lab_math_contains(lab_math_text(lab_math_struve_l_fields("I0(x)"), "function"), "besseli(0, x)", true);
-    lab_math_contains(lab_math_text(lab_math_struve_l_fields("hypergeometricpfq(0,1,2,x^2/4)"), "tex"), "F_{1}", true);
+    lab_math_contains(lab_math_text(lab_math_struve_L_fields("I0(x)"), "tex"), "I_{0}", true);
+    lab_math_contains(lab_math_text(lab_math_struve_L_fields("I0(x)"), "function"), "besseli(0, x)", true);
+    lab_math_contains(lab_math_text(lab_math_struve_L_fields("hypergeometricpfq(0,1,2,x^2/4)"), "tex"), "F_{1}", true);
 }
 
 static void test_struve_l_readme(void)
 {
     /* README example: docs/expression.md, modified Struve function. */
-    lab_math_places(creal(lab_math_struve_l_value("struve_l(0,1)")), 0.710243185937891, 14);
-    lab_math_places(creal(lab_math_struve_l_value("{Dx(L0(x)) | x=0}")), 0.636619772367581, 14);
+    lab_math_places(creal(lab_math_struve_L_value("struve_L(0,1)")), 0.710243185937891, 14);
+    lab_math_places(creal(lab_math_struve_L_value("{Dx(L0(x)) | x=0}")), 0.636619772367581, 14);
 }
 
 /* Register all ordinary Struve L cases before README examples. */

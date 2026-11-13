@@ -36,41 +36,87 @@ static void test_checks_suite_progress(void)
     string_t *program = checks_path(root, "suite"), *log = checks_path(root, "suite.log");
     file_t *source = file_new_cstr(MARS_CHECKS_PROCESS_FIXTURE_PATH), *target = file_new(program), *report = file_new(log);
     bool ok = runner && source && target && report && file_copy(source, target, false) && file_chmod(target, 0700);
-    for (unsigned pass = 0; ok && pass < 2; ++pass) {
+    for (unsigned mode = 0; ok && mode < 4; ++mode) {
+        bool pass = mode >= 2, discovery = mode == 3, grouped = mode != 0;
+        unsigned index = mode == 2 ? 1 : mode == 3 ? 10 : 48;
         checks_strings_t *arguments = checks_strings_new();
         checks_strings_add(arguments, checks_text("env"));
         checks_strings_add(arguments, string_sprintf("MARS_ROOT=%s", string_c_str(root)));
         checks_strings_add(arguments, string_clone(runner));
         checks_strings_add(arguments, checks_text("test-suite"));
+        if (grouped) {
+            checks_strings_add(arguments, checks_text("--suite-progress"));
+            checks_strings_add(arguments, string_sprintf("%u", index));
+            checks_strings_add(arguments, checks_text("48"));
+            checks_strings_add(arguments, checks_text("--summary-width"));
+            checks_strings_add(arguments, checks_text("96"));
+        }
         checks_strings_add(arguments, string_clone(program));
-        checks_strings_add(arguments, checks_text("--suite"));
+        checks_strings_add(arguments, checks_text(discovery ? "--suite-unknown" : "--suite"));
         if (!pass)
             checks_strings_add(arguments, checks_text("fail"));
         string_t *output = NULL, *errors = NULL;
         int status = -1;
         bool ran = checks_process_run(arguments, root, 5, &output, &errors, &status);
         ok = ran && status == (pass ? 0 : 7) && output &&
-             string_find(output, pass ? "\033[32mPASS\033[0m" : "\033[31mFAIL\033[0m") >= 0 &&
-             string_find(output, pass ? "2 passed, 0 failed" : "2 passed, 1 failed") >= 0 &&
-             string_find(output, "⠋") >= 0 && string_find(output, "working 00:") >= 0;
+             string_find(output, pass ? "\033[1;32mPASS\033[0m" : "\033[1;31mFAIL\033[0m") >= 0 &&
+             string_find(output, pass ? "4 passed, 0 failed" : "4 passed, 1 failed") >= 0 &&
+             string_find(output, "⠋") >= 0 && string_find(output, "working 00:") >= 0 &&
+             string_find(output, pass ? "tests 4/4" : "tests 5/5") >= 0 &&
+             string_find(output, discovery ? "discovering tests" : pass ? "tests 0/4" : "tests 0/5") >= 0;
         if (!pass) {
             string_t *evidence = checks_read(log);
             ok = ok && evidence && string_find(evidence, "fixture diagnostic") >= 0 &&
-                 string_find(evidence, "FAIL: third") >= 0;
+                 string_find(evidence, "FAIL: third") >= 0 &&
+                 string_find(output, "\033[1;31mFAIL\033[0m: third") >= 0;
             string_free(evidence);
         } else {
             ok = !file_exists(report) && ok;
+        }
+        if (grouped) {
+            string_t *summary = string_sprintf("  [%2u/48]  %-96s ... \033[1;%sm%s\033[0m (", index,
+                                               string_c_str(program), pass ? "32" : "31", pass ? "PASS" : "FAIL");
+            string_t *completed = string_sprintf("%u/48 suites completed", index - 1);
+            ok = ok && summary && completed && string_find(output, string_c_str(summary)) >= 0 &&
+                 string_find(output, string_c_str(completed)) >= 0;
+            string_free(completed); string_free(summary);
         }
         if (!ok)
             fprintf(stderr, "Test suite runner: status=%d, output=%s, stderr=%s\n", status,
                     output ? string_c_str(output) : "missing", errors ? string_c_str(errors) : "missing");
         string_free(output); string_free(errors); checks_strings_free(arguments);
     }
+    checks_strings_t *invalid = checks_strings_new();
+    checks_strings_add(invalid, string_clone(runner));
+    checks_strings_add(invalid, checks_text("test-suite"));
+    checks_strings_add(invalid, checks_text("--suite-progress"));
+    checks_strings_add(invalid, checks_text("3"));
+    checks_strings_add(invalid, checks_text("2"));
+    checks_strings_add(invalid, string_clone(program));
+    string_t *output = NULL, *errors = NULL;
+    int status = -1;
+    ok = checks_process_run(invalid, root, 5, &output, &errors, &status) && status == 2 &&
+         errors && string_find(errors, "--suite-progress requires") >= 0 && !file_exists(report) && ok;
+    string_free(output); string_free(errors); checks_strings_free(invalid);
+    static const char *widths[] = {"0", "4097", "not-a-width"};
+    for (size_t i = 0; ok && i < sizeof widths / sizeof *widths; ++i) {
+        invalid = checks_strings_new();
+        checks_strings_add(invalid, string_clone(runner));
+        checks_strings_add(invalid, checks_text("test-suite"));
+        checks_strings_add(invalid, checks_text("--summary-width"));
+        checks_strings_add(invalid, checks_text(widths[i]));
+        checks_strings_add(invalid, string_clone(program));
+        output = NULL; errors = NULL; status = -1;
+        ok = checks_process_run(invalid, root, 5, &output, &errors, &status) && status == 2 && errors &&
+             string_find(errors, "--summary-width requires") >= 0 && !file_exists(report);
+        string_free(output); string_free(errors); checks_strings_free(invalid);
+    }
     file_free(report); file_free(target); file_free(source);
     string_free(log); string_free(program); string_free(runner);
     ok = test_checks_finish(root) && ok;
     TEST_ASSERT_TRUE(ok, "suite progress parses split escapes and a noisy final burst, colours outcomes, retains "
-                         "failure diagnostics and removes stale logs after success");
+                         "failure diagnostics, aligns suite numbers and outcomes, validates widths and counts, "
+                         "and removes stale logs after success");
 }
 
 static string_t *test_checks_inventory(void)

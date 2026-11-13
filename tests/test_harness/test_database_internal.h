@@ -2,7 +2,7 @@
  * @file test_database_internal.h
  * @brief Private raw-SQLite storage boundary for test management, profiles and reporting.
  *
- * Consumed only by tests/test_config/test_database*.c. Authorised fixtures use the narrower tests/internal
+ * Consumed only by the database support files in tests/test_harness. Authorised fixtures use the narrower tests/internal
  * boundary; ordinary test suites and repository commands use test_database.h.
  * This code deliberately never includes sqlite-t.h or calls the MARS sqlite module. A connection is owned by
  * its opaque test-storage object and must be closed before invoking any case under test.
@@ -18,6 +18,15 @@
 #include "test_database.h"
 #define MARS_SHARED_TEST_DATABASE_INTERNAL_ACCESS
 #include "internal/test_database_internal.h"
+
+/**
+ * @brief Relocate renamed regression source identities without losing selections or recorded timings.
+ * @param[in,out] database Caller-owned compatible storage, used sequentially.
+ * @return True when no relocation is needed or all updates succeed; false on storage/identity conflicts.
+ * @note Creates no files. Joins the caller's transaction or owns one transaction when none exists. Conflicts
+ * never discard either identity; the caller must roll back its transaction on failure. All input remains owned.
+ */
+bool test_database_relocate_sources(test_database_t *database);
 
 /** @brief Owned storage state, accessed only by the test-management implementation. */
 struct _test_database_t {
@@ -146,14 +155,6 @@ bool test_database_history_record(test_database_t *database, const test_database
  */
 bool test_database_history_assess(test_database_t *database, const test_database_result_t *result, bool memory_test,
                                   test_timing_assessment_t *assessment);
-
-/**
- * @brief Print suspected timing regressions after their report has committed.
- * @param[in,out] database Borrowed connection used only for reading the committed results.
- * @param[in] run_id Identifier of the completed report.
- * @return No value; diagnostic output never changes the completed test outcome or stored report.
- */
-void test_database_history_warn(test_database_t *database, sqlite3_int64 run_id);
 
 /**
  * @brief Upgrade old report columns and populate lifetime statistics exactly once.

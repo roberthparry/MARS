@@ -1613,7 +1613,7 @@ static expr_t *equ_self_power_lambert_family_root(const expr_t *rhs, const char 
 {
     expr_t *arg = equ_self_power_log_family_arg(rhs, branch_name);
     expr_t *k = expr_new_named_var(NUM_NAN, "k");
-    expr_t *lambert = (arg && k) ? expr_lambert_wn(k, arg) : NULL;
+    expr_t *lambert = (arg && k) ? expr_lambert_Wn(k, arg) : NULL;
     expr_t *root = lambert ? expr_exp(lambert) : NULL;
     expr_t *out = expr_simplify_owned(root);
 

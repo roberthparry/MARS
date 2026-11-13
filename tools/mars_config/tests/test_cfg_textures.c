@@ -2,7 +2,8 @@
  * @file test_cfg_textures.c
  * @brief Photographic database installation, indexed reads, corruption rejection and rollback tests.
  *
- * Uses the packaged PNGs and disposable plaintext/encrypted databases. Failed replacement fixtures never
+ * Uses compact PNG fixtures and disposable plaintext/encrypted databases. The README case alone loads the real
+ * packaged overview. Failed replacement fixtures never
  * modify source assets or installed databases. Captured progress verifies the full global and regional image
  * count. The documented metadata example runs after ordinary tests.
  */
@@ -40,6 +41,25 @@ static string_t *texture_fixture_root(void)
 {
     const char *root = test_cfg_texture_root();
     return root ? string_new_with(root) : NULL;
+}
+
+static bool texture_fixture_sources(void)
+{
+    const char *root = test_cfg_texture_root();
+    string_t *sources = root ? string_sprintf("%s/packaging/globe-db", root) : NULL;
+    bool ok = sources && !setenv("MARS_GLOBE_SOURCE_DIR", string_c_str(sources), 1);
+    string_free(sources);
+    return ok;
+}
+
+static size_t texture_source_size(const char *relative)
+{
+    file_t *file = texture_file(test_cfg_texture_root(), relative);
+    file_info_t *info = file ? file_get_info(file) : NULL;
+    size_t size = info ? file_info_size(info) : 0;
+    file_info_free(info);
+    file_free(file);
+    return size;
 }
 
 static sqlite_t *texture_database(const char *key, file_t **directory)
@@ -242,12 +262,14 @@ static void test_cfg_textures_install(void)
         globe_t *globe = globe_open_databases(db, db, NULL);
         globe_texture_info_t info;
         TEST_ASSERT_TRUE(globe_texture_metadata(globe, 0, 0, 0, &info) && info.width == 2048 && info.height == 1024 &&
-                         info.byte_count == 2623195, "overview dimensions and encoded length survive installation");
+                         info.byte_count == texture_source_size("earth_surface.png"),
+                         "overview dimensions and encoded length survive installation");
         array_t *png = globe_texture_png(globe, 0, 0, 0, &info);
         TEST_ASSERT_TRUE(png && array_size(png) == info.byte_count, "read unchanged, verified PNG bytes");
         array_destroy(png);
         TEST_ASSERT_TRUE(globe_texture_metadata(globe, 3, 0, 0, &info) && info.width == 1800 &&
-                         info.byte_count == 4216742, "regional reference photograph is installed");
+                         info.byte_count == texture_source_size("regional/00.png"),
+                         "regional image dimensions and encoded length survive installation");
         TEST_ASSERT_TRUE(globe_texture_metadata(globe, 3, 127, 0, &info) && info.width == 3600,
                          "a real installed PNG is addressed by a three-digit regional slot");
         unsigned found = 0;
@@ -327,12 +349,15 @@ static void test_cfg_textures_rollback(void)
 static bool texture_migration_fixture(const char *directory)
 {
     string_t *textures = string_sprintf("%s/packaging/globe-db/textures", test_cfg_texture_root());
-    bool configured = textures && !setenv("MARS_GLOBE_TEXTURE_DIR", string_c_str(textures), 1);
+    bool configured = textures && !setenv("MARS_GLOBE_TEXTURE_DIR", string_c_str(textures), 1) &&
+                      texture_fixture_sources();
     string_free(textures);
     file_t *fixture = NULL;
     sqlite_t *db = texture_database("", &fixture);
     string_t *root = string_new_with(MARS_CONFIG_ROOT_DIR), *staging = string_new_with(directory);
+    /* Match the installer's transaction boundary; individual fixture writes must not fsync every row. */
     bool ok = configured && db && root && staging && sqlite_exec_cstr(db,
+        "BEGIN;"
         "create table shoreline_dataset(id,format_version,point_count);insert into shoreline_dataset values(1,2,7);"
         "create table shoreline_blob(id,vertices);"
         "create table shoreline_chunk(id,level,codec,point_count,byte_offset,byte_count,boundary,blob_id);"
@@ -342,6 +367,9 @@ static bool texture_migration_fixture(const char *directory)
         cfg_database_textures_valid(db);
     sqlite_stmt_t *q = sqlite_stmt_prepare(db, "select source from rivers_dataset");
     ok = ok && q && sqlite_stmt_step(q) == SQLITE_STEP_ROW && !strcmp(sqlite_stmt_column_text(q, 0), "retained");
+    sqlite_stmt_finalize(q);
+    q = sqlite_stmt_prepare(db, "SELECT count(*) FROM rivers_bank WHERE length(rings)=48");
+    ok = ok && q && sqlite_stmt_step(q) == SQLITE_STEP_ROW && sqlite_stmt_column_int(q, 0) == 1;
     sqlite_stmt_finalize(q);
     ok = ok && cfg_database_revision(db, "globe", 9) &&
          sqlite_exec_cstr(db, "delete from globe_texture where level=3;drop table globe_texture_region") &&
@@ -387,7 +415,7 @@ static bool texture_migration_fixture(const char *directory)
     sqlite_stmt_finalize(q);
     string_t *installed_path = fixture ? string_sprintf("%s/textures.db", file_path(fixture)) : NULL;
     ok = ok && installed_path && !setenv("MARS_GLOBE_DB_PATH", string_c_str(installed_path), 1) &&
-         !setenv("MARS_GLOBE_DB_KEY", "", 1);
+         !setenv("MARS_GLOBE_DB_KEY", "", 1) && sqlite_exec_cstr(db, "COMMIT");
     sqlite_close(db);
     db = NULL;
     ok = ok && cfg_databases_update() == 0;
@@ -462,10 +490,10 @@ static bool texture_staged_fixture(const char *directory)
     string_t *staging = parent ? cfg_database_stage(parent) : NULL;
     file_t *installed = path ? file_new(path) : NULL;
     bool ok = db && root && installed && staging &&
-        !setenv("MARS_GLOBE_SOURCE_DIR", MARS_CONFIG_ROOT_DIR "/packaging/globe-db", 1) &&
+        texture_fixture_sources() &&
         cfg_database_textures(db, root) &&
         cfg_database_revision(db, "globe", 15) && sqlite_exec_cstr(db,
-            "PRAGMA application_id=1296126547; PRAGMA user_version=27;\n"
+            "BEGIN; PRAGMA application_id=1296126547; PRAGMA user_version=27;\n"
             "CREATE TABLE country_name(id INTEGER PRIMARY KEY,name TEXT,iso_country_code TEXT);\n"
             "CREATE TABLE country_chunk(id INTEGER PRIMARY KEY,country INTEGER);\n"
             "CREATE VIRTUAL TABLE country_bounds USING rtree_i32(id,west,east,south,north);\n"
@@ -492,7 +520,7 @@ static bool texture_staged_fixture(const char *directory)
             "CREATE VIEW retained_view AS SELECT label FROM retained;\n"
             "CREATE TABLE audit(value TEXT);INSERT INTO audit VALUES('original');\n"
             "CREATE TRIGGER retained_audit AFTER INSERT ON retained BEGIN\n"
-            "  INSERT INTO audit VALUES(new.label);END;");
+            "  INSERT INTO audit VALUES(new.label);END; COMMIT;");
     if (ok) ok = cfg_database_rebuild_globe(&db, path, root, staging, cfg_database_globe_refresh,
                                            CFG_GLOBE_DATA_REVISION, false) && !db;
     cfg_database_cleanup(staging); string_free(staging);
@@ -603,7 +631,7 @@ static bool texture_reimport_fixture(const char *directory)
     struct stat before = {0}, after = {0};
     bool ok = db && root && staging && installed && cfg_database_textures(db, root) &&
         cfg_database_revision(db, "globe", CFG_GLOBE_DATA_REVISION) && sqlite_exec_cstr(db,
-            "CREATE TABLE retained(value TEXT); INSERT INTO retained VALUES('original');\n"
+            "BEGIN; CREATE TABLE retained(value TEXT); INSERT INTO retained VALUES('original');\n"
             "CREATE TABLE retained_payload(id INTEGER PRIMARY KEY,bytes BLOB);\n"
             "INSERT INTO retained_payload VALUES(17,zeroblob(1048576));\n"
             "CREATE TABLE retained_parent(id INTEGER PRIMARY KEY); INSERT INTO retained_parent VALUES(17);\n"
@@ -614,7 +642,7 @@ static bool texture_reimport_fixture(const char *directory)
             "CREATE TRIGGER retained_audit AFTER INSERT ON retained BEGIN\n"
             "  INSERT INTO audit VALUES(new.value); END;\n"
             "UPDATE globe_texture SET png=zeroblob(byte_count) WHERE level=0;\n"
-            "INSERT INTO globe_texture VALUES(99,0,0,1,1,1,'obsolete',x'00');") &&
+            "INSERT INTO globe_texture VALUES(99,0,0,1,1,1,'obsolete',x'00'); COMMIT;") &&
         stat(file_path(installed), &before) == 0;
     sqlite_stmt_t *page = ok ? sqlite_stmt_prepare(db,
         "SELECT rootpage FROM main.sqlite_schema WHERE name='retained_payload'") : NULL;
@@ -679,13 +707,32 @@ static void test_cfg_textures_reimport(void)
         "full reimport replaces matching and obsolete images, retains payload pages and schema, and recovers interrupted work");
 }
 
+/* Keep the documentation's real image and exact byte count out of repeated migration/corruption fixtures. */
+static bool texture_documented_overview(sqlite_t *db)
+{
+    file_t *source = texture_file(MARS_CONFIG_ROOT_DIR, "earth_surface.png");
+    array_t *bytes = source ? file_read_all_bytes(source) : NULL;
+    string_t *digest = source ? file_sha256(source) : NULL;
+    sqlite_stmt_t *replace = db ? sqlite_stmt_prepare(db,
+        "UPDATE globe_texture SET byte_count=?1, sha256=?2, png=?3\n"
+        "WHERE level=0 AND column_index=0 AND row_index=0") : NULL;
+    bool ok = bytes && digest && replace && sqlite_stmt_bind_int64(replace, 1, array_size(bytes)) &&
+              sqlite_stmt_bind_text(replace, 2, string_c_str(digest)) &&
+              sqlite_stmt_bind_blob(replace, 3, array_get(bytes, 0), array_size(bytes)) &&
+              sqlite_stmt_step(replace) == SQLITE_STEP_DONE;
+    sqlite_stmt_finalize(replace);
+    string_free(digest); array_destroy(bytes); file_free(source);
+    return ok;
+}
+
 static void example_globe_texture_metadata(void)
 {
     /* README example: query one image and release its owned bytes after use. */
     file_t *fixture = NULL;
     sqlite_t *db = texture_database("", &fixture);
     string_t *root = texture_fixture_root();
-    TEST_ASSERT_TRUE(db && root && cfg_database_textures(db, root), "prepare documented image fixture");
+    TEST_ASSERT_TRUE(db && root && cfg_database_textures(db, root) && texture_documented_overview(db),
+                     "prepare documented image fixture");
     globe_t *globe = globe_open_databases(db, db, NULL);
     globe_texture_info_t info;
     TEST_ASSERT_TRUE(globe_texture_metadata(globe, 0, 0, 0, &info), "README texture metadata");

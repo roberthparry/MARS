@@ -2,10 +2,11 @@
  * @file test_cfg_texture_fixture.c
  * @brief Compact, valid PNG catalogue fixtures for transactional imagery tests.
  *
- * Keeps the real overview and original reference patch used by documented byte-count examples. Other images are
- * genuine single-colour PNGs at their declared dimensions, generated with bounded row buffers. A 128-region
- * catalogue exercises multi-digit addresses without copying the installed satellite collection. Fixtures stay
- * beneath caller-owned temporary directories and never change packaged images or configured databases.
+ * Images are genuine single-colour PNGs at their declared dimensions, generated with bounded row buffers.
+ * The documented metadata example separately loads the real overview. A 128-region
+ * catalogue exercises multi-digit addresses without copying the installed satellite collection. Photo-only
+ * migrations use miniature companion water and regional layers and links to immutable boundary sources.
+ * Fixtures stay beneath caller-owned temporary directories and never change packaged assets or configured databases.
  */
 #include <stdint.h>
 #include <stdio.h>
@@ -21,6 +22,55 @@
 #include "test_cfg_support.h"
 
 static file_t *fixture_root;
+
+static const char *geography_files[] = {
+    "map-units-5.1.1.shp.zst", "map-units-5.1.1.dbf.zst", "jurisdiction_subdivisions.sql",
+    "flag_regions.geojson", "mapped_water.sql"
+};
+
+/* Photo migrations need valid companion layers, not repeated imports of every surveyed water polygon. */
+static bool fixture_geography(const char *directory)
+{
+    bool ok = true;
+    for (size_t i = 0; ok && i < 3; ++i) {
+        string_t *source = string_sprintf("%s/packaging/globe-db/%s", MARS_CONFIG_ROOT_DIR, geography_files[i]);
+        string_t *target = string_sprintf("%s/packaging/globe-db/%s", directory, geography_files[i]);
+        file_t *from = file_new(source), *to = file_new(target);
+        /* A link shares the immutable source bytes, including when TMPDIR is on a different filesystem. */
+        ok = from && to && (file_create_hard_link(from, to) || file_create_symlink(from, to));
+        file_free(to); file_free(from); string_free(target); string_free(source);
+    }
+    static const char *bodies[] = {
+        "{\"type\":\"FeatureCollection\",\"features\":[{\"type\":\"Feature\","
+        "\"properties\":{\"code\":\"GB-ENG\"},\"geometry\":{\"type\":\"Polygon\","
+        "\"coordinates\":[[[0,0],[1,0],[1,1],[0,1],[0,0]]]}}]}",
+        "-- Synthetic, closed one-degree water polygon for photographic migration checks.\n"
+        "CREATE TABLE IF NOT EXISTS rivers_bank(\n"
+        "    id INTEGER PRIMARY KEY, source_id INTEGER, source_type INTEGER, rings BLOB NOT NULL\n"
+        ");\n"
+        "CREATE VIRTUAL TABLE IF NOT EXISTS rivers_bank_bounds USING rtree_i32(id,min_x,max_x,min_y,max_y);\n"
+        "CREATE TABLE IF NOT EXISTS rivers_width(\n"
+        "    feature_id INTEGER PRIMARY KEY, metres REAL NOT NULL CHECK(metres>0 AND metres<=100000)\n"
+        ");\n"
+        "CREATE TABLE IF NOT EXISTS rivers_water_source(\n"
+        "    layer TEXT PRIMARY KEY, source TEXT NOT NULL, sha256 TEXT NOT NULL, coverage TEXT NOT NULL\n"
+        ");\n"
+        "CREATE VIRTUAL TABLE IF NOT EXISTS rivers_water_coverage USING rtree_i32(id,min_x,max_x,min_y,max_y);\n"
+        "INSERT OR REPLACE INTO rivers_bank VALUES(1,1,1,\n"
+        "    x'00000001000000050000000000000000000f424000000000000f4240000f424000000000000f42400000000000000000');\n"
+        "INSERT OR REPLACE INTO rivers_bank_bounds VALUES(1,0,1000000,0,1000000);\n"
+        "INSERT OR REPLACE INTO rivers_width VALUES(1,4);\n"
+        "INSERT OR REPLACE INTO rivers_water_coverage VALUES(1,0,1000000,0,1000000);\n"
+    };
+    for (size_t i = 0; ok && i < 2; ++i) {
+        string_t *path = string_sprintf("%s/packaging/globe-db/%s", directory, geography_files[i + 3]);
+        file_t *file = file_new(path);
+        string_t *body = string_new_with(bodies[i]);
+        ok = file && body && file_write_all_text(file, body);
+        string_free(body); file_free(file); string_free(path);
+    }
+    return ok;
+}
 
 static const json_t *field(const json_t *object, const char *name)
 {
@@ -56,17 +106,15 @@ static bool chunk(array_t *output, const char *kind, const void *data, size_t si
 
 static json_t *pattern(const char *directory, unsigned width, unsigned height)
 {
-    size_t row_size = (size_t)width * 4 + 1;
+    size_t row_size = (size_t)width + 1;
     unsigned char *row = malloc(row_size), block[65536], header[13] = {0};
     array_t *compressed = array_create(1, NULL, NULL), *png = array_create(1, NULL, NULL);
     z_stream stream = {0};
-    bool initialised = deflateInit(&stream, 1) == Z_OK;
+    bool initialised = deflateInit(&stream, Z_BEST_COMPRESSION) == Z_OK;
     bool ok = row && compressed && png && initialised;
     if (row) {
         row[0] = 0;
-        for (unsigned x = 0; x < width; ++x) {
-            row[x * 4 + 1] = 35; row[x * 4 + 2] = 75; row[x * 4 + 3] = 53; row[x * 4 + 4] = 255;
-        }
+        memset(row + 1, 53, width);
     }
     for (unsigned y = 0; ok && y < height; ++y) {
         stream.next_in = row; stream.avail_in = (uInt)row_size;
@@ -80,7 +128,7 @@ static json_t *pattern(const char *directory, unsigned width, unsigned height)
     }
     if (initialised) deflateEnd(&stream);
     free(row);
-    u32(header, width); u32(header + 4, height); header[8] = 8; header[9] = 6;
+    u32(header, width); u32(header + 4, height); header[8] = 8; header[9] = 0;
     ok = ok && array_append_carray(png, "\211PNG\r\n\032\n", 8) && chunk(png, "IHDR", header, sizeof header) &&
          chunk(png, "IDAT", array_get(compressed, 0), array_size(compressed)) && chunk(png, "IEND", NULL, 0);
     string_t *path = string_sprintf("%s/pattern-%u.png", directory, width);
@@ -104,7 +152,7 @@ bool test_cfg_copy_textures(const char *directory)
     file_t *source_manifest = file_new(manifest_path);
     string_t *text = file_read_all_text(source_manifest);
     json_t *manifest = text ? json_from_text(text) : NULL, *assets = json_new_object(), *regions = json_new_array();
-    const json_t *original_regions = field(manifest, "regions"), *original_assets = field(manifest, "assets");
+    const json_t *original_regions = field(manifest, "regions");
     bool ok = manifest && assets && regions && json_array_size(original_regions) >= 44;
     static const char *folders[] = {"", "earth_tiles", "regional"};
     for (unsigned i = 0; ok && i < 3; ++i) {
@@ -116,22 +164,19 @@ bool test_cfg_copy_textures(const char *directory)
     json_t *small = ok ? pattern(string_c_str(base), 1800, 1800) : NULL;
     json_t *large = ok ? pattern(string_c_str(base), 3600, 3600) : NULL;
     json_t *detail = ok ? pattern(string_c_str(base), 8192, 4096) : NULL;
-    ok = ok && small && large && detail;
+    json_t *overview = ok ? pattern(string_c_str(base), 2048, 1024) : NULL;
+    ok = ok && small && large && detail && overview;
     for (unsigned i = 0; ok && i < 74 + 128; ++i) {
         unsigned slot = i >= 74 ? i - 74 : 0;
         string_t *relative = i < 72 ? string_sprintf("earth_tiles/%02u-%02u.png", i % 12, i / 12) :
             i >= 74 ? string_sprintf("regional/%02u.png", slot) :
             string_new_with(i == 72 ? "earth_surface.png" : "earth_surface_detail.png");
-        bool reference = i == 72 || i == 74;
-        const json_t *asset = reference ? json_object_get(original_assets, relative) :
-                             i == 73 ? detail : i < 72 ? small : large;
-        string_t *source = reference ? string_sprintf("%s/packaging/globe-db/textures/%s", MARS_CONFIG_ROOT_DIR,
-                                                      string_c_str(relative)) :
-            string_sprintf("%s/pattern-%u.png", string_c_str(base), i == 73 ? 8192 : i < 72 ? 1800 : 3600);
+        const json_t *asset = i == 72 ? overview : i == 73 ? detail : i < 72 || i == 74 ? small : large;
+        unsigned width = i == 72 ? 2048 : i == 73 ? 8192 : i < 72 || i == 74 ? 1800 : 3600;
+        string_t *source = string_sprintf("%s/pattern-%u.png", string_c_str(base), width);
         string_t *target = string_sprintf("%s/%s", string_c_str(base), string_c_str(relative));
         file_t *from = file_new(source), *to = file_new(target);
-        ok = asset && (reference ? file_copy(from, to, false) :
-             (file_create_hard_link(from, to) || file_copy(from, to, false))) &&
+        ok = asset && (file_create_hard_link(from, to) || file_copy(from, to, false)) &&
              json_object_set(assets, relative, asset);
         if (ok && i >= 74) {
             json_t *region = json_clone(json_array_get(original_regions, slot < 44 ? slot : 1));
@@ -161,7 +206,7 @@ bool test_cfg_copy_textures(const char *directory)
     ok = output && file_write_all_text(to, output);
     file_free(to); string_free(target); string_free(output); string_free(base); string_free(manifest_path);
     file_free(source_manifest); string_free(text); json_free(manifest); json_free(assets); json_free(regions);
-    json_free(small); json_free(large); json_free(detail);
+    json_free(small); json_free(large); json_free(detail); json_free(overview);
     return ok;
 }
 
@@ -169,15 +214,22 @@ static void fixture_cleanup(void)
 {
     if (!fixture_root) return;
     string_t *base = string_sprintf("%s/packaging/globe-db/textures", file_path(fixture_root));
-    for (unsigned i = 0; i < 74 + 128 + 4; ++i) {
+    for (unsigned i = 0; i < 74 + 128 + 5; ++i) {
         string_t *relative = i < 72 ? string_sprintf("earth_tiles/%02u-%02u.png", i % 12, i / 12) :
             i >= 74 && i < 202 ? string_sprintf("regional/%02u.png", i - 74) :
             i == 72 ? string_new_with("earth_surface.png") : i == 73 ? string_new_with("earth_surface_detail.png") :
-            i == 202 ? string_new_with("manifest.json") : string_sprintf("pattern-%u.png", i == 203 ? 1800 : i == 204 ? 3600 : 8192);
+            i == 202 ? string_new_with("manifest.json") :
+            string_sprintf("pattern-%u.png", i == 203 ? 1800 : i == 204 ? 3600 : i == 205 ? 8192 : 2048);
         string_t *path = string_sprintf("%s/%s", string_c_str(base), string_c_str(relative));
         file_t *file = file_new(path);
         if (file_exists(file)) file_delete(file);
         file_free(file); string_free(path); string_free(relative);
+    }
+    for (size_t i = 0; i < sizeof geography_files / sizeof *geography_files; ++i) {
+        string_t *path = string_sprintf("%s/packaging/globe-db/%s", file_path(fixture_root), geography_files[i]);
+        file_t *file = file_new(path);
+        if (file_exists(file)) file_delete(file);
+        file_free(file); string_free(path);
     }
     static const char *folders[] = {"packaging/globe-db/textures/regional", "packaging/globe-db/textures/earth_tiles",
         "packaging/globe-db/textures", "packaging/globe-db", "packaging", ""};
@@ -197,7 +249,8 @@ const char *test_cfg_texture_root(void)
         string_t *parent = string_new_with(temporary && *temporary ? temporary : MARS_CONFIG_ROOT_DIR "/build");
         fixture_root = file_create_temp_directory(parent);
         string_free(parent);
-        if (!fixture_root || !test_cfg_copy_textures(file_path(fixture_root))) { fixture_cleanup(); return NULL; }
+        if (!fixture_root || !test_cfg_copy_textures(file_path(fixture_root)) ||
+            !fixture_geography(file_path(fixture_root))) { fixture_cleanup(); return NULL; }
         atexit(fixture_cleanup);
     }
     return file_path(fixture_root);

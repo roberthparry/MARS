@@ -36,6 +36,7 @@ pointer is NULL. Database-specific size limits still apply.
 - reject empty keys in encrypted mode; never silently downgrade a failed encrypted open
 - reject databases opened with the wrong key
 - enable foreign-key checks for each connection
+- tune each schema's connection-local page-cache allowance in KiB
 - run SQL text through `sqlite_exec()` or `sqlite_exec_cstr()`
 - create the built-in `mars_object` table
 - store and load named binary objects with type and encoding metadata
@@ -58,6 +59,27 @@ Plaintext opening does not disable process-wide memory protection enabled by an 
 Neither opener converts an existing file: encrypted files fail in plaintext mode and keyed opens reject plaintext
 files. Use an explicit export to a different file for conversion.
 
+## Page-cache budgets
+
+`sqlite_set_cache_budget(db, schema, kibibytes)` configures SQLite's database-page
+cache for one schema on one connection. Use `NULL` for the main database, `"temp"`
+for temporary tables, or an attached database's name. Schema names are quoted as
+identifiers. Zero, empty schema names and allowances above `INT_MAX` KiB are rejected.
+Failure returns false; inspect `sqlite_last_error()` or `sqlite_diagnostic()`.
+
+The allowance uses KiB rather than a page count, so 8192 means approximately
+8 MiB with either 4 KiB or 64 KiB database pages. Reapply it after changing the
+page size. SQLite allocates cache memory on demand and may exceed the suggested
+allowance; this is not a hard process-memory cap. Budget for every concurrently
+open connection and schema. Closing a connection discards the setting without
+altering the database or other connections.
+
+For example, a retained geographic reader can use 8 MiB for its main database and
+512 KiB for temporary tables, as in the plaintext example below. Sequential imports
+can choose larger allowances. The wrapper leaves SQLite's defaults unchanged until
+the caller chooses a budget. Reusing the connection allows repeated queries to
+reuse pages; this cache does not hold decoded images or GPU textures.
+
 ## Example: Plaintext query
 
 ```c
@@ -68,7 +90,8 @@ files. Use an explicit export to a different file for conversion.
 int main(void) {
     string_t *path = string_new_with(":memory:");
     sqlite_t *db = sqlite_open_plain(path);
-    sqlite_stmt_t *stmt = db ? sqlite_stmt_prepare(db, "SELECT 42") : NULL;
+    bool ready = db && sqlite_set_cache_budget(db, NULL, 8192) && sqlite_set_cache_budget(db, "temp", 512);
+    sqlite_stmt_t *stmt = ready ? sqlite_stmt_prepare(db, "SELECT 42") : NULL;
     int result = 1;
     if (stmt && sqlite_stmt_step(stmt) == SQLITE_STEP_ROW) {
         printf("%d\n", sqlite_stmt_column_int(stmt, 0));

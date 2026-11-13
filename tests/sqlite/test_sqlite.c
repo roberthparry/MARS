@@ -3,12 +3,15 @@
  * @brief SQLCipher connection and object-storage regressions.
  *
  * Checks mandatory keys, wrong-key rejection, encrypted persistence and supported MARS object round trips.
+ * Cache regressions cover connection/schema isolation, quoted names and page-size-independent KiB budgets.
  * Documented query and storage examples run through the same public database API.
  *
  * Used by the project test harness for regression verification. Select cases through tests/test_config.json and
  * run suites sequentially; this source is not part of the installed library.
  */
 
+#include <errno.h>
+#include <limits.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -211,12 +214,87 @@ static void test_sqlite_plain_storage(void)
     string_free(path); string_free(key);
 }
 
+static int sqlite_query_integer(sqlite_t *db, const char *sql)
+{
+    sqlite_stmt_t *query = sqlite_stmt_prepare(db, sql);
+    bool ok = query && sqlite_stmt_step(query) == SQLITE_STEP_ROW;
+    int value = ok ? sqlite_stmt_column_int(query, 0) : 0;
+    ok = ok && sqlite_stmt_step(query) == SQLITE_STEP_DONE;
+    sqlite_stmt_finalize(query);
+    (void)test_assert_true(ok, __FILE__, __LINE__, "integer query has exactly one row");
+    return value;
+}
+
+static void test_sqlite_cache_scope(void)
+{
+    string_t *path = s(test_case_temp_path("cache-scope.db")), *key = s("cache scope fixture");
+    sqlite_t *first = sqlite_open_encrypted(path, key);
+    TEST_ASSERT_NOT_NULL(first);
+    TEST_ASSERT_TRUE(sqlite_exec_cstr(first, "CREATE TABLE retained(value); INSERT INTO retained VALUES(42)"),
+                     "persist the encrypted fixture");
+    sqlite_t *second = sqlite_open_encrypted(path, key);
+    TEST_ASSERT_NOT_NULL(second);
+    int original = sqlite_query_integer(second, "PRAGMA main.cache_size");
+    TEST_ASSERT_TRUE(sqlite_set_cache_budget(first, NULL, 8192), "main budget changes");
+    TEST_ASSERT_TRUE(sqlite_set_cache_budget(first, "temp", 512), "temporary budget is independent");
+    ASSERT_EQ_INT(sqlite_query_integer(first, "PRAGMA main.cache_size"), -8192);
+    ASSERT_EQ_INT(sqlite_query_integer(first, "PRAGMA temp.cache_size"), -512);
+    ASSERT_EQ_INT(sqlite_query_integer(second, "PRAGMA main.cache_size"), original);
+
+    TEST_ASSERT_TRUE(sqlite_exec_cstr(first, "ATTACH ':memory:' AS \"aux\"\"quoted\" KEY ''"),
+                     "attach a schema whose name needs quoting");
+    TEST_ASSERT_TRUE(sqlite_set_cache_budget(first, "aux\"quoted", 1024), "quote schema names as identifiers");
+    ASSERT_EQ_INT(sqlite_query_integer(first, "PRAGMA \"aux\"\"quoted\".cache_size"), -1024);
+    TEST_ASSERT_TRUE(!sqlite_set_cache_budget(first, "main\"; DROP TABLE retained; --", 1024),
+                     "schema text cannot inject SQL");
+    TEST_ASSERT_TRUE(!sqlite_set_cache_budget(first, "missing", 1024), "unknown schemas fail");
+    TEST_ASSERT_TRUE(!sqlite_set_cache_budget(first, "", 1024), "empty schema fails");
+    errno = 0;
+    TEST_ASSERT_TRUE(!sqlite_set_cache_budget(first, NULL, 0) && errno == EINVAL, "zero budget fails");
+    TEST_ASSERT_TRUE(!sqlite_set_cache_budget(first, NULL, (size_t)INT_MAX + 1), "overflow budget fails");
+    TEST_ASSERT_TRUE(!sqlite_set_cache_budget(NULL, NULL, 8192), "missing database fails");
+    TEST_ASSERT_NOT_NULL(sqlite_last_error(first));
+    ASSERT_EQ_INT(sqlite_query_integer(first, "PRAGMA main.cache_size"), -8192);
+    ASSERT_EQ_INT(sqlite_query_integer(first, "SELECT value FROM retained"), 42);
+    sqlite_close(first);
+    first = sqlite_open_encrypted(path, key);
+    TEST_ASSERT_NOT_NULL(first);
+    ASSERT_EQ_INT(sqlite_query_integer(first, "PRAGMA main.cache_size"), original);
+    sqlite_close(first);
+    sqlite_close(second);
+    string_free(key);
+    string_free(path);
+}
+
+static void test_sqlite_cache_row(const test_database_case_t *row)
+{
+    char *end = NULL;
+    unsigned long kibibytes = strtoul(string_c_str(row->input), &end, 10);
+    TEST_ASSERT_TRUE(end && !*end && kibibytes && kibibytes <= INT_MAX, "valid fixture budget");
+    string_t *path = s(test_case_temp_path("cache-pages.db"));
+    sqlite_t *db = sqlite_open_plain(path);
+    TEST_ASSERT_NOT_NULL(db);
+    TEST_ASSERT_TRUE(sqlite_exec_cstr(db,
+        "PRAGMA page_size=65536; CREATE TABLE retained(value); INSERT INTO retained VALUES(42)"), "64 KiB pages");
+    ASSERT_EQ_INT(sqlite_query_integer(db, "PRAGMA page_size"), 65536);
+    TEST_ASSERT_TRUE(sqlite_set_cache_budget(db, "main", kibibytes), "KiB budget independent of page size");
+    sqlite_stmt_t *query = sqlite_stmt_prepare(db, "PRAGMA main.cache_size");
+    TEST_ASSERT_TRUE(query && sqlite_stmt_step(query) == SQLITE_STEP_ROW, "configured budget is readable");
+    TEST_ASSERT_STR_EQ(sqlite_stmt_column_text(query, 0), string_c_str(row->expected));
+    sqlite_stmt_finalize(query);
+    ASSERT_EQ_INT(sqlite_query_integer(db, "SELECT value FROM retained"), 42);
+    sqlite_close(db);
+    string_free(path);
+}
+
 /* README example: the same prepared-statement API works without a database key. */
 static void example_sqlite_readme_plain(void)
 {
     string_t *path = s(":memory:");
     sqlite_t *db = sqlite_open_plain(path);
     TEST_ASSERT_NOT_NULL(db);
+    TEST_ASSERT_TRUE(sqlite_set_cache_budget(db, NULL, 8192), "README main cache budget");
+    TEST_ASSERT_TRUE(sqlite_set_cache_budget(db, "temp", 512), "README temporary cache budget");
     sqlite_stmt_t *stmt = sqlite_stmt_prepare(db, "SELECT 42");
     TEST_ASSERT_TRUE(stmt && sqlite_stmt_step(stmt) == SQLITE_STEP_ROW, "README plain query");
     printf("%d\n", sqlite_stmt_column_int(stmt, 0));
@@ -477,6 +555,10 @@ static void example_sqlite_readme_expression_object_storage(void)
 static void test_sqlite_database_row(const void *data)
 {
     const test_database_case_t *row = data;
+    if (!strcmp(string_c_str(row->operation), "cache_budget")) {
+        test_sqlite_cache_row(row);
+        return;
+    }
     TEST_ASSERT_TRUE(!strcmp(string_c_str(row->operation), "scalar_query"), "known SQLite case operation");
     const char *base = getenv("MARS_ROOT");
     string_t *root = string_new_with(base && *base ? base : ".");
@@ -511,6 +593,7 @@ int tests_main(void)
     TEST_RUN_IN_GROUP(test_sqlite_object_blob_round_trip, tests, NULL);
     TEST_RUN_IN_GROUP(test_sqlite_requires_key, tests, NULL);
     TEST_RUN_IN_GROUP(test_sqlite_plain_storage, tests, NULL);
+    TEST_RUN_IN_GROUP(test_sqlite_cache_scope, tests, NULL);
     test_sqlite_csv_cases();
     TEST_RUN_IN_GROUP(test_sqlite_database_cases, tests, "sqlite,database-cases");
 

@@ -331,7 +331,7 @@ static const expr_integrate_binary_rule_fn integrate_div_initial_rules[] = {
     integrate_div_by_exp_denominator,
     integrate_div_sin_integer_multiple_quotient,
     integrate_inverse_sqrt_sin_cos_sin3_cos,
-    integrate_inverse_quartic_appell_f1,
+    integrate_inverse_quartic_appell_F1,
     integrate_div_logarithmic_derivative,
     integrate_poly_times_affine_power,
     integrate_symbolic_monomial_times_affine_power,

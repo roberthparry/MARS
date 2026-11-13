@@ -123,7 +123,7 @@ static void assert_string_antiderivative_round_trips(const char *input)
     ASSERT_NOT_NULL(text);
     ASSERT_NOT_NULL(round_trip);
     ASSERT_TRUE(strstr(text, "LommelSPrime") == NULL);
-    ASSERT_TRUE(strstr(text, "lommel_s_derivative") == NULL);
+    ASSERT_TRUE(strstr(text, "lommel_S_derivative") == NULL);
 
     expr_free(round_trip);
     expr_bindings_free(round_trip_bindings);
@@ -3778,7 +3778,7 @@ static void test_integrate_exact_symbolic_atan_affine_scale(void)
 static void test_integrate_unsupported_product_returns_null(void)
 {
     expr_t *x = test_expr_new_named_var_d(0.5, "x");
-    expr_t *w0_x = expr_lambert_w0(x);
+    expr_t *w0_x = expr_lambert_W0(x);
     expr_t *x_w0_x = expr_mul(x, w0_x);
     expr_t *anti = expr_integrate(x_w0_x, x);
 
@@ -4038,7 +4038,7 @@ static void test_harmonic_poly_calculus(void)
 /* Small construction/destruction regressions for detached parameter leaks under Valgrind. */
 static void test_integrate_struve_parameter_ownership(void)
 {
-    expr_t *(*const constructors[])(const expr_t *, const expr_t *) = {expr_struve_h, expr_struve_l};
+    expr_t *(*const constructors[])(const expr_t *, const expr_t *) = {expr_struve_H, expr_struve_L};
     const char *const orders[] = {"1/3", "-1/2", "-2", "-5/2"};
 
     for (size_t family = 0u; family < 2u; ++family) {
@@ -4063,7 +4063,7 @@ static void test_integrate_bessel_i_parameter_ownership(void)
     number_t degree = num_create_from_frac(1, 3);
     expr_t *order = expr_new_const(degree);
     expr_t *x = test_expr_new_named_var_d(1.0, "x");
-    expr_t *function = expr_bessel_i(order, x);
+    expr_t *function = expr_bessel_I(order, x);
     expr_t *primitive = expr_integrate(function, x);
 
     ASSERT_NOT_NULL(primitive);
@@ -4080,7 +4080,7 @@ static void test_integrate_bessel_y_lommel_parameter_ownership(void)
     number_t degree = num_create_from_frac(1, 3);
     expr_t *order = expr_new_const(degree);
     expr_t *x = test_expr_new_named_var_d(1.0, "x");
-    expr_t *function = expr_bessel_y(order, x);
+    expr_t *function = expr_bessel_Y(order, x);
     expr_t *primitive = expr_integrate(function, x);
 
     ASSERT_NOT_NULL(primitive);
@@ -4098,7 +4098,7 @@ static void test_integrate_bessel_y_lommel_rejection_ownership(void)
     number_t degree = num_create_from_long(65);
     expr_t *order = expr_new_const(degree);
     expr_t *x = test_expr_new_named_var_d(1.0, "x");
-    expr_t *function = expr_bessel_y(order, x);
+    expr_t *function = expr_bessel_Y(order, x);
     expr_t *primitive = expr_integrate(function, x);
 
     ASSERT_TRUE(primitive == NULL);

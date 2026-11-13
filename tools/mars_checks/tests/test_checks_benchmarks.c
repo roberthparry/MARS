@@ -500,11 +500,11 @@ static void test_benchmarks_complex_inputs(void)
         "INSERT INTO benchmark_result(run_id, operation, backend, bits, arguments, complex_mask, sequence,\n"
         "                             outcome, median_ns)\n"
         "VALUES (1, 'sin', 'qcomplex', 106, '-0.25', 1, 8, 'pass', 3000),\n"
-        "       (1, 'bessel_j', 'qcomplex', 106, '2,0.7', 2, 9, 'pass', 1000),\n"
-        "       (1, 'bessel_j', 'mpc', 256, '2,0.7', 2, 10, 'pass', 2000),\n"
-        "       (1, 'bessel_j', 'mpc', 512, '2,0.7', 0, 11, 'pass', 4000),\n"
-        "       (1, 'bessel_j', 'qfloat', 106, '2,0.7', 2, 12, 'pass', 5000),\n"
-        "       (1, 'appell_f1', 'qcomplex', 106, '0.5,0.7,0.8,2.5,0.2,0.3', 63, 13, 'pass', 6000),\n"
+        "       (1, 'bessel_J', 'qcomplex', 106, '2,0.7', 2, 9, 'pass', 1000),\n"
+        "       (1, 'bessel_J', 'mpc', 256, '2,0.7', 2, 10, 'pass', 2000),\n"
+        "       (1, 'bessel_J', 'mpc', 512, '2,0.7', 0, 11, 'pass', 4000),\n"
+        "       (1, 'bessel_J', 'qfloat', 106, '2,0.7', 2, 12, 'pass', 5000),\n"
+        "       (1, 'appell_F1', 'qcomplex', 106, '0.5,0.7,0.8,2.5,0.2,0.3', 63, 13, 'pass', 6000),\n"
         "       (1, 'polygamma', 'qcomplex', 106, '3,2.345', 2, 14, 'pass', 7000),\n"
         "       (1, 'sgn', 'qcomplex', 106, '-0.7', 0, 15, 'pass', 8000);") && ok;
     sqlite_close(db);
@@ -512,13 +512,13 @@ static void test_benchmarks_complex_inputs(void)
     ok = ok && benchmark_test_command(root, report, 2, 0, &out) &&
         string_find(out, "| Operation | Inputs |") >= 0 && string_find(out, "Real input literals") < 0 &&
         string_find(out, "| sin | -0.25+0.125i | 3.0 µs |") >= 0 &&
-        string_find(out, "| bessel_j | 2, 0.7+0.125i | 1.0 µs |") >= 0 &&
-        string_find(out, "| bessel_j | 2, 0.7+0.125i | 2.0 µs | — |") >= 0 &&
-        string_find(out, "| bessel_j | 2,0.7 | — | 4.0 µs |") >= 0 &&
-        string_find(out, "| bessel_j | 2,0.7 | 5.0 µs |") >= 0 &&
+        string_find(out, "| bessel_J | 2, 0.7+0.125i | 1.0 µs |") >= 0 &&
+        string_find(out, "| bessel_J | 2, 0.7+0.125i | 2.0 µs | — |") >= 0 &&
+        string_find(out, "| bessel_J | 2,0.7 | — | 4.0 µs |") >= 0 &&
+        string_find(out, "| bessel_J | 2,0.7 | 5.0 µs |") >= 0 &&
         string_find(out, "| polygamma | 3, 2.345+0.125i | 7.0 µs |") >= 0 &&
         string_find(out, "| sgn | -0.7 | 8.0 µs |") >= 0 &&
-        benchmark_test_wrapped_inputs(out, "| appell_f1 | ",
+        benchmark_test_wrapped_inputs(out, "| appell_F1 | ",
             "0.5+0.125i, 0.7+0.125i, 0.8+0.125i, 2.5+0.125i, 0.2+0.125i, 0.3+0.125i", 40);
     string_free(out); out = NULL;
     const char *formats[] = {"--format=grid", "--format=markdown", "--format=tsv"};
@@ -526,7 +526,7 @@ static void test_benchmarks_complex_inputs(void)
     const char *views[] = {"--summary", "--details"};
     for (size_t v = 0; ok && v < sizeof views / sizeof *views; ++v) {
         for (size_t i = 0; ok && i < sizeof formats / sizeof *formats; ++i) {
-            const char *stats[] = {"stats", "--run", "1", "--backend", "qcomplex", "--operation", "bessel_j",
+            const char *stats[] = {"stats", "--run", "1", "--backend", "qcomplex", "--operation", "bessel_J",
                                    views[v], formats[i]};
             ok = benchmark_test_environment(root, stats, 9, 0, &out, environment, 2, NULL) &&
                 string_find(out, "2, 0.7+0.125i") >= 0 && string_find(out, "2+0.125i") < 0;
@@ -534,12 +534,12 @@ static void test_benchmarks_complex_inputs(void)
         }
     }
     const char *long_arguments = "0.5+0.125i, 0.7+0.125i, 0.8+0.125i, 2.5+0.125i, 0.2+0.125i, 0.3+0.125i";
-    const char *wide[] = {"stats", "--run", "1", "--backend", "qcomplex", "--operation", "appell_f1"};
+    const char *wide[] = {"stats", "--run", "1", "--backend", "qcomplex", "--operation", "appell_F1"};
     const char *narrow[] = {"NO_COLOR=1", "COLUMNS=60"};
-    const char *markdown[] = {"stats", "--run", "1", "--backend", "qcomplex", "--operation", "appell_f1",
+    const char *markdown[] = {"stats", "--run", "1", "--backend", "qcomplex", "--operation", "appell_F1",
                               "--format=markdown"};
     ok = ok && benchmark_test_command(root, markdown, 8, 0, &out) &&
-        benchmark_test_wrapped_inputs(out, "| appell\\_f1 | ", long_arguments, 40);
+        benchmark_test_wrapped_inputs(out, "| appell\\_F1 | ", long_arguments, 40);
     string_free(out); out = NULL;
     ok = ok && benchmark_test_environment(root, wide, 7, 0, &out, environment, 2, NULL) &&
         string_find(out, "╠") >= 0 && benchmark_test_grid_width(out, 132) &&
@@ -552,7 +552,7 @@ static void test_benchmarks_complex_inputs(void)
     db = benchmark_test_open(root);
     ok = db && benchmark_test_integer(db,
         "SELECT count(*) FROM benchmark_result\n"
-        "WHERE run_id = 1 AND operation = 'bessel_j' AND arguments = '2,0.7'\n"
+        "WHERE run_id = 1 AND operation = 'bessel_J' AND arguments = '2,0.7'\n"
         "  AND complex_mask = 2 AND median_ns IN (1000, 2000, 5000)") == 3 && ok;
     sqlite_close(db);
     ok = test_checks_finish(root) && ok;
@@ -706,6 +706,20 @@ static void test_benchmarks_fraction_inputs(void)
 
 static void test_benchmarks_display_migration(void)
 {
+    static const char *const renamed[][2] = {
+        {"appell_f1", "appell_F1"},
+        {"bessel_i", "bessel_I"},
+        {"bessel_j", "bessel_J"},
+        {"bessel_k", "bessel_K"},
+        {"bessel_y", "bessel_Y"},
+        {"lambert_w0", "lambert_W0"},
+        {"lambert_wm1", "lambert_Wm1"},
+        {"lambert_wn", "lambert_Wn"},
+        {"lauricella_f", "lauricella_F"},
+        {"struve_h", "struve_H"},
+        {"struve_l", "struve_L"},
+        {"lommel_s", "lommel_S"}
+    };
     string_t *root = test_checks_root();
     bool ok = benchmark_test_fixture(root);
     string_t *path = checks_path(root, "bench/benchmarks.sql"), *legacy = checks_read(path);
@@ -741,10 +755,35 @@ static void test_benchmarks_display_migration(void)
         "                                    (1,'chebyshev_u','qfloat',106,1,222),\n"
         "                                    (1,'hermite_h','qfloat',106,1,333);\n"
         "PRAGMA user_version=3;");
+    for (size_t i = 0; ok && i < sizeof renamed / sizeof *renamed; ++i) {
+        string_t *sql = string_sprintf(
+            "INSERT INTO benchmark_operation VALUES ('%s',2,'0,1',0,1,1);\n"
+            "INSERT INTO benchmark_workload VALUES ('%s','exact-integer','0,1');\n"
+            "INSERT INTO benchmark_result(run_id,operation,backend,bits,arguments,sequence,outcome,\n"
+            "                             median_ns,complex_mask,timing_outlier,detail)\n"
+            "VALUES (1,'%s','qfloat',106,'0,1',%zu,'pass',777,0,1,'retained rename');\n"
+            "INSERT INTO benchmark_sample VALUES (1,'%s','qfloat',106,1,777);",
+            renamed[i][0], renamed[i][0], renamed[i][0], i + 5, renamed[i][0]);
+        ok = sql && sqlite_exec(db, sql);
+        string_free(sql);
+    }
     string_free(legacy); sqlite_close(db);
     const char *sync[] = {"sync"};
     ok = ok && benchmark_test_command(root, sync, 1, 0, NULL);
     db = benchmark_test_open(root);
+    for (size_t i = 0; ok && db && i < sizeof renamed / sizeof *renamed; ++i) {
+        string_t *sql = string_sprintf(
+            "SELECT count(*)\n"
+            "FROM benchmark_result AS r\n"
+            "JOIN benchmark_sample AS s USING (run_id, operation, backend, bits)\n"
+            "JOIN benchmark_workload AS w USING (operation, arguments)\n"
+            "WHERE r.operation='%s' AND r.median_ns=777 AND r.timing_outlier=1\n"
+            "  AND r.detail='retained rename' AND s.nanoseconds_per_call=777\n"
+            "  AND NOT EXISTS (SELECT 1 FROM benchmark_operation WHERE name='%s')",
+            renamed[i][1], renamed[i][0]);
+        ok = sql && benchmark_test_integer(db, string_c_str(sql)) == 1;
+        string_free(sql);
+    }
     ok = ok && db && benchmark_test_integer(db,
         "SELECT count(*) FROM benchmark_result\n"
         "WHERE run_id=1 AND arguments='-355/+113, 5' AND arguments_display='⁻³⁵⁵⁄₊₁₁₃, 5'\n"
@@ -999,12 +1038,12 @@ static void test_benchmarks_expression_coverage(void)
         if (!strcmp(name, "hypergeometric_pFq")) {
             string_free(source);
             source = string_sprintf("hypergeometric_pFq(1,1,%s)", sqlite_stmt_column_text(rows, 1));
-        } else if (!strcmp(name, "lauricella_f")) {
+        } else if (!strcmp(name, "lauricella_F")) {
             string_t *arguments = string_new_with(sqlite_stmt_column_text(rows, 1));
             checks_strings_t *parts = arguments ? checks_split(arguments, ',') : NULL;
             string_free(source);
             source = parts && checks_strings_count(parts) == 3 ?
-                string_sprintf("lauricella_f(1,%s,%s,%s,%s)",
+                string_sprintf("lauricella_F(1,%s,%s,%s,%s)",
                     string_c_str(checks_strings_get(parts, 0)), string_c_str(checks_strings_get(parts, 1)),
                     string_c_str(checks_strings_get(parts, 2)), string_c_str(checks_strings_get(parts, 1))) : NULL;
             checks_strings_free(parts);

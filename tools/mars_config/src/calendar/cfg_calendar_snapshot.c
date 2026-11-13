@@ -99,29 +99,29 @@ bool cfg_calendar_policy(sqlite_t *db, const string_t *path, const string_t *key
 }
 
 static bool cfg_calendar_settings(sqlite_t *db, const cfg_calendar_place_t *place, const string_t *locale,
-                                  int last_year)
+                                  int first_year, int last_year)
 {
     sqlite_stmt_t *stmt = sqlite_stmt_prepare(
         db, "INSERT INTO calendar_local_settings "
             "(singleton,location,jurisdiction,timezone,latitude,longitude,first_year,last_year,locale) "
-            "VALUES(1,?1,?2,?3,?4,?5,2015,?6,?7)");
+            "VALUES(1,?1,?2,?3,?4,?5,?6,?7,?8)");
     bool ok = stmt && sqlite_stmt_bind_text(stmt, 1, string_c_str(place->name)) &&
               sqlite_stmt_bind_text(stmt, 2, string_c_str(place->jurisdiction)) &&
               sqlite_stmt_bind_text(stmt, 3, string_c_str(place->timezone)) &&
               sqlite_stmt_bind_double(stmt, 4, place->latitude) && sqlite_stmt_bind_double(stmt, 5, place->longitude) &&
-              sqlite_stmt_bind_int(stmt, 6, last_year) &&
-              (locale && string_byte_length(locale) ? sqlite_stmt_bind_text(stmt, 7, string_c_str(locale))
-                                                    : sqlite_stmt_bind_null(stmt, 7)) &&
+              sqlite_stmt_bind_int(stmt, 6, first_year) && sqlite_stmt_bind_int(stmt, 7, last_year) &&
+              (locale && string_byte_length(locale) ? sqlite_stmt_bind_text(stmt, 8, string_c_str(locale))
+                                                    : sqlite_stmt_bind_null(stmt, 8)) &&
               sqlite_stmt_step(stmt) == SQLITE_STEP_DONE;
     sqlite_stmt_finalize(stmt);
     return ok;
 }
 
-static bool cfg_calendar_days(sqlite_t *db, int last_year, const bool *weekends, long *expected,
+static bool cfg_calendar_days(sqlite_t *db, int first_year, int last_year, const bool *weekends, long *expected,
                               cfg_progress_t *progress)
 {
     datetime_t *day = datetime_alloc();
-    long first = datetime_ymd_to_jdn(2015, 1, 1), last = datetime_ymd_to_jdn((short)last_year, 12, 31);
+    long first = datetime_ymd_to_jdn((short)first_year, 1, 1), last = datetime_ymd_to_jdn((short)last_year, 12, 31);
     *expected = last - first + 1;
     static const char label[] = "Generating local calendar";
     cfg_progress_update_items(progress, label, 0, (uint64_t)*expected, "days generated");
@@ -152,7 +152,7 @@ static bool cfg_calendar_days(sqlite_t *db, int last_year, const bool *weekends,
         ok = ok && sqlite_stmt_bind_text(write, 1, string_c_str(date)) &&
              (any ? sqlite_stmt_bind_text(write, 2, string_c_str(names)) : sqlite_stmt_bind_null(write, 2)) &&
              sqlite_stmt_bind_int(write, 3,
-                                  weekends[(datetime_year(day) - 2015) * 7 + (datetime_weekday(day) + 5) % 7]) &&
+                                  weekends[(datetime_year(day) - first_year) * 7 + (datetime_weekday(day) + 5) % 7]) &&
              sqlite_stmt_bind_double(write, 4, offset) && sqlite_stmt_step(write) == SQLITE_STEP_DONE;
         string_free(names);
         string_free(date);
@@ -178,26 +178,30 @@ static bool cfg_calendar_validate(sqlite_t *db, long expected)
     return ok;
 }
 
-/* Expand first, then replace under a savepoint and validate every date rendering. */
-bool cfg_calendar_snapshot(sqlite_t *db, const string_t *path, const string_t *key, const cfg_calendar_place_t *place,
-                           const string_t *locale, cfg_progress_t *progress)
+/* A zero final year selects the installer's ordinary horizon in the observer's local timezone. */
+static bool cfg_calendar_snapshot_period(sqlite_t *db, const string_t *path, const string_t *key,
+                                        const cfg_calendar_place_t *place, const string_t *locale,
+                                        int first_year, int last_year, cfg_progress_t *progress)
 {
     cfg_calendar_environment_t timezone = {0};
     bool ok = cfg_calendar_zone_enter(place->timezone, &timezone);
-    time_t now = time(NULL);
-    struct tm local;
-    ok = ok && now != (time_t)-1 && localtime_r(&now, &local);
-    int last_year = ok ? local.tm_year + 1900 + 7 : 0;
-    ok = ok && last_year >= 2015 && last_year < SHRT_MAX;
-    bool *weekends = ok ? calloc((size_t)(last_year - 2015 + 1) * 7, sizeof(bool)) : NULL;
+    if (!last_year) {
+        time_t now = time(NULL);
+        struct tm local;
+        ok = ok && now != (time_t)-1 && localtime_r(&now, &local);
+        last_year = ok ? local.tm_year + 1900 + 7 : 0;
+    }
+    ok = ok && last_year >= first_year && last_year < SHRT_MAX;
+    bool *weekends = ok ? calloc((size_t)(last_year - first_year + 1) * 7, sizeof(bool)) : NULL;
     ok = ok && weekends && cfg_calendar_labels(db, place->jurisdiction, locale) &&
-         cfg_calendar_policy(db, path, key, place, 2015, last_year, weekends);
+         cfg_calendar_policy(db, path, key, place, first_year, last_year, weekends);
     bool transaction = ok && sqlite_exec_cstr(db, "SAVEPOINT cfg_calendar_snapshot");
     ok = ok && transaction &&
          sqlite_exec_cstr(db, "DELETE FROM calendar_local_days; DELETE FROM calendar_local_settings;") &&
-         cfg_calendar_settings(db, place, locale, last_year);
+         cfg_calendar_settings(db, place, locale, first_year, last_year);
     long expected = 0;
-    ok = ok && cfg_calendar_days(db, last_year, weekends, &expected, progress) && cfg_calendar_validate(db, expected);
+    ok = ok && cfg_calendar_days(db, first_year, last_year, weekends, &expected, progress) &&
+         cfg_calendar_validate(db, expected);
     /* Restore process state before committing, so a restoration failure also rolls back. */
     bool restored = cfg_calendar_restore(&timezone);
     tzset();
@@ -213,4 +217,20 @@ bool cfg_calendar_snapshot(sqlite_t *db, const string_t *path, const string_t *k
                 string_c_str(place->name), string_c_str(place->jurisdiction));
     free(weekends);
     return ok;
+}
+
+/* Preserve the full installation horizon while sharing the bounded snapshot implementation. */
+bool cfg_calendar_snapshot(sqlite_t *db, const string_t *path, const string_t *key, const cfg_calendar_place_t *place,
+                           const string_t *locale, cfg_progress_t *progress)
+{
+    return cfg_calendar_snapshot_period(db, path, key, place, locale, 2015, 0, progress);
+}
+
+/* Expand an explicitly bounded period using the same atomic publication and validation as installation. */
+bool cfg_calendar_snapshot_range(sqlite_t *db, const string_t *path, const string_t *key,
+                                 const cfg_calendar_place_t *place, const string_t *locale,
+                                 int first_year, int last_year, cfg_progress_t *progress)
+{
+    if (first_year < 1 || last_year < first_year || last_year >= SHRT_MAX) return false;
+    return cfg_calendar_snapshot_period(db, path, key, place, locale, first_year, last_year, progress);
 }

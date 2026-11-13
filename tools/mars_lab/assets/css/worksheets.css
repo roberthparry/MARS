@@ -643,7 +643,18 @@ html[data-almanac-jurisdiction-flag] .almanac-summary .almanac-location-flag:has
 .history-editor-heading h2 { margin: 0; }
 .history-editor p { font-size: .9rem; }
 .history-editor ol { padding: 0; margin: .8rem 0 0; list-style: none; min-height: 0; overflow: auto; overscroll-behavior: contain; }
-.history-entry { display: flex; align-items: center; flex-wrap: wrap; gap: .5rem; padding: .6rem; border-bottom: 1px solid #52675b; }
+.history-entry { position: relative; display: flex; align-items: center; flex-wrap: wrap; gap: .5rem; padding: .6rem; border-bottom: 1px solid #52675b; }
+.history-drag-handle {
+  display: inline-flex; align-items: center; justify-content: center; flex: 0 0 2rem; min-height: 2.5rem;
+  color: #f0c873; font-size: 1.6rem; cursor: grab; touch-action: none; user-select: none;
+}
+.history-dragging { z-index: 2; pointer-events: none; background: #1c382e; opacity: .9; box-shadow: 0 .3rem .8rem #0008; }
+.history-reordering, .history-reordering .history-drag-handle { cursor: grabbing; user-select: none; }
+.history-drop-before::before, .history-drop-after::after {
+  content: ''; position: absolute; z-index: 3; left: 0; right: 0; height: 3px; background: #f0c873; pointer-events: none;
+}
+.history-drop-before::before { top: -2px; }
+.history-drop-after::after { bottom: -2px; }
 .history-entry[aria-current] { background: rgba(233, 181, 77, .12); border-radius: 8px; }
 .history-entry-open { flex: 1 1 16rem; min-width: 0; text-align: left; white-space: pre-wrap; overflow-wrap: anywhere; }
 .history-entry-location { display: flex; align-items: center; gap: .65rem; white-space: normal; }

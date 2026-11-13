@@ -185,7 +185,7 @@ static bool cfg_database_update_one(const cfg_database_migration *migration, boo
     sqlite_t *db = cfg_database_open(path, key);
     int64_t revision = 0;
     if (ok && exists)
-        ok = db && sqlite_exec_cstr(db, "PRAGMA cache_size=-16384; PRAGMA temp.cache_size=-512;") &&
+        ok = db && sqlite_set_cache_budget(db, NULL, 16384) && sqlite_set_cache_budget(db, "temp", 512) &&
              cfg_database_current_revision(db, migration->name, &revision) && revision <= migration->revision;
     string_t *texture_root = ok && exists && migration->rebuild_globe ?
         string_new() : NULL;
@@ -1033,9 +1033,9 @@ static bool cfg_database_build(cfg_database_options *options, const cfg_database
     string_t *root = string_new();
     cfg_progress_t *progress = cfg_progress_start("Preparing database");
     sqlite_t *db = temporary && root ? cfg_database_open(temporary_path, options->key) : NULL;
-    /* Bound both working caches as catalogues grow; their pages are locked by SQLCipher. */
-    ok = ok && db && destination &&
-         sqlite_exec_cstr(db, "PRAGMA foreign_keys = ON; PRAGMA cache_size=-512; PRAGMA temp.cache_size=-512;");
+    /* Bound both caches, allowing useful locality with 64 KiB plaintext pages as well as encrypted pages. */
+    ok = ok && db && destination && sqlite_set_cache_budget(db, NULL, 16384) &&
+         sqlite_set_cache_budget(db, "temp", 512) && sqlite_exec_cstr(db, "PRAGMA foreign_keys = ON;");
     cfg_progress_finish(progress, ok);
     if (ok) {
         fprintf(stderr, "Building %s %s database...\n",

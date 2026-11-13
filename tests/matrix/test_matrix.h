@@ -6,9 +6,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "../expression/test_expr.h"
 #include "matrix-t.h"
 #include "test_harness.h"
+#include "test_expr_support.h"
 
 const test_validity_contract_t *matrix_validity_contract_double_default(void);
 const test_validity_contract_t *matrix_validity_contract_mp_real_default(void);

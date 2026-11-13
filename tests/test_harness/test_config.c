@@ -14,6 +14,7 @@
 #include <stdio.h>
 #include <sys/stat.h>
 
+#include "string-t.h"
 #define MARS_TEST_CONFIG_INTERNAL_ACCESS
 #include "test_config_internal.h"
 
@@ -196,6 +197,15 @@ static void load_json_if_needed(void)
 
     json_free(g_root);
     g_root = json;
+}
+
+/* Observe the global snapshot without running registration helpers or changing local-fixture load order. */
+bool test_config_count_current(const string_t *suite_source, test_config_selection_fn selection, size_t *count)
+{
+    if (count) *count = 0;
+    if (g_mode != TEST_CONFIG_GLOBAL || !suite_source || !count) return false;
+    load_json_if_needed();
+    return test_config_count_enabled(g_root, suite_source, TEST_CONFIG_GLOBAL, selection, count);
 }
 
 bool test_config_is_enabled(const string_t *file, const string_t *func, const string_t *parent)

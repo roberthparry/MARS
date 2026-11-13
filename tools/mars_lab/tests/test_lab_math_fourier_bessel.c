@@ -38,10 +38,10 @@ static double math_fourier_bessel_series(int order, double point, int terms)
 
 static void test_bessel_indexed_parser_and_bindings(void)
 {
-    const char *cases[][2] = {{"J_n(x)", "bessel_j(n,x)"}, {"J_{n+1}(x)", "bessel_j(n+1,x)"},
-        {"J_3(x)", "bessel_j(3,x)"}, {"J₃(x)", "bessel_j(3,x)"}, {"J₋₃(x)", "bessel_j(-3,x)"},
-        {"J_-3(x)", "bessel_j(-3,x)"}, {"J3(x)", "bessel_j(3,x)"}, {"Y_n(x)", "bessel_y(n,x)"},
-        {"Y_{n+1}(x)", "bessel_y(n+1,x)"}, {"Y₂(x)", "bessel_y(2,x)"}};
+    const char *cases[][2] = {{"J_n(x)", "bessel_J(n,x)"}, {"J_{n+1}(x)", "bessel_J(n+1,x)"},
+        {"J_3(x)", "bessel_J(3,x)"}, {"J₃(x)", "bessel_J(3,x)"}, {"J₋₃(x)", "bessel_J(-3,x)"},
+        {"J_-3(x)", "bessel_J(-3,x)"}, {"J3(x)", "bessel_J(3,x)"}, {"Y_n(x)", "bessel_Y(n,x)"},
+        {"Y_{n+1}(x)", "bessel_Y(n+1,x)"}, {"Y₂(x)", "bessel_Y(2,x)"}};
     for (size_t i = 0; i < 10; ++i)
         lab_math_equal(math_fourier_text(math_fourier_fields(cases[i][0], "x"), "tex"), math_fourier_text(
             math_fourier_fields(cases[i][1], "x"), "tex"));

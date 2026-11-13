@@ -12,6 +12,7 @@
 #include <string.h>
 #include <time.h>
 
+#include "string-t.h"
 #include "file-t.h"
 #define MARS_TEST_DATABASE_INTERNAL_ACCESS
 #include "test_database_internal.h"
@@ -100,6 +101,8 @@ test_database_t *test_database_open(const string_t *root, const string_t *path, 
              test_database_exec(database, "COMMIT");
     if (ok && create && !path)
         ok = test_database_reports_migrate(database, root);
+    if (ok && create)
+        ok = test_database_relocate_sources(database);
     string_free(owned_path);
     if (!ok) {
         if (error)

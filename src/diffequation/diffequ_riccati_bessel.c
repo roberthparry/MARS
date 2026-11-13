@@ -98,10 +98,10 @@ de_riccati_bessel_t *de_riccati_bessel_new(const expr_t *potential, const expr_t
         b->speed = signed_speed;
     }
     expr_t *upper_order = expr_add_long(negative_order, 1L), *lower_order = expr_add_long(order, -1L);
-    b->negative = expr_bessel_j(negative_order, b->argument);
-    b->positive = expr_bessel_j(order, b->argument);
-    b->upper = expr_bessel_j(upper_order, b->argument);
-    b->lower = expr_bessel_j(lower_order, b->argument);
+    b->negative = expr_bessel_J(negative_order, b->argument);
+    b->positive = expr_bessel_J(order, b->argument);
+    b->upper = expr_bessel_J(upper_order, b->argument);
+    b->lower = expr_bessel_J(lower_order, b->argument);
     expr_free(lower_order); expr_free(upper_order);
     b->first = expr_mul(b->root, b->negative);
     b->second = expr_mul_simplify_owned(expr_clone(b->sign), expr_mul(b->root, b->positive));

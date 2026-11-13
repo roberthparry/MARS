@@ -93,10 +93,18 @@ bool checks_process_run_observed(const checks_strings_t *arguments, const string
  * @brief Run one test executable with live elapsed-time progress and a coloured final summary.
  * @param[in] root Borrowed working directory used for execution and relative log paths.
  * @param[in] argc Number of arguments; at least the executable is required.
- * @param[in] argv Borrowed executable followed by literal test arguments, forwarded without a shell.
- * @return Zero on success; a non-zero child status or 1 on execution/logging failure; 2 on missing arguments.
+ * @param[in] argv Borrowed executable followed by literal test arguments, forwarded without a shell. An optional
+ * leading --suite-progress INDEX TOTAL reports the overall suite count; these three arguments are not forwarded.
+ * INDEX and TOTAL are positive decimal integers with INDEX no greater than TOTAL. Optional --summary-width WIDTH
+ * follows that prefix (or precedes the executable alone) and pads executable labels to WIDTH columns, from 1 to
+ * 4096, without truncation; these two arguments are not forwarded. Suite indices align to TOTAL's digit count.
+ * @return Zero on success; a non-zero child status or 1 on execution/logging failure; 2 on invalid arguments.
  * @note Execution remains sequential. Failure output is retained beside the executable as a .log file;
- * successful runs remove a previous log. No test database or installed resource is created by the runner.
+ * successful runs remove a previous log. The caller retains all arguments for this call's duration. Terminal
+ * output uses separate suite and module progress bars plus the current case, with bold result colours.
+ * Native PLAN/PROGRESS records provide enabled-case totals, excluding disabled cases and group wrappers.
+ * Missing/new configuration uses discovery activity; legacy executables without plans remain supported.
+ * No test database or installed resource is created by this observer.
  */
 int checks_test_suite(const string_t *root, int argc, char **argv);
 

@@ -9,6 +9,7 @@
  * run suites sequentially; this source is not part of the installed library.
  */
 
+#include "string-t.h"
 #define MARS_EXPR_INTERNAL_ACCESS
 #include "expression/expr_internal.h"
 #include "test_database.h"
@@ -938,8 +939,8 @@ static void test_to_string_lambert_w_TeX(void)
 {
     expr_t *x0 = test_expr_new_named_var_d(1.0, "x0");
     expr_t *x1 = test_expr_new_named_var_s("-0.2", "x1");
-    expr_t *w0 = expr_lambert_w0(x0);
-    expr_t *wm1 = expr_lambert_wm1(x1);
+    expr_t *w0 = expr_lambert_W0(x0);
+    expr_t *wm1 = expr_lambert_Wm1(x1);
     char *got_w0 = expr_to_string(w0, style_LATEX);
     char *got_wm1 = expr_to_string(wm1, style_LATEX);
 
@@ -2213,12 +2214,12 @@ void test_to_string_special_functions(void)
     }
     {
         expr_t *x = test_expr_new_named_var_d(1.0, "x");
-        check_roundtrip("to_string: W₀(x)", expr_lambert_w0(x), __LINE__);
+        check_roundtrip("to_string: W₀(x)", expr_lambert_W0(x), __LINE__);
         expr_free(x);
     }
     {
         expr_t *x = test_expr_new_named_var_d(-0.2, "x");
-        check_roundtrip("to_string: W₋₁(x)", expr_lambert_wm1(x), __LINE__);
+        check_roundtrip("to_string: W₋₁(x)", expr_lambert_Wm1(x), __LINE__);
         expr_free(x);
     }
     {
@@ -2266,7 +2267,7 @@ void test_to_string_special_functions(void)
     {
         expr_t *order = test_expr_new_named_const_d(0.5, "nu");
         expr_t *x = test_expr_new_named_var_d(2.0, "x");
-        expr_t *f = expr_bessel_j(order, x);
+        expr_t *f = expr_bessel_J(order, x);
         expr_free(order);
         expr_free(x);
         check_roundtrip("to_string: BesselJ(nu,x)", f, __LINE__);
@@ -2274,7 +2275,7 @@ void test_to_string_special_functions(void)
     {
         expr_t *order = test_expr_new_named_const_d(0.5, "nu");
         expr_t *x = test_expr_new_named_var_d(2.0, "x");
-        expr_t *f = expr_bessel_y(order, x);
+        expr_t *f = expr_bessel_Y(order, x);
         expr_free(order);
         expr_free(x);
         check_roundtrip("to_string: BesselY(nu,x)", f, __LINE__);
@@ -2313,7 +2314,7 @@ void test_to_string_special_functions(void)
         expr_t *c = test_expr_new_named_const_d(2.25, "c");
         expr_t *variables[] = {test_expr_new_named_var_d(0.1, "x"), test_expr_new_named_var_d(0.2, "y"),
                                test_expr_new_named_var_d(0.3, "z")};
-        expr_t *f = expr_lauricella_f(a, 3u, (const expr_t *const *)parameters, c, (const expr_t *const *)variables);
+        expr_t *f = expr_lauricella_F(a, 3u, (const expr_t *const *)parameters, c, (const expr_t *const *)variables);
 
         for (size_t i = 0u; i < 3u; ++i) {
             expr_free(variables[i]);
@@ -2327,7 +2328,7 @@ void test_to_string_special_functions(void)
 
 static void test_to_string_appell_f1(void)
 {
-    static const char *const inputs[] = {"{ appell_f1(1, 1, 1, 2, x, y) }", "{ F1(1, 1, 1, 2, x, y) }",
+    static const char *const inputs[] = {"{ appell_F1(1, 1, 1, 2, x, y) }", "{ F1(1, 1, 1, 2, x, y) }",
                                          "{ F_1(1, 1, 1, 2, x, y) }", "{ F₁(1, 1, 1, 2, x, y) }", NULL};
     const char *want_expr = "F₁(1; 1, 1; 2; x, y)";
     const char *want_func = "appellf1(1, 1, 1, 2, x, y)";
@@ -2341,17 +2342,17 @@ static void test_to_string_appell_f1(void)
 
         ASSERT_NOT_NULL(f);
         if (got_expr)
-            to_string_pass("appell_f1 alias (EXPR)", got_expr, want_expr);
+            to_string_pass("appell_F1 alias (EXPR)", got_expr, want_expr);
         else
-            to_string_fail(__FILE__, __LINE__, 1, "appell_f1 alias (EXPR)", "(null)", want_expr);
+            to_string_fail(__FILE__, __LINE__, 1, "appell_F1 alias (EXPR)", "(null)", want_expr);
         if (got_func)
-            to_string_pass("appell_f1 alias (FUNCTION)", got_func, want_func);
+            to_string_pass("appell_F1 alias (FUNCTION)", got_func, want_func);
         else
-            to_string_fail(__FILE__, __LINE__, 1, "appell_f1 alias (FUNCTION)", "(null)", want_func);
+            to_string_fail(__FILE__, __LINE__, 1, "appell_F1 alias (FUNCTION)", "(null)", want_func);
         if (got_TeX)
-            to_string_pass("appell_f1 alias (TEX)", got_TeX, want_TeX);
+            to_string_pass("appell_F1 alias (TEX)", got_TeX, want_TeX);
         else
-            to_string_fail(__FILE__, __LINE__, 1, "appell_f1 alias (TEX)", "(null)", want_TeX);
+            to_string_fail(__FILE__, __LINE__, 1, "appell_F1 alias (TEX)", "(null)", want_TeX);
 
         free(got_TeX);
         free(got_func);

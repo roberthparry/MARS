@@ -11,6 +11,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "string-t.h"
 #include "http_fixture.h"
 #include "json-t.h"
 

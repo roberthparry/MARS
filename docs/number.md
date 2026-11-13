@@ -624,9 +624,9 @@ their existing backend-specific precision and representation.
 | `num_erfc(x)` | Evaluates the complementary error function `1 - erf(x)`. |
 | `num_erfinv(x)` | Evaluates the principal inverse error function. |
 | `num_erfcinv(x)` | Evaluates the principal inverse complementary error function. |
-| `num_lambert_wn(k, x)` | Evaluates branch `k` of Lambert W, the inverse of `w e^w`. |
-| `num_lambert_w0(x)` | Evaluates the principal branch `W₀(x)`. |
-| `num_lambert_wm1(x)` | Evaluates the real lower branch `W₋₁(x)` where it exists, with principal complex continuation otherwise. |
+| `num_lambert_Wn(k, x)` | Evaluates branch `k` of Lambert W, the inverse of `w e^w`. |
+| `num_lambert_W0(x)` | Evaluates the principal branch `W₀(x)`. |
+| `num_lambert_Wm1(x)` | Evaluates the real lower branch `W₋₁(x)` where it exists, with principal complex continuation otherwise. |
 | `num_productlog(x)` | Evaluates the principal product logarithm, an alias of principal Lambert W. |
 | `num_beta(a, b)` | Evaluates Euler's beta function `B(a, b)`. |
 | `num_logbeta(a, b)` | Evaluates the principal logarithm of `B(a, b)`. |
@@ -652,15 +652,15 @@ their existing backend-specific precision and representation.
 | `num_lerch_phi(z, s, a)` | Compatibility spelling for `number_lerch_phi(z, s, a)`. |
 | `num_harmonic_poly(degree, x)` | Evaluates the finite harmonic polynomial Hₙ(x) = Σₖ₌₁ⁿ xᵏ/k; the degree must be an exact non-negative integer. |
 | `num_legendre_chi(s, x)` | Evaluates Legendre's chi function `χₛ(x)`. |
-| `num_bessel_j(ν, x)` | Evaluates the Bessel function of the first kind `Jν(x)`. |
-| `num_bessel_i(ν, x)` | Evaluates the principal modified Bessel function `Iν(x)`, including `I₀(x)` at order zero. |
-| `num_bessel_k(ν, x)` | Evaluates the principal modified Bessel function `Kν(x)` for real or complex order and non-zero argument. |
-| `num_bessel_y(ν, x)` | Evaluates the Bessel function of the second kind `Yν(x)`. |
-| `num_struve_l(ν, x)` | Evaluates the principal modified Struve function `Lν(x)` for real or complex inputs. |
-| `num_struve_h(ν, x)` | Evaluates the principal ordinary Struve function `Hν(x)` for real or complex inputs. |
-| `num_lommel_s(μ, ν, x)` | Evaluates the Lommel function `sμ,ν(x)`. |
-| `num_appell_f1(a, b1, b2, c, x, y)` | Evaluates the two-variable Appell `F₁` hypergeometric function. |
-| `num_lauricella_f(a, b, c, x, count)` | Evaluates Lauricella `F_D` for the paired parameter and argument arrays. |
+| `num_bessel_J(ν, x)` | Evaluates the Bessel function of the first kind `Jν(x)`. |
+| `num_bessel_I(ν, x)` | Evaluates the principal modified Bessel function `Iν(x)`, including `I₀(x)` at order zero. |
+| `num_bessel_K(ν, x)` | Evaluates the principal modified Bessel function `Kν(x)` for real or complex order and non-zero argument. |
+| `num_bessel_Y(ν, x)` | Evaluates the Bessel function of the second kind `Yν(x)`. |
+| `num_struve_L(ν, x)` | Evaluates the principal modified Struve function `Lν(x)` for real or complex inputs. |
+| `num_struve_H(ν, x)` | Evaluates the principal ordinary Struve function `Hν(x)` for real or complex inputs. |
+| `num_lommel_S(μ, ν, x)` | Evaluates the Lommel function `sμ,ν(x)`. |
+| `num_appell_F1(a, b1, b2, c, x, y)` | Evaluates the two-variable Appell `F₁` hypergeometric function. |
+| `num_lauricella_F(a, b, c, x, count)` | Evaluates Lauricella `F_D` for the paired parameter and argument arrays. |
 | `num_hypergeometric_pFq(upper, p, lower, q, x)` | Evaluates the generalised hypergeometric function with `p` upper and `q` lower parameters. |
 
 #### Incomplete gamma precision
@@ -757,7 +757,7 @@ and non-finite inputs return NaN. Each call returns an owning number.
 
 ### Bessel Y
 
-`num_bessel_y(order, argument)` returns an owning principal Bessel function
+`num_bessel_Y(order, argument)` returns an owning principal Bessel function
 of the second kind, including Y₀. Real and complex inputs use MPFR/MPC at
 the greatest input precision; exact inputs contribute the current default
 precision. The calculation does not change the input values or the default
@@ -795,7 +795,7 @@ wrappers additionally have the exponent range of their component type.
 int main(void)
 {
     NUM_SCOPE(scope);
-    number_t value = num_bessel_y(NUM_ZERO, NUM_ONE);
+    number_t value = num_bessel_Y(NUM_ZERO, NUM_ONE);
     printf("Y_0(1) = %.15f\n", num_to_double(value));
     num_destroy(&value);
     return 0;
@@ -812,7 +812,7 @@ the [qfloat](qfloat.md) and [qcomplex](qcomplex.md#bessel-y) APIs.
 
 ### Modified Bessel K
 
-`num_bessel_k(order, argument)` returns an owning number containing the
+`num_bessel_K(order, argument)` returns an owning number containing the
 principal modified Bessel function of the second kind. Both operands may be
 real or complex. Non-finite operands, a zero argument, or an operand magnitude
 greater than 1000 return NaN. Real orders with positive real arguments return
@@ -839,7 +839,7 @@ finite sums belong to the [expression layer](expression.md#inverse-hyperbolic-si
 
 ### Modified Bessel I
 
-`num_bessel_i(order, argument)` returns an owning number containing the
+`num_bessel_I(order, argument)` returns an owning number containing the
 unscaled modified Bessel function of the first kind. Order zero selects
 `I_0(z)`. Real, complex, exact rational and fixed-precision inputs use the
 widest input precision; exact inputs contribute the current default precision.
@@ -880,7 +880,7 @@ every point. No scaled or large-argument asymptotic evaluator is provided.
 int main(void)
 {
     NUM_SCOPE(scope);
-    number_t bessel = num_bessel_i(NUM_ZERO, NUM_ONE);
+    number_t bessel = num_bessel_I(NUM_ZERO, NUM_ONE);
     num_printf("I_0(1) = %.16n\n", bessel);
     return 0;
 }
@@ -892,7 +892,7 @@ I_0(1) = 1.266065877752008
 
 ### Ordinary Struve H
 
-`num_struve_h(order, argument)` returns an owning number containing the
+`num_struve_H(order, argument)` returns an owning number containing the
 unscaled principal ordinary Struve function. Real and complex orders and
 arguments are accepted, including exact integer and rational inputs. The
 result retains the greater input precision; exact inputs contribute the
@@ -941,7 +941,7 @@ do not guarantee success at every point.
 int main(void)
 {
     NUM_SCOPE(scope);
-    number_t ordinary = num_struve_h(NUM_ZERO, NUM_ONE);
+    number_t ordinary = num_struve_H(NUM_ZERO, NUM_ONE);
     num_printf("H_0(1) = %.15n\n", ordinary);
     return 0;
 }
@@ -953,7 +953,7 @@ H_0(1) = 0.568656627048288
 
 ### Modified Struve L
 
-`num_struve_l(order, argument)` returns an owning number containing the
+`num_struve_L(order, argument)` returns an owning number containing the
 unscaled principal modified Struve function. It accepts real and complex
 orders and arguments, including exact integers and rationals, and uses the
 greater input precision; exact inputs contribute the current default
@@ -1004,7 +1004,7 @@ every point passes the numerical guards.
 int main(void)
 {
     NUM_SCOPE(scope);
-    number_t value = num_struve_l(NUM_ZERO, NUM_ONE);
+    number_t value = num_struve_L(NUM_ZERO, NUM_ONE);
     num_printf("L_0(1) = %.16n\n", value);
     return 0;
 }
@@ -1061,7 +1061,7 @@ work budget returns `NULL` and discards partial factors. Without a control,
 factorisation is unrestricted and a difficult composite can take a long time;
 operand size alone does not predict its cost.
 
-Appell F₁ is the two-variable member of `num_lauricella_f(...)`. Its MPFR and
+Appell F₁ is the two-variable member of `num_lauricella_F(...)`. Its MPFR and
 MPC paths group the defining double series by total degree and generate the
 coefficients with a three-term recurrence. This avoids nested summation and
 retains the participating precision for real and complex parameters. The
@@ -1464,7 +1464,7 @@ Failures and timeouts remain visible. † marks a retained slowdown outlier.
 | acoth | 2.345 | 29.6 ns |
 | add | 0.7, 0.7 | 11.1 ns |
 | add_long | 17, 3 | 584.7 ns |
-| appell_f1 | 0.5, 0.7, 0.8, 2.5, 0.2, 0.3 | 23.1 µs |
+| appell_F1 | 0.5, 0.7, 0.8, 2.5, 0.2, 0.3 | 23.1 µs |
 | arccovercos | 0.5 | 113.3 ns |
 | arccoversin | 0.5 | 116.1 ns |
 | archacovercos | 0.5 | 218.2 ns |
@@ -1481,10 +1481,10 @@ Failures and timeouts remain visible. † marks a retained slowdown outlier.
 | atan | 0.7 | 29.6 ns |
 | atan2 | 0.5, -0.75 | 41.2 ns |
 | atanh | 0.7 | 25.8 ns |
-| bessel_i | 2, 0.7 | 45.4 µs |
-| bessel_j | 2, 0.7 | 7.3 µs |
-| bessel_k | 2, 0.7 | 26.7 µs |
-| bessel_y | 2, 0.7 | 17.9 µs |
+| bessel_I | 2, 0.7 | 45.4 µs |
+| bessel_J | 2, 0.7 | 7.3 µs |
+| bessel_K | 2, 0.7 | 26.7 µs |
+| bessel_Y | 2, 0.7 | 17.9 µs |
 | beta | 2.3, 4.5 | 131.6 ns |
 | beta_pdf | 0.5, 2.5, 3.5 | 183.8 ns |
 | binomial | 5, 2 | 381.7 ns |
@@ -1529,10 +1529,10 @@ Failures and timeouts remain visible. † marks a retained slowdown outlier.
 | hypot | 0.7, 1.2 | 22.4 ns |
 | imag_part | 0.7 | 26.0 ns |
 | inv | 0.7 | 8.5 ns |
-| lambert_w0 | 0.7 | 18.5 µs |
-| lambert_wm1 | -0.2 | 15.1 µs |
-| lambert_wn | 1, 0.7 | 31.1 µs |
-| lauricella_f | 0.5, 0.3, 2.5 | 19.9 µs |
+| lambert_W0 | 0.7 | 18.5 µs |
+| lambert_Wm1 | -0.2 | 15.1 µs |
+| lambert_Wn | 1, 0.7 | 31.1 µs |
+| lauricella_F | 0.5, 0.3, 2.5 | 19.9 µs |
 | ldexp | 1.23456789, 3 | 48.6 ns |
 | legendre_chi | 2, 0.7 | 30.4 µs |
 | lerch_phi | 0.3, 2, 1.4 | 84.1 µs |
@@ -1543,7 +1543,7 @@ Failures and timeouts remain visible. † marks a retained slowdown outlier.
 | log10 | 2.345678 | 22.3 ns |
 | logbeta | 2.3, 4.5 | 129.6 ns |
 | logbeta_pdf | 0.5, 2.5, 3.5 | 167.5 ns |
-| lommel_s | 0.5, 0.7, 1.2 | 7.1 µs |
+| lommel_S | 0.5, 0.7, 1.2 | 7.1 µs |
 | mul | 0.7, 0.7 | 12.3 ns |
 | mul_long | 17, 3 | 546.4 ns |
 | mul_pow10 | 1.23456789, 3 | 71.6 ns |
@@ -1576,8 +1576,8 @@ Failures and timeouts remain visible. † marks a retained slowdown outlier.
 | sqr | 0.7 | 9.4 ns |
 | sqrt | 1.23456789 | 9.8 ns |
 | step | 0.7 | 124.0 ns |
-| struve_h | 2, 0.7 | 62.4 µs |
-| struve_l | 2, 0.7 | 70.7 µs |
+| struve_H | 2, 0.7 | 62.4 µs |
+| struve_L | 2, 0.7 | 70.7 µs |
 | sub | 0.7, 0.7 | 32.6 ns |
 | tan | 0.7 | 12.9 µs † |
 | tanh | 0.7 | 304.3 ns |
@@ -1607,7 +1607,7 @@ Failures and timeouts remain visible. † marks a retained slowdown outlier.
 | acoth | 2.345 | 7.6 µs | 11.8 µs | 20.0 µs † | 25.7 µs † | 209.7 µs † | 165.4 µs |
 | add | 0.7, 0.7 | 133.8 ns | 168.5 ns | 134.4 ns | 347.9 ns | 237.3 ns | 276.5 ns |
 | add_long | 17, 3 | 629.2 ns | 924.5 ns | 1.0 µs | 1.8 µs † | 1.1 µs | 832.4 ns |
-| appell_f1 | 0.5, 0.7, 0.8, 2.5, 0.2, 0.3 | 138.4 µs | 402.6 µs | 799.0 µs † | 2.250 ms † | 5.402 ms | 25.774 ms |
+| appell_F1 | 0.5, 0.7, 0.8, 2.5, 0.2, 0.3 | 138.4 µs | 402.6 µs | 799.0 µs † | 2.250 ms † | 5.402 ms | 25.774 ms |
 | arccovercos | 0.5 | 15.3 µs | 34.8 µs † | 47.2 µs | 60.6 µs | 115.3 µs | 392.6 µs |
 | arccoversin | 0.5 | 15.7 µs | 26.1 µs | 37.8 µs | 48.6 µs | 96.3 µs | 332.5 µs |
 | archacovercos | 0.5 | 1.5 µs | 1.6 µs | 2.4 µs | 1.8 µs | 1.9 µs | 2.3 µs |
@@ -1624,10 +1624,10 @@ Failures and timeouts remain visible. † marks a retained slowdown outlier.
 | atan | 0.7 | 15.2 µs | 23.1 µs | 38.5 µs | 56.5 µs | 134.9 µs | 285.7 µs |
 | atan2 | 0.5, -0.75 | 14.7 µs | 32.1 µs | 29.3 µs | 66.4 µs | 114.4 µs | 360.9 µs |
 | atanh | 0.7 | 6.7 µs | 9.9 µs | 15.3 µs | 17.8 µs | 48.8 µs | 163.9 µs |
-| bessel_i | 2, 0.7 | 107.7 µs | 230.6 µs | 440.9 µs | 534.6 µs | 2.047 ms | 9.002 ms |
-| bessel_j | 2, 0.7 | 8.1 µs | 19.0 µs | 26.5 µs | 60.4 µs † | 181.8 µs | 894.0 µs |
-| bessel_k | 2, 0.7 | 65.3 µs | 106.4 µs | 178.9 µs | 274.7 µs | 1.303 ms † | 5.419 ms |
-| bessel_y | 2, 0.7 | 42.6 µs | 98.6 µs | 183.3 µs | 282.3 µs | 1.403 ms † | 5.577 ms † |
+| bessel_I | 2, 0.7 | 107.7 µs | 230.6 µs | 440.9 µs | 534.6 µs | 2.047 ms | 9.002 ms |
+| bessel_J | 2, 0.7 | 8.1 µs | 19.0 µs | 26.5 µs | 60.4 µs † | 181.8 µs | 894.0 µs |
+| bessel_K | 2, 0.7 | 65.3 µs | 106.4 µs | 178.9 µs | 274.7 µs | 1.303 ms † | 5.419 ms |
+| bessel_Y | 2, 0.7 | 42.6 µs | 98.6 µs | 183.3 µs | 282.3 µs | 1.403 ms † | 5.577 ms † |
 | beta | 2.3, 4.5 | 112.2 µs | 300.5 µs | 459.0 µs | 876.7 µs | 3.831 ms | 27.760 ms † |
 | beta_pdf | 0.5, 2.5, 3.5 | 103.9 µs | 244.1 µs | 441.0 µs | 585.1 µs | 2.208 ms | 14.646 ms |
 | binomial | 5, 2 | 107.4 µs | 276.9 µs | 638.3 µs | 730.1 µs | 3.810 ms | 15.276 ms |
@@ -1672,8 +1672,8 @@ Failures and timeouts remain visible. † marks a retained slowdown outlier.
 | hypot | 0.7, 1.2 | 820.9 ns | 948.3 ns | 1.4 µs | 2.1 µs | 3.3 µs | 9.7 µs |
 | imag_part | 0.7 | 95.1 ns | 90.1 ns | 85.2 ns | 104.9 ns | 104.6 ns | 87.8 ns |
 | inv | 0.7 | 244.1 ns | 317.0 ns | 483.2 ns | 1.5 µs † | 1.7 µs | 5.4 µs |
-| lambert_w0 | 0.7 | 56.8 µs | 101.3 µs | 181.3 µs | 375.5 µs | 945.5 µs | 4.059 ms |
-| lambert_wm1 | -0.2 | 75.7 µs | 133.9 µs | 245.7 µs | 350.3 µs | 1.063 ms | 8.568 ms † |
+| lambert_W0 | 0.7 | 56.8 µs | 101.3 µs | 181.3 µs | 375.5 µs | 945.5 µs | 4.059 ms |
+| lambert_Wm1 | -0.2 | 75.7 µs | 133.9 µs | 245.7 µs | 350.3 µs | 1.063 ms | 8.568 ms † |
 | ldexp | 1.23456789, 3 | 156.9 ns | 131.1 ns | 193.3 ns | 236.6 ns | 167.1 ns | 276.0 ns |
 | legendre_chi | 2, 0.7 | 55.2 µs | 131.2 µs | 199.8 µs | 335.8 µs | 909.6 µs | 3.454 ms |
 | lerch_phi | 0.3, 2, 1.4 | 195.0 µs | 600.9 µs | 1.162 ms † | 1.408 ms † | 6.013 ms † | 28.873 ms † |
@@ -1684,7 +1684,7 @@ Failures and timeouts remain visible. † marks a retained slowdown outlier.
 | log10 | 2.345678 | 14.3 µs | 24.5 µs | 35.9 µs | 39.1 µs | 115.7 µs | 240.8 µs |
 | logbeta | 2.3, 4.5 | 114.9 µs | 293.1 µs | 643.5 µs | 947.6 µs | 6.025 ms † | 19.888 ms |
 | logbeta_pdf | 0.5, 2.5, 3.5 | 111.2 µs | 213.7 µs | 497.1 µs | 774.9 µs | 2.872 ms | 12.836 ms † |
-| lommel_s | 0.5, 0.7, 1.2 | 33.1 µs | 72.8 µs | 149.6 µs | 298.7 µs | 959.1 µs | 3.493 ms |
+| lommel_S | 0.5, 0.7, 1.2 | 33.1 µs | 72.8 µs | 149.6 µs | 298.7 µs | 959.1 µs | 3.493 ms |
 | mul | 0.7, 0.7 | 122.8 ns | 224.7 ns | 257.2 ns | 475.3 ns | 1.2 µs | 3.0 µs |
 | mul_long | 17, 3 | 763.9 ns | 868.2 ns | 1.2 µs | 1.0 µs | 1.3 µs † | 1.0 µs |
 | mul_pow10 | 1.23456789, 3 | 380.0 ns | 454.3 ns | 801.2 ns | 599.5 ns | 608.7 ns | 819.7 ns |
@@ -1716,8 +1716,8 @@ Failures and timeouts remain visible. † marks a retained slowdown outlier.
 | sqr | 0.7 | 204.8 ns | 230.2 ns | 369.9 ns | 539.6 ns | 770.4 ns | 1.7 µs |
 | sqrt | 1.23456789 | 320.9 ns | 640.2 ns | 726.8 ns | 735.3 ns | 1.8 µs | 3.3 µs |
 | step | 0.7 | 232.5 ns | 246.6 ns | 322.9 ns | 402.7 ns | 310.6 ns | 412.1 ns |
-| struve_h | 2, 0.7 | 176.7 µs | 425.4 µs | 852.6 µs | 1.052 ms | 2.903 ms | 17.807 ms |
-| struve_l | 2, 0.7 | 188.3 µs | 430.2 µs | 702.1 µs | 1.022 ms | 3.534 ms | 16.416 ms |
+| struve_H | 2, 0.7 | 176.7 µs | 425.4 µs | 852.6 µs | 1.052 ms | 2.903 ms | 17.807 ms |
+| struve_L | 2, 0.7 | 188.3 µs | 430.2 µs | 702.1 µs | 1.022 ms | 3.534 ms | 16.416 ms |
 | sub | 0.7, 0.7 | 90.6 ns | 117.7 ns | 103.4 ns | 167.4 ns | 180.6 ns | 387.1 ns |
 | tan | 0.7 | 15.7 µs | 21.6 µs † | 24.1 µs | 32.2 µs | 56.4 µs | 215.3 µs |
 | tanh | 0.7 | 3.2 µs | 6.5 µs | 12.5 µs | 19.0 µs | 62.0 µs | 237.2 µs |
@@ -1747,7 +1747,7 @@ Failures and timeouts remain visible. † marks a retained slowdown outlier.
 | acoth | 2.345+0.125i | 132.1 µs † | 62.8 µs | 79.4 µs | 107.2 µs | 230.7 µs | 963.9 µs |
 | add | 0.7+0.125i, 0.7+0.125i | 798.6 ns | 440.3 ns | 439.5 ns | 406.0 ns | 459.7 ns | 559.4 ns |
 | add_long | 17+0.125i, 3 | 4.2 µs † | 3.4 µs | 2.6 µs | 3.4 µs | 3.2 µs | 2.7 µs |
-| appell_f1 | <span style="display:inline-block;width:40ch;max-width:100%;white-space:normal;overflow-wrap:anywhere">0.5+0.125i, 0.7+0.125i, 0.8+0.125i, 2.5+<br/>0.125i, 0.2+0.125i, 0.3+0.125i</span> | 758.5 µs † | 1.460 ms | 2.524 ms | 5.192 ms | 21.524 ms | 127.651 ms |
+| appell_F1 | <span style="display:inline-block;width:40ch;max-width:100%;white-space:normal;overflow-wrap:anywhere">0.5+0.125i, 0.7+0.125i, 0.8+0.125i, 2.5+<br/>0.125i, 0.2+0.125i, 0.3+0.125i</span> | 758.5 µs † | 1.460 ms | 2.524 ms | 5.192 ms | 21.524 ms | 127.651 ms |
 | arccovercos | 0.5+0.125i | 94.0 µs † | 87.7 µs | 68.9 µs | 145.7 µs | 162.1 µs | 434.2 µs |
 | arccoversin | 0.5+0.125i | 80.9 µs | 50.7 µs | 58.1 µs | 187.7 µs | 157.6 µs | 523.8 µs |
 | archacovercos | 0.5+0.125i | 16.1 µs † | 19.0 µs | 21.2 µs | 27.1 µs | 44.3 µs | 124.7 µs |
@@ -1763,10 +1763,10 @@ Failures and timeouts remain visible. † marks a retained slowdown outlier.
 | asinh | 0.7+0.125i | 77.0 µs | 72.0 µs | 116.2 µs | 137.2 µs | 348.1 µs | 1.122 ms |
 | atan | 0.7+0.125i | 92.0 µs † | 96.5 µs | 91.9 µs | 148.7 µs | 341.1 µs | 859.1 µs |
 | atanh | 0.7+0.125i | 41.9 µs | 61.2 µs | 92.5 µs | 126.3 µs | 277.1 µs | 870.5 µs |
-| bessel_i | 2, 0.7+0.125i | 298.7 µs † | 475.2 µs | 732.3 µs | 1.199 ms | 4.065 ms | 16.836 ms |
-| bessel_j | 2, 0.7+0.125i | 258.1 µs | 548.3 µs † | 870.3 µs | 1.226 ms | 4.295 ms | 16.443 ms |
-| bessel_k | 2, 0.7+0.125i | 216.7 µs † | 241.4 µs | 478.8 µs | 738.5 µs | 2.338 ms | 12.875 ms |
-| bessel_y | 2, 0.7+0.125i | 406.5 µs † | 412.2 µs | 708.5 µs | 1.097 ms | 4.360 ms | 18.857 ms |
+| bessel_I | 2, 0.7+0.125i | 298.7 µs † | 475.2 µs | 732.3 µs | 1.199 ms | 4.065 ms | 16.836 ms |
+| bessel_J | 2, 0.7+0.125i | 258.1 µs | 548.3 µs † | 870.3 µs | 1.226 ms | 4.295 ms | 16.443 ms |
+| bessel_K | 2, 0.7+0.125i | 216.7 µs † | 241.4 µs | 478.8 µs | 738.5 µs | 2.338 ms | 12.875 ms |
+| bessel_Y | 2, 0.7+0.125i | 406.5 µs † | 412.2 µs | 708.5 µs | 1.097 ms | 4.360 ms | 18.857 ms |
 | ceil | 0.7+0.125i | 1.7 µs | 1.5 µs | 1.6 µs | 1.6 µs | 1.7 µs | 1.6 µs |
 | chebyshev_Tn | 2, 0.7+0.125i | 12.3 µs | 11.6 µs | 13.1 µs | 11.5 µs | 12.3 µs | 18.6 µs |
 | chebyshev_Un | 2, 0.7+0.125i | 14.7 µs | 14.0 µs | 12.2 µs | 16.6 µs | 15.9 µs | 18.5 µs |
@@ -1815,7 +1815,7 @@ Failures and timeouts remain visible. † marks a retained slowdown outlier.
 | ln | 2.345678+0.125i | 20.6 µs | 31.7 µs | 40.2 µs | 57.6 µs | 190.6 µs | 355.4 µs |
 | log | 2.345678+0.125i | 24.8 µs | 31.7 µs | 39.5 µs | 65.1 µs | 174.3 µs | 400.6 µs |
 | log10 | 2.345678+0.125i | 24.3 µs | 56.0 µs | 55.5 µs | 85.8 µs | 180.7 µs | 572.8 µs |
-| lommel_s | 0.5+0.125i, 0.7+0.125i, 1.2+0.125i | 244.6 µs | 432.9 µs | 843.5 µs | 1.334 ms | 7.216 ms † | 21.843 ms |
+| lommel_S | 0.5+0.125i, 0.7+0.125i, 1.2+0.125i | 244.6 µs | 432.9 µs | 843.5 µs | 1.334 ms | 7.216 ms † | 21.843 ms |
 | mul | 0.7+0.125i, 0.7+0.125i | 1.6 µs | 1.8 µs | 2.0 µs | 3.1 µs | 11.4 µs † | 7.1 µs |
 | mul_long | 17+0.125i, 3 | 4.1 µs | 4.1 µs | 3.6 µs | 3.1 µs | 4.9 µs | 5.1 µs |
 | mul_pow10 | 1.23456789+0.125i, 3 | 3.4 µs | 3.2 µs | 4.3 µs | 3.1 µs | 4.0 µs | 4.1 µs |
@@ -1844,8 +1844,8 @@ Failures and timeouts remain visible. † marks a retained slowdown outlier.
 | sqr | 0.7+0.125i | 1.8 µs | 2.0 µs | 2.2 µs | 3.0 µs | 4.7 µs | 10.6 µs † |
 | sqrt | 1.23456789+0.125i | 2.9 µs | 2.5 µs | 3.7 µs | 5.5 µs | 6.7 µs | 15.2 µs |
 | step | 0.7 | 820.5 ns | 838.2 ns | 878.9 ns | 954.4 ns | 1.1 µs | 793.2 ns |
-| struve_h | 2, 0.7+0.125i | 265.6 µs | 686.6 µs | 945.4 µs | 1.584 ms | 6.746 ms | 21.221 ms |
-| struve_l | 2, 0.7+0.125i | 316.5 µs | 589.6 µs | 1.353 ms | 1.687 ms | 5.180 ms | 21.095 ms |
+| struve_H | 2, 0.7+0.125i | 265.6 µs | 686.6 µs | 945.4 µs | 1.584 ms | 6.746 ms | 21.221 ms |
+| struve_L | 2, 0.7+0.125i | 316.5 µs | 589.6 µs | 1.353 ms | 1.687 ms | 5.180 ms | 21.095 ms |
 | sub | 0.7+0.125i, 0.7+0.125i | 420.3 ns | 450.0 ns | 371.5 ns | 432.6 ns | 400.7 ns | 571.3 ns |
 | tan | 0.7+0.125i | 15.2 µs | 57.3 µs † | 29.2 µs | 47.6 µs | 122.8 µs | 384.9 µs |
 | tanh | 0.7+0.125i | 33.4 µs | 23.9 µs | 83.0 µs | 41.5 µs | 99.3 µs | 320.4 µs |

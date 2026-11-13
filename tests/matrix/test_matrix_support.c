@@ -9,6 +9,7 @@
  * implementation.
  */
 
+#include "string-t.h"
 #include "test_matrix.h"
 
 char current_matrix_input_label[128];

@@ -21,10 +21,10 @@ static bool uses(const expr_t *e, const expr_t *x)
 
 /* Modified Bessel I. */
 
-static number_t bessel_i_eval(expr_t *e)
+static number_t bessel_I_eval(expr_t *e)
 {
     number_t order = expr_eval(e->a), z = expr_eval(e->b);
-    number_t result = num_bessel_i(order, z);
+    number_t result = num_bessel_I(order, z);
     num_destroy(&order);
     num_destroy(&z);
     return result;
@@ -54,7 +54,7 @@ static expr_t *reflect_literal_order(expr_t *order)
 }
 
 /* DLMF 10.29.1: the symmetric derivative introduces no removable division by z. */
-static expr_t *bessel_i_deriv(expr_t *e)
+static expr_t *bessel_I_deriv(expr_t *e)
 {
     const expr_t *x = expr_current_wrt_internal();
     if (!x)
@@ -68,7 +68,7 @@ static expr_t *bessel_i_deriv(expr_t *e)
 
     expr_t *order = reflect_literal_order(expr_simplify(e->a));
     expr_t *lower_order = expr_add_long(order, -1), *upper_order = expr_add_long(order, 1);
-    expr_t *lower = expr_bessel_i(lower_order, e->b), *upper = expr_bessel_i(upper_order, e->b);
+    expr_t *lower = expr_bessel_I(lower_order, e->b), *upper = expr_bessel_I(upper_order, e->b);
     expr_t *sum = expr_add(lower, upper), *local = expr_div_num(sum, &NUM_TWO);
     expr_t *chain = expr_create_deriv(e->b, x), *result = expr_mul(local, chain);
     expr_free(chain); expr_free(local); expr_free(sum); expr_free(upper); expr_free(lower);
@@ -76,7 +76,7 @@ static expr_t *bessel_i_deriv(expr_t *e)
     return result;
 }
 
-static void bessel_i_reverse(const expr_t *e, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
+static void bessel_I_reverse(const expr_t *e, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
 {
     number_t order = expr_eval(e->a), z = expr_eval(e->b);
     if (negative_integer(order)) {
@@ -85,7 +85,7 @@ static void bessel_i_reverse(const expr_t *e, const number_t *out_bar, number_t 
         order = positive;
     }
     number_t lower_order = num_add_long(order, -1), upper_order = num_add_long(order, 1);
-    number_t lower = num_bessel_i(lower_order, z), upper = num_bessel_i(upper_order, z);
+    number_t lower = num_bessel_I(lower_order, z), upper = num_bessel_I(upper_order, z);
     number_t sum = num_add(lower, upper), factor = num_div(sum, NUM_TWO);
     *a_bar = NUM_NAN;
     *b_bar = num_mul(*out_bar, factor);
@@ -97,7 +97,7 @@ static void bessel_i_reverse(const expr_t *e, const number_t *out_bar, number_t 
  * Termwise integration gives 2 (z/2)^(n+1) 1F2((n+1)/2;n+1,(n+3)/2;z^2/4)
  * divided by (n+1) Gamma(n+1). Reflection precedes parameter construction so that negative
  * integral orders never generate spurious gamma poles or terminating hypergeometric quotients. */
-static expr_t *bessel_i_series(const expr_t *order, const expr_t *z, bool primitive)
+static expr_t *bessel_I_series(const expr_t *order, const expr_t *z, bool primitive)
 {
     NUM_SCOPE(scope);
     if (!order || !z)
@@ -154,12 +154,12 @@ static expr_t *bessel_i_series(const expr_t *order, const expr_t *z, bool primit
 }
 
 /* Expand numerical orders for symbolic verification, with the exact entire 0F1 form at order zero. */
-expr_t *expr_bessel_i_hypergeometric(const expr_t *order, const expr_t *argument)
+expr_t *expr_bessel_I_hypergeometric(const expr_t *order, const expr_t *argument)
 {
-    return bessel_i_series(order, argument, false);
+    return bessel_I_series(order, argument, false);
 }
 
-static expr_t *bessel_i_integrate(const expr_t *e, const expr_t *x)
+static expr_t *bessel_I_integrate(const expr_t *e, const expr_t *x)
 {
     if (uses(e->a, x))
         return NULL;
@@ -170,12 +170,12 @@ static expr_t *bessel_i_integrate(const expr_t *e, const expr_t *x)
         expr_free(rate);
         return NULL;
     }
-    expr_t *primitive = bessel_i_series(e->a, e->b, true), *result = expr_div(primitive, rate);
+    expr_t *primitive = bessel_I_series(e->a, e->b, true), *result = expr_div(primitive, rate);
     expr_free(primitive); expr_free(rate);
     return result;
 }
 
-static expr_t *bessel_i_simplify(const expr_t *e, expr_t *order, expr_t *z)
+static expr_t *bessel_I_simplify(const expr_t *e, expr_t *order, expr_t *z)
 {
     order = reflect_literal_order(order);
     if (order && z && expr_is_const(order) && !order->name && num_is_finite(order->c) &&
@@ -193,35 +193,35 @@ static expr_t *bessel_i_simplify(const expr_t *e, expr_t *order, expr_t *z)
     return expr_simplify_binary_operator(e, order, z);
 }
 
-const expr_ops_t ops_bessel_i = {
-    .eval = bessel_i_eval, .deriv = bessel_i_deriv, .kind = EXPR_KIND_BESSEL_I, .arity = EXPR_OP_BINARY,
-    .expression_name = "BesselI", .function_name = "besseli", .apply_binary = expr_bessel_i,
-    .simplify = bessel_i_simplify, .integrate = bessel_i_integrate,
-    .reverse = bessel_i_reverse,
+const expr_ops_t ops_bessel_I = {
+    .eval = bessel_I_eval, .deriv = bessel_I_deriv, .kind = EXPR_KIND_BESSEL_I, .arity = EXPR_OP_BINARY,
+    .expression_name = "BesselI", .function_name = "besseli", .apply_binary = expr_bessel_I,
+    .simplify = bessel_I_simplify, .integrate = bessel_I_integrate,
+    .reverse = bessel_I_reverse,
 };
 
 /* Construct the principal modified Bessel function with its order and argument retained. */
-expr_t *expr_bessel_i(const expr_t *order, const expr_t *argument)
+expr_t *expr_bessel_I(const expr_t *order, const expr_t *argument)
 {
     if (!order || !argument)
         return NULL;
     expr_retain(order);
     expr_retain(argument);
-    return expr_new_binary_internal(&ops_bessel_i, order, argument);
+    return expr_new_binary_internal(&ops_bessel_I, order, argument);
 }
 
 /* Modified Bessel K. */
 
-static number_t bessel_k_eval(expr_t *e)
+static number_t bessel_K_eval(expr_t *e)
 {
     number_t n = expr_eval(e->a), z = expr_eval(e->b);
-    number_t result = num_bessel_k(n, z);
+    number_t result = num_bessel_K(n, z);
     num_destroy(&n);
     num_destroy(&z);
     return result;
 }
 
-static expr_t *bessel_k_deriv(expr_t *e)
+static expr_t *bessel_K_deriv(expr_t *e)
 {
     const expr_t *x = expr_current_wrt_internal();
     if (!x)
@@ -231,7 +231,7 @@ static expr_t *bessel_k_deriv(expr_t *e)
         return expr_new_formal_derivative(e, 1u, &variable);
     }
     expr_t *lower_n = expr_add_long(e->a, -1), *upper_n = expr_add_long(e->a, 1);
-    expr_t *lower = expr_bessel_k(lower_n, e->b), *upper = expr_bessel_k(upper_n, e->b);
+    expr_t *lower = expr_bessel_K(lower_n, e->b), *upper = expr_bessel_K(upper_n, e->b);
     number_t coefficient = num_neg(NUM_HALF);
     expr_t *sum = expr_add(lower, upper), *half = expr_new_const(coefficient);
     num_destroy(&coefficient);
@@ -246,8 +246,8 @@ static expr_t *bessel_k_deriv(expr_t *e)
 static expr_t *zero_primitive(const expr_t *z)
 {
     expr_t *one = expr_const_one(), *zero = expr_const_zero(), *minus_one = expr_const_long(-1);
-    expr_t *l0 = expr_struve_l(zero, z), *lm1 = expr_struve_l(minus_one, z);
-    expr_t *k0 = expr_bessel_k(zero, z), *k1 = expr_bessel_k(one, z);
+    expr_t *l0 = expr_struve_L(zero, z), *lm1 = expr_struve_L(minus_one, z);
+    expr_t *k0 = expr_bessel_K(zero, z), *k1 = expr_bessel_K(one, z);
     expr_t *left = expr_mul(k0, lm1), *right = expr_mul(k1, l0), *sum = expr_add(left, right);
     expr_t *pi = expr_new_named_const(NUM_PI, "@pi"), *pi_z = expr_mul(pi, z);
     expr_t *scale = expr_div_num(pi_z, &NUM_TWO), *result = expr_mul(scale, sum);
@@ -257,7 +257,7 @@ static expr_t *zero_primitive(const expr_t *z)
     return result;
 }
 
-static expr_t *bessel_k_integrate(const expr_t *e, const expr_t *x)
+static expr_t *bessel_K_integrate(const expr_t *e, const expr_t *x)
 {
     if (uses(e->a, x) || !expr_is_const(e->a) || !num_is_real(e->a->c) || !num_is_integer(e->a->c))
         return NULL;
@@ -270,10 +270,10 @@ static expr_t *bessel_k_integrate(const expr_t *e, const expr_t *x)
         return NULL;
     }
     long n = (long)degree;
-    expr_t *zero = expr_const_zero(), *k0 = expr_bessel_k(zero, e->b);
+    expr_t *zero = expr_const_zero(), *k0 = expr_bessel_K(zero, e->b);
     expr_t *primitive = n % 2 ? expr_neg(k0) : zero_primitive(e->b);
     for (long order = n % 2 + 2; order <= n; order += 2) {
-        expr_t *index = expr_const_long(order-1), *k = expr_bessel_k(index, e->b);
+        expr_t *index = expr_const_long(order-1), *k = expr_bessel_K(index, e->b);
         expr_t *minus_two = expr_const_long(-2), *term = expr_mul(minus_two, k);
         expr_t *next = expr_sub(term, primitive);
         expr_free(term); expr_free(minus_two); expr_free(k); expr_free(index); expr_free(primitive);
@@ -284,7 +284,7 @@ static expr_t *bessel_k_integrate(const expr_t *e, const expr_t *x)
     return result;
 }
 
-static expr_t *bessel_k_simplify(const expr_t *e, expr_t *n, expr_t *z)
+static expr_t *bessel_K_simplify(const expr_t *e, expr_t *n, expr_t *z)
 {
     expr_t *positive = expr_simplify_positive_part_if_negative(n);
     if (positive) {
@@ -294,20 +294,20 @@ static expr_t *bessel_k_simplify(const expr_t *e, expr_t *n, expr_t *z)
     return expr_simplify_binary_operator(e, n, z);
 }
 
-const expr_ops_t ops_bessel_k = {
-    .eval = bessel_k_eval, .deriv = bessel_k_deriv, .kind = EXPR_KIND_BESSEL_K, .arity = EXPR_OP_BINARY,
-    .expression_name = "BesselK", .function_name = "besselk", .apply_binary = expr_bessel_k,
-    .simplify = bessel_k_simplify, .integrate = bessel_k_integrate,
+const expr_ops_t ops_bessel_K = {
+    .eval = bessel_K_eval, .deriv = bessel_K_deriv, .kind = EXPR_KIND_BESSEL_K, .arity = EXPR_OP_BINARY,
+    .expression_name = "BesselK", .function_name = "besselk", .apply_binary = expr_bessel_K,
+    .simplify = bessel_K_simplify, .integrate = bessel_K_integrate,
 };
 
 /* Construct an order-argument node, preserving the scalar function for all output styles. */
-expr_t *expr_bessel_k(const expr_t *order, const expr_t *argument)
+expr_t *expr_bessel_K(const expr_t *order, const expr_t *argument)
 {
     if (!order || !argument)
         return NULL;
     expr_retain(order);
     expr_retain(argument);
-    return expr_new_binary_internal(&ops_bessel_k, order, argument);
+    return expr_new_binary_internal(&ops_bessel_K, order, argument);
 }
 
 /* Bessel Y of the second kind. */
@@ -321,10 +321,10 @@ static bool odd_integer(number_t value)
 }
 
 /* Evaluate the principal Bessel Y function through the number module. */
-number_t eval_bessel_y(expr_t *e)
+number_t eval_bessel_Y(expr_t *e)
 {
     number_t order = expr_eval(e->a), z = expr_eval(e->b);
-    number_t result = num_bessel_y(order, z);
+    number_t result = num_bessel_Y(order, z);
     num_destroy(&z); num_destroy(&order);
     return result;
 }
@@ -337,14 +337,14 @@ static expr_t *argument_derivative(const expr_t *order, const expr_t *z)
     bool literal = expr_is_const(n) && !n->name && num_is_finite(n->c);
     if (literal && num_is_zero(n->c)) {
         /* Y0' = -Y1 preserves its genuine origin singularity without subtracting infinities. */
-        expr_t *one = expr_const_one(), *y1 = expr_bessel_y(one, z), *result = expr_neg(y1);
+        expr_t *one = expr_const_one(), *y1 = expr_bessel_Y(one, z), *result = expr_neg(y1);
         expr_free(y1); expr_free(one); expr_free(n);
         return result;
     }
     /* Keep both adjacent orders in the native Y backend, including negative half-integral orders.
      * At zero, the numeric backend's extension (or rejection) is inherited consistently. */
     expr_t *lower_order = expr_add_long(n, -1), *upper_order = expr_add_long(n, 1);
-    expr_t *lower = expr_bessel_y(lower_order, z), *upper = expr_bessel_y(upper_order, z);
+    expr_t *lower = expr_bessel_Y(lower_order, z), *upper = expr_bessel_Y(upper_order, z);
     expr_t *difference = expr_sub(lower, upper), *result = expr_div_num(difference, &NUM_TWO);
     expr_free(difference); expr_free(upper); expr_free(lower);
     expr_free(upper_order); expr_free(lower_order); expr_free(n);
@@ -352,7 +352,7 @@ static expr_t *argument_derivative(const expr_t *order, const expr_t *z)
 }
 
 /* Differentiate in the argument; order-dependent derivatives remain formal. */
-expr_t *deriv_bessel_y(expr_t *e)
+expr_t *deriv_bessel_Y(expr_t *e)
 {
     const expr_t *x = expr_current_wrt_internal();
     if (!x)
@@ -370,7 +370,7 @@ expr_t *deriv_bessel_y(expr_t *e)
 }
 
 /* Reuse the guarded local derivative in the existing reverse-mode dispatch. */
-void expr_reverse_bessel_y(const expr_t *e, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
+void expr_reverse_bessel_Y(const expr_t *e, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
 {
     number_t order_value = expr_eval(e->a);
     expr_t *order = expr_new_const(order_value);
@@ -382,13 +382,13 @@ void expr_reverse_bessel_y(const expr_t *e, const number_t *out_bar, number_t *a
     expr_free(local); expr_free(order);
 }
 
-static expr_t *bessel_y_simplify(const expr_t *e, expr_t *order, expr_t *z)
+static expr_t *bessel_Y_simplify(const expr_t *e, expr_t *order, expr_t *z)
 {
     if (order && z && expr_is_const(order) && !order->name && num_is_finite(order->c) &&
         num_is_real(order->c) && num_lt(order->c, NUM_ZERO) && num_is_integer(order->c)) {
         number_t positive = num_neg(order->c);
         bool negate = odd_integer(positive);
-        expr_t *n = expr_new_const(positive), *result = expr_bessel_y(n, z);
+        expr_t *n = expr_new_const(positive), *result = expr_bessel_Y(n, z);
         if (negate)
             result = expr_negate_owned(result);
         num_destroy(&positive);
@@ -398,19 +398,19 @@ static expr_t *bessel_y_simplify(const expr_t *e, expr_t *order, expr_t *z)
     return expr_simplify_binary_operator(e, order, z);
 }
 
-const expr_ops_t ops_bessel_y = {
-    .eval = eval_bessel_y, .deriv = deriv_bessel_y, .reverse = expr_reverse_bessel_y,
+const expr_ops_t ops_bessel_Y = {
+    .eval = eval_bessel_Y, .deriv = deriv_bessel_Y, .reverse = expr_reverse_bessel_Y,
     .kind = EXPR_KIND_BESSEL_Y, .arity = EXPR_OP_BINARY,
-    .expression_name = "BesselY", .function_name = "bessely", .apply_binary = expr_bessel_y,
-    .integrate = expr_integrate_dispatch_primitive, .simplify = bessel_y_simplify,
+    .expression_name = "BesselY", .function_name = "bessely", .apply_binary = expr_bessel_Y,
+    .integrate = expr_integrate_dispatch_primitive, .simplify = bessel_Y_simplify,
 };
 
 /* Construct the principal Bessel function of the second kind, retaining its operands. */
-expr_t *expr_bessel_y(const expr_t *order, const expr_t *argument)
+expr_t *expr_bessel_Y(const expr_t *order, const expr_t *argument)
 {
     if (!order || !argument)
         return NULL;
     expr_retain(order);
     expr_retain(argument);
-    return expr_new_binary_internal(&ops_bessel_y, order, argument);
+    return expr_new_binary_internal(&ops_bessel_Y, order, argument);
 }

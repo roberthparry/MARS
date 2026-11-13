@@ -821,20 +821,20 @@ static void emit_expr_inner(const expr_t *f, sbuf_t *b, int parent_prec)
             emit_expr_legendre_chi(f, b);
             return;
         }
-        if (expr_is_op(f, &ops_lambert_wn)) {
-            emit_expr_lambert_wn(f, b);
+        if (expr_is_op(f, &ops_lambert_Wn)) {
+            emit_expr_lambert_Wn(f, b);
             return;
         }
-        if (expr_is_op(f, &ops_lommel_s)) {
-            emit_expr_lommel_s(f, b);
+        if (expr_is_op(f, &ops_lommel_S)) {
+            emit_expr_lommel_S(f, b);
             return;
         }
-        if (expr_is_op(f, &ops_appell_f1)) {
-            emit_expr_appell_f1(f, b);
+        if (expr_is_op(f, &ops_appell_F1)) {
+            emit_expr_appell_F1(f, b);
             return;
         }
-        if (expr_is_op(f, &ops_lauricella_f)) {
-            emit_expr_lauricella_f(f, b);
+        if (expr_is_op(f, &ops_lauricella_F)) {
+            emit_expr_lauricella_F(f, b);
             return;
         }
         if (expr_is_op(f, &ops_hypergeometric_pFq)) {

@@ -15,6 +15,7 @@
 #include <unistd.h>
 #include <wchar.h>
 
+#include "string-t.h"
 #include "array-t.h"
 #define MARS_TEST_DATABASE_INTERNAL_ACCESS
 #include "test_database_internal.h"

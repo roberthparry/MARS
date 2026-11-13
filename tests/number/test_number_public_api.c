@@ -14,6 +14,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "string-t.h"
 #include "test_number.h"
 
 static void test_scoped_payload_index(void)

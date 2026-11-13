@@ -252,7 +252,7 @@ static expr_t *special_bessel(const expr_t *f, const expr_t *t, const expr_t *s,
 {
     if (special_uses(f->a, t))
         return NULL;
-    bool second_kind = f->ops == &ops_bessel_y;
+    bool second_kind = f->ops == &ops_bessel_Y;
     bool known = special_constant(f->a);
     bool negative_integer = false;
     bool odd = false;
@@ -500,7 +500,7 @@ expr_t *expr_laplace_special_rule(const expr_t *f, const expr_t *t, const expr_t
     if (f->ops == &ops_gammainc_lower || f->ops == &ops_gammainc_upper ||
         f->ops == &ops_gammainc_P || f->ops == &ops_gammainc_Q)
         return special_incomplete_gamma(f, t, s, bound, conditions);
-    if (f->ops == &ops_bessel_j || f->ops == &ops_bessel_y)
+    if (f->ops == &ops_bessel_J || f->ops == &ops_bessel_Y)
         return special_bessel(f, t, s, bound, conditions);
     if (f->ops == &ops_clausen2 || f->ops == &ops_clausen)
         return special_clausen(f, t, s, bound);
@@ -517,42 +517,42 @@ expr_t *expr_laplace_invhyper_formula(const expr_t *s, const expr_t *rate, bool 
     expr_t *one = expr_const_one();
     expr_t *two = expr_const_long(2);
     expr_t *pi = expr_new_named_const(NUM_PI, "@pi");
-    expr_t *struve = cosine ? expr_struve_l(zero, z) : expr_struve_h(zero, z);
+    expr_t *struve = cosine ? expr_struve_L(zero, z) : expr_struve_H(zero, z);
     expr_t *denominator = expr_mul(two, s);
     expr_t *out;
     if (cosine) {
         /* acosh(0)=i*pi/2; its derivative below the branch point contributes -i(I0-L0).
          * A negative rate reverses that companion, but not the positive real K0 tail. */
-        expr_t *bessel_i = expr_bessel_i(zero, z);
-        expr_t *difference = expr_sub(bessel_i, struve);
+        expr_t *bessel_I = expr_bessel_I(zero, z);
+        expr_t *difference = expr_sub(bessel_I, struve);
         expr_t *companion = negative ? expr_add(one, difference) : expr_sub(one, difference);
         expr_t *imaginary = expr_new_const(NUM_I);
         expr_t *i_pi = expr_mul(imaginary, pi);
         expr_t *numerator = expr_mul(i_pi, companion);
         expr_t *branch = expr_div(numerator, denominator);
-        expr_t *bessel_k = expr_bessel_k(zero, z);
-        expr_t *tail = expr_div(bessel_k, s);
+        expr_t *bessel_K = expr_bessel_K(zero, z);
+        expr_t *tail = expr_div(bessel_K, s);
         out = expr_add(tail, branch);
         expr_free(tail);
-        expr_free(bessel_k);
+        expr_free(bessel_K);
         expr_free(branch);
         expr_free(numerator);
         expr_free(i_pi);
         expr_free(imaginary);
         expr_free(companion);
         expr_free(difference);
-        expr_free(bessel_i);
+        expr_free(bessel_I);
     } else {
         /* Both native functions support the complex right half-plane Re(s)>0. */
-        expr_t *bessel_y = expr_bessel_y(zero, z);
-        expr_t *difference = expr_sub(struve, bessel_y);
+        expr_t *bessel_Y = expr_bessel_Y(zero, z);
+        expr_t *difference = expr_sub(struve, bessel_Y);
         expr_t *numerator = expr_mul(pi, difference);
         expr_t *positive = expr_div(numerator, denominator);
         out = negative ? expr_neg(positive) : expr_clone(positive);
         expr_free(positive);
         expr_free(numerator);
         expr_free(difference);
-        expr_free(bessel_y);
+        expr_free(bessel_Y);
     }
     expr_free(denominator);
     expr_free(struve);
@@ -573,29 +573,29 @@ expr_t *expr_laplace_invcircular_formula(const expr_t *s, const expr_t *rate, bo
     expr_t *two = expr_const_long(2);
     expr_t *pi = expr_new_named_const(NUM_PI, "@pi");
     expr_t *imaginary = expr_new_const(NUM_I);
-    expr_t *bessel_i = expr_bessel_i(zero, z);
-    expr_t *struve_l = expr_struve_l(zero, z);
-    expr_t *difference = expr_sub(bessel_i, struve_l);
+    expr_t *bessel_I = expr_bessel_I(zero, z);
+    expr_t *struve_L = expr_struve_L(zero, z);
+    expr_t *difference = expr_sub(bessel_I, struve_L);
     expr_t *signed_difference = negative ? expr_neg(difference) : expr_clone(difference);
     expr_t *companion = cosine ? expr_sub(one, signed_difference) : expr_clone(signed_difference);
     expr_t *numerator = expr_mul(pi, companion);
     expr_t *denominator = expr_mul(two, s);
     expr_t *interior = expr_div(numerator, denominator);
-    expr_t *bessel_k = expr_bessel_k(zero, z);
-    expr_t *i_k = expr_mul(imaginary, bessel_k);
+    expr_t *bessel_K = expr_bessel_K(zero, z);
+    expr_t *i_k = expr_mul(imaginary, bessel_K);
     expr_t *tail = expr_div(i_k, s);
     expr_t *out = cosine ? expr_sub(interior, tail) : expr_add(interior, tail);
     expr_free(tail);
     expr_free(i_k);
-    expr_free(bessel_k);
+    expr_free(bessel_K);
     expr_free(interior);
     expr_free(denominator);
     expr_free(numerator);
     expr_free(companion);
     expr_free(signed_difference);
     expr_free(difference);
-    expr_free(struve_l);
-    expr_free(bessel_i);
+    expr_free(struve_L);
+    expr_free(bessel_I);
     expr_free(imaginary);
     expr_free(pi);
     expr_free(two);

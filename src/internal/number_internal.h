@@ -181,7 +181,7 @@ void num_scope_resume_cleanup(num_scope_t **scope);
  * @param argument Borrowed numeric argument of the Lommel function; its storage remains caller-owned.
  * @return Owned numeric result released with num_destroy; the native invalid-value sentinel indicates failure.
  */
-number_t num_lommel_s_derivative_internal(const number_t mu, const number_t nu, const number_t argument);
+number_t num_lommel_S_derivative_internal(const number_t mu, const number_t nu, const number_t argument);
 
 /** @brief Suspend numeric scope allocation until lexical-scope cleanup resumes it automatically. */
 #define NUM_SCOPE_SUSPEND(name)                                                                                        \

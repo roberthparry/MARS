@@ -195,6 +195,7 @@ static const struct lab_svr_asset lab_svr_assets[] = {
     {"/js/surface_volume.js", "@scripts/surface_volume.js", "text/javascript; charset=utf-8", 4194304},
     {"/js/state.js", "@scripts/state.js", "text/javascript; charset=utf-8", 4194304},
     {"/js/history.js", "@scripts/history.js", "text/javascript; charset=utf-8", 4194304},
+    {"/js/history_drag.js", "@scripts/history_drag.js", "text/javascript; charset=utf-8", 4194304},
     {"/js/workspace.js", "@scripts/workspace.js", "text/javascript; charset=utf-8", 4194304},
     {"/js/workspace_controllers.js", "@scripts/workspace_controllers.js", "text/javascript; charset=utf-8", 4194304},
     {"/js/workspace_native.js", "@scripts/workspace_native.js", "text/javascript; charset=utf-8", 4194304},

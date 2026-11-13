@@ -13,7 +13,7 @@
 
 static void test_qf_lambert_w0(void)
 {
-    printf(C_CYAN "TEST: qf_lambert_w0\n" C_RESET);
+    printf(C_CYAN "TEST: qf_lambert_W0\n" C_RESET);
 
     char buf[256], buf_exp[256];
 
@@ -44,7 +44,7 @@ static void test_qf_lambert_w0(void)
     for (int i = 0; tests[i].xs != NULL; i++) {
 
         qfloat_t x = qf_from_string(tests[i].xs);
-        qfloat_t got = qf_lambert_w0(x);
+        qfloat_t got = qf_lambert_W0(x);
         qfloat_t exp = qf_from_string(tests[i].want);
 
         test_qf_to_buffer(got, buf, sizeof(buf));
@@ -61,7 +61,7 @@ static void test_qf_lambert_w0(void)
 
 static void test_qf_lambert_wm1(void)
 {
-    printf(C_CYAN "TEST: qf_lambert_wm1\n" C_RESET);
+    printf(C_CYAN "TEST: qf_lambert_Wm1\n" C_RESET);
 
     char buf[256], buf_exp[256];
 
@@ -86,7 +86,7 @@ static void test_qf_lambert_wm1(void)
     for (int i = 0; tests[i].xs != NULL; i++) {
 
         qfloat_t x = qf_from_string(tests[i].xs);
-        qfloat_t got = qf_lambert_wm1(x);
+        qfloat_t got = qf_lambert_Wm1(x);
         qfloat_t exp = qf_from_string(tests[i].want);
 
         test_qf_to_buffer(got, buf, sizeof(buf));

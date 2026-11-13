@@ -11,22 +11,89 @@ verification evidence, and keep a separate log for every isolated batch.
 `make test` retains a failing suite's standard output and standard error beside
 its executable, with a `.log` suffix, and prints that pathname beside `FAIL`.
 Successful suites' temporary logs are removed.
-The suite summary colours `PASS` green and `FAIL` red.
-While a suite runs, `make test` shows a UTF-8 Braille spinner, an elapsed timer,
-green ✓ and red ✗ result counts, and the latest completed check. A terminal
-updates the same line four times per second; redirected output receives a status
+The suite summary colours `PASS` bold green and `FAIL` bold red. `make test` supplies
+the number of suites, so its progress bar shows completed suites out of that total.
+Suite numbers are right-aligned, for example `[ 1/48]` and `[10/48]`, and executable
+labels are padded to the longest path in the run so all final `PASS`/`FAIL` results align.
+Elapsed durations below a minute use seconds; longer durations use minutes and seconds,
+for example `11m 08.6s` instead of `668.6s`. The same format applies to immediate failure
+reports and running-case durations.
+The final standalone README batch uses one replacing progress row, including its
+enabled-example count and elapsed time. Compilation and execution refresh that row;
+successful or disabled examples do not print individual lines. Its final summary
+retains the bar, count, duration and bold coloured outcome. Failures are still printed
+with their example identifier, Markdown source line and diagnostic; compiler and
+programme output and `build/readme-examples/results.json` retain the detailed evidence.
+While a suite runs, a second progress bar shows completed tests out of the selected
+module total, with a percentage, a UTF-8 Braille spinner, an elapsed timer, bold green ✓
+and bold red ✗ result counts, and the running check. The native harness counts enabled
+leaf cases from `tests/test_config.json`, including helper source files and README
+examples, while excluding disabled tests, disabled groups and group wrappers. Saved
+profile selections override JSON selections in the same way as actual execution.
+If a selected test skips itself at run time, it is also removed from the total.
+Failures
+are printed immediately, with their test name and elapsed suite time. A terminal
+updates the same three rows four times per second; redirected output receives a status
 line every ten seconds. The runner
 reads appended output incrementally, without rescanning a growing log or adding
-threads to the test process. These counts include nested result records and are
-not a claimed total number of tests. Suites still run sequentially, with no new
+threads to the test process. Counts include successful README examples and exclude group
+summaries. Final harness counters reconcile the live counts even when a diagnostic did
+not end with a newline. If configuration is absent, a module is new, or an unconfigured
+case is discovered, the module bar shows discovery activity instead of inventing a
+total. The configuration is regenerated normally for the next run. Individual-suite
+runs show the module bar and running case on two rows; local configuration fixtures
+also use discovery so counting cannot interfere with their configuration setup.
+Native test executables accept `--test-plan` to print the current configured count
+without running fixtures, writing configuration or recording a test run.
+Suites still run sequentially, with no new
 execution deadline.
+
+The standalone globe-installation fixture imports the complete packaged coastline once,
+in the plaintext storage mode used by normal installations. Release preparation separately
+checks a fresh installation of all three stores. A small encrypted catalogue checks
+key routing, integrity, retained layers and failed replacement. Calendar cases share one
+immutable plaintext catalogue and copy it into separate temporary homes; their settings
+stores remain encrypted. Direct fixture imports use transactions, as the production
+installer does. These fixtures retain catalogue, migration and rollback assertions without
+repeating the complete coastline import for each storage mode. Selection checks use
+the real schema, core towns and complete locale data. The shared complete calendar
+seed covers bulk worldwide town and holiday-rule imports; the plaintext jurisdiction
+installation checks searches for every shipped country.
+Repeated calendar translation comparisons publish only their checked year, including
+a leap-year and invalid-range rollback check. The full default installation horizon
+remains covered separately. Texture regressions use small, valid single-colour PNGs
+at the real image dimensions, retaining the 128-region and complete global-grid
+address checks. Only the README metadata example loads the real overview photograph.
+Photo-only migration checks use a single valid mapped-water polygon and regional
+outline; full geography remains covered by the globe and country installation checks.
+Their immutable boundary sources are linked rather than copied, and no additional
+persistent cache or database is created.
+Fixture setup batches related writes in transactions, while interrupted-publication
+tests retain their real commit, locking and recovery behaviour.
+Country migration checks every historical revision in plaintext and checks encrypted
+migration, failed replacement and preserved layers separately, without repeating the
+same historical geometry imports in both storage modes.
+Fresh imports request a 16 MiB main page-cache allowance, matching the update path; calendar
+query fixtures use 8 MiB. This avoids testing large plaintext pages with only a handful
+of cache slots. Temporary-table caches have separate, smaller allowances; SQLite allocates
+pages on demand, and these settings are not hard process-memory limits.
+
 Executables that also serve native subprocess fixtures may define
 `test_program_setup()` to dispatch those commands before test-option parsing.
 Ordinary suite registration and test-database reporting happen afterwards; a
 fixture command that exits from this hook does not start a test run.
-The configuration suite logs SQLCipher errors for its synthetic encrypted fixtures,
+The configuration and Lab suites log SQLCipher errors for their synthetic encrypted fixtures,
 without repeating memory-lock quota warnings for every allocation. Encryption and
 memory security remain enabled; this test-only log level does not change application diagnostics.
+It also prevents repeated warnings from exhausting the calculation workers' bounded output capture.
+
+Standalone README programmes which open installed almanac, globe or jurisdiction
+databases inherit a lazily loaded settings snapshot, using the same `mars.json` and
+encrypted `mars.db` as the applications. Explicit environment overrides, including
+empty database keys, take precedence. The runner reads settings through an isolated
+helper and never puts credentials in command arguments or result files. It does not
+install missing data. Other examples, including the disposable globe-reader fixture,
+need no installed configuration or desktop key store.
 
 ```sh
 make test_qfloat
@@ -215,7 +282,9 @@ support interfaces remain in `tests/include`.
 
 ### Module case tables
 
-Each migrated module supplies `tests/<module>/test_<module>.sql`. The importer
+Each migrated module supplies `tests/<module>/test_<module>.sql`. When the directory
+already begins with `test_`, reuse that prefix: the harness regressions use
+`tests/test_test_harness/test_test_harness.sql`. The importer
 discovers these files automatically and applies them in a deterministic order,
 inside the same transaction as catalogue synchronisation. The shared
 `tests/test_database.sql` contains only the management schema. For example:
@@ -262,7 +331,7 @@ Markdown source and expected output, and run after ordinary tests.
 For example, this complete programme demonstrates inserting and inspecting a row
 in an isolated in-memory fixture. To add a real case, apply its `INSERT` to the
 test database, or add the row to the tracked SQL source. The standalone source is
-[`tests/test_database/readme_case_table.c`](../tests/test_database/readme_case_table.c).
+[`tests/test_test_harness/readme_case_table.c`](../tests/test_test_harness/readme_case_table.c).
 
 ```c
 /**
@@ -316,7 +385,7 @@ another_sum|5/6
 ```
 
 The source-synchronisation and fixture README test runs last in
-`make -j1 test_database`. `make -j1 test-readme-examples` compiles the exact
+`make -j1 test_test_harness`. `make -j1 test-readme-examples` compiles the exact
 documented programme and checks the output above. Keep shared case changes in both
 the readable SQL source and `tests/tests.db`. After adding seed rows to the SQL
 source, run `make test-db-sync` and include both files in the same commit.
@@ -1142,6 +1211,38 @@ coverage, not a whole-project memory-safety guarantee.
 
 ## Recommended Suite Shape
 
+The execution core lives in `tests/test_harness`: `test_harness_runtime.c` supplies
+`main()`, calls the suite's `tests_main()`, and owns assertions, nested execution,
+fixtures, capture, timings and summaries. `test_harness_text.c` supplies a small
+C-allocated diagnostic buffer. These sources and `test_harness.h` have no MARS
+library dependencies. The bootstrap executable
+`tests/build/release/test_test_harness/test_harness_bootstrap` links without `libmars`, JSON
+or SQLite and checks those facilities, including failure and skip subprocesses.
+It intentionally creates no configuration or test database.
+
+JSON selections, persistence, catalogue, profiles and results live alongside the
+runtime in the `tests/test_harness` implementation module. Its regression suite
+lives in `tests/test_test_harness`. The optional bridge in
+`tests/test_harness/test_harness_mars.c` connects those services through
+`test_harness_adapter.h`; ordinary MARS suites link it to preserve their existing
+selection, progress planning and recorded history. The core retains no database
+connection or representation-specific knowledge. SQLite implementation tests
+continue to disable automatic database selection before their fixtures run.
+
+The harness regression source moves preserve existing case names. Storage updates
+the source identities transactionally across the catalogue, selections, results
+and timing distributions; recorded outcomes, outlier evidence and memory-test
+dates remain intact. A conflicting destination aborts the relocation rather than
+discarding either case history.
+
+Domain validity callbacks receive opaque values and a core-owned `test_text_t`
+diagnostic sink. Append ordinary C text with `test_text_append_cstr()` or standard
+printf arguments with `test_text_append_format()`; do not retain or free the sink.
+The domain callback owns any mathematical formatting and releases its temporary
+objects itself. Expression helpers live in `tests/expression/test_expr_support.c`,
+with declarations in `tests/include/test_expr_support.h`; only the expression and
+matrix suites link them. A suite must never include another suite's private header.
+
 The harness works best when each suite keeps a clear boundary between
 infrastructure and domain semantics.
 
@@ -1306,8 +1407,8 @@ Test files declare one of two modes before including `test_harness.h`:
 | `TEST_CONFIG_LOCAL` | `<normalised test source path>.json` (one file per test binary) |
 | `TEST_CONFIG_NONE` | no config file is read or written |
 
-For example, `tests/test_test_config/test_test_config.c` uses
-`tests/test_test_config/test_test_config.json` in local mode.
+For example, `tests/test_test_harness/test_test_harness.c` uses
+`tests/test_test_harness/test_test_harness.json` in local mode.
 
 Use `TEST_CONFIG_NONE` only for suites that genuinely cannot participate in
 config I/O. The ordinary project suites, including `string` and `dictionary`,

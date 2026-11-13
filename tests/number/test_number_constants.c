@@ -13,6 +13,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "string-t.h"
 #include "test_number.h"
 
 void run_number_constant_tests(void)

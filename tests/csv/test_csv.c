@@ -10,6 +10,7 @@
 #include <string.h>
 #include <unistd.h>
 
+#include "string-t.h"
 #include "csv-t.h"
 #include "test_harness.h"
 

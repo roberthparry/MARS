@@ -4,7 +4,9 @@
  *
  * Uses the native README entry in the repository's global test configuration.
  * Compiler words are parsed without a shell. Each execution owns a disposable
- * working tree and separated output files. Interruptions unwind fixture ownership.
+ * working tree and separated output files. Enabled examples are planned once in memory. A single progress row
+ * remains active during compilation and execution; only failures receive permanent diagnostic lines.
+ * Interruptions unwind fixture ownership and retain partial result evidence.
  */
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE
@@ -15,10 +17,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "array-t.h"
 #include "mars_paths.h"
 #include "checks_process.h"
 #include "checks_fixtures.h"
 #include "checks_readme.h"
+#define MARS_CHECKS_README_INTERNAL_ACCESS
+#include "checks_readme_internal.h"
 
 struct options {
     string_t *cc;
@@ -114,7 +119,8 @@ static bool checks_readme_artifact(const string_t *output, const string_t *id, c
 
 static const char *checks_readme_execute_example(const string_t *root, const struct options *options,
                                                  const string_t *output, checks_fixtures_t *fixtures,
-                                                 const checks_example_t *example, json_t *record)
+                                                 const checks_example_t *example, json_t *record,
+                                                 checks_readme_progress_t *progress)
 {
     if (!checks_example_has_main(example))
         return "C example has no main()";
@@ -138,7 +144,8 @@ static const char *checks_readme_execute_example(const string_t *root, const str
     checks_strings_add(arguments, string_clone(binary));
     string_t *stdout_text = NULL, *stderr_text = NULL;
     int status = -1;
-    bool ran = parsed && checks_process_run(arguments, root, 0, &stdout_text, &stderr_text, &status);
+    bool ran = parsed && checks_process_run_observed(arguments, root, 0, &stdout_text, &stderr_text, &status,
+                                                     checks_readme_progress_observe, progress);
     checks_strings_free(arguments);
     string_free(source_name);
     const char *error = NULL;
@@ -166,8 +173,8 @@ static const char *checks_readme_execute_example(const string_t *root, const str
             bool ready = checks_fixtures_programme(fixtures, checks_example_path(example), code, binary, working,
                                                   arguments);
             stdout_text = stderr_text = NULL;
-            ran =
-                ready && checks_process_run(arguments, working, options->timeout, &stdout_text, &stderr_text, &status);
+            ran = ready && checks_process_run_observed(arguments, working, options->timeout,
+                         &stdout_text, &stderr_text, &status, checks_readme_progress_observe, progress);
             int execution_error = errno;
             if (!ran)
                 error = execution_error == ETIMEDOUT ? "program timed out" : "could not execute programme";
@@ -204,6 +211,39 @@ static const char *checks_readme_execute_example(const string_t *root, const str
     return error;
 }
 
+static void checks_readme_release_examples(void *value)
+{
+    checks_examples_free(*(checks_examples_t **)value);
+}
+
+/* Parse each document once and retain enabled examples by direct array index; no additional files are written. */
+static bool checks_readme_plan(const string_t *root, const json_t *config, array_t *collections, array_t *jobs)
+{
+    checks_strings_t *paths = checks_files(root, "", ".md", true);
+    bool ok = true;
+    for (size_t i = 0; ok && i < checks_strings_count(paths) && !checks_process_interrupt_signal(); ++i) {
+        const string_t *relative = checks_strings_get(paths, i);
+        string_t *path = checks_path(root, string_c_str(relative));
+        string_t *text = checks_read(path);
+        string_free(path);
+        if (!text) { ok = false; break; }
+        string_replace(text, "\r\n", "\n");
+        string_replace(text, "\r", "\n");
+        checks_examples_t *examples = checks_examples_parse(relative, text);
+        string_free(text);
+        size_t before = array_size(jobs);
+        for (size_t j = 0; j < checks_examples_count(examples); ++j) {
+            const checks_example_t *example = checks_examples_get(examples, j);
+            if (checks_readme_enabled(config, checks_example_id(example)) && !array_add(jobs, &example))
+                checks_fatal("planning README examples");
+        }
+        if (array_size(jobs) == before) checks_examples_free(examples);
+        else if (!array_add(collections, &examples)) checks_fatal("retaining README examples");
+    }
+    checks_strings_free(paths);
+    return ok;
+}
+
 /* Run README examples and retain their compiler and execution evidence. */
 int checks_readme(const string_t *root, int argc, char **argv)
 {
@@ -223,58 +263,38 @@ int checks_readme(const string_t *root, int argc, char **argv)
         checks_fatal("reading global test configuration");
     const json_t *config = checks_member(configuration, "tools/mars_checks/src/readme/checks_readme.c");
     config = checks_member(config, "readme_examples");
-    checks_strings_t *paths = checks_files(root, "", ".md", true);
+    array_t *collections = array_create(sizeof(checks_examples_t *), NULL, checks_readme_release_examples);
+    array_t *jobs = array_create(sizeof(const checks_example_t *), NULL, NULL);
+    if (!collections || !jobs) checks_fatal("allocating README plan");
+    int infrastructure_error = checks_readme_plan(root, config, collections, jobs) ? 0 : 2;
+    checks_readme_progress_t *progress = checks_readme_progress_new(array_size(jobs));
     json_t *records = json_new_array();
     checks_fixtures_t *fixtures = checks_fixtures_new(root);
     size_t checked = 0, failed = 0;
-    int infrastructure_error = 0;
-    for (size_t i = 0; i < checks_strings_count(paths) && !checks_process_interrupt_signal(); ++i) {
-        const string_t *relative = checks_strings_get(paths, i);
-        string_t *path = checks_path(root, string_c_str(relative));
-        string_t *text = checks_read(path);
-        string_free(path);
-        if (!text) {
-            infrastructure_error = 2;
-            break;
-        }
-        /* Python's text mode normalises CRLF before parsing fences and source. */
-        string_replace(text, "\r\n", "\n");
-        string_replace(text, "\r", "\n");
-        checks_examples_t *examples = checks_examples_parse(relative, text);
-        string_free(text);
-        for (size_t j = 0; j < checks_examples_count(examples) && !checks_process_interrupt_signal(); ++j) {
-            const checks_example_t *example = checks_examples_get(examples, j);
-            const string_t *id = checks_example_id(example);
-            if (!checks_readme_enabled(config, id)) {
-                string_printf("SKIP README %s\n", string_c_str(id));
-                fflush(stdout);
-                continue;
-            }
-            ++checked;
-            json_t *record = json_new_object();
-            checks_json_text(record, "id", id);
-            checks_json_text(record, "path", relative);
-            checks_json_integer(record, "line", (long)checks_example_line(example));
-            const char *error = checks_readme_execute_example(root, &options, output, fixtures, example, record);
-            if (error) {
-                ++failed;
-                string_t *message = checks_text(error);
-                checks_json_text(record, "error", message);
-                string_free(message);
-                if (!checks_example_has_main(example))
-                    string_printf("FAIL README %s: %s\n", string_c_str(id), error);
-                else
-                    string_printf("FAIL README %s: %s (%s:%zu)\n", string_c_str(id), error, string_c_str(relative),
-                                  checks_example_line(example));
-            } else {
-                string_printf("PASS README %s\n", string_c_str(id));
-            }
+    for (size_t i = 0; !infrastructure_error && i < array_size(jobs) && !checks_process_interrupt_signal(); ++i) {
+        const checks_example_t *example = *(const checks_example_t **)array_get(jobs, i);
+        const string_t *relative = checks_example_path(example);
+        const string_t *id = checks_example_id(example);
+        ++checked;
+        json_t *record = json_new_object();
+        checks_json_text(record, "id", id);
+        checks_json_text(record, "path", relative);
+        checks_json_integer(record, "line", (long)checks_example_line(example));
+        const char *error = checks_readme_execute_example(root, &options, output, fixtures, example, record, progress);
+        if (error) {
+            ++failed;
+            string_t *message = checks_text(error);
+            checks_json_text(record, "error", message);
+            string_free(message);
+            checks_readme_progress_clear(progress);
+            printf("\033[1;31mFAIL\033[0m README %s: %s (%s:%zu)\n", string_c_str(id), error,
+                   string_c_str(relative), checks_example_line(example));
             fflush(stdout);
-            if (!json_array_append(records, record))
-                checks_fatal("recording README result");
-            json_free(record);
         }
-        checks_examples_free(examples);
+        checks_readme_progress_update(progress, checked, failed);
+        if (!json_array_append(records, record))
+            checks_fatal("recording README result");
+        json_free(record);
     }
     checks_fixtures_free(fixtures);
     string_t *results_path = checks_path(output, "results.json");
@@ -288,10 +308,13 @@ int checks_readme(const string_t *root, int argc, char **argv)
     string_free(results_path);
     json_free(records);
     json_free(configuration);
-    checks_strings_free(paths);
+    array_destroy(jobs);
+    array_destroy(collections);
     string_free(output);
     checks_readme_free_options(&options);
-    printf("README programs: %zu checked, %zu failed\n", checked, failed);
+    bool success = !infrastructure_error && !failed && !checks_process_interrupt_signal();
+    checks_readme_progress_finish(progress, success);
+    checks_readme_progress_free(progress);
     if (infrastructure_error)
         fprintf(stderr, "README check could not inspect the repository or write results\n");
     if (checks_process_interrupt_signal())

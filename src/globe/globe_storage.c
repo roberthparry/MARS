@@ -60,7 +60,8 @@ static sqlite_t *globe_database_open(const string_t *path, const string_t *key)
     file_t *database = path ? file_new(path) : NULL;
     sqlite_t *db = database && file_exists(database) && key
                        ? (string_byte_length(key) ? sqlite_open_encrypted(path, key) : sqlite_open_plain(path)) : NULL;
-    if (db && !sqlite_exec_cstr(db, "PRAGMA query_only=ON; PRAGMA cache_size=-512;")) {
+    if (db && (!sqlite_set_cache_budget(db, NULL, 8192) || !sqlite_set_cache_budget(db, "temp", 512) ||
+               !sqlite_exec_cstr(db, "PRAGMA query_only=ON;"))) {
         sqlite_close(db);
         db = NULL;
     }

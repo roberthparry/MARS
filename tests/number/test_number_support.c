@@ -13,6 +13,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "string-t.h"
 #include "test_number.h"
 
 static int number_validity_equal(const void *got, const void *want, void *ctx)
@@ -21,7 +22,7 @@ static int number_validity_equal(const void *got, const void *want, void *ctx)
     return num_eq(*(const number_t *)got, *(const number_t *)want);
 }
 
-static int number_validity_format(const void *value, string_t *out, void *ctx)
+static int number_validity_format(const void *value, test_text_t *out, void *ctx)
 {
     string_t *text;
 
@@ -31,9 +32,9 @@ static int number_validity_format(const void *value, string_t *out, void *ctx)
 
     text = num_to_string(*(const number_t *)value);
     if (!text)
-        return string_append_cstr(out, "<num_to_string failed>");
+        return test_text_append_cstr(out, "<num_to_string failed>");
 
-    if (string_append_string(out, text) != 0) {
+    if (test_text_append_cstr(out, string_c_str(text)) != 0) {
         string_free(text);
         return -1;
     }

@@ -12,6 +12,7 @@
 #include <math.h>
 #include <string.h>
 
+#include "string-t.h"
 #include "computation-t.h"
 #define MARS_SHARED_EXPR_INTERNAL_ACCESS
 #include "internal/expr_internal.h"
@@ -21,7 +22,7 @@
 static bool test_expr_suite_setup(void);
 static int expr_number_exact_equal(const void *got, const void *want, void *ctx);
 static int expr_number_close_equal(const void *got_input, const void *want_input, void *ctx);
-static int expr_number_format(const void *value, string_t *out, void *ctx);
+static int expr_number_format(const void *value, test_text_t *out, void *ctx);
 static number_t expr_error_magnitude(number_t got, number_t want);
 
 TEST_SUITE_CONFIG(TEST_CONFIG_GLOBAL);
@@ -99,7 +100,7 @@ static int expr_number_close_equal(const void *got_input, const void *want_input
     return ok;
 }
 
-static int expr_number_format(const void *value, string_t *out, void *ctx)
+static int expr_number_format(const void *value, test_text_t *out, void *ctx)
 {
     string_t *text;
 
@@ -108,8 +109,8 @@ static int expr_number_format(const void *value, string_t *out, void *ctx)
         return -1;
     text = num_to_string(*(const number_t *)value);
     if (!text)
-        return string_append_cstr(out, "<num_to_string failed>");
-    if (string_append_string(out, text) != 0) {
+        return test_text_append_cstr(out, "<num_to_string failed>");
+    if (test_text_append_cstr(out, string_c_str(text)) != 0) {
         string_free(text);
         return -1;
     }

@@ -17,18 +17,18 @@ static void test_modified_bessel_k_numeric_layers(void)
 {
     NUM_SCOPE(scope);
     const double expected = 0.42102443824070833334;
-    ASSERT_TRUE(fabs(qf_to_double(qf_bessel_k(QF_ZERO, QF_ONE))-expected) < 1e-15);
-    qcomplex_t complex_value = qc_bessel_k(QC_ZERO, QC_ONE);
+    ASSERT_TRUE(fabs(qf_to_double(qf_bessel_K(QF_ZERO, QF_ONE))-expected) < 1e-15);
+    qcomplex_t complex_value = qc_bessel_K(QC_ZERO, QC_ONE);
     ASSERT_TRUE(fabs(qf_to_double(qc_real(complex_value))-expected) < 1e-15);
     ASSERT_TRUE(qf_eq(qc_imag(complex_value), QF_ZERO));
-    number_t value = num_bessel_k(NUM_ZERO, NUM_ONE);
+    number_t value = num_bessel_K(NUM_ZERO, NUM_ONE);
     bool correct_value = fabs(num_to_double(value)-expected) < 1e-15;
     num_destroy(&value);
     ASSERT_TRUE(correct_value);
-    ASSERT_TRUE(qf_isnan(qf_bessel_k(QF_ZERO, QF_ZERO)));
-    ASSERT_TRUE(num_is_nan(num_bessel_k(NUM_ZERO, NUM_ZERO)));
+    ASSERT_TRUE(qf_isnan(qf_bessel_K(QF_ZERO, QF_ZERO)));
+    ASSERT_TRUE(num_is_nan(num_bessel_K(NUM_ZERO, NUM_ZERO)));
     number_t diagonal[] = {NUM_ONE, NUM_TWO};
-    matrix_t *a = mat_create_diagonal(2u, diagonal), *result = mat_bessel_k(a, &NUM_ZERO);
+    matrix_t *a = mat_create_diagonal(2u, diagonal), *result = mat_bessel_K(a, &NUM_ZERO);
     ASSERT_NOT_NULL(result);
     if (result) {
         ASSERT_TRUE(fabs(num_to_double(mat_get_num(result, 0, 0))-expected) < 1e-15);
@@ -38,7 +38,7 @@ static void test_modified_bessel_k_numeric_layers(void)
     mat_free(result);
     mat_free(a);
     a = mat_from_string("(3/2, 1/2; 1/2, 3/2)");
-    result = mat_bessel_k(a, &NUM_ZERO);
+    result = mat_bessel_K(a, &NUM_ZERO);
     ASSERT_NOT_NULL(result);
     if (result) {
         ASSERT_TRUE(fabs(num_to_double(mat_get_num(result, 0, 0))-(expected+0.11389387274953343565)/2) < 1e-15);

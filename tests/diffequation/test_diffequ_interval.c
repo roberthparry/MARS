@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "string-t.h"
 #include "diffequation-t.h"
 #include "equation-t.h"
 #include "test_harness.h"

@@ -11,6 +11,7 @@
 
 #include <stdint.h>
 
+#include "string-t.h"
 #include "test_matrix.h"
 
 static void check_matrix_fromstring_expr_double(const char *label, const expr_t *expr, double want_value, double tol)

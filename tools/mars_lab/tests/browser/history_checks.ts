@@ -81,6 +81,26 @@ window.checkLabHistoryPersistence = async (): Promise<void> => {
         };
         const historyButton = (position: number, action: string): HTMLButtonElement =>
             document.querySelector<HTMLButtonElement>(`#historyEditorEntries [data-history-position="${position}"] [data-history-action="${action}"]`)!;
+        const historyRow = (position: number): HTMLElement =>
+            document.querySelector<HTMLElement>(`#historyEditorEntries [data-history-position="${position}"]`)!;
+        const pointer = (type: string, x: number, y: number, pointerType = 'mouse'): PointerEvent =>
+            new PointerEvent(type, {bubbles: true, cancelable: true, pointerId: 91, isPrimary: true,
+                pointerType, button: 0, buttons: type === 'pointerup' ? 0 : 1, clientX: x, clientY: y});
+        const beginDrag = async (from: number, to: number, pointerType = 'mouse', after = false): Promise<void> => {
+            const grip = historyRow(from).querySelector<HTMLElement>('.history-drag-handle')!;
+            check(Boolean(grip) && getComputedStyle(grip).touchAction === 'none', 'history has a touch-safe drag grip');
+            const start = grip.getBoundingClientRect(), target = historyRow(to).getBoundingClientRect();
+            const x = start.left + start.width / 2, y = after ? target.bottom - 5 : target.top + 5;
+            grip.dispatchEvent(pointer('pointerdown', x, start.top + start.height / 2, pointerType));
+            document.dispatchEvent(pointer('pointermove', x, y, pointerType));
+            await new Promise(requestAnimationFrame);
+        };
+        const endDrag = (from: number, to: number, pointerType = 'mouse', after = false): void => {
+            const start = historyRow(from).querySelector('.history-drag-handle')!.getBoundingClientRect();
+            const target = historyRow(to).getBoundingClientRect();
+            document.dispatchEvent(pointer('pointerup', start.left + start.width / 2,
+                after ? target.bottom - 5 : target.top + 5, pointerType));
+        };
         try {
             worksheetHistoryEditor.start();
             owner.install(editingRecord);
@@ -187,6 +207,42 @@ window.checkLabHistoryPersistence = async (): Promise<void> => {
                 check(notice.textContent === 'Orienting view at History-only town',
                     'arrival orientation does not report the original distance as remaining travel');
             } finally { townSelect.value = selectedTown; pendingTown.remove(); }
+            await beginDrag(3, 0);
+            check(historyRow(3).classList.contains('history-dragging') &&
+                historyRow(0).classList.contains('history-drop-before') && worksheetHistoryEditor.pending,
+                'drag feedback shows the insertion point without changing native history');
+            check(historyText(0) === '2+3' && native.lab_workspace_history_current(0) === 2,
+                'previewing a drag does not move the current worksheet');
+            endDrag(3, 0);
+            await settle(() => historyText(0) === '4+5' && native.lab_workspace_history_current(0) === 3,
+                'mouse drop moves across several entries while preserving current identity');
+            historyButton(0, 'open').dispatchEvent(new MouseEvent('click', {bubbles: true, cancelable: true, detail: 1}));
+            check((document.getElementById('historyEditor') as HTMLDialogElement).open &&
+                native.lab_workspace_history_current(0) === 3 && WorksheetBindings.editor.currentExpressionText() === '5+6',
+                'releasing a drag never accidentally opens the row below the pointer');
+            await beginDrag(0, 3, 'touch', true);
+            endDrag(0, 3, 'touch', true);
+            await settle(() => historyText(0) === '2+3' && historyText(3) === '4+5' &&
+                native.lab_workspace_history_current(0) === 2, 'touch drop moves an entry to the end');
+            const beforeCancelledDrag = native.lab_workspace_history_revision(0);
+            await beginDrag(3, 0);
+            document.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape', bubbles: true, cancelable: true}));
+            check(!worksheetHistoryEditor.pending && !document.querySelector('.history-dragging, .history-drop-before, .history-drop-after') &&
+                native.lab_workspace_history_revision(0) === beforeCancelledDrag &&
+                (document.getElementById('historyEditor') as HTMLDialogElement).open,
+                'Escape cancels the gesture, retains history and leaves the editor open');
+            await beginDrag(3, 0, 'touch');
+            document.dispatchEvent(pointer('pointercancel', 0, 0, 'touch'));
+            check(!worksheetHistoryEditor.pending && native.lab_workspace_history_revision(0) === beforeCancelledDrag,
+                'touch cancellation never commits a move');
+            await beginDrag(3, 0);
+            check(native.lab_workspace_history_move(0, 0, 3), 'simulate a concurrent native history edit');
+            const changedDuringDrag = native.lab_workspace_history_revision(0);
+            endDrag(3, 0);
+            check(native.lab_workspace_history_revision(0) === changedDuringDrag && !worksheetHistoryEditor.pending,
+                'a stale drag cannot overwrite a newer timeline revision');
+            check(native.lab_workspace_history_move(0, 3, 0), 'restore the authored history after revision checks');
+            worksheetHistoryEditor.refresh();
             historyButton(3, 'earlier').click();
             await settle(() => historyText(2) === '4+5', 'move a forward entry across the current worksheet');
             await LabTestBrowser.wait(20);
@@ -224,6 +280,18 @@ window.checkLabHistoryPersistence = async (): Promise<void> => {
             check(list.scrollTop > 0 && dialog.scrollTop === 0 && headingBox.top >= dialogBox.top &&
                 headingBox.bottom <= dialogBox.bottom && headingBox.top >= 0,
                 'long history scrolls its entries while the heading and Close button remain visible');
+            const last = list.lastElementChild as HTMLElement;
+            const grip = last.querySelector<HTMLElement>('.history-drag-handle')!, gripBox = grip.getBoundingClientRect();
+            const edge = list.getBoundingClientRect(), scrollBeforeDrag = list.scrollTop;
+            grip.dispatchEvent(pointer('pointerdown', gripBox.left + gripBox.width / 2, gripBox.top + gripBox.height / 2, 'touch'));
+            document.dispatchEvent(pointer('pointermove', gripBox.left + gripBox.width / 2, edge.top + 8, 'touch'));
+            for (let attempt = 0; attempt < 100 && list.scrollTop >= scrollBeforeDrag - 30; ++attempt)
+                await LabTestBrowser.wait(10);
+            check(list.scrollTop < scrollBeforeDrag - 30 && window.scrollY === scrollBeforeHistory && dialog.scrollTop === 0,
+                'holding a touch drag near an edge scrolls only the history list');
+            document.dispatchEvent(pointer('pointercancel', 0, 0, 'touch'));
+            check(!worksheetHistoryEditor.pending && !list.querySelector('.history-dragging'),
+                'cancelling an auto-scrolling drag clears feedback and its animation frame');
             document.getElementById('historyEditorClose')!.click();
             check(Math.abs(window.scrollY - scrollBeforeHistory) < 1, 'closing history preserves the page scroll position');
             owner.install({mode: 0, epoch: '', revision: 0, history: editedHistory});

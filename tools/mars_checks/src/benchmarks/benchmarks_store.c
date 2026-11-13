@@ -29,12 +29,24 @@ static bool benchmark_store_display_column(sqlite_t *db, const char *table)
 }
 
 /* Rename catalogue identities and their retained timings together; never merge distinct historical observations. */
-static bool benchmark_store_polynomial_names(sqlite_t *db)
+static bool benchmark_store_operation_names(sqlite_t *db)
 {
     static const char *const names[][2] = {
         {"chebyshev_t", "chebyshev_Tn"},
         {"chebyshev_u", "chebyshev_Un"},
-        {"hermite_h", "hermite_Hn"}
+        {"hermite_h", "hermite_Hn"},
+        {"appell_f1", "appell_F1"},
+        {"bessel_i", "bessel_I"},
+        {"bessel_j", "bessel_J"},
+        {"bessel_k", "bessel_K"},
+        {"bessel_y", "bessel_Y"},
+        {"lambert_w0", "lambert_W0"},
+        {"lambert_wm1", "lambert_Wm1"},
+        {"lambert_wn", "lambert_Wn"},
+        {"lauricella_f", "lauricella_F"},
+        {"struve_h", "struve_H"},
+        {"struve_l", "struve_L"},
+        {"lommel_s", "lommel_S"}
     };
     static const char *const tables[][2] = {
         {"benchmark_operation", "name"},
@@ -45,14 +57,14 @@ static bool benchmark_store_polynomial_names(sqlite_t *db)
     sqlite_stmt_t *exists = sqlite_stmt_prepare(db, "SELECT EXISTS(SELECT 1 FROM benchmark_operation WHERE name = ?1)");
     sqlite_stmt_t *updates[4] = {0};
     bool ok = exists && sqlite_exec_cstr(db, "PRAGMA defer_foreign_keys = ON");
-    /* Four fixed module-owned identifiers and three renamed operations bound the entire migration. */
+    /* The fixed module-owned table and rename lists bound this one-off catalogue migration. */
     for (size_t i = 0; ok && i < 4; ++i) {
         string_t *sql = string_sprintf("UPDATE %s\nSET %s = ?2\nWHERE %s = ?1", tables[i][0], tables[i][1], tables[i][1]);
         updates[i] = sql ? sqlite_stmt_prepare(db, string_c_str(sql)) : NULL;
         string_free(sql);
         ok = updates[i] != NULL;
     }
-    for (size_t i = 0; ok && i < 3; ++i) {
+    for (size_t i = 0; ok && i < sizeof names / sizeof *names; ++i) {
         ok = sqlite_stmt_bind_text(exists, 1, names[i][1]) && sqlite_stmt_step(exists) == SQLITE_STEP_ROW;
         bool separate_history = ok && sqlite_stmt_column_int(exists, 0);
         sqlite_stmt_reset(exists);
@@ -122,7 +134,7 @@ static bool benchmark_store_schema(sqlite_t *db, const string_t *root)
     ok = source && sqlite_exec_cstr(db, "BEGIN IMMEDIATE") &&
         benchmark_store_display_column(db, "benchmark_result") &&
         benchmark_store_display_column(db, "benchmark_workload") && sqlite_exec(db, source) &&
-        benchmark_store_polynomial_names(db);
+        benchmark_store_operation_names(db);
     string_free(source);
     string_free(path);
     sqlite_stmt_t *insert = ok ? sqlite_stmt_prepare(db,

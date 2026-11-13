@@ -11,7 +11,7 @@ SVG and WebGL rendering remain application responsibilities.
 The offline source package is `packaging/globe-db/textures/`; its manifest records
 dimensions, byte counts, SHA-256 digests and NASA source attribution.
 Fresh installations include the 74 overview and original NASA images, 1,152 full-resolution NASA tiles
-and 5,242 regional Sentinel-2 photographs.
+and 5,358 regional Sentinel-2 photographs.
 Managed database revision 16 installs the expanded coastal PNG catalogue and its complete manifest
 to existing installations through `make update-mars-db` or `make release`,
 preserving coastline, country, regional and river layers. Import validates every
@@ -50,6 +50,8 @@ Falklands, Ascension, Isle of Man, Jersey, Guernsey, coastal Svalbard and Cape P
 The completed expansion adds mainland France, New Zealand and its offshore islands,
 Finland including Åland, Sweden, Norway, Iceland, and selected Australian areas: Brisbane,
 Sydney, Melbourne, Perth, Mooloolaba, Maroochydore, Canberra, Cairns, Alice Springs and Gold Coast.
+Further coverage includes Cyprus, the Nile Delta up to the Mediterranean coast,
+the Suez Canal and selected stretches of the Nile Valley south of Cairo.
 The regional PNG package occupies about 36.6 GiB after coastline trimming. The full-resolution NASA grid
 adds 2,199,613,908 bytes (about 2.05 GiB); its temporary source GeoTIFF downloads are removed after verification.
 France, New Zealand, Finland, Sweden, Norway, Iceland, the Australian areas, Spain and Svalbard use
@@ -485,6 +487,11 @@ Missing files, changed keys or changed metadata discard the old connection befor
 attempting a replacement. The borrowed controller expires on the next `get` or
 `free`; callers must serialise access and create sessions after forking. The Lab's
 single geometry service owns one such session and closes it on service exit.
+Configured connections use an on-demand 8 MiB main database-page cache and a
+512 KiB temporary-table allowance. This permits reuse of spatial-index and image-block
+pages between requests. These SQLite allowances apply per connection, are separate
+from decoded imagery and GPU caches, and are released when the connection closes.
+Callers supplying their own connections retain their chosen cache settings.
 
 `globe_reader_identity()` refreshes a session and returns an owned, opaque fingerprint
 of its resolved database path and database/WAL metadata, or `NULL` if unavailable.

@@ -223,31 +223,31 @@ static number_t regression_qc_erfcinv(const number_t *a)
 static number_t regression_bessel_half(const number_t *a)
 {
     number_t reference = num_mul(num_sqrt(num_div(NUM_TWO, num_mul(num_const(NUM_PI), a[0]))), num_sin(a[0]));
-    return num_sub(num_bessel_j(NUM_HALF, a[0]), reference);
+    return num_sub(num_bessel_J(NUM_HALF, a[0]), reference);
 }
 
 static number_t regression_qc_bessel_half(const number_t *a)
 {
     number_t reference = num_mul(num_sqrt(num_div(NUM_TWO, num_mul(num_const(NUM_PI), a[0]))), num_sin(a[0]));
-    return num_sub(num_create_from_qcomplex(qc_bessel_j(qc_make(QF_HALF, QF_ZERO), regression_qcomplex(a[0]))), reference);
+    return num_sub(num_create_from_qcomplex(qc_bessel_J(qc_make(QF_HALF, QF_ZERO), regression_qcomplex(a[0]))), reference);
 }
 
 static number_t regression_lommel(const number_t *a)
 {
-    return num_sub(num_lommel_s(NUM_ONE, NUM_ZERO, a[0]), num_sub(NUM_ONE, num_bessel_j(NUM_ZERO, a[0])));
+    return num_sub(num_lommel_S(NUM_ONE, NUM_ZERO, a[0]), num_sub(NUM_ONE, num_bessel_J(NUM_ZERO, a[0])));
 }
 
 static number_t regression_qc_lommel(const number_t *a)
 {
-    number_t value = num_create_from_qcomplex(qc_lommel_s(QC_ONE, QC_ZERO, regression_qcomplex(a[0])));
-    return num_sub(value, num_sub(NUM_ONE, num_bessel_j(NUM_ZERO, a[0])));
+    number_t value = num_create_from_qcomplex(qc_lommel_S(QC_ONE, QC_ZERO, regression_qcomplex(a[0])));
+    return num_sub(value, num_sub(NUM_ONE, num_bessel_J(NUM_ZERO, a[0])));
 }
 
 static number_t regression_lommel_recurrence(const number_t *a)
 {
     number_t factor = num_sub(num_sqr(num_add(a[0], NUM_ONE)), num_sqr(a[1]));
-    number_t sum = num_add(num_lommel_s(num_add(a[0], NUM_TWO), a[1], a[2]),
-                          num_mul(factor, num_lommel_s(a[0], a[1], a[2])));
+    number_t sum = num_add(num_lommel_S(num_add(a[0], NUM_TWO), a[1], a[2]),
+                          num_mul(factor, num_lommel_S(a[0], a[1], a[2])));
     return num_sub(sum, num_pow(a[2], num_add(a[0], NUM_ONE)));
 }
 
@@ -255,21 +255,21 @@ static number_t regression_appell_product(const number_t *a)
 {
     number_t reference = num_mul(num_pow(num_sub(NUM_ONE, a[4]), num_neg(a[1])),
                                  num_pow(num_sub(NUM_ONE, a[5]), num_neg(a[2])));
-    return num_sub(num_appell_f1(a[0], a[1], a[2], a[3], a[4], a[5]), reference);
+    return num_sub(num_appell_F1(a[0], a[1], a[2], a[3], a[4], a[5]), reference);
 }
 
 static number_t regression_appell_log(const number_t *a)
 {
     number_t reference = num_div(num_sub(num_ln(num_sub(NUM_ONE, a[5])), num_ln(num_sub(NUM_ONE, a[4]))),
                                  num_sub(a[4], a[5]));
-    return num_sub(num_appell_f1(a[0], a[1], a[2], a[3], a[4], a[5]), reference);
+    return num_sub(num_appell_F1(a[0], a[1], a[2], a[3], a[4], a[5]), reference);
 }
 
 static number_t regression_appell_linear(const number_t *a)
 {
     number_t linear = num_add(num_mul(a[1], a[4]), num_mul(a[2], a[5]));
     number_t reference = num_sub(NUM_ONE, num_div(linear, a[3]));
-    return num_sub(num_appell_f1(a[0], a[1], a[2], a[3], a[4], a[5]), reference);
+    return num_sub(num_appell_F1(a[0], a[1], a[2], a[3], a[4], a[5]), reference);
 }
 
 static number_t regression_appell_quadratic(const number_t *a)
@@ -280,12 +280,12 @@ static number_t regression_appell_quadratic(const number_t *a)
     number_t yy = num_mul(num_mul(a[2], num_add(a[2], NUM_ONE)), num_sqr(a[5]));
     number_t reference = num_sub(NUM_ONE, num_div(num_mul(NUM_TWO, linear), a[3]));
     reference = num_add(reference, num_div(num_add(num_add(xx, xy), yy), num_mul(a[3], num_add(a[3], NUM_ONE))));
-    return num_sub(num_appell_f1(a[0], a[1], a[2], a[3], a[4], a[5]), reference);
+    return num_sub(num_appell_F1(a[0], a[1], a[2], a[3], a[4], a[5]), reference);
 }
 
 static number_t regression_appell_nan(const number_t *a)
 {
-    return num_is_nan(num_appell_f1(a[0], a[1], a[2], a[3], a[4], a[5])) ? NUM_ZERO : NUM_NAN;
+    return num_is_nan(num_appell_F1(a[0], a[1], a[2], a[3], a[4], a[5])) ? NUM_ZERO : NUM_NAN;
 }
 
 static number_t regression_normal_cdf(const number_t *a)
@@ -479,11 +479,11 @@ static number_t regression_chi(const number_t *a)
     return num_sub(num_legendre_chi(a[0], a[1]), reference);
 }
 
-static number_t regression_bessel_k(const number_t *a)
+static number_t regression_bessel_K(const number_t *a)
 {
     number_t next = num_add(a[0], NUM_ONE);
-    number_t sum = num_add(num_mul(num_bessel_i(a[0], a[1]), num_bessel_k(next, a[1])),
-                           num_mul(num_bessel_i(next, a[1]), num_bessel_k(a[0], a[1])));
+    number_t sum = num_add(num_mul(num_bessel_I(a[0], a[1]), num_bessel_K(next, a[1])),
+                           num_mul(num_bessel_I(next, a[1]), num_bessel_K(a[0], a[1])));
     return num_sub(sum, num_div(NUM_ONE, a[1]));
 }
 
@@ -534,7 +534,7 @@ static const regression_operation_t regression_operations[] = {
     {"appell_quadratic", 6, regression_appell_quadratic},
     {"asec", 1, regression_asec},
     {"bessel_half", 1, regression_bessel_half},
-    {"bessel_k", 2, regression_bessel_k},
+    {"bessel_k", 2, regression_bessel_K},
     {"chi", 2, regression_chi},
     {"chi_limit", 2, regression_chi_limit},
     {"clausen_catalan", 1, regression_clausen_catalan},

@@ -19,6 +19,7 @@
 #include <unistd.h>
 
 #include "file-t.h"
+#include "string-t.h"
 #include "array-t.h"
 #include "test_harness.h"
 

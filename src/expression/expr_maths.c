@@ -587,16 +587,16 @@ number_t eval_legendre_chi(expr_t *expr)
 {
     return expr_eval_binary_num(expr, num_legendre_chi);
 }
-number_t eval_bessel_j(expr_t *expr)
+number_t eval_bessel_J(expr_t *expr)
 {
-    return expr_eval_binary_num(expr, num_bessel_j);
+    return expr_eval_binary_num(expr, num_bessel_J);
 }
-number_t eval_lommel_s_pack(expr_t *expr)
+number_t eval_lommel_S_pack(expr_t *expr)
 {
     (void)expr;
     return NUM_NAN;
 }
-bool expr_lommel_s_unpack(const expr_t *expr, const expr_t **mu, const expr_t **nu, const expr_t **argument)
+bool expr_lommel_S_unpack(const expr_t *expr, const expr_t **mu, const expr_t **nu, const expr_t **argument)
 {
     const expr_t *parameters;
 
@@ -606,11 +606,11 @@ bool expr_lommel_s_unpack(const expr_t *expr, const expr_t **mu, const expr_t **
         *nu = NULL;
     if (argument)
         *argument = NULL;
-    if (!expr || !expr_is_op(expr, &ops_lommel_s) || !expr->a || !expr->b)
+    if (!expr || !expr_is_op(expr, &ops_lommel_S) || !expr->a || !expr->b)
         return false;
 
     parameters = expr->a;
-    if (!expr_is_op(parameters, &ops_lommel_s_pack) || !parameters->a || !parameters->b)
+    if (!expr_is_op(parameters, &ops_lommel_S_pack) || !parameters->a || !parameters->b)
         return false;
 
     if (mu)
@@ -621,24 +621,24 @@ bool expr_lommel_s_unpack(const expr_t *expr, const expr_t **mu, const expr_t **
         *argument = expr->b;
     return true;
 }
-number_t eval_lommel_s(expr_t *expr)
+number_t eval_lommel_S(expr_t *expr)
 {
     const expr_t *mu = NULL;
     const expr_t *nu = NULL;
     const expr_t *argument = NULL;
 
-    if (!expr_lommel_s_unpack(expr, &mu, &nu, &argument))
+    if (!expr_lommel_S_unpack(expr, &mu, &nu, &argument))
         return NUM_NAN;
-    return num_lommel_s(expr_eval_num_internal((expr_t *)mu), expr_eval_num_internal((expr_t *)nu),
+    return num_lommel_S(expr_eval_num_internal((expr_t *)mu), expr_eval_num_internal((expr_t *)nu),
                         expr_eval_num_internal((expr_t *)argument));
 }
 
-number_t eval_appell_f1_pack(expr_t *expr)
+number_t eval_appell_F1_pack(expr_t *expr)
 {
     (void)expr;
     return NUM_NAN;
 }
-bool expr_appell_f1_unpack(const expr_t *expr, const expr_t **a, const expr_t **b1, const expr_t **b2, const expr_t **c,
+bool expr_appell_F1_unpack(const expr_t *expr, const expr_t **a, const expr_t **b1, const expr_t **b2, const expr_t **c,
                            const expr_t **x, const expr_t **y)
 {
     const expr_t *params;
@@ -658,18 +658,18 @@ bool expr_appell_f1_unpack(const expr_t *expr, const expr_t **a, const expr_t **
         *x = NULL;
     if (y)
         *y = NULL;
-    if (!expr || !expr_is_op(expr, &ops_appell_f1) || !expr->a || !expr->b)
+    if (!expr || !expr_is_op(expr, &ops_appell_F1) || !expr->a || !expr->b)
         return false;
 
     params = expr->a;
     vars = expr->b;
-    if (!expr_is_op(params, &ops_appell_f1_pack) || !expr_is_op(vars, &ops_appell_f1_pack) || !params->a ||
+    if (!expr_is_op(params, &ops_appell_F1_pack) || !expr_is_op(vars, &ops_appell_F1_pack) || !params->a ||
         !params->b || !vars->a || !vars->b)
         return false;
 
     ab = params->a;
     bc = params->b;
-    if (!expr_is_op(ab, &ops_appell_f1_pack) || !expr_is_op(bc, &ops_appell_f1_pack) || !ab->a || !ab->b || !bc->a ||
+    if (!expr_is_op(ab, &ops_appell_F1_pack) || !expr_is_op(bc, &ops_appell_F1_pack) || !ab->a || !ab->b || !bc->a ||
         !bc->b)
         return false;
 
@@ -687,7 +687,7 @@ bool expr_appell_f1_unpack(const expr_t *expr, const expr_t **a, const expr_t **
         *y = vars->b;
     return true;
 }
-number_t eval_appell_f1(expr_t *expr)
+number_t eval_appell_F1(expr_t *expr)
 {
     const expr_t *a = NULL;
     const expr_t *b1 = NULL;
@@ -696,9 +696,9 @@ number_t eval_appell_f1(expr_t *expr)
     const expr_t *x = NULL;
     const expr_t *y = NULL;
 
-    if (!expr_appell_f1_unpack(expr, &a, &b1, &b2, &c, &x, &y))
+    if (!expr_appell_F1_unpack(expr, &a, &b1, &b2, &c, &x, &y))
         return NUM_NAN;
-    return num_appell_f1(expr_eval_num_internal(a), expr_eval_num_internal(b1), expr_eval_num_internal(b2),
+    return num_appell_F1(expr_eval_num_internal(a), expr_eval_num_internal(b1), expr_eval_num_internal(b2),
                          expr_eval_num_internal(c), expr_eval_num_internal(x), expr_eval_num_internal(y));
 }
 
@@ -758,7 +758,7 @@ static bool hypergeometric_parameter_set_unpack(const expr_t *set, const expr_t 
     return true;
 }
 
-bool expr_lauricella_f_unpack(const expr_t *expr, const expr_t **a, const expr_t ***b, const expr_t **c,
+bool expr_lauricella_F_unpack(const expr_t *expr, const expr_t **a, const expr_t ***b, const expr_t **c,
                               const expr_t ***x, size_t *variable_count)
 {
     const expr_t *parameters;
@@ -778,7 +778,7 @@ bool expr_lauricella_f_unpack(const expr_t *expr, const expr_t **a, const expr_t
         *x = NULL;
     if (variable_count)
         *variable_count = 0u;
-    if (!expr || !a || !b || !c || !x || !variable_count || !expr_is_op(expr, &ops_lauricella_f) || !expr->a ||
+    if (!expr || !a || !b || !c || !x || !variable_count || !expr_is_op(expr, &ops_lauricella_F) || !expr->a ||
         !expr->b)
         return false;
     parameters = expr->a;
@@ -800,7 +800,7 @@ bool expr_lauricella_f_unpack(const expr_t *expr, const expr_t **a, const expr_t
     return true;
 }
 
-number_t eval_lauricella_f(expr_t *expr)
+number_t eval_lauricella_F(expr_t *expr)
 {
     const expr_t *a = NULL;
     const expr_t **b = NULL;
@@ -811,7 +811,7 @@ number_t eval_lauricella_f(expr_t *expr)
     number_t result = NUM_NAN;
     size_t variable_count = 0u;
 
-    if (!expr_lauricella_f_unpack(expr, &a, &b, &c, &x, &variable_count))
+    if (!expr_lauricella_F_unpack(expr, &a, &b, &c, &x, &variable_count))
         return NUM_NAN;
     if (variable_count > 0u) {
         b_values = calloc(variable_count, sizeof(*b_values));
@@ -823,7 +823,7 @@ number_t eval_lauricella_f(expr_t *expr)
         b_values[i] = expr_eval_num_internal(b[i]);
         x_values[i] = expr_eval_num_internal(x[i]);
     }
-    result = num_lauricella_f(expr_eval_num_internal(a), b_values, expr_eval_num_internal(c), x_values, variable_count);
+    result = num_lauricella_F(expr_eval_num_internal(a), b_values, expr_eval_num_internal(c), x_values, variable_count);
 
 cleanup:
     free(x_values);
@@ -918,17 +918,17 @@ number_t eval_lambert_w(expr_t *expr)
 {
     return expr_eval_unary_num(expr, num_productlog);
 }
-number_t eval_lambert_wn(expr_t *expr)
+number_t eval_lambert_Wn(expr_t *expr)
 {
-    return expr_eval_binary_num(expr, num_lambert_wn);
+    return expr_eval_binary_num(expr, num_lambert_Wn);
 }
-number_t eval_lambert_w0(expr_t *expr)
+number_t eval_lambert_W0(expr_t *expr)
 {
-    return expr_eval_unary_num(expr, num_lambert_w0);
+    return expr_eval_unary_num(expr, num_lambert_W0);
 }
-number_t eval_lambert_wm1(expr_t *expr)
+number_t eval_lambert_Wm1(expr_t *expr)
 {
-    return expr_eval_unary_num(expr, num_lambert_wm1);
+    return expr_eval_unary_num(expr, num_lambert_Wm1);
 }
 number_t eval_normal_pdf(expr_t *expr)
 {
@@ -2205,7 +2205,7 @@ expr_t *deriv_legendre_chi(expr_t *expr)
     return out;
 }
 
-expr_t *deriv_appell_f1_pack(expr_t *expr)
+expr_t *deriv_appell_F1_pack(expr_t *expr)
 {
     (void)expr;
     return expr_new_const(NUM_NAN);
@@ -2261,19 +2261,19 @@ static expr_t *deriv_bessel_argument(expr_t *expr, expr_t *(*builder)(const expr
     return out ? out : expr_new_const(NUM_NAN);
 }
 
-expr_t *deriv_bessel_j(expr_t *expr)
+expr_t *deriv_bessel_J(expr_t *expr)
 {
-    return deriv_bessel_argument(expr, expr_bessel_j);
+    return deriv_bessel_argument(expr, expr_bessel_J);
 }
 
 
-expr_t *deriv_lommel_s_pack(expr_t *expr)
+expr_t *deriv_lommel_S_pack(expr_t *expr)
 {
     (void)expr;
     return expr_new_const(NUM_NAN);
 }
 
-expr_t *deriv_lommel_s(expr_t *expr)
+expr_t *deriv_lommel_S(expr_t *expr)
 {
     const expr_t *mu = NULL;
     const expr_t *nu = NULL;
@@ -2282,11 +2282,11 @@ expr_t *deriv_lommel_s(expr_t *expr)
     expr_t *argument_derivative = NULL;
     expr_t *out = NULL;
 
-    if (!expr_lommel_s_unpack(expr, &mu, &nu, &argument) || !expr_derivative_is_zero_local(mu) ||
+    if (!expr_lommel_S_unpack(expr, &mu, &nu, &argument) || !expr_derivative_is_zero_local(mu) ||
         !expr_derivative_is_zero_local(nu))
         return expr_new_const(NUM_NAN);
 
-    factor = expr_lommel_s_argument_derivative_expansion(mu, nu, argument);
+    factor = expr_lommel_S_argument_derivative_expansion(mu, nu, argument);
     argument_derivative = expr_get_dx_internal(argument);
     out = factor && argument_derivative ? expr_mul(factor, argument_derivative) : NULL;
 
@@ -2295,7 +2295,7 @@ expr_t *deriv_lommel_s(expr_t *expr)
     return out ? out : expr_new_const(NUM_NAN);
 }
 
-expr_t *deriv_appell_f1(expr_t *expr)
+expr_t *deriv_appell_F1(expr_t *expr)
 {
     const expr_t *a = NULL;
     const expr_t *b1 = NULL;
@@ -2308,19 +2308,19 @@ expr_t *deriv_appell_f1(expr_t *expr)
     expr_t *lauricella = NULL;
     expr_t *out = NULL;
 
-    if (!expr_appell_f1_unpack(expr, &a, &b1, &b2, &c, &x, &y))
+    if (!expr_appell_F1_unpack(expr, &a, &b1, &b2, &c, &x, &y))
         return expr_new_const(NUM_NAN);
     parameters[0] = b1;
     parameters[1] = b2;
     variables[0] = x;
     variables[1] = y;
-    lauricella = expr_lauricella_f(a, 2u, parameters, c, variables);
+    lauricella = expr_lauricella_F(a, 2u, parameters, c, variables);
     out = lauricella ? expr_get_dx_internal(lauricella) : NULL;
     expr_free(lauricella);
     return out ? out : expr_new_const(NUM_NAN);
 }
 
-expr_t *deriv_lauricella_f(expr_t *expr)
+expr_t *deriv_lauricella_F(expr_t *expr)
 {
     const expr_t *a = NULL;
     const expr_t **b = NULL;
@@ -2333,7 +2333,7 @@ expr_t *deriv_lauricella_f(expr_t *expr)
     expr_t *out = NULL;
     size_t variable_count = 0u;
 
-    if (!expr_lauricella_f_unpack(expr, &a, &b, &c, &x, &variable_count) || !expr_derivative_is_zero_local(a) ||
+    if (!expr_lauricella_F_unpack(expr, &a, &b, &c, &x, &variable_count) || !expr_derivative_is_zero_local(a) ||
         !expr_derivative_is_zero_local(c))
         goto cleanup;
     for (size_t i = 0u; i < variable_count; ++i) {
@@ -2363,7 +2363,7 @@ expr_t *deriv_lauricella_f(expr_t *expr)
             shifted_b[j] = b[j];
         bi1 = expr_add_long(b[i], 1);
         shifted_b[i] = bi1;
-        shifted = bi1 ? expr_lauricella_f(a1, variable_count, shifted_b, c1, x) : NULL;
+        shifted = bi1 ? expr_lauricella_F(a1, variable_count, shifted_b, c1, x) : NULL;
         ab = expr_mul(a, b[i]);
         coefficient = ab ? expr_div(ab, c) : NULL;
         factor = coefficient && shifted ? expr_mul(coefficient, shifted) : NULL;
@@ -2501,10 +2501,10 @@ expr_t *deriv_gammainv(expr_t *expr)
     return out;
 }
 
-expr_t *deriv_lambert_w0(expr_t *expr)
+expr_t *deriv_lambert_W0(expr_t *expr)
 {
     expr_t *da = expr_get_dx_internal(expr->a);
-    expr_t *w = expr_lambert_w0(expr->a);
+    expr_t *w = expr_lambert_W0(expr->a);
     expr_t *wp1 = expr_add_long(w, 1);
     expr_t *den = expr_mul(expr->a, wp1);
     expr_t *fac = expr_div(w, den);
@@ -2533,10 +2533,10 @@ expr_t *deriv_lambert_w(expr_t *expr)
     return out;
 }
 
-expr_t *deriv_lambert_wn(expr_t *expr)
+expr_t *deriv_lambert_Wn(expr_t *expr)
 {
     expr_t *db = expr_get_dx_internal(expr->b);
-    expr_t *w = expr_lambert_wn_xp(expr->a, expr->b);
+    expr_t *w = expr_lambert_Wn_xp(expr->a, expr->b);
     expr_t *wp1 = expr_add_long(w, 1);
     expr_t *den = expr_mul(expr->b, wp1);
     expr_t *fac = expr_div(w, den);
@@ -2549,10 +2549,10 @@ expr_t *deriv_lambert_wn(expr_t *expr)
     return out;
 }
 
-expr_t *deriv_lambert_wm1(expr_t *expr)
+expr_t *deriv_lambert_Wm1(expr_t *expr)
 {
     expr_t *da = expr_get_dx_internal(expr->a);
-    expr_t *w = expr_lambert_wm1(expr->a);
+    expr_t *w = expr_lambert_Wm1(expr->a);
     expr_t *wp1 = expr_add_long(w, 1);
     expr_t *den = expr_mul(expr->a, wp1);
     expr_t *fac = expr_div(w, den);

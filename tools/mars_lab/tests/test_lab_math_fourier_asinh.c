@@ -198,7 +198,7 @@ static void test_numeric_orders_and_complex_arguments(void)
 static void test_aliases_derivative_integral_and_sum(void)
 {
     const char *unary[] = {"K0", "K_0", "K₀"};
-    const char *binary[] = {"besselk", "bessel_k", "BesselK"};
+    const char *binary[] = {"besselk", "bessel_K", "BesselK"};
     for (size_t i = 0; i < 3; ++i) {
         lab_math_places(creal(math_fourier_number(math_fourier_fields(lab_math_format("%s(1)", unary[i]), "k"))),
             0.42102443824070833, 14);

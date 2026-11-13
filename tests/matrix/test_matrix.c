@@ -9,6 +9,7 @@
  * run suites sequentially; this source is not part of the installed library.
  */
 
+#include "string-t.h"
 #include "test_matrix.h"
 #include "test_database.h"
 
@@ -194,7 +195,7 @@ static void test_readme_example_struve_l(void)
 {
     number_t values[] = {NUM_ZERO, NUM_ONE, NUM_ZERO, NUM_ZERO};
     matrix_t *A = mat_create(2, 2, values);
-    matrix_t *L = mat_struve_l(A, &NUM_ZERO);
+    matrix_t *L = mat_struve_L(A, &NUM_ZERO);
 
     check_bool("README Struve L example produces a matrix", L != NULL);
     if (L) {
@@ -217,7 +218,7 @@ static void test_readme_example_bessel_i(void)
                          NUM_ZERO, NUM_ZERO, NUM_ONE,
                          NUM_ZERO, NUM_ZERO, NUM_ZERO};
     matrix_t *A = mat_create(3, 3, values);
-    matrix_t *I0 = mat_bessel_i(A, &NUM_ZERO);
+    matrix_t *I0 = mat_bessel_I(A, &NUM_ZERO);
 
     check_bool("README Bessel I0 example produces a matrix", I0 != NULL);
     if (I0) {
@@ -241,7 +242,7 @@ static void test_readme_example_struve_h(void)
                          NUM_ZERO, NUM_ZERO, NUM_ZERO, NUM_ONE,
                          NUM_ZERO, NUM_ZERO, NUM_ZERO, NUM_ZERO};
     matrix_t *A = mat_create(4, 4, values);
-    matrix_t *h0 = mat_struve_h(A, &NUM_ZERO);
+    matrix_t *h0 = mat_struve_H(A, &NUM_ZERO);
 
     check_bool("README Struve H0 example produces a matrix", h0 != NULL);
     if (h0) {
@@ -262,7 +263,7 @@ static void test_readme_example_bessel_y(void)
 {
     number_t values[] = {NUM_ONE, NUM_ONE, NUM_ZERO, NUM_ONE};
     matrix_t *A = mat_create(2, 2, values);
-    matrix_t *y0 = mat_bessel_y(A, &NUM_ZERO);
+    matrix_t *y0 = mat_bessel_Y(A, &NUM_ZERO);
 
     check_bool("README Bessel Y0 example produces a matrix", y0 != NULL);
     if (y0) {

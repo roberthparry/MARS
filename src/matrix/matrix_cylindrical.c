@@ -272,29 +272,29 @@ static matrix_t *cylindrical_function(const matrix_t *A, const number_t *order, 
 }
 
 /* Evaluate modified Bessel I using analytic numeric or symbolic matrix functional calculus. */
-matrix_t *mat_bessel_i(const matrix_t *A, const number_t *order)
+matrix_t *mat_bessel_I(const matrix_t *A, const number_t *order)
 {
-    return cylindrical_function(A, order, false, false, num_bessel_i, expr_bessel_i);
+    return cylindrical_function(A, order, false, false, num_bessel_I, expr_bessel_I);
 }
 
-static expr_t *bessel_k_spectral(const expr_t *value, void *context)
+static expr_t *bessel_K_spectral(const expr_t *value, void *context)
 {
-    return expr_bessel_k(context, value);
+    return expr_bessel_K(context, value);
 }
 
 /* Reconstruct the matrix function from its scalar spectral values, never elementwise. */
-matrix_t *mat_bessel_k(const matrix_t *A, const number_t *order)
+matrix_t *mat_bessel_K(const matrix_t *A, const number_t *order)
 {
     if (!order || !num_is_finite(*order))
         return NULL;
     expr_t *n = expr_new_const(*order), *one = expr_new_const(NUM_ONE);
-    matrix_t *result = mat_pow_expr_spectral_map(A, one, bessel_k_spectral, n);
+    matrix_t *result = mat_pow_expr_spectral_map(A, one, bessel_K_spectral, n);
     expr_free(one);
     expr_free(n);
     return result;
 }
 
-static bool bessel_y_matrix_finite(const matrix_t *A)
+static bool bessel_Y_matrix_finite(const matrix_t *A)
 {
     for (size_t row = 0u; row < A->rows; ++row) {
         for (size_t col = 0u; col < A->cols; ++col) {
@@ -309,7 +309,7 @@ static bool bessel_y_matrix_finite(const matrix_t *A)
 }
 
 /* Group equal complex nodes contiguously so confluent divided differences use analytic derivatives. */
-static int bessel_y_compare_nodes(const void *left, const void *right)
+static int bessel_Y_compare_nodes(const void *left, const void *right)
 {
     NUM_SCOPE(scope);
     number_t a = *(const number_t *)left, b = *(const number_t *)right;
@@ -319,7 +319,7 @@ static int bessel_y_compare_nodes(const void *left, const void *right)
 }
 
 /* Y_nu^(k)(z)/k! = sum_j (-1)^j binom(k,j) Y_(nu-k+2j)(z) / (2^k k!). */
-static number_t bessel_y_taylor(const number_t *order, number_t argument, size_t degree)
+static number_t bessel_Y_taylor(const number_t *order, number_t argument, size_t degree)
 {
     NUM_SCOPE(scope);
     number_t factorial = NUM_ONE;
@@ -331,7 +331,7 @@ static number_t bessel_y_taylor(const number_t *order, number_t argument, size_t
 
     for (size_t j = 0u; j <= degree; ++j) {
         number_t shifted = num_add_long(*order, 2L * (long)j - (long)degree);
-        number_t value = num_bessel_y(shifted, argument);
+        number_t value = num_bessel_Y(shifted, argument);
 
         num_destroy(&shifted);
         if (!num_is_finite(value)) {
@@ -349,7 +349,7 @@ static number_t bessel_y_taylor(const number_t *order, number_t argument, size_t
     return num_scope_detach(sum);
 }
 
-static void bessel_y_add_diagonal(matrix_t *A, number_t value)
+static void bessel_Y_add_diagonal(matrix_t *A, number_t value)
 {
     for (size_t i = 0u; i < A->rows; ++i) {
         NUM_SCOPE(scope);
@@ -359,7 +359,7 @@ static void bessel_y_add_diagonal(matrix_t *A, number_t value)
     }
 }
 
-static matrix_t *bessel_y_interpolate(const matrix_t *A, const number_t *order)
+static matrix_t *bessel_Y_interpolate(const matrix_t *A, const number_t *order)
 {
     const size_t n = A->rows;
     number_t *nodes = calloc(n, sizeof(*nodes));
@@ -389,9 +389,9 @@ static matrix_t *bessel_y_interpolate(const matrix_t *A, const number_t *order)
         if (!num_is_finite(nodes[i]) || num_eq(nodes[i], NUM_ZERO))
             goto cleanup;
     }
-    qsort(nodes, n, sizeof(*nodes), bessel_y_compare_nodes);
+    qsort(nodes, n, sizeof(*nodes), bessel_Y_compare_nodes);
     for (size_t i = 0u; i < n; ++i) {
-        coefficients[i] = num_bessel_y(*order, nodes[i]);
+        coefficients[i] = num_bessel_Y(*order, nodes[i]);
         if (!num_is_finite(coefficients[i]))
             goto cleanup;
     }
@@ -403,7 +403,7 @@ static matrix_t *bessel_y_interpolate(const matrix_t *A, const number_t *order)
             number_t value;
 
             if (num_eq(nodes[i], nodes[i - degree]))
-                value = bessel_y_taylor(order, nodes[i], degree);
+                value = bessel_Y_taylor(order, nodes[i], degree);
             else
                 value = num_div(num_sub(coefficients[i], coefficients[i - 1u]),
                                 num_sub(nodes[i], nodes[i - degree]));
@@ -419,13 +419,13 @@ static matrix_t *bessel_y_interpolate(const matrix_t *A, const number_t *order)
     result = mat_new(n, n);
     if (!result)
         goto cleanup;
-    bessel_y_add_diagonal(result, coefficients[n - 1u]);
+    bessel_Y_add_diagonal(result, coefficients[n - 1u]);
     for (size_t k = n - 1u; k > 0u; --k) {
         matrix_t *factor = mat_copy_preserving_store(A);
         number_t negative_node = num_neg(nodes[k - 1u]);
 
         if (factor)
-            bessel_y_add_diagonal(factor, negative_node);
+            bessel_Y_add_diagonal(factor, negative_node);
         num_destroy(&negative_node);
         matrix_t *next = factor ? mat_mul(factor, result) : NULL;
 
@@ -434,9 +434,9 @@ static matrix_t *bessel_y_interpolate(const matrix_t *A, const number_t *order)
         result = next;
         if (!result)
             goto cleanup;
-        bessel_y_add_diagonal(result, coefficients[k - 1u]);
+        bessel_Y_add_diagonal(result, coefficients[k - 1u]);
     }
-    if (!bessel_y_matrix_finite(result)) {
+    if (!bessel_Y_matrix_finite(result)) {
         mat_free(result);
         result = NULL;
     }
@@ -453,13 +453,13 @@ cleanup:
 }
 
 /* Evaluate ordinary Bessel Y by analytic Hermite interpolation or symbolic matrix functional calculus. */
-matrix_t *mat_bessel_y(const matrix_t *A, const number_t *order)
+matrix_t *mat_bessel_Y(const matrix_t *A, const number_t *order)
 {
     if (!A || !order || !num_is_finite(*order) || A->rows != A->cols || A->rows == 0u || A->rows > INT_MAX)
         return NULL;
     if (matrix_is_symbolic(A))
-        return cylindrical_symbolic(A, order, num_bessel_y, expr_bessel_y);
-    if (!bessel_y_matrix_finite(A))
+        return cylindrical_symbolic(A, order, num_bessel_Y, expr_bessel_Y);
+    if (!bessel_Y_matrix_finite(A))
         return NULL;
 
     number_t determinant = number_invalid();
@@ -475,7 +475,7 @@ matrix_t *mat_bessel_y(const matrix_t *A, const number_t *order)
             return NULL;
         for (size_t i = 0u; i < A->rows; ++i) {
             NUM_SCOPE(scope);
-            number_t value = num_bessel_y(*order, mat_get_num(A, i, i));
+            number_t value = num_bessel_Y(*order, mat_get_num(A, i, i));
 
             if (!num_is_finite(value)) {
                 num_destroy(&value);
@@ -486,17 +486,17 @@ matrix_t *mat_bessel_y(const matrix_t *A, const number_t *order)
         }
         return result;
     }
-    return bessel_y_interpolate(A, order);
+    return bessel_Y_interpolate(A, order);
 }
 
 /* Evaluate ordinary Struve H using its alternating matrix series and symbolic functional calculus. */
-matrix_t *mat_struve_h(const matrix_t *A, const number_t *order)
+matrix_t *mat_struve_H(const matrix_t *A, const number_t *order)
 {
-    return cylindrical_function(A, order, true, true, num_struve_h, expr_struve_h);
+    return cylindrical_function(A, order, true, true, num_struve_H, expr_struve_H);
 }
 
 /* Evaluate modified Struve L using analytic numeric or symbolic matrix functional calculus. */
-matrix_t *mat_struve_l(const matrix_t *A, const number_t *order)
+matrix_t *mat_struve_L(const matrix_t *A, const number_t *order)
 {
-    return cylindrical_function(A, order, true, false, num_struve_l, expr_struve_l);
+    return cylindrical_function(A, order, true, false, num_struve_L, expr_struve_L);
 }

@@ -108,10 +108,10 @@ static double math_inverse_positive_ei(double x)
     return NAN;
 }
 
-static double math_inverse_bessel_j(double order, double x)
+static double math_inverse_bessel_J(double order, double x)
 {
     if (order < 0 && order == floor(order))
-        return pow(-1, -order) * math_inverse_bessel_j(-order, x);
+        return pow(-1, -order) * math_inverse_bessel_J(-order, x);
     double term = pow(x / 2, order) / tgamma(order + 1);
     double total = term;
     for (int k = 1; k < 1000; ++k) {
@@ -124,7 +124,7 @@ static double math_inverse_bessel_j(double order, double x)
     return NAN;
 }
 
-static double math_inverse_bessel_y_zero(double x)
+static double math_inverse_bessel_Y_zero(double x)
 {
     double term = 1, harmonic = 0, correction = 0;
     for (int k = 1; k < 1000; ++k) {
@@ -133,7 +133,7 @@ static double math_inverse_bessel_y_zero(double x)
         double contribution = -harmonic * term;
         correction += contribution;
         if (fabs(contribution) < 2e-16 * fmax(1, fabs(correction)))
-            return 2 / acos(-1) * ((log(x / 2) + euler_gamma) * math_inverse_bessel_j(0, x) + correction);
+            return 2 / acos(-1) * ((log(x / 2) + euler_gamma) * math_inverse_bessel_J(0, x) + correction);
     }
     lab_math_check(false, "Bessel Y reference series did not converge");
     return NAN;
@@ -164,8 +164,8 @@ static double math_inverse_log_one(double t) { return log(2 * t + 1); }
 static double math_inverse_log_three(double t) { return log(2 * t + 3); }
 static double math_inverse_log10_three(double t) { return log10(2 * t + 3); }
 static double math_inverse_affine_e1(double t) { return -3 * math_inverse_e1(2 * t) + 4; }
-static double math_inverse_j_reference(double t) { return math_inverse_bessel_j(bessel_order, 2 * t); }
-static double math_inverse_y_reference(double t) { return math_inverse_bessel_y_zero(2 * t); }
+static double math_inverse_j_reference(double t) { return math_inverse_bessel_J(bessel_order, 2 * t); }
+static double math_inverse_y_reference(double t) { return math_inverse_bessel_Y_zero(2 * t); }
 
 static double math_inverse_gamma_reference(double t)
 {
@@ -213,9 +213,9 @@ static void test_bessel_orders_and_scales(void)
     const double orders[] = {-3, -0.75, 0, 0.5, 1, 3};
     for (size_t i = 0; i < 6; ++i) {
         bessel_order = orders[i];
-        math_inverse_round_trip(lab_math_format("bessel_j(%.17g,2*t)", bessel_order), math_inverse_j_reference);
+        math_inverse_round_trip(lab_math_format("bessel_J(%.17g,2*t)", bessel_order), math_inverse_j_reference);
     }
-    math_inverse_round_trip("bessel_y(0,2*t)", math_inverse_y_reference);
+    math_inverse_round_trip("bessel_Y(0,2*t)", math_inverse_y_reference);
 }
 
 static void test_copied_bessel_spectra(void)

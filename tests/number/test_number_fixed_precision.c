@@ -48,7 +48,7 @@ void run_number_fixed_precision_tests(void)
         number_t cosh_i = num_cosh(qc_i);
         number_t tanh_i = num_tanh(qc_i);
         number_t qc_w0_arg = num_create_from_qcomplex(qc_from_string("0.2 + 0.1i"));
-        number_t qc_w0 = num_lambert_w0(qc_w0_arg);
+        number_t qc_w0 = num_lambert_W0(qc_w0_arg);
         number_t want_w0 = num_create_from_qcomplex(qc_productlog(qc_from_string("0.2 + 0.1i")));
         number_t want_sin_i = num_create_from_qcomplex(qc_sin(qc_from_string("0 + 1i")));
         number_t want_cos_i = num_create_from_qcomplex(qc_cos(qc_from_string("0 + 1i")));

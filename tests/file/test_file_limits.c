@@ -15,6 +15,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+#include "string-t.h"
 #include "file-t.h"
 #include "test_harness.h"
 

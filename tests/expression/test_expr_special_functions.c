@@ -185,7 +185,7 @@ void test_lambert_w0(void)
 {
     /* W₀(0) = 0 exactly */
     expr_t *c = test_expr_new_var_d(0.0);
-    expr_t *f = expr_lambert_w0(c);
+    expr_t *f = expr_lambert_W0(c);
     check_q_at(__FILE__, __LINE__, 1, "W₀(0) = 0", expr_eval_qf(f), qf_from_double(0.0));
     print_expr_of(f);
     expr_free(f);
@@ -193,7 +193,7 @@ void test_lambert_w0(void)
 
     /* W₀(e) = 1 — use qfloat_t e so the input is accurate to ~33 digits */
     c = test_expr_new_var_qf(qf_exp(qf_from_double(1.0)));
-    f = expr_lambert_w0(c);
+    f = expr_lambert_W0(c);
     check_q_at(__FILE__, __LINE__, 1, "W₀(e) = 1", expr_eval_qf(f), qf_from_double(1.0));
     print_expr_of(f);
     expr_free(f);
@@ -201,7 +201,7 @@ void test_lambert_w0(void)
 
     /* W₀(x)·exp(W₀(x)) = x — defining equation verified at x=2 */
     qfloat_t X = qf_from_double(2.0);
-    qfloat_t W = qf_lambert_w0(X);
+    qfloat_t W = qf_lambert_W0(X);
     qfloat_t lhs = qf_mul(W, qf_exp(W));
     check_q_at(__FILE__, __LINE__, 1, "W₀(2)*exp(W₀(2)) = 2", lhs, X);
 }
@@ -210,13 +210,13 @@ void test_lambert_wm1(void)
 {
     /* W_{-1}(x)·exp(W_{-1}(x)) = x — defining equation at x=-0.1 */
     qfloat_t X = qf_from_string("-0.1");
-    qfloat_t W = qf_lambert_wm1(X);
+    qfloat_t W = qf_lambert_Wm1(X);
     qfloat_t lhs = qf_mul(W, qf_exp(W));
     check_q_at(__FILE__, __LINE__, 1, "W₋₁(-0.1)*exp(W₋₁(-0.1)) = -0.1", lhs, X);
 
     /* W_{-1}(x)·exp(W_{-1}(x)) = x — defining equation at x=-0.3 */
     X = qf_from_string("-0.3");
-    W = qf_lambert_wm1(X);
+    W = qf_lambert_Wm1(X);
     lhs = qf_mul(W, qf_exp(W));
     check_q_at(__FILE__, __LINE__, 1, "W₋₁(-0.3)*exp(W₋₁(-0.3)) = -0.3", lhs, X);
 }
@@ -622,8 +622,8 @@ void test_dilog_polylog(void)
         qfloat_t appell_want =
             qf_from_string("1.1778303565638345453879410947052170506848071256473314110734863879480772052813379");
 
-        f = expr_appell_f1(a, b1, b2, cc, x, y);
-        check_q_at(__FILE__, __LINE__, 1, "appell_f1(1;1,1;2;0.1,0.2)", expr_eval_qf(f), appell_want);
+        f = expr_appell_F1(a, b1, b2, cc, x, y);
+        check_q_at(__FILE__, __LINE__, 1, "appell_F1(1;1,1;2;0.1,0.2)", expr_eval_qf(f), appell_want);
         print_expr_of(f);
 
         expr_free(f);
@@ -656,11 +656,11 @@ void test_dilog_polylog(void)
         expr_t *c_lauricella = test_expr_new_const_d(2.0);
         expr_t *variables[] = {test_expr_new_named_var_d(0.1, "x"), test_expr_new_const_d(0.2)};
         expr_t *lauricella =
-            expr_lauricella_f(a, 2u, (const expr_t *const *)b, c_lauricella, (const expr_t *const *)variables);
+            expr_lauricella_F(a, 2u, (const expr_t *const *)b, c_lauricella, (const expr_t *const *)variables);
         const expr_t *derivative = expr_get_deriv(lauricella, variables[0]);
         qfloat_t shifted_b[] = {qf_from_string("1.5"), qf_from_string("1.5")};
         qfloat_t shifted_x[] = {qf_from_string("0.1"), qf_from_string("0.2")};
-        qfloat_t want = qf_mul(qf_from_string("0.3125"), qf_lauricella_f(qf_from_string("2.25"), shifted_b,
+        qfloat_t want = qf_mul(qf_from_string("0.3125"), qf_lauricella_F(qf_from_string("2.25"), shifted_b,
                                                                              qf_from_string("3.0"), shifted_x, 2u));
 
         ASSERT_NOT_NULL(lauricella);
@@ -681,15 +681,15 @@ void test_bessel(void)
 {
     expr_t *order = test_expr_new_const_d(0.5);
     expr_t *x = test_expr_new_named_var_d(1.25, "x");
-    expr_t *j = expr_bessel_j(order, x);
-    expr_t *y = expr_bessel_y(order, x);
+    expr_t *j = expr_bessel_J(order, x);
+    expr_t *y = expr_bessel_Y(order, x);
     const expr_t *dj = expr_get_deriv(j, x);
     qfloat_t argument = qf_from_string("1.25");
     qfloat_t scale = qf_sqrt(qf_div(qf_from_double(2.0), qf_mul(QF_PI, argument)));
     qfloat_t want_j = qf_mul(scale, qf_sin(argument));
     qfloat_t want_y = qf_neg(qf_mul(scale, qf_cos(argument)));
-    qfloat_t want_dj = qf_mul(qf_from_double(0.5), qf_sub(qf_bessel_j(qf_from_double(-0.5), argument),
-                                                              qf_bessel_j(qf_from_double(1.5), argument)));
+    qfloat_t want_dj = qf_mul(qf_from_double(0.5), qf_sub(qf_bessel_J(qf_from_double(-0.5), argument),
+                                                              qf_bessel_J(qf_from_double(1.5), argument)));
     char *tex = expr_to_TeX_body(j);
 
     ASSERT_NOT_NULL(j);
@@ -699,7 +699,7 @@ void test_bessel(void)
     check_q_at(__FILE__, __LINE__, 1, "J_(1/2) half-order identity", expr_eval_qf(j), want_j);
     check_q_at(__FILE__, __LINE__, 1, "Y_(1/2) half-order identity", expr_eval_qf(y), want_y);
     {
-        static const char *const spellings[] = {"BesselJ", "BesselY", "bessel_j", "bessel_y"};
+        static const char *const spellings[] = {"BesselJ", "BesselY", "bessel_J", "bessel_Y"};
 
         for (size_t i = 0u; i < sizeof(spellings) / sizeof(spellings[0]); ++i) {
             char input[96];
@@ -731,10 +731,10 @@ void test_bessel(void)
     {
         expr_t *mu = test_expr_new_const_d(1.0);
         expr_t *nu = test_expr_new_const_d(0.0);
-        expr_t *lommel = expr_lommel_s(mu, nu, x);
+        expr_t *lommel = expr_lommel_S(mu, nu, x);
         const expr_t *dlommel = expr_get_deriv(lommel, x);
-        qfloat_t want_lommel = qf_sub(QF_ONE, qf_bessel_j(QF_ZERO, argument));
-        qfloat_t want_derivative = qf_bessel_j(QF_ONE, argument);
+        qfloat_t want_lommel = qf_sub(QF_ONE, qf_bessel_J(QF_ZERO, argument));
+        qfloat_t want_derivative = qf_bessel_J(QF_ONE, argument);
         char *lommel_TeX = expr_to_TeX_body(lommel);
         char *dlommel_text = dlommel ? expr_to_string(dlommel, style_UNBOUND) : NULL;
 
@@ -750,7 +750,7 @@ void test_bessel(void)
         ASSERT_NULL(strstr(dlommel_text, "derivative"));
 
         {
-            static const char *const spellings[] = {"LommelS", "lommel_s"};
+            static const char *const spellings[] = {"LommelS", "lommel_S"};
 
             for (size_t i = 0u; i < sizeof(spellings) / sizeof(spellings[0]); ++i) {
                 char input[96];

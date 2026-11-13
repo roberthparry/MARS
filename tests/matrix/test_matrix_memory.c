@@ -11,6 +11,7 @@
 
 #include <errno.h>
 
+#include "string-t.h"
 #include "test_matrix.h"
 
 /* Linker wrapping is confined to the matrix test binary; production allocators are unchanged. */
@@ -215,7 +216,7 @@ static void test_mat_bessel_y_survives_scope(void)
     number_t upper[] = {NUM_TWO, NUM_ONE, NUM_ZERO, NUM_TWO};
     number_t lower[] = {NUM_TWO, NUM_ZERO, NUM_ONE, NUM_TWO};
     const number_t *values[] = {upper, lower};
-    number_t y1 = num_bessel_y(NUM_ONE, NUM_TWO);
+    number_t y1 = num_bessel_Y(NUM_ONE, NUM_TWO);
     number_t expected = num_neg(y1);
     num_destroy(&y1);
     for (size_t i = 0u; i < 2u; ++i) {
@@ -223,7 +224,7 @@ static void test_mat_bessel_y_survives_scope(void)
         matrix_t *result;
         {
             NUM_SCOPE(scope);
-            result = input ? mat_bessel_y(input, &NUM_ZERO) : NULL;
+            result = input ? mat_bessel_Y(input, &NUM_ZERO) : NULL;
         }
         check_bool("Bessel Y matrix survives its evaluation scope", result != NULL);
         if (result) {

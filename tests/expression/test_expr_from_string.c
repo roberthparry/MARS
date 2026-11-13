@@ -9,6 +9,7 @@
  * run suites sequentially; this source is not part of the installed library.
  */
 
+#include "string-t.h"
 #define MARS_EXPR_INTERNAL_ACCESS
 #include "expression/expr_internal.h"
 #include "test_database.h"
@@ -1767,7 +1768,7 @@ static void test_from_string_special_functions(void)
     check_parse_val("HypergeometricpFq general 1F0 identity", "{ HypergeometricpFq(1, 0, 2, x) | x = 0.2 }",
                     1.0 / (0.8 * 0.8), __LINE__);
     check_parse_val("Lauricella FD general product identity",
-                    "{ lauricella_f(3, 1.25, 0.5, 1.5, 2, 1.25, 0.1, 0.2, 0.15) }",
+                    "{ lauricella_F(3, 1.25, 0.5, 1.5, 2, 1.25, 0.1, 0.2, 0.15) }",
                     pow(0.9, -0.5) * pow(0.8, -1.5) * pow(0.85, -2.0), __LINE__);
     {
         expr_t *expr = expr_from_string("{ Γ(x + 1)·(ψ⁽¹⁾(x + 1) + ψ⁽⁰⁾²(x + 1)) | x = ? }", NULL);
@@ -1780,7 +1781,7 @@ static void test_from_string_special_functions(void)
         }
         expr_free(expr);
     }
-    check_parse_val("W₀(0) = 0 via lambert_w0", "{ lambert_w0(x) | x = 0 }", 0.0, __LINE__);
+    check_parse_val("W₀(0) = 0 via lambert_W0", "{ lambert_W0(x) | x = 0 }", 0.0, __LINE__);
     check_parse_val("W₀(0) = 0 via productlog", "{ productlog(x) | x = 0 }", 0.0, __LINE__);
     check_parse_val("W₀(0) = 0", "{ W₀(x) | x = 0 }", 0.0, __LINE__);
     check_parse_val("W₀(0) = 0 via W", "{ W(x) | x = 0 }", 0.0, __LINE__);
@@ -1788,7 +1789,7 @@ static void test_from_string_special_functions(void)
     check_parse_val("W₀(0) = 0 via W_0", "{ W_0(x) | x = 0 }", 0.0, __LINE__);
     test_run_database_cases(__FILE__, __LINE__,
         "expression.test_from_string_special_functions_check_parse_expr_3", NULL, check_parse_expr_database_row);
-    check_parse_val("W₋₁(-0.2) via lambert_wm1", "{ lambert_wm1(x) | x = -0.2 }", -2.5426413577735265, __LINE__);
+    check_parse_val("W₋₁(-0.2) via lambert_Wm1", "{ lambert_Wm1(x) | x = -0.2 }", -2.5426413577735265, __LINE__);
     check_parse_val("W₋₁(-0.2)", "{ W₋₁(x) | x = -0.2 }", -2.5426413577735265, __LINE__);
     check_parse_val("W₋₁(-0.2) via W-1", "{ W-1(x) | x = -0.2 }", -2.5426413577735265, __LINE__);
     check_parse_val("W₋₁(-0.2) via W_-1", "{ W_-1(x) | x = -0.2 }", -2.5426413577735265, __LINE__);

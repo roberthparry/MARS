@@ -134,17 +134,25 @@ OBJS    := $(SRCS:src/%.c=$(BUILD_DIR)/%.o)
 QFLOAT_OBJS   := $(patsubst src/%.c,$(BUILD_DIR)/%.o,$(wildcard src/qfloat/*.c))
 QCOMPLEX_OBJS := $(patsubst src/%.c,$(BUILD_DIR)/%.o,$(wildcard src/qcomplex/*.c))
 
-TEST_ALL_SRCS     := $(shell find tests -name 'test_*.c' ! -path 'tests/test_config/*' | sort)
-TEST_SRCS         := $(shell find tests -name 'test_*.c' ! -path 'tests/test_config/*' | while read -r f; do d=$$(basename "$$(dirname "$$f")"); b=$$(basename "$$f"); if [ "$$b" = "test_$$d.c" ] || [ "$$b" = "$$d.c" ]; then printf '%s\n' "$$f"; fi; done | sort)
-TEST_HELPER_SRCS  := $(filter-out $(TEST_SRCS),$(TEST_ALL_SRCS))
-TEST_COMMON_SRCS  := $(shell find tests/test_config -name '*.c' 2>/dev/null | sort)
+TEST_ALL_SRCS     := $(shell find tests -name 'test_*.c' ! -path 'tests/test_harness/*' | sort)
+TEST_SRCS         := $(shell find tests -name 'test_*.c' ! -path 'tests/test_harness/*' | \
+    awk -F/ '{d=$$(NF-1); b=$$NF; if (b == "test_" d ".c" || b == d ".c") print}' | sort)
+TEST_SRCS += tests/test_test_harness/test_harness_bootstrap.c
+TEST_CORE_SRCS := tests/test_harness/test_harness_runtime.c tests/test_harness/test_harness_text.c
+TEST_CORE_OBJS := $(TEST_CORE_SRCS:tests/%.c=$(TEST_BUILD_DIR)/%.o)
+TEST_CORE_BUILD_OBJS := $(TEST_CORE_OBJS) $(TEST_BUILD_DIR)/test_test_harness/test_harness_bootstrap.o
+TEST_CORE_BIN := $(TEST_BUILD_DIR)/test_test_harness/test_harness_bootstrap
+TEST_EXPR_SUPPORT_OBJ := $(TEST_BUILD_DIR)/expression/test_expr_support.o
+TEST_COMMON_SRCS := $(shell find tests/test_harness -name '*.c' 2>/dev/null | sort)
+TEST_HELPER_SRCS := $(filter-out $(TEST_SRCS) $(TEST_COMMON_SRCS),$(TEST_ALL_SRCS))
 TEST_SHARED_HEADERS := $(wildcard tests/include/*.h)
 TEST_SUITE_HEADERS  := $(shell find tests -mindepth 2 -maxdepth 2 -name 'test_*.h' | sort)
 TEST_OBJS         := $(TEST_SRCS:tests/%.c=$(TEST_BUILD_DIR)/%.o)
 TEST_HELPER_OBJS  := $(TEST_HELPER_SRCS:tests/%.c=$(TEST_BUILD_DIR)/%.o)
 TEST_COMMON_HELPER_OBJS := $(TEST_COMMON_SRCS:tests/%.c=$(TEST_BUILD_DIR)/%.o)
 TEST_DATABASE_OBJS := $(filter %/test_database_store.o %/test_database_profile.o %/test_database_cases.o \
-    %/test_database_command.o %/test_database_stats.o %/test_database_seed.o %/test_database_history.o %/test_database_migrate.o,\
+    %/test_database_command.o %/test_database_stats.o %/test_database_seed.o %/test_database_history.o \
+    %/test_database_migrate.o %/test_database_relocate.o,\
     $(TEST_COMMON_HELPER_OBJS))
 BENCH_SRCS        := $(shell find bench -name 'bench_*.c' 2>/dev/null | sort)
 BENCH_OBJS        := $(BENCH_SRCS:bench/%.c=$(BUILD_DIR)/bench/%.o)
@@ -200,8 +208,10 @@ TEST_BINS += $(TBA_TEST_BIN) $(LAB_TEST_BIN) $(CONFIG_TEST_BIN) $(CHECKS_TEST_BI
 .PHONY: native-tools
 native-tools: $(CHECKS_BIN) $(CONFIG_PROGRAM)
 
-$(SHARED_LIB) $(TEST_OBJS) $(TEST_HELPER_OBJS) $(filter-out $(TEST_DATABASE_OBJS),$(TEST_COMMON_HELPER_OBJS)) \
-$(TEST_BINS) $(BENCH_OBJS) $(BENCH_BINS) $(SCRATCH_OBJS) $(SCRATCH_BINS) \
+$(SHARED_LIB) $(filter-out $(TEST_BUILD_DIR)/test_test_harness/test_harness_bootstrap.o,$(TEST_OBJS)) \
+$(filter-out $(TEST_CORE_OBJS),$(TEST_HELPER_OBJS)) \
+$(filter-out $(TEST_DATABASE_OBJS) $(TEST_CORE_OBJS),$(TEST_COMMON_HELPER_OBJS)) \
+$(filter-out $(TEST_CORE_BIN),$(TEST_BINS)) $(BENCH_OBJS) $(BENCH_BINS) $(SCRATCH_OBJS) $(SCRATCH_BINS) \
 $(filter-out $(APP_RESOURCE_OBJ),$(LAB_OBJS)) $(LAB_TEST_OBJS) $(LAB_SERVER) \
 $(filter-out $(APP_RESOURCE_OBJ),$(TBA_OBJS)) $(TBA_SERVER) \
 $(CONFIG_TEST_OBJS) $(CHECKS_TEST_OBJS) $(CHECKS_TEST_FIXTURE_BIN): | native-tools
@@ -521,8 +531,8 @@ FILE_TEST_HELPERS = $(filter $(TEST_BUILD_DIR)/file/%.o,$(TEST_HELPER_OBJS))
 # prerequisites could otherwise start compiling before the check in parallel.
 # Order-only prerequisites avoid rebuilding current artefacts merely because
 # the dependency check is phony. Direct object and executable targets are covered.
-$(OBJS) $(TEST_OBJS) $(TEST_HELPER_OBJS) $(TEST_COMMON_HELPER_OBJS) \
-$(BENCH_OBJS) $(SCRATCH_OBJS) $(STATIC_LIB) $(SHARED_LIB) $(TEST_BINS) \
+$(OBJS) $(filter-out $(TEST_CORE_BUILD_OBJS),$(TEST_OBJS) $(TEST_HELPER_OBJS) $(TEST_COMMON_HELPER_OBJS)) \
+$(BENCH_OBJS) $(SCRATCH_OBJS) $(STATIC_LIB) $(SHARED_LIB) $(filter-out $(TEST_CORE_BIN),$(TEST_BINS)) \
 $(BENCH_BINS) $(SCRATCH_BINS) \
 $(FILE_COVERAGE_OBJS) $(FILE_COVERAGE_DIR)/test_file $(LAB_OBJS) $(LAB_SERVER) $(LAB_TEST_OBJS) \
 $(CONFIG_OBJS) $(CONFIG_PROGRAM) $(CONFIG_TEST_OBJS) $(CHECKS_OBJS) $(CHECKS_BIN) $(CHECKS_TEST_OBJS): | check-native-deps
@@ -547,22 +557,35 @@ define TEST_BIN_RULE
 $(patsubst tests/%.c,$(TEST_BUILD_DIR)/%,$(1)): \
     $(patsubst tests/%.c,$(TEST_BUILD_DIR)/%.o,$(1)) \
     $(STATIC_LIB) $(SHARED_LIB) \
-    $(TEST_COMMON_HELPER_OBJS) \
+    $(TEST_COMMON_HELPER_OBJS) $(if $(filter tests/matrix/%,$(1)),$(TEST_EXPR_SUPPORT_OBJ)) \
     $(filter $(TEST_BUILD_DIR)/$(dir $(patsubst tests/%,%,$(1)))%.o,$(TEST_HELPER_OBJS))
 	@mkdir -p $$(dir $$@)
 	$(CC) $$(TEST_LINK_FLAGS) -o $$@ \
 	    $(patsubst tests/%.c,$(TEST_BUILD_DIR)/%.o,$(1)) \
-	    $(TEST_COMMON_HELPER_OBJS) \
+	    $(TEST_COMMON_HELPER_OBJS) $(if $(filter tests/matrix/%,$(1)),$(TEST_EXPR_SUPPORT_OBJ)) \
 	    $(filter $(TEST_BUILD_DIR)/$(dir $(patsubst tests/%,%,$(1)))%.o,$(TEST_HELPER_OBJS)) \
 	    $$(TEST_CONFIGURATION_OBJS) \
 	    $(STATIC_LIB) $(LDLIBS)
 endef
 
-$(foreach src,$(TEST_SRCS),$(eval $(call TEST_BIN_RULE,$(src))))
+$(foreach src,$(filter-out tests/test_test_harness/test_harness_bootstrap.c,$(TEST_SRCS)),$(eval $(call TEST_BIN_RULE,$(src))))
+
+# This proof executable has no library archive, optional adapter or native-tool prerequisite.
+$(TEST_CORE_BUILD_OBJS): $(TEST_BUILD_DIR)/%.o: tests/%.c Makefile \
+    tests/include/test_harness.h tests/include/test_harness_adapter.h tests/test_harness/test_harness_internal.h \
+    | build-temporary
+	@mkdir -p $(dir $@) $(dir $@).deps
+	$(CC) $(filter -O% -g% -Wall -Wextra -Werror -DDEBUG,$(CFLAGS)) -D_GNU_SOURCE -std=c11 \
+	    $(DEPFLAGS) -Itests/include -c $< -o $@
+
+$(TEST_CORE_BIN): $(TEST_BUILD_DIR)/test_test_harness/test_harness_bootstrap.o $(TEST_CORE_OBJS)
+	$(CC) $(LDFLAGS) -o $@ $^ -lm
 
 # Configured engine tests are application clients: load mars.db before entering library code.
-$(TEST_BUILD_DIR)/almanac/test_almanac $(TEST_BUILD_DIR)/jurisdiction/test_jurisdiction: TEST_CONFIGURATION_OBJS = $(APP_RESOURCE_OBJ)
-$(TEST_BUILD_DIR)/almanac/test_almanac $(TEST_BUILD_DIR)/jurisdiction/test_jurisdiction: $(APP_RESOURCE_OBJ)
+$(TEST_BUILD_DIR)/almanac/test_almanac $(TEST_BUILD_DIR)/jurisdiction/test_jurisdiction \
+$(TEST_BUILD_DIR)/computation/test_computation: TEST_CONFIGURATION_OBJS = $(APP_RESOURCE_OBJ)
+$(TEST_BUILD_DIR)/almanac/test_almanac $(TEST_BUILD_DIR)/jurisdiction/test_jurisdiction \
+$(TEST_BUILD_DIR)/computation/test_computation: $(APP_RESOURCE_OBJ)
 
 $(BUILD_DIR)/bench/%: $(BUILD_DIR)/bench/%.o $(STATIC_LIB) $(SHARED_LIB)
 	@mkdir -p $(dir $@)
@@ -606,8 +629,10 @@ bench-db: $(CHECKS_BIN)
 endif
 
 test: check-public-distribution $(TEST_BINS)
-	@rc=0; "$(CHECKS_BIN)" source-policy || rc=1; for t in $(TEST_BINS); do \
-	    "$(CHECKS_BIN)" test-suite "$$t" $(TEST_ARGS) || rc=1; \
+	@rc=0; i=0; label_width=$$(printf '%s\n' $(TEST_BINS) | awk 'length > width { width = length } END { print width + 0 }'); \
+	"$(CHECKS_BIN)" source-policy || rc=1; for t in $(TEST_BINS); do \
+	    i=$$((i + 1)); "$(CHECKS_BIN)" test-suite --suite-progress $$i $(words $(TEST_BINS)) \
+	        --summary-width $$label_width "$$t" $(TEST_ARGS) || rc=1; \
 	done; $(README_EXAMPLE_CHECK) || rc=1; exit $$rc
 
 memtest: $(TEST_BINS)

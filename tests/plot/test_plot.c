@@ -10,6 +10,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "string-t.h"
 #include "computation-t.h"
 #include "xml-t.h"
 #include "plot-t.h"

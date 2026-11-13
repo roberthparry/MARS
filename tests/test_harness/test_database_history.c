@@ -253,7 +253,7 @@ bool test_database_history_assess(test_database_t *database, const test_database
 }
 
 /* Warnings identify candidates for investigation; successful assertions keep their actual outcome. */
-void test_database_history_warn(test_database_t *database, sqlite3_int64 run_id)
+static void test_database_history_warn(test_database_t *database, sqlite3_int64 run_id)
 {
     sqlite3_stmt *statement = test_database_prepare(database,
         "SELECT source, path, elapsed_ms, baseline_median_ms, outlier_threshold_ms\n"
@@ -268,4 +268,13 @@ void test_database_history_warn(test_database_t *database, sqlite3_int64 run_id)
                 sqlite3_column_double(statement, 2), sqlite3_column_double(statement, 3),
                 sqlite3_column_double(statement, 4));
     sqlite3_finalize(statement);
+}
+
+/* Keep report transaction identifiers private while preserving the ordinary timing warnings. */
+bool test_database_report_complete(test_database_t *database, int exit_code, double elapsed_ms)
+{
+    sqlite3_int64 run_id = database ? database->run_id : 0;
+    if (!test_database_run_finish(database, exit_code, elapsed_ms)) return false;
+    test_database_history_warn(database, run_id);
+    return true;
 }

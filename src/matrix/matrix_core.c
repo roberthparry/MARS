@@ -1936,13 +1936,13 @@ void num_scalar_normal_logpdf(void *out, const void *a)
 {
     num_replace_value(out, num_normal_logpdf(*(const number_t *)a));
 }
-void num_scalar_lambert_w0(void *out, const void *a)
+void num_scalar_lambert_W0(void *out, const void *a)
 {
-    num_replace_value(out, num_lambert_w0(*(const number_t *)a));
+    num_replace_value(out, num_lambert_W0(*(const number_t *)a));
 }
-void num_scalar_lambert_wm1(void *out, const void *a)
+void num_scalar_lambert_Wm1(void *out, const void *a)
 {
-    num_replace_value(out, num_lambert_wm1(*(const number_t *)a));
+    num_replace_value(out, num_lambert_Wm1(*(const number_t *)a));
 }
 void num_scalar_productlog(void *out, const void *a)
 {
@@ -2376,22 +2376,22 @@ void expr_scalar_normal_logpdf(void *out, const void *a)
     *(expr_t **)out = res;
 }
 
-void expr_scalar_lambert_w0(void *out, const void *a)
+void expr_scalar_lambert_W0(void *out, const void *a)
 {
     expr_t *arg = *(expr_t *const *)a;
     expr_t *prev = *(expr_t **)out;
-    expr_t *res = expr_lambert_w0(arg);
+    expr_t *res = expr_lambert_W0(arg);
 
     if (prev)
         expr_free(prev);
     *(expr_t **)out = res;
 }
 
-void expr_scalar_lambert_wm1(void *out, const void *a)
+void expr_scalar_lambert_Wm1(void *out, const void *a)
 {
     expr_t *arg = *(expr_t *const *)a;
     expr_t *prev = *(expr_t **)out;
-    expr_t *res = expr_lambert_wm1(arg);
+    expr_t *res = expr_lambert_Wm1(arg);
 
     if (prev)
         expr_free(prev);
@@ -2403,7 +2403,7 @@ void expr_scalar_productlog(void *out, const void *a)
     expr_t *arg = *(expr_t *const *)a;
     expr_t *prev = *(expr_t **)out;
     /* ProductLog is the principal Lambert W branch. */
-    expr_t *res = expr_lambert_w0(arg);
+    expr_t *res = expr_lambert_W0(arg);
 
     if (prev)
         expr_free(prev);
@@ -3032,7 +3032,7 @@ static void num_fun_coeffs_up_to_second(number_t *c0, number_t *c1, number_t *c2
         return;
     }
 
-    if (scalar_f == number_elem.fun->lambert_w0 || scalar_f == number_elem.fun->lambert_wm1) {
+    if (scalar_f == number_elem.fun->lambert_W0 || scalar_f == number_elem.fun->lambert_Wm1) {
         number_t one = num_clone(NUM_ONE);
         number_t two = num_create_from_double(2.0);
         number_t wp1 = num_add(one, f0);

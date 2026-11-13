@@ -4,7 +4,7 @@
  *
  * Owns parsed C examples, their following documented output and source locations.
  * Reference-only fences are excluded. The runner uses the existing global JSON
- * test configuration and HTTP Python fixtures; compiler commands never use a
+ * test configuration and native local fixtures; compiler commands never use a
  * shell. Accessors borrow strings until the example collection is freed.
  */
 #ifndef MARS_CHECKS_README_H
@@ -104,6 +104,9 @@ string_t *checks_output_normalise(const string_t *text);
  * @param argc Number of command-option arguments.
  * @param argv Borrowed option argument vector, excluding the subcommand.
  * @return Zero for success, one for a failed control, or two for an inspection or usage error.
+ * @note Enabled examples are counted before execution; disabled examples do not enlarge the total. One progress
+ * row updates during compilation and execution, followed by a bold coloured summary with count and elapsed time.
+ * Failures retain their identifier, source location and saved JSON/compiler/output evidence. All work is sequential.
  */
 int checks_readme(const string_t *root, int argc, char **argv);
 

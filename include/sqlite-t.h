@@ -6,6 +6,8 @@
  * Opaque database and statement handles support SQL execution, parameter binding,
  * typed result access and transactions. Object-storage helpers persist supported
  * MARS values without exposing database implementation details.
+ * Per-schema page-cache budgets tune repeated database access without changing
+ * connection defaults elsewhere or reserving the requested memory in advance.
  * CSV ingestion adds conservative whole-file type inference, explicit streaming
  * schemas and savepoint-protected insertion. Query export delegates escaping
  * to csv_t; CSV syntax remains the responsibility of the CSV module.
@@ -91,6 +93,27 @@ sqlite_t *sqlite_open_encrypted(const string_t *path, const string_t *key);
  * @return An open database handle, or NULL for an invalid path or unreadable database.
  */
 sqlite_t *sqlite_open_plain(const string_t *path);
+
+/**
+ * @brief Set a connection-local database-page cache allowance in kibibytes.
+ *
+ * Uses SQLite's negative cache_size convention, independently of the current page size.
+ * The default page cache allocates memory on demand and treats this as a suggested
+ * allowance, not a hard process-memory limit. Each schema and connection has its own
+ * allowance; include concurrent connections when choosing an application memory budget.
+ * Reapply after changing the schema's page size. Closing the connection discards the
+ * setting; no database contents, persistent defaults or other connections are changed.
+ *
+ * @param[in,out] db Borrowed open database; serialise with its other operations.
+ * @param[in] schema Borrowed schema name: NULL selects main; temp or an attached name
+ * is also accepted. Names are quoted as identifiers, never interpreted as SQL.
+ * @param kibibytes Requested allowance, from 1 to INT_MAX KiB inclusive.
+ * @return True on success; false for an invalid argument, unknown schema, allocation
+ * failure or SQL error. Invalid arguments set errno to EINVAL; allocation failure sets
+ * ENOMEM. For a valid db, sqlite_last_error() and sqlite_diagnostic() describe failure.
+ * No ownership is transferred and there is no additional resource to release.
+ */
+bool sqlite_set_cache_budget(sqlite_t *db, const char *schema, size_t kibibytes);
 
 /**
  * @brief Closes an open database handle.

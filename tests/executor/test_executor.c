@@ -12,6 +12,7 @@
 #include <string.h>
 #include <unistd.h>
 
+#include "string-t.h"
 #include "thread-t.h"
 #include "executor-t.h"
 #include "test_harness.h"

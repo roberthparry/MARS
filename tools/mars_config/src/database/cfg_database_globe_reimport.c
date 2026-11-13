@@ -79,8 +79,9 @@ bool cfg_database_reimport_globe(sqlite_t *db, const string_t *root, const strin
     int enforcement = foreign && sqlite_stmt_step(foreign) == SQLITE_STEP_ROW ?
         sqlite_stmt_column_int(foreign, 0) : -1;
     sqlite_stmt_finalize(foreign);
-    bool configured = enforcement >= 0 && sqlite_exec_cstr(db,
-        "PRAGMA synchronous=FULL; PRAGMA cache_size=-65536; PRAGMA temp.cache_size=-512; PRAGMA foreign_keys=OFF;");
+    bool configured = enforcement >= 0 && sqlite_set_cache_budget(db, NULL, 65536) &&
+        sqlite_set_cache_budget(db, "temp", 512) &&
+        sqlite_exec_cstr(db, "PRAGMA synchronous=FULL; PRAGMA foreign_keys=OFF;");
     bool transaction = configured && sqlite_exec_cstr(db, "BEGIN IMMEDIATE");
     int64_t installed = 0;
     bool ok = transaction && cfg_database_current_revision(db, "globe", &installed) && installed <= revision;

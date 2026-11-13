@@ -15,6 +15,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "string-t.h"
 #include "file-t.h"
 #include "sqlite-t.h"
 #include "almanac-t.h"

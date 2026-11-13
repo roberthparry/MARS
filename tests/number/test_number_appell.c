@@ -34,7 +34,7 @@ static bool appell_real_aliases(mpfr_prec_t bits, bool compact)
         mpfr_neg(exponent, values[2], MPFR_RNDN);
         mpfr_pow(right, right, exponent, MPFR_RNDN);
         mpfr_mul(reference, left, right, MPFR_RNDN);
-        int status = number_mpfr_appell_f1(values[alias], values[0], values[1], values[2],
+        int status = number_mpfr_appell_F1(values[alias], values[0], values[1], values[2],
                                           values[3], values[4], values[5]);
         mpfr_sub(error, values[alias], reference, MPFR_RNDU);
         mpfr_abs(error, error, MPFR_RNDU);
@@ -72,7 +72,7 @@ static bool appell_complex_aliases(mpfr_prec_t bits, bool compact)
         mpc_neg(exponent, values[2], MPC_RNDNN);
         mpc_pow(right, right, exponent, MPC_RNDNN);
         mpc_mul(reference, left, right, MPC_RNDNN);
-        int status = number_mpc_appell_f1(values[alias], values[0], values[1], values[2],
+        int status = number_mpc_appell_F1(values[alias], values[0], values[1], values[2],
                                          values[3], values[4], values[5], MPC_RNDNN);
         mpc_sub(difference, values[alias], reference, MPC_RNDNN);
         mpc_abs(error, difference, MPFR_RNDU);

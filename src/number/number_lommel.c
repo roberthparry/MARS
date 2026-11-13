@@ -112,13 +112,13 @@ done:
 }
 
 /* Evaluate the principal complex Lommel function at the caller's requested precision. */
-int number_mpc_lommel_s(mpc_ptr out, mpc_srcptr mu, mpc_srcptr nu, mpc_srcptr argument, mpc_rnd_t rounding)
+int number_mpc_lommel_S(mpc_ptr out, mpc_srcptr mu, mpc_srcptr nu, mpc_srcptr argument, mpc_rnd_t rounding)
 {
     return lommel_series(out, mu, nu, argument, rounding, false);
 }
 
 /* Differentiate each series term without changing the principal power's branch. */
-int number_mpc_lommel_s_derivative(mpc_ptr out, mpc_srcptr mu, mpc_srcptr nu, mpc_srcptr argument,
+int number_mpc_lommel_S_derivative(mpc_ptr out, mpc_srcptr mu, mpc_srcptr nu, mpc_srcptr argument,
                                    mpc_rnd_t rounding)
 {
     return lommel_series(out, mu, nu, argument, rounding, true);

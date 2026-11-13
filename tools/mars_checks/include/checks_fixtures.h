@@ -1,10 +1,12 @@
 /**
  * @file checks_fixtures.h
- * @brief Local HTTP fixture lifecycle for documented programmes.
+ * @brief Local protocol fixtures and installed-resource settings for documented programmes.
  *
  * Starts the native tests/http/fixtures peers on loopback-only ephemeral
  * sockets. Peers are lazy and shared across the sequential README run. The
  * owner must free the collection to terminate and reap all child processes.
+ * Installed-resource examples inherit the saved application settings through an isolated helper;
+ * disposable globe-reader examples remain independent of installed data.
  */
 #ifndef MARS_CHECKS_FIXTURES_H
 #define MARS_CHECKS_FIXTURES_H
@@ -50,8 +52,11 @@ bool checks_fixtures_arguments(checks_fixtures_t *fixtures, const string_t *path
  * @param[in,out] arguments Borrowed empty collection receiving owned command words; no shell is used.
  * @return True when preparation succeeds; false on storage or protocol-fixture failure. Release the command
  * collection on either path and remove the working directory after the child exits, including failure paths.
- * @note Globe reader examples receive an unencrypted temporary SQLite database through child-only environment
- * assignments. Installed data and the parent environment are unchanged. Call sequentially before execution.
+ * @note Globe reader identity examples receive an unencrypted temporary SQLite database through child-only
+ * environment assignments. Examples opening installed almanac, globe or jurisdiction data lazily load the saved
+ * settings once into the process environment, preserving explicit overrides, including empty keys. The encrypted
+ * settings store is read in an isolated helper; credentials never enter command arguments. No database is created
+ * or installed by this preparation. Call sequentially before execution and before starting application threads.
  */
 bool checks_fixtures_programme(checks_fixtures_t *fixtures, const string_t *path, const string_t *code,
                               const string_t *binary, const string_t *working, checks_strings_t *arguments);

@@ -148,7 +148,7 @@ done:
 }
 
 /* Evaluate the principal modified Bessel K with guard precision for cancellation in its convergent series. */
-number_t num_bessel_k(const number_t order, const number_t argument)
+number_t num_bessel_K(const number_t order, const number_t argument)
 {
     NUM_SCOPE(scope);
     if (!num_is_finite(order) || !num_is_finite(argument) || num_is_zero(argument))

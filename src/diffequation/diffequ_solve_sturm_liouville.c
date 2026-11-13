@@ -868,12 +868,12 @@ static expr_t *de_power_law_bessel_solution(const diffequ_t *de, const expr_t *i
     if (negative_order && argument) {
         expr_t *arguments[2] = {negative_order, argument};
 
-        first_bessel = expr_bessel_j(arguments[0], arguments[1]);
+        first_bessel = expr_bessel_J(arguments[0], arguments[1]);
     }
     if (order && argument) {
         expr_t *arguments[2] = {order, argument};
 
-        second_bessel = expr_bessel_j(arguments[0], arguments[1]);
+        second_bessel = expr_bessel_J(arguments[0], arguments[1]);
     }
     first_term = first_bessel ? expr_mul_simplify_owned(de_named_constant("C1"), first_bessel) : NULL;
     if (first_bessel)
@@ -930,7 +930,7 @@ static expr_t *de_power_law_bessel_solution(const diffequ_t *de, const expr_t *i
             }
         }
         if (lommel_order && order && argument)
-            lommel = expr_lommel_s(lommel_order, order, argument);
+            lommel = expr_lommel_S(lommel_order, order, argument);
         lommel_term = lommel_scale && lommel ? expr_mul_simplify_owned(lommel_scale, lommel) : NULL;
         if (lommel_scale && lommel) {
             lommel_scale = NULL;

@@ -9,6 +9,7 @@
 #include <unistd.h>
 
 #include "qfloat-t.h"
+#include "string-t.h"
 #include "test_harness.h"
 
 void print_q(const char *label, qfloat_t x);

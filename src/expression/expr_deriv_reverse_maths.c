@@ -818,9 +818,9 @@ static void expr_reverse_bessel(const expr_t *expr, const number_t *out_bar, num
     expr_reverse_binary(NUM_NAN, num_mul(*out_bar, factor), a_bar, b_bar);
 }
 
-void expr_reverse_bessel_j(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
+void expr_reverse_bessel_J(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
 {
-    expr_reverse_bessel(expr, out_bar, a_bar, b_bar, num_bessel_j);
+    expr_reverse_bessel(expr, out_bar, a_bar, b_bar, num_bessel_J);
 }
 
 
@@ -830,18 +830,18 @@ void expr_reverse_parameter_pack(const expr_t *expr, const number_t *out_bar, nu
     expr_reverse_binary(num_clone(*out_bar), num_clone(*out_bar), a_bar, b_bar);
 }
 
-void expr_reverse_lommel_s(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
+void expr_reverse_lommel_S(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
 {
     const expr_t *mu = NULL;
     const expr_t *nu = NULL;
     const expr_t *argument = NULL;
     number_t factor;
 
-    if (!expr_lommel_s_unpack(expr, &mu, &nu, &argument)) {
+    if (!expr_lommel_S_unpack(expr, &mu, &nu, &argument)) {
         expr_reverse_binary(NUM_NAN, NUM_NAN, a_bar, b_bar);
         return;
     }
-    factor = num_lommel_s_derivative_internal(expr_eval_num_internal(mu), expr_eval_num_internal(nu),
+    factor = num_lommel_S_derivative_internal(expr_eval_num_internal(mu), expr_eval_num_internal(nu),
                                               expr_eval_num_internal(argument));
     expr_reverse_binary(NUM_NAN, num_mul(*out_bar, factor), a_bar, b_bar);
 }
@@ -916,7 +916,7 @@ static int expr_reverse_emit_nan(expr_reverse_accumulate_fn accumulate, void *co
     return accumulate(context, child, &contribution);
 }
 
-int expr_reverse_appell_f1_many(const expr_t *expr, const number_t *out_bar, expr_reverse_accumulate_fn accumulate,
+int expr_reverse_appell_F1_many(const expr_t *expr, const number_t *out_bar, expr_reverse_accumulate_fn accumulate,
                                 void *context)
 {
     const expr_t *a = NULL;
@@ -936,7 +936,7 @@ int expr_reverse_appell_f1_many(const expr_t *expr, const number_t *out_bar, exp
     number_t x_factor;
     number_t y_factor;
 
-    if (!expr_appell_f1_unpack(expr, &a, &b1, &b2, &c, &x, &y))
+    if (!expr_appell_F1_unpack(expr, &a, &b1, &b2, &c, &x, &y))
         return -1;
     if (expr_reverse_emit_nan(accumulate, context, a) != 0 || expr_reverse_emit_nan(accumulate, context, b1) != 0 ||
         expr_reverse_emit_nan(accumulate, context, b2) != 0 || expr_reverse_emit_nan(accumulate, context, c) != 0)
@@ -950,8 +950,8 @@ int expr_reverse_appell_f1_many(const expr_t *expr, const number_t *out_bar, exp
     yv = expr_eval_num_internal(y);
     a1 = num_add(av, NUM_ONE);
     c1 = num_add(cv, NUM_ONE);
-    x_factor = num_mul(num_div(num_mul(av, b1v), cv), num_appell_f1(a1, num_add(b1v, NUM_ONE), b2v, c1, xv, yv));
-    y_factor = num_mul(num_div(num_mul(av, b2v), cv), num_appell_f1(a1, b1v, num_add(b2v, NUM_ONE), c1, xv, yv));
+    x_factor = num_mul(num_div(num_mul(av, b1v), cv), num_appell_F1(a1, num_add(b1v, NUM_ONE), b2v, c1, xv, yv));
+    y_factor = num_mul(num_div(num_mul(av, b2v), cv), num_appell_F1(a1, b1v, num_add(b2v, NUM_ONE), c1, xv, yv));
     return expr_reverse_emit(out_bar, x_factor, accumulate, context, x) == 0 &&
                    expr_reverse_emit(out_bar, y_factor, accumulate, context, y) == 0
                ? 0
@@ -993,7 +993,7 @@ int expr_reverse_lerch_phi_many(const expr_t *expr, const number_t *out_bar, exp
                : -1;
 }
 
-int expr_reverse_lauricella_f_many(const expr_t *expr, const number_t *out_bar, expr_reverse_accumulate_fn accumulate,
+int expr_reverse_lauricella_F_many(const expr_t *expr, const number_t *out_bar, expr_reverse_accumulate_fn accumulate,
                                    void *context)
 {
     const expr_t *a = NULL;
@@ -1010,7 +1010,7 @@ int expr_reverse_lauricella_f_many(const expr_t *expr, const number_t *out_bar, 
     size_t count = 0u;
     int status = -1;
 
-    if (!expr_lauricella_f_unpack(expr, &a, &b, &c, &x, &count) || expr_reverse_emit_nan(accumulate, context, a) != 0 ||
+    if (!expr_lauricella_F_unpack(expr, &a, &b, &c, &x, &count) || expr_reverse_emit_nan(accumulate, context, a) != 0 ||
         expr_reverse_emit_nan(accumulate, context, c) != 0)
         goto cleanup;
     if (count > 0u) {
@@ -1035,7 +1035,7 @@ int expr_reverse_lauricella_f_many(const expr_t *expr, const number_t *out_bar, 
         number_t factor;
 
         shifted_b[i] = num_add(b_values[i], NUM_ONE);
-        factor = num_mul(num_div(num_mul(av, b_values[i]), cv), num_lauricella_f(a1, shifted_b, c1, x_values, count));
+        factor = num_mul(num_div(num_mul(av, b_values[i]), cv), num_lauricella_F(a1, shifted_b, c1, x_values, count));
         if (expr_reverse_emit(out_bar, factor, accumulate, context, x[i]) != 0)
             goto cleanup;
         shifted_b[i] = b_values[i];
@@ -1072,7 +1072,7 @@ static number_t num_lambert_reverse_factor(const number_t z, const number_t w)
     }
 }
 
-void expr_reverse_lambert_w0(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
+void expr_reverse_lambert_W0(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
 {
     number_t factor = num_lambert_reverse_factor(expr_eval_num_internal(expr->a), expr_eval_num_internal(expr));
 
@@ -1086,14 +1086,14 @@ void expr_reverse_lambert_w(const expr_t *expr, const number_t *out_bar, number_
     expr_reverse_unary(expr_reverse_num_mul(*out_bar, factor), a_bar, b_bar);
 }
 
-void expr_reverse_lambert_wn(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
+void expr_reverse_lambert_Wn(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
 {
     number_t factor = num_lambert_reverse_factor(expr_eval_num_internal(expr->b), expr_eval_num_internal(expr));
 
     expr_reverse_binary(NUM_ZERO, expr_reverse_num_mul(*out_bar, factor), a_bar, b_bar);
 }
 
-void expr_reverse_lambert_wm1(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
+void expr_reverse_lambert_Wm1(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
 {
     number_t factor = num_lambert_reverse_factor(expr_eval_num_internal(expr->a), expr_eval_num_internal(expr));
 

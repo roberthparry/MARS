@@ -98,6 +98,24 @@ bool cfg_calendar_labels(sqlite_t *db, const string_t *jurisdiction, const strin
 bool cfg_calendar_snapshot(sqlite_t *db, const string_t *path, const string_t *key, const cfg_calendar_place_t *place,
                            const string_t *locale, cfg_progress_t *progress);
 
+/**
+ * @brief Publish a validated daily snapshot for an explicit inclusive range of whole years.
+ * @param[in,out] db Borrowed staging connection; remains caller-owned and open.
+ * @param[in] path Borrowed committed staging pathname used by the jurisdiction engine during the call.
+ * @param[in] key Borrowed credential; never printed or retained beyond this call.
+ * @param[in] place Borrowed resolved location, including its validated timezone; not modified or retained.
+ * @param[in] locale Borrowed locale, or NULL for untranslated labels; not modified or retained.
+ * @param first_year First included year, at least 1.
+ * @param last_year Last included year, at least first_year and below SHRT_MAX.
+ * @param[in,out] progress Optional borrowed reporter; NULL suppresses reporting. The caller finishes it.
+ * @return True after complete replacement; false for an invalid range, allocation, policy or validation failure.
+ * A failure leaves the previously published snapshot intact. No ownership is transferred. Serialise calls:
+ * timezone and environment scopes are process-wide. The ordinary installer retains its full default horizon.
+ */
+bool cfg_calendar_snapshot_range(sqlite_t *db, const string_t *path, const string_t *key,
+                                 const cfg_calendar_place_t *place, const string_t *locale,
+                                 int first_year, int last_year, cfg_progress_t *progress);
+
 /** @brief Fill temporary events and caller-owned (last-first+1)*7 Monday-first weekend flags using prepared labels. */
 bool cfg_calendar_policy(sqlite_t *db, const string_t *path, const string_t *key, const cfg_calendar_place_t *place,
                          int first_year, int last_year, bool *weekends);

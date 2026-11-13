@@ -116,8 +116,8 @@ struct elem_fun_vtable {
     void (*normal_pdf)(void *out, const void *a);
     void (*normal_cdf)(void *out, const void *a);
     void (*normal_logpdf)(void *out, const void *a);
-    void (*lambert_w0)(void *out, const void *a);
-    void (*lambert_wm1)(void *out, const void *a);
+    void (*lambert_W0)(void *out, const void *a);
+    void (*lambert_Wm1)(void *out, const void *a);
     void (*productlog)(void *out, const void *a);
     void (*ei)(void *out, const void *a);
     void (*e1)(void *out, const void *a);

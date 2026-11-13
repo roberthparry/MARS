@@ -28,11 +28,11 @@ static void test_symfunc_jordan_special(void)
 
     R = mat_erf(T);
     G = mat_gamma(T);
-    W = mat_lambert_w0(T);
+    W = mat_lambert_W0(T);
 
     check_bool("mat_erf(expr 3x3 lower Jordan) not NULL", R != NULL);
     check_bool("mat_gamma(expr 3x3 lower Jordan) not NULL", G != NULL);
-    check_bool("mat_lambert_w0(expr 3x3 lower Jordan) not NULL", W != NULL);
+    check_bool("mat_lambert_W0(expr 3x3 lower Jordan) not NULL", W != NULL);
 
     if (T)
         print_mdv("T", T);
@@ -41,7 +41,7 @@ static void test_symfunc_jordan_special(void)
     if (G)
         print_mdv("gamma(T)", G);
     if (W)
-        print_mdv("lambert_w0(T)", W);
+        print_mdv("lambert_W0(T)", W);
 
     if (R) {
         check_bool("erf(T) preserves lower-triangular structure", mat_is_lower_triangular(R));
@@ -59,11 +59,11 @@ static void test_symfunc_jordan_special(void)
     }
 
     if (W) {
-        check_bool("lambert_w0(T) preserves lower-triangular structure", mat_is_lower_triangular(W));
+        check_bool("lambert_W0(T) preserves lower-triangular structure", mat_is_lower_triangular(W));
         mat_get(W, 0, 0, &v);
-        check_expr_text_contains("lambert_w0(T)[0,0] stays symbolic in x", v, "W₀");
+        check_expr_text_contains("lambert_W0(T)[0,0] stays symbolic in x", v, "W₀");
         test_expr_set_val_d(x, 0.1);
-        check_bool("lambert_w0(T)[0,0] numerically finite", isfinite(expr_eval_d(v)));
+        check_bool("lambert_W0(T)[0,0] numerically finite", isfinite(expr_eval_d(v)));
     }
 
     mat_free(T);

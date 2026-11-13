@@ -288,7 +288,7 @@ Failures and timeouts remain visible. † marks a retained slowdown outlier.
 | acoth | 2.345 | 29.6 ns |
 | add | 0.7, 0.7 | 11.1 ns |
 | add_long | 17, 3 | 584.7 ns |
-| appell_f1 | 0.5, 0.7, 0.8, 2.5, 0.2, 0.3 | 23.1 µs |
+| appell_F1 | 0.5, 0.7, 0.8, 2.5, 0.2, 0.3 | 23.1 µs |
 | arccovercos | 0.5 | 113.3 ns |
 | arccoversin | 0.5 | 116.1 ns |
 | archacovercos | 0.5 | 218.2 ns |
@@ -305,10 +305,10 @@ Failures and timeouts remain visible. † marks a retained slowdown outlier.
 | atan | 0.7 | 29.6 ns |
 | atan2 | 0.5, -0.75 | 41.2 ns |
 | atanh | 0.7 | 25.8 ns |
-| bessel_i | 2, 0.7 | 45.4 µs |
-| bessel_j | 2, 0.7 | 7.3 µs |
-| bessel_k | 2, 0.7 | 26.7 µs |
-| bessel_y | 2, 0.7 | 17.9 µs |
+| bessel_I | 2, 0.7 | 45.4 µs |
+| bessel_J | 2, 0.7 | 7.3 µs |
+| bessel_K | 2, 0.7 | 26.7 µs |
+| bessel_Y | 2, 0.7 | 17.9 µs |
 | beta | 2.3, 4.5 | 131.6 ns |
 | beta_pdf | 0.5, 2.5, 3.5 | 183.8 ns |
 | binomial | 5, 2 | 381.7 ns |
@@ -353,10 +353,10 @@ Failures and timeouts remain visible. † marks a retained slowdown outlier.
 | hypot | 0.7, 1.2 | 22.4 ns |
 | imag_part | 0.7 | 26.0 ns |
 | inv | 0.7 | 8.5 ns |
-| lambert_w0 | 0.7 | 18.5 µs |
-| lambert_wm1 | -0.2 | 15.1 µs |
-| lambert_wn | 1, 0.7 | 31.1 µs |
-| lauricella_f | 0.5, 0.3, 2.5 | 19.9 µs |
+| lambert_W0 | 0.7 | 18.5 µs |
+| lambert_Wm1 | -0.2 | 15.1 µs |
+| lambert_Wn | 1, 0.7 | 31.1 µs |
+| lauricella_F | 0.5, 0.3, 2.5 | 19.9 µs |
 | ldexp | 1.23456789, 3 | 48.6 ns |
 | legendre_chi | 2, 0.7 | 30.4 µs |
 | lerch_phi | 0.3, 2, 1.4 | 84.1 µs |
@@ -367,7 +367,7 @@ Failures and timeouts remain visible. † marks a retained slowdown outlier.
 | log10 | 2.345678 | 22.3 ns |
 | logbeta | 2.3, 4.5 | 129.6 ns |
 | logbeta_pdf | 0.5, 2.5, 3.5 | 167.5 ns |
-| lommel_s | 0.5, 0.7, 1.2 | 7.1 µs |
+| lommel_S | 0.5, 0.7, 1.2 | 7.1 µs |
 | mul | 0.7, 0.7 | 12.3 ns |
 | mul_long | 17, 3 | 546.4 ns |
 | mul_pow10 | 1.23456789, 3 | 71.6 ns |
@@ -400,8 +400,8 @@ Failures and timeouts remain visible. † marks a retained slowdown outlier.
 | sqr | 0.7 | 9.4 ns |
 | sqrt | 1.23456789 | 9.8 ns |
 | step | 0.7 | 124.0 ns |
-| struve_h | 2, 0.7 | 62.4 µs |
-| struve_l | 2, 0.7 | 70.7 µs |
+| struve_H | 2, 0.7 | 62.4 µs |
+| struve_L | 2, 0.7 | 70.7 µs |
 | sub | 0.7, 0.7 | 32.6 ns |
 | tan | 0.7 | 12.9 µs † |
 | tanh | 0.7 | 304.3 ns |
@@ -430,7 +430,7 @@ Failures and timeouts remain visible. † marks a retained slowdown outlier.
 | acot | 0.7 | 1.5 µs |
 | acoth | 2.345 | 3.6 µs |
 | add | 0.7, 0.7 | 7.9 ns |
-| appell_f1 | 0.5, 0.7, 0.8, 2.5, 0.2, 0.3 | 96.0 µs |
+| appell_F1 | 0.5, 0.7, 0.8, 2.5, 0.2, 0.3 | 96.0 µs |
 | arccovercos | 0.5 | 1.7 µs |
 | arccoversin | 0.5 | 1.5 µs |
 | archacovercos | 0.5 | 31.0 ns |
@@ -446,10 +446,10 @@ Failures and timeouts remain visible. † marks a retained slowdown outlier.
 | atan | 0.7 | 1.3 µs |
 | atan2 | 0.5, -0.75 | 1.3 µs |
 | atanh | 0.7 | 3.4 µs |
-| bessel_i | 2, 0.7 | 64.3 µs |
-| bessel_j | 2, 0.7 | 6.8 µs |
-| bessel_k | 2, 0.7 | 34.2 µs |
-| bessel_y | 2, 0.7 | 30.1 µs |
+| bessel_I | 2, 0.7 | 64.3 µs |
+| bessel_J | 2, 0.7 | 6.8 µs |
+| bessel_K | 2, 0.7 | 34.2 µs |
+| bessel_Y | 2, 0.7 | 30.1 µs |
 | beta | 2.3, 4.5 | 4.9 µs |
 | beta_pdf | 0.5, 2.5, 3.5 | 30.8 µs |
 | binomial | 5, 2 | 30.4 µs |
@@ -490,9 +490,9 @@ Failures and timeouts remain visible. † marks a retained slowdown outlier.
 | hermite_Hn | 2, 0.7 | 51.0 ns |
 | hypergeometric_pFq | 0.7, 2.5, 0.3 | 4.0 µs |
 | hypot | 0.7, 1.2 | 406.3 ns |
-| lambert_w0 | 0.7 | 13.5 µs |
-| lambert_wm1 | -0.2 | 17.0 µs |
-| lauricella_f | 0.5, 0.3, 2.5 | 19.3 µs |
+| lambert_W0 | 0.7 | 13.5 µs |
+| lambert_Wm1 | -0.2 | 17.0 µs |
+| lauricella_F | 0.5, 0.3, 2.5 | 19.3 µs |
 | ldexp | 1.23456789, 3 | 9.9 ns |
 | legendre_chi | 2, 0.7 | 27.9 µs |
 | lerch_phi | 0.3, 2, 1.4 | 8.5 µs |
@@ -503,7 +503,7 @@ Failures and timeouts remain visible. † marks a retained slowdown outlier.
 | log10 | 2.345678 | 2.9 µs |
 | logbeta | 2.3, 4.5 | 30.1 µs |
 | logbeta_pdf | 0.5, 2.5, 3.5 | 32.6 µs |
-| lommel_s | 0.5, 0.7, 1.2 | 7.0 µs |
+| lommel_S | 0.5, 0.7, 1.2 | 7.0 µs |
 | mul | 0.7, 0.7 | 7.6 ns |
 | mul_pow10 | 1.23456789, 3 | 39.7 ns |
 | neg | 0.7 | 2.1 ns |
@@ -532,8 +532,8 @@ Failures and timeouts remain visible. † marks a retained slowdown outlier.
 | sqr | 0.7 | 5.6 ns |
 | sqrt | 1.23456789 | 379.9 ns |
 | step | 0.7 | 9.1 ns |
-| struve_h | 2, 0.7 | 98.5 µs |
-| struve_l | 2, 0.7 | 80.7 µs |
+| struve_H | 2, 0.7 | 98.5 µs |
+| struve_L | 2, 0.7 | 80.7 µs |
 | sub | 0.7, 0.7 | 7.8 ns |
 | tan | 0.7 | 1.9 µs |
 | tanh | 0.7 | 1.7 µs |
@@ -562,7 +562,7 @@ Failures and timeouts remain visible. † marks a retained slowdown outlier.
 | acot | 0.7+0.125i | 13.4 µs |
 | acoth | 2.345+0.125i | 5.6 µs |
 | add | 0.7+0.125i, 0.7+0.125i | 18.3 ns |
-| appell_f1 | <span style="display:inline-block;width:40ch;max-width:100%;white-space:normal;overflow-wrap:anywhere">0.5+0.125i, 0.7+0.125i, 0.8+0.125i, 2.5+<br/>0.125i, 0.2+0.125i, 0.3+0.125i</span> | 693.3 µs |
+| appell_F1 | <span style="display:inline-block;width:40ch;max-width:100%;white-space:normal;overflow-wrap:anywhere">0.5+0.125i, 0.7+0.125i, 0.8+0.125i, 2.5+<br/>0.125i, 0.2+0.125i, 0.3+0.125i</span> | 693.3 µs |
 | arccovercos | 0.5+0.125i | 9.7 µs |
 | arccoversin | 0.5+0.125i | 9.5 µs |
 | archacovercos | 0.5+0.125i | 6.6 µs |
@@ -579,10 +579,10 @@ Failures and timeouts remain visible. † marks a retained slowdown outlier.
 | atan | 0.7+0.125i | 12.7 µs |
 | atan2 | 0.5+0.125i, -0.75+0.125i | 12.6 µs |
 | atanh | 0.7+0.125i | 6.7 µs |
-| bessel_i | 2, 0.7+0.125i | 112.2 µs |
-| bessel_j | 2, 0.7+0.125i | 130.7 µs |
-| bessel_k | 2, 0.7+0.125i | 86.3 µs |
-| bessel_y | 2, 0.7+0.125i | 107.1 µs |
+| bessel_I | 2, 0.7+0.125i | 112.2 µs |
+| bessel_J | 2, 0.7+0.125i | 130.7 µs |
+| bessel_K | 2, 0.7+0.125i | 86.3 µs |
+| bessel_Y | 2, 0.7+0.125i | 107.1 µs |
 | beta | 2.3+0.125i, 4.5+0.125i | 41.2 µs |
 | beta_pdf | 0.5+0.125i, 2.5+0.125i, 3.5+0.125i | 60.9 µs |
 | binomial | 5+0.125i, 2+0.125i | 33.6 µs |
@@ -626,10 +626,10 @@ Failures and timeouts remain visible. † marks a retained slowdown outlier.
 | hypot | 0.7+0.125i, 1.2+0.125i | 1.8 µs |
 | imag_part | 0.7+0.125i | 3.3 ns |
 | inv | 0.7+0.125i | 199.8 ns |
-| lambert_w0 | 0.7+0.125i | 36.0 µs |
-| lambert_wm1 | -0.2+0.125i | 47.6 µs † |
-| lambert_wn | 1, 0.7+0.125i | 36.4 µs |
-| lauricella_f | 0.5+0.125i, 0.3+0.125i, 2.5+0.125i | 205.6 µs |
+| lambert_W0 | 0.7+0.125i | 36.0 µs |
+| lambert_Wm1 | -0.2+0.125i | 47.6 µs † |
+| lambert_Wn | 1, 0.7+0.125i | 36.4 µs |
+| lauricella_F | 0.5+0.125i, 0.3+0.125i, 2.5+0.125i | 205.6 µs |
 | ldexp | 1.23456789+0.125i, 3 | 32.8 ns |
 | legendre_chi | 2, 0.7+0.125i | 401.6 µs |
 | lerch_phi | 0.3+0.125i, 2+0.125i, 1.4+0.125i | 814.5 µs |
@@ -640,7 +640,7 @@ Failures and timeouts remain visible. † marks a retained slowdown outlier.
 | log10 | 2.345678+0.125i | 5.8 µs |
 | logbeta | 2.3+0.125i, 4.5+0.125i | 34.4 µs |
 | logbeta_pdf | 0.5+0.125i, 2.5+0.125i, 3.5+0.125i | 48.2 µs |
-| lommel_s | 0.5+0.125i, 0.7+0.125i, 1.2+0.125i | 143.7 µs |
+| lommel_S | 0.5+0.125i, 0.7+0.125i, 1.2+0.125i | 143.7 µs |
 | mul | 0.7+0.125i, 0.7+0.125i | 61.3 ns |
 | neg | 0.7+0.125i | 7.5 ns |
 | normal_cdf | 0.7+0.125i | 46.6 µs |
@@ -667,8 +667,8 @@ Failures and timeouts remain visible. † marks a retained slowdown outlier.
 | sqr | 0.7+0.125i | 57.5 ns |
 | sqrt | 1.23456789+0.125i | 4.1 µs |
 | step | 0.7 | 14.8 ns |
-| struve_h | 2, 0.7+0.125i | 175.6 µs |
-| struve_l | 2, 0.7+0.125i | 123.2 µs |
+| struve_H | 2, 0.7+0.125i | 175.6 µs |
+| struve_L | 2, 0.7+0.125i | 123.2 µs |
 | sub | 0.7+0.125i, 0.7+0.125i | 18.1 ns |
 | tan | 0.7+0.125i | 22.4 µs |
 | tanh | 0.7+0.125i | 18.7 µs |
@@ -698,7 +698,7 @@ Failures and timeouts remain visible. † marks a retained slowdown outlier.
 | acoth | 2.345 | 7.6 µs | 11.8 µs | 20.0 µs † | 25.7 µs † | 209.7 µs † | 165.4 µs |
 | add | 0.7, 0.7 | 133.8 ns | 168.5 ns | 134.4 ns | 347.9 ns | 237.3 ns | 276.5 ns |
 | add_long | 17, 3 | 629.2 ns | 924.5 ns | 1.0 µs | 1.8 µs † | 1.1 µs | 832.4 ns |
-| appell_f1 | 0.5, 0.7, 0.8, 2.5, 0.2, 0.3 | 138.4 µs | 402.6 µs | 799.0 µs † | 2.250 ms † | 5.402 ms | 25.774 ms |
+| appell_F1 | 0.5, 0.7, 0.8, 2.5, 0.2, 0.3 | 138.4 µs | 402.6 µs | 799.0 µs † | 2.250 ms † | 5.402 ms | 25.774 ms |
 | arccovercos | 0.5 | 15.3 µs | 34.8 µs † | 47.2 µs | 60.6 µs | 115.3 µs | 392.6 µs |
 | arccoversin | 0.5 | 15.7 µs | 26.1 µs | 37.8 µs | 48.6 µs | 96.3 µs | 332.5 µs |
 | archacovercos | 0.5 | 1.5 µs | 1.6 µs | 2.4 µs | 1.8 µs | 1.9 µs | 2.3 µs |
@@ -715,10 +715,10 @@ Failures and timeouts remain visible. † marks a retained slowdown outlier.
 | atan | 0.7 | 15.2 µs | 23.1 µs | 38.5 µs | 56.5 µs | 134.9 µs | 285.7 µs |
 | atan2 | 0.5, -0.75 | 14.7 µs | 32.1 µs | 29.3 µs | 66.4 µs | 114.4 µs | 360.9 µs |
 | atanh | 0.7 | 6.7 µs | 9.9 µs | 15.3 µs | 17.8 µs | 48.8 µs | 163.9 µs |
-| bessel_i | 2, 0.7 | 107.7 µs | 230.6 µs | 440.9 µs | 534.6 µs | 2.047 ms | 9.002 ms |
-| bessel_j | 2, 0.7 | 8.1 µs | 19.0 µs | 26.5 µs | 60.4 µs † | 181.8 µs | 894.0 µs |
-| bessel_k | 2, 0.7 | 65.3 µs | 106.4 µs | 178.9 µs | 274.7 µs | 1.303 ms † | 5.419 ms |
-| bessel_y | 2, 0.7 | 42.6 µs | 98.6 µs | 183.3 µs | 282.3 µs | 1.403 ms † | 5.577 ms † |
+| bessel_I | 2, 0.7 | 107.7 µs | 230.6 µs | 440.9 µs | 534.6 µs | 2.047 ms | 9.002 ms |
+| bessel_J | 2, 0.7 | 8.1 µs | 19.0 µs | 26.5 µs | 60.4 µs † | 181.8 µs | 894.0 µs |
+| bessel_K | 2, 0.7 | 65.3 µs | 106.4 µs | 178.9 µs | 274.7 µs | 1.303 ms † | 5.419 ms |
+| bessel_Y | 2, 0.7 | 42.6 µs | 98.6 µs | 183.3 µs | 282.3 µs | 1.403 ms † | 5.577 ms † |
 | beta | 2.3, 4.5 | 112.2 µs | 300.5 µs | 459.0 µs | 876.7 µs | 3.831 ms | 27.760 ms † |
 | beta_pdf | 0.5, 2.5, 3.5 | 103.9 µs | 244.1 µs | 441.0 µs | 585.1 µs | 2.208 ms | 14.646 ms |
 | binomial | 5, 2 | 107.4 µs | 276.9 µs | 638.3 µs | 730.1 µs | 3.810 ms | 15.276 ms |
@@ -763,8 +763,8 @@ Failures and timeouts remain visible. † marks a retained slowdown outlier.
 | hypot | 0.7, 1.2 | 820.9 ns | 948.3 ns | 1.4 µs | 2.1 µs | 3.3 µs | 9.7 µs |
 | imag_part | 0.7 | 95.1 ns | 90.1 ns | 85.2 ns | 104.9 ns | 104.6 ns | 87.8 ns |
 | inv | 0.7 | 244.1 ns | 317.0 ns | 483.2 ns | 1.5 µs † | 1.7 µs | 5.4 µs |
-| lambert_w0 | 0.7 | 56.8 µs | 101.3 µs | 181.3 µs | 375.5 µs | 945.5 µs | 4.059 ms |
-| lambert_wm1 | -0.2 | 75.7 µs | 133.9 µs | 245.7 µs | 350.3 µs | 1.063 ms | 8.568 ms † |
+| lambert_W0 | 0.7 | 56.8 µs | 101.3 µs | 181.3 µs | 375.5 µs | 945.5 µs | 4.059 ms |
+| lambert_Wm1 | -0.2 | 75.7 µs | 133.9 µs | 245.7 µs | 350.3 µs | 1.063 ms | 8.568 ms † |
 | ldexp | 1.23456789, 3 | 156.9 ns | 131.1 ns | 193.3 ns | 236.6 ns | 167.1 ns | 276.0 ns |
 | legendre_chi | 2, 0.7 | 55.2 µs | 131.2 µs | 199.8 µs | 335.8 µs | 909.6 µs | 3.454 ms |
 | lerch_phi | 0.3, 2, 1.4 | 195.0 µs | 600.9 µs | 1.162 ms † | 1.408 ms † | 6.013 ms † | 28.873 ms † |
@@ -775,7 +775,7 @@ Failures and timeouts remain visible. † marks a retained slowdown outlier.
 | log10 | 2.345678 | 14.3 µs | 24.5 µs | 35.9 µs | 39.1 µs | 115.7 µs | 240.8 µs |
 | logbeta | 2.3, 4.5 | 114.9 µs | 293.1 µs | 643.5 µs | 947.6 µs | 6.025 ms † | 19.888 ms |
 | logbeta_pdf | 0.5, 2.5, 3.5 | 111.2 µs | 213.7 µs | 497.1 µs | 774.9 µs | 2.872 ms | 12.836 ms † |
-| lommel_s | 0.5, 0.7, 1.2 | 33.1 µs | 72.8 µs | 149.6 µs | 298.7 µs | 959.1 µs | 3.493 ms |
+| lommel_S | 0.5, 0.7, 1.2 | 33.1 µs | 72.8 µs | 149.6 µs | 298.7 µs | 959.1 µs | 3.493 ms |
 | mul | 0.7, 0.7 | 122.8 ns | 224.7 ns | 257.2 ns | 475.3 ns | 1.2 µs | 3.0 µs |
 | mul_long | 17, 3 | 763.9 ns | 868.2 ns | 1.2 µs | 1.0 µs | 1.3 µs † | 1.0 µs |
 | mul_pow10 | 1.23456789, 3 | 380.0 ns | 454.3 ns | 801.2 ns | 599.5 ns | 608.7 ns | 819.7 ns |
@@ -807,8 +807,8 @@ Failures and timeouts remain visible. † marks a retained slowdown outlier.
 | sqr | 0.7 | 204.8 ns | 230.2 ns | 369.9 ns | 539.6 ns | 770.4 ns | 1.7 µs |
 | sqrt | 1.23456789 | 320.9 ns | 640.2 ns | 726.8 ns | 735.3 ns | 1.8 µs | 3.3 µs |
 | step | 0.7 | 232.5 ns | 246.6 ns | 322.9 ns | 402.7 ns | 310.6 ns | 412.1 ns |
-| struve_h | 2, 0.7 | 176.7 µs | 425.4 µs | 852.6 µs | 1.052 ms | 2.903 ms | 17.807 ms |
-| struve_l | 2, 0.7 | 188.3 µs | 430.2 µs | 702.1 µs | 1.022 ms | 3.534 ms | 16.416 ms |
+| struve_H | 2, 0.7 | 176.7 µs | 425.4 µs | 852.6 µs | 1.052 ms | 2.903 ms | 17.807 ms |
+| struve_L | 2, 0.7 | 188.3 µs | 430.2 µs | 702.1 µs | 1.022 ms | 3.534 ms | 16.416 ms |
 | sub | 0.7, 0.7 | 90.6 ns | 117.7 ns | 103.4 ns | 167.4 ns | 180.6 ns | 387.1 ns |
 | tan | 0.7 | 15.7 µs | 21.6 µs † | 24.1 µs | 32.2 µs | 56.4 µs | 215.3 µs |
 | tanh | 0.7 | 3.2 µs | 6.5 µs | 12.5 µs | 19.0 µs | 62.0 µs | 237.2 µs |
@@ -838,7 +838,7 @@ Failures and timeouts remain visible. † marks a retained slowdown outlier.
 | acoth | 2.345+0.125i | 132.1 µs † | 62.8 µs | 79.4 µs | 107.2 µs | 230.7 µs | 963.9 µs |
 | add | 0.7+0.125i, 0.7+0.125i | 798.6 ns | 440.3 ns | 439.5 ns | 406.0 ns | 459.7 ns | 559.4 ns |
 | add_long | 17+0.125i, 3 | 4.2 µs † | 3.4 µs | 2.6 µs | 3.4 µs | 3.2 µs | 2.7 µs |
-| appell_f1 | <span style="display:inline-block;width:40ch;max-width:100%;white-space:normal;overflow-wrap:anywhere">0.5+0.125i, 0.7+0.125i, 0.8+0.125i, 2.5+<br/>0.125i, 0.2+0.125i, 0.3+0.125i</span> | 758.5 µs † | 1.460 ms | 2.524 ms | 5.192 ms | 21.524 ms | 127.651 ms |
+| appell_F1 | <span style="display:inline-block;width:40ch;max-width:100%;white-space:normal;overflow-wrap:anywhere">0.5+0.125i, 0.7+0.125i, 0.8+0.125i, 2.5+<br/>0.125i, 0.2+0.125i, 0.3+0.125i</span> | 758.5 µs † | 1.460 ms | 2.524 ms | 5.192 ms | 21.524 ms | 127.651 ms |
 | arccovercos | 0.5+0.125i | 94.0 µs † | 87.7 µs | 68.9 µs | 145.7 µs | 162.1 µs | 434.2 µs |
 | arccoversin | 0.5+0.125i | 80.9 µs | 50.7 µs | 58.1 µs | 187.7 µs | 157.6 µs | 523.8 µs |
 | archacovercos | 0.5+0.125i | 16.1 µs † | 19.0 µs | 21.2 µs | 27.1 µs | 44.3 µs | 124.7 µs |
@@ -854,10 +854,10 @@ Failures and timeouts remain visible. † marks a retained slowdown outlier.
 | asinh | 0.7+0.125i | 77.0 µs | 72.0 µs | 116.2 µs | 137.2 µs | 348.1 µs | 1.122 ms |
 | atan | 0.7+0.125i | 92.0 µs † | 96.5 µs | 91.9 µs | 148.7 µs | 341.1 µs | 859.1 µs |
 | atanh | 0.7+0.125i | 41.9 µs | 61.2 µs | 92.5 µs | 126.3 µs | 277.1 µs | 870.5 µs |
-| bessel_i | 2, 0.7+0.125i | 298.7 µs † | 475.2 µs | 732.3 µs | 1.199 ms | 4.065 ms | 16.836 ms |
-| bessel_j | 2, 0.7+0.125i | 258.1 µs | 548.3 µs † | 870.3 µs | 1.226 ms | 4.295 ms | 16.443 ms |
-| bessel_k | 2, 0.7+0.125i | 216.7 µs † | 241.4 µs | 478.8 µs | 738.5 µs | 2.338 ms | 12.875 ms |
-| bessel_y | 2, 0.7+0.125i | 406.5 µs † | 412.2 µs | 708.5 µs | 1.097 ms | 4.360 ms | 18.857 ms |
+| bessel_I | 2, 0.7+0.125i | 298.7 µs † | 475.2 µs | 732.3 µs | 1.199 ms | 4.065 ms | 16.836 ms |
+| bessel_J | 2, 0.7+0.125i | 258.1 µs | 548.3 µs † | 870.3 µs | 1.226 ms | 4.295 ms | 16.443 ms |
+| bessel_K | 2, 0.7+0.125i | 216.7 µs † | 241.4 µs | 478.8 µs | 738.5 µs | 2.338 ms | 12.875 ms |
+| bessel_Y | 2, 0.7+0.125i | 406.5 µs † | 412.2 µs | 708.5 µs | 1.097 ms | 4.360 ms | 18.857 ms |
 | ceil | 0.7+0.125i | 1.7 µs | 1.5 µs | 1.6 µs | 1.6 µs | 1.7 µs | 1.6 µs |
 | chebyshev_Tn | 2, 0.7+0.125i | 12.3 µs | 11.6 µs | 13.1 µs | 11.5 µs | 12.3 µs | 18.6 µs |
 | chebyshev_Un | 2, 0.7+0.125i | 14.7 µs | 14.0 µs | 12.2 µs | 16.6 µs | 15.9 µs | 18.5 µs |
@@ -906,7 +906,7 @@ Failures and timeouts remain visible. † marks a retained slowdown outlier.
 | ln | 2.345678+0.125i | 20.6 µs | 31.7 µs | 40.2 µs | 57.6 µs | 190.6 µs | 355.4 µs |
 | log | 2.345678+0.125i | 24.8 µs | 31.7 µs | 39.5 µs | 65.1 µs | 174.3 µs | 400.6 µs |
 | log10 | 2.345678+0.125i | 24.3 µs | 56.0 µs | 55.5 µs | 85.8 µs | 180.7 µs | 572.8 µs |
-| lommel_s | 0.5+0.125i, 0.7+0.125i, 1.2+0.125i | 244.6 µs | 432.9 µs | 843.5 µs | 1.334 ms | 7.216 ms † | 21.843 ms |
+| lommel_S | 0.5+0.125i, 0.7+0.125i, 1.2+0.125i | 244.6 µs | 432.9 µs | 843.5 µs | 1.334 ms | 7.216 ms † | 21.843 ms |
 | mul | 0.7+0.125i, 0.7+0.125i | 1.6 µs | 1.8 µs | 2.0 µs | 3.1 µs | 11.4 µs † | 7.1 µs |
 | mul_long | 17+0.125i, 3 | 4.1 µs | 4.1 µs | 3.6 µs | 3.1 µs | 4.9 µs | 5.1 µs |
 | mul_pow10 | 1.23456789+0.125i, 3 | 3.4 µs | 3.2 µs | 4.3 µs | 3.1 µs | 4.0 µs | 4.1 µs |
@@ -935,8 +935,8 @@ Failures and timeouts remain visible. † marks a retained slowdown outlier.
 | sqr | 0.7+0.125i | 1.8 µs | 2.0 µs | 2.2 µs | 3.0 µs | 4.7 µs | 10.6 µs † |
 | sqrt | 1.23456789+0.125i | 2.9 µs | 2.5 µs | 3.7 µs | 5.5 µs | 6.7 µs | 15.2 µs |
 | step | 0.7 | 820.5 ns | 838.2 ns | 878.9 ns | 954.4 ns | 1.1 µs | 793.2 ns |
-| struve_h | 2, 0.7+0.125i | 265.6 µs | 686.6 µs | 945.4 µs | 1.584 ms | 6.746 ms | 21.221 ms |
-| struve_l | 2, 0.7+0.125i | 316.5 µs | 589.6 µs | 1.353 ms | 1.687 ms | 5.180 ms | 21.095 ms |
+| struve_H | 2, 0.7+0.125i | 265.6 µs | 686.6 µs | 945.4 µs | 1.584 ms | 6.746 ms | 21.221 ms |
+| struve_L | 2, 0.7+0.125i | 316.5 µs | 589.6 µs | 1.353 ms | 1.687 ms | 5.180 ms | 21.095 ms |
 | sub | 0.7+0.125i, 0.7+0.125i | 420.3 ns | 450.0 ns | 371.5 ns | 432.6 ns | 400.7 ns | 571.3 ns |
 | tan | 0.7+0.125i | 15.2 µs | 57.3 µs † | 29.2 µs | 47.6 µs | 122.8 µs | 384.9 µs |
 | tanh | 0.7+0.125i | 33.4 µs | 23.9 µs | 83.0 µs | 41.5 µs | 99.3 µs | 320.4 µs |
@@ -1158,7 +1158,7 @@ This benchmark exercises the generic `number_t` API, including:
   `sinh`, `tanh`, and `pow`
 - paired output functions such as `sincos` and `sinhcosh`
 - special functions such as `gamma`, `lgamma`, `digamma`, `trigamma`,
-  `tetragamma`, `erf`, `erfc`, `gammainv`, `lambert_w0`, `lambert_wm1`,
+  `tetragamma`, `erf`, `erfc`, `gammainv`, `lambert_W0`, `lambert_Wm1`,
   `beta`, `logbeta`, `binomial`, `normal_pdf`, `normal_cdf`, `Ei`, and `E1`
 - named constants such as `pi`, `e`, and Euler-Mascheroni
 
@@ -1201,7 +1201,7 @@ This benchmark currently covers a broader `qfloat` maths slice:
 - `qf_erf(0.5)` and `qf_erfc(0.5)`
 - `qf_gamma`, `qf_lgamma`, `qf_digamma`, `qf_trigamma`, and `qf_tetragamma`
 - `qf_gammainv`
-- `qf_lambert_w0` and `qf_lambert_wm1`
+- `qf_lambert_W0` and `qf_lambert_Wm1`
 - `qf_Ei` and `qf_E1`
 - `qf_beta` and `qf_logbeta`
 
@@ -1213,7 +1213,7 @@ log_10                bits=256  avg_µs=   2.471 avg_ms=     0.002
 gamma_2_3             bits=256  avg_µs=   1.246 avg_ms=     0.001
 lgamma_2_3            bits=256  avg_µs=   3.797 avg_ms=     0.004
 gammainv_9_5          bits=256  avg_µs=  82.548 avg_ms=     0.083
-lambert_wm1_-0_1      bits=256  avg_µs=  58.889 avg_ms=     0.059
+lambert_Wm1_-0_1      bits=256  avg_µs=  58.889 avg_ms=     0.059
 logbeta_2_3_4_5       bits=256  avg_µs=  17.206 avg_ms=     0.017
 ```
 
@@ -1238,7 +1238,7 @@ This benchmark covers a representative complex-valued slice:
 - complex gamma-family calls including `qc_gamma`, `qc_lgamma`, `qc_digamma`,
   `qc_trigamma`, and `qc_tetragamma`
 - real and genuinely complex `qc_gammainv` cases
-- `qc_productlog` and `qc_lambert_wm1`
+- `qc_productlog` and `qc_lambert_Wm1`
 - `qc_Ei`, `qc_E1`, `qc_beta`, and `qc_logbeta`
 
 Current sample timings on the benchmark machine:
@@ -1256,7 +1256,7 @@ tetragamma_2_plus_0_5i       avg_µs=     3.598 avg_ms=     0.004
 gammainv_gamma_2_5           avg_µs=    55.586 avg_ms=     0.056
 gammainv_gamma_2_5_0_3i      avg_µs=   145.943 avg_ms=     0.146
 productlog_1_plus_1i         avg_µs=    19.744 avg_ms=     0.020
-lambert_wm1_-0_2_-0_1i       avg_µs=    19.262 avg_ms=     0.019
+lambert_Wm1_-0_2_-0_1i       avg_µs=    19.262 avg_ms=     0.019
 ei_1_plus_1i                 avg_µs=    29.968 avg_ms=     0.030
 e1_1_plus_1i                 avg_µs=    30.136 avg_ms=     0.030
 beta_1_5_0_5__2_-0_3         avg_µs=    26.146 avg_ms=     0.026

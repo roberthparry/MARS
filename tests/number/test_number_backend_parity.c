@@ -14,6 +14,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "string-t.h"
 #include "test_number.h"
 
 #define NUMBER_PARITY_PRECISION 512u
@@ -356,8 +357,8 @@ static void test_number_real_special_parity(void)
     number_t erfinv_half = num_erfinv(half);
     number_t erfcinv_half = num_erfcinv(half);
     number_t gammainv_three = num_gammainv(three);
-    number_t w0_one = num_lambert_w0(one);
-    number_t wm1_neg_tenth = num_lambert_wm1(neg_tenth);
+    number_t w0_one = num_lambert_W0(one);
+    number_t wm1_neg_tenth = num_lambert_Wm1(neg_tenth);
     number_t beta_2_3 = num_beta(two, three);
     number_t logbeta_25_35 = num_logbeta(two_point_5, three_point_5);
     number_t binomial_55_25 = num_binomial(five_point_5, two_point_5);
@@ -385,8 +386,8 @@ static void test_number_real_special_parity(void)
     assert_number_string_prefix("erfinv(0.5)", erfinv_half, "0.47693627620446987");
     assert_number_string_prefix("erfcinv(0.5)", erfcinv_half, "0.47693627620446987");
     assert_number_string_prefix("gammainv(3)", gammainv_three, "3.4058699863095669");
-    assert_number_string_prefix("lambert_w0(1)", w0_one, "0.567143290409783872999968662210355");
-    assert_number_string_prefix("lambert_wm1(-0.1)", wm1_neg_tenth, "-3.57715206395729721840939196351199");
+    assert_number_string_prefix("lambert_W0(1)", w0_one, "0.567143290409783872999968662210355");
+    assert_number_string_prefix("lambert_Wm1(-0.1)", wm1_neg_tenth, "-3.57715206395729721840939196351199");
     assert_number_string_prefix("beta(2, 3)", beta_2_3, "0.083333333333333333333333333333333");
     assert_number_string_prefix("logbeta(2.5, 3.5)", logbeta_25_35, "-3.30183526996205260979918438338982");
     assert_number_string("binomial(5.5, 2.5)", binomial_55_25, "14.4375");

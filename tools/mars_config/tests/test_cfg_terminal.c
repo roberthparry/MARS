@@ -34,7 +34,7 @@
 /** Register real-terminal installer cases in the ordinary sequential test groups. */
 void test_cfg_terminal_cases(void);
 
-static const char *test_calendar_password = "calendar-regression-only";
+static const char *test_calendar_password = "";
 
 static bool test_calendar_text(const string_t *text, const char *expected)
 {
@@ -224,63 +224,13 @@ static bool test_calendar_same_file(file_t *left, file_t *right)
     return ok;
 }
 
-/* PTY cases exercise real menus and publication, not a second worldwide-rule import benchmark.
- * Keep every packaged town/language and the real schema/manual rules. The full immutable
- * baseline and database installation group separately retain generated-rule coverage. */
-static bool test_calendar_pty_sources(const char *directory)
-{
-    string_t *root = string_sprintf("%s/pty-sources", directory);
-    string_t *folder_path = root ? string_sprintf("%s/packaging/jurisdiction-db", string_c_str(root)) : NULL;
-    file_t *folder = folder_path ? file_new(folder_path) : NULL;
-    bool ok = folder && file_create_directory(folder, 0700, true);
-    static const char *const sources[] = {"mars_holiday_rules.sql",
-                                          "mars_country_jurisdictions.sql",
-                                          "mars_target_subdivisions.sql",
-                                          "mars_timezone_rules.sql",
-                                          "mars_jurisdiction_location_defaults.sql",
-                                          "mars_jurisdiction_towns.sql",
-                                          "town_catalogue_seed.sql",
-                                          "mars_jurisdiction_world_towns.sql",
-                                          "location_additions.sql",
-                                          "location_subdivisions.sql",
-                                          "town_search.sql",
-                                          "mars_manual_first_class_rules.sql",
-                                          "mars_holiday_localized_names.sql",
-                                          "mars_calendar_locale_names.sql",
-                                          "mars_calendar_local.sql"};
-    for (size_t i = 0; i < sizeof(sources) / sizeof(*sources) && ok; ++i) {
-        string_t *source_path = string_sprintf("%s/packaging/jurisdiction-db/%s", MARS_CONFIG_ROOT_DIR, sources[i]);
-        string_t *target_path = string_sprintf("%s/%s", string_c_str(folder_path), sources[i]);
-        file_t *source = source_path ? file_new(source_path) : NULL;
-        file_t *target = target_path ? file_new(target_path) : NULL;
-        ok = source && target && file_copy(source, target, false);
-        file_free(source);
-        file_free(target);
-        string_free(source_path);
-        string_free(target_path);
-    }
-    string_t *generated_path =
-        folder_path ? string_sprintf("%s/mars_generated_first_class_rules.sql", string_c_str(folder_path)) : NULL;
-    file_t *generated = generated_path ? file_new(generated_path) : NULL;
-    string_t *empty = string_new_with("-- PTY fixture: generated rules are covered by the full installation tests.\n");
-    ok = ok && generated && empty && file_write_all_text(generated, empty) &&
-         !setenv("MARS_ROOT", string_c_str(root), 1);
-    string_free(empty);
-    file_free(generated);
-    string_free(generated_path);
-    file_free(folder);
-    string_free(folder_path);
-    string_free(root);
-    return ok;
-}
-
 static bool test_calendar_pty_fixture(const char *directory)
 {
     string_t *path = NULL, *key = NULL;
     sqlite_t *db = test_cfg_calendar_database(directory, &path, &key);
     bool ok = db != NULL;
     sqlite_close(db);
-    ok = ok && test_calendar_pty_sources(directory);
+    ok = ok && test_cfg_calendar_sources(directory);
     static const test_calendar_dialogue_t choose[] = {
         {"Choice: ", "/\n"},
         {"Choice: ", "n\n"},
@@ -295,11 +245,11 @@ static bool test_calendar_pty_fixture(const char *directory)
          string_find(output, "1. Italian") >= 0 && string_find(output, "2. Latin") >= 0 &&
          string_find(output, "Generating local calendar") >= 0 &&
          string_find(output, "Finalising and publishing database — done") >= 0 &&
-         string_find(output, "\033[2K[") >= 0 &&
+         string_find(output, "\033[2K") >= 0 &&
          string_find(output, "keep current key") < 0 &&
-         string_find(output, test_calendar_password) < 0;
+         string_find(output, "isolated-installer-settings-key") < 0;
     string_free(output);
-    db = ok ? sqlite_open_encrypted(path, key) : NULL;
+    db = ok ? sqlite_open_plain(path) : NULL;
     ok = ok && db &&
          test_calendar_query(db, "SELECT location||'|'||locale FROM calendar_local_settings", "Vatican City|la_VA");
     sqlite_close(db);

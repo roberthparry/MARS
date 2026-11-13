@@ -10,47 +10,47 @@
 #include "number-t.h"
 
 /* Round guarded principal Bessel J to complex double-double precision. */
-qcomplex_t qc_bessel_j(qcomplex_t order, qcomplex_t argument)
+qcomplex_t qc_bessel_J(qcomplex_t order, qcomplex_t argument)
 {
     NUM_SCOPE(scope);
-    number_t value = num_bessel_j(num_create_from_qcomplex(order), num_create_from_qcomplex(argument));
+    number_t value = num_bessel_J(num_create_from_qcomplex(order), num_create_from_qcomplex(argument));
     return num_is_finite(value) ? qc_make(num_to_qfloat(num_real_part(value)), num_to_qfloat(num_imag_part(value))) : QC_NAN;
 }
 
 /* Round the principal complex Lommel series to double-double precision. */
-qcomplex_t qc_lommel_s(qcomplex_t mu, qcomplex_t nu, qcomplex_t argument)
+qcomplex_t qc_lommel_S(qcomplex_t mu, qcomplex_t nu, qcomplex_t argument)
 {
     NUM_SCOPE(scope);
-    number_t value = num_lommel_s(num_create_from_qcomplex(mu), num_create_from_qcomplex(nu),
+    number_t value = num_lommel_S(num_create_from_qcomplex(mu), num_create_from_qcomplex(nu),
                                   num_create_from_qcomplex(argument));
     return num_is_finite(value) ? qc_make(num_to_qfloat(num_real_part(value)), num_to_qfloat(num_imag_part(value))) : QC_NAN;
 }
 
 /* Round principal modified Bessel I to complex double-double precision. */
-qcomplex_t qc_bessel_i(qcomplex_t order, qcomplex_t argument)
+qcomplex_t qc_bessel_I(qcomplex_t order, qcomplex_t argument)
 {
     NUM_SCOPE(scope);
-    number_t value = num_bessel_i(num_create_from_qcomplex(order), num_create_from_qcomplex(argument));
+    number_t value = num_bessel_I(num_create_from_qcomplex(order), num_create_from_qcomplex(argument));
     if (num_is_nan(value))
         return QC_NAN;
     return qc_make(num_to_qfloat(num_real_part(value)), num_to_qfloat(num_imag_part(value)));
 }
 
 /* Round the principal complex modified Bessel K after guarded evaluation. */
-qcomplex_t qc_bessel_k(qcomplex_t order, qcomplex_t argument)
+qcomplex_t qc_bessel_K(qcomplex_t order, qcomplex_t argument)
 {
     NUM_SCOPE(scope);
-    number_t value = num_bessel_k(num_create_from_qcomplex(order), num_create_from_qcomplex(argument));
+    number_t value = num_bessel_K(num_create_from_qcomplex(order), num_create_from_qcomplex(argument));
     qcomplex_t result = qc_make(num_to_qfloat(num_real_part(value)), num_to_qfloat(num_imag_part(value)));
     num_destroy(&value);
     return result;
 }
 
 /* Round the native principal Bessel Y value to complex double-double precision. */
-qcomplex_t qc_bessel_y(qcomplex_t order, qcomplex_t argument)
+qcomplex_t qc_bessel_Y(qcomplex_t order, qcomplex_t argument)
 {
     NUM_SCOPE(scope);
-    number_t value = num_bessel_y(num_create_from_qcomplex(order), num_create_from_qcomplex(argument));
+    number_t value = num_bessel_Y(num_create_from_qcomplex(order), num_create_from_qcomplex(argument));
     qcomplex_t result = num_is_nan(value) ? QC_NAN :
                         qc_make(num_to_qfloat(num_real_part(value)), num_to_qfloat(num_imag_part(value)));
 
@@ -59,20 +59,20 @@ qcomplex_t qc_bessel_y(qcomplex_t order, qcomplex_t argument)
 }
 
 /* Round principal ordinary Struve H to complex double-double precision. */
-qcomplex_t qc_struve_h(qcomplex_t order, qcomplex_t argument)
+qcomplex_t qc_struve_H(qcomplex_t order, qcomplex_t argument)
 {
     NUM_SCOPE(scope);
-    number_t value = num_struve_h(num_create_from_qcomplex(order), num_create_from_qcomplex(argument));
+    number_t value = num_struve_H(num_create_from_qcomplex(order), num_create_from_qcomplex(argument));
     if (num_is_nan(value))
         return QC_NAN;
     return qc_make(num_to_qfloat(num_real_part(value)), num_to_qfloat(num_imag_part(value)));
 }
 
 /* Round the guarded principal modified Struve L to complex double-double precision. */
-qcomplex_t qc_struve_l(qcomplex_t order, qcomplex_t argument)
+qcomplex_t qc_struve_L(qcomplex_t order, qcomplex_t argument)
 {
     NUM_SCOPE(scope);
-    number_t value = num_struve_l(num_create_from_qcomplex(order), num_create_from_qcomplex(argument));
+    number_t value = num_struve_L(num_create_from_qcomplex(order), num_create_from_qcomplex(argument));
     if (num_is_nan(value))
         return QC_NAN;
     return qc_make(num_to_qfloat(num_real_part(value)), num_to_qfloat(num_imag_part(value)));

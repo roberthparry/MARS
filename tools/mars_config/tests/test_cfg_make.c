@@ -232,14 +232,23 @@ static bool test_cfg_make_help_fixture(const char *directory)
         "mars_lab", "equation_lab", "diffequation_lab", "matrix_lab", "integrator_lab",
         "datetime_lab", "almanac_lab", "almanac_event_lab", "holiday_lab", "ophelia"
     };
-    for (size_t i = 0; i < sizeof(obsolete) / sizeof(*obsolete) && ok; ++i) {
-        ok = string_find(output, obsolete[i]) < 0;
-        const char *probe[] = {"make", "--no-print-directory", "-j1", "-n", obsolete[i], NULL};
-        string_t *rejected = NULL;
-        status = 0;
-        ok = ok && lab_proc_run(probe, MARS_CONFIG_ROOT_DIR, 30000, 262144, &rejected, &status) && status != 0;
-        string_free(rejected);
+    /* Keep-going visits every obsolete goal in one parse of the real Makefile. */
+    const char *probe[6 + sizeof obsolete / sizeof *obsolete] = {
+        "make", "--no-print-directory", "-j1", "-n", "-k"
+    };
+    for (size_t i = 0; i < sizeof obsolete / sizeof *obsolete; ++i)
+        probe[5 + i] = obsolete[i];
+    probe[5 + sizeof obsolete / sizeof *obsolete] = NULL;
+    string_t *rejected = NULL;
+    status = 0;
+    ok = ok && lab_proc_run(probe, MARS_CONFIG_ROOT_DIR, 30000, 262144, &rejected, &status) && status != 0;
+    for (size_t i = 0; i < sizeof obsolete / sizeof *obsolete && ok; ++i) {
+        string_t *diagnostic = string_sprintf("No rule to make target '%s'", obsolete[i]);
+        ok = string_find(output, obsolete[i]) < 0 && diagnostic && rejected &&
+             string_find(rejected, string_c_str(diagnostic)) >= 0;
+        string_free(diagnostic);
     }
+    string_free(rejected);
     string_free(output);
     output = NULL;
     const char *focused[] = {"make", "--no-print-directory", "-j1", "CHECKS_BIN=/not-built/checks",

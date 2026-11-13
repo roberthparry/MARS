@@ -23,63 +23,41 @@
 
 #include <stdbool.h>
 
+#include "json-t.h"
 #include "string-t.h"
+#include "test_harness.h"
 
 /* ------------------------------------------------------------------------- */
 /* Configuration mode                                                        */
 /* ------------------------------------------------------------------------- */
 
+
 /**
- * @enum test_config_mode_t
- * @brief Selects how test enable/disable information is stored and resolved.
- *
- * The test configuration system supports three independent modes:
- *
- * ### TEST_CONFIG_NONE
- * No JSON file is read or written. All tests default to enabled, and
- * test_config_has_key_for() always reports false.
- *
- * ### TEST_CONFIG_GLOBAL
- * A single shared JSON file is used for all test translation units:
- *
- *     tests/test_config.json
- *
- * The JSON structure is:
- * @code{.json}
- * {
- *     "test_file.c": {
- *         "group": {
- *             "enabled": true,
- *             "test_name": true
- *         },
- *         "another_group": { ... }
- *     }
- * }
- * @endcode
- *
- * ### TEST_CONFIG_LOCAL
- * Each test translation unit uses its own JSON file, derived from `__FILE__`:
- *
- *     tests/<basename>.json
- *
- * The JSON structure omits the filename wrapper:
- * @code{.json}
- * {
- *     "group": {
- *         "enabled": true,
- *         "test_name": true
- *     }
- * }
- * @endcode
- *
- * LOCAL mode is ideal when tests should not interfere with each other’s
- * configuration, while GLOBAL mode is ideal for centralised control.
+ * @brief Resolve an optional selection override while counting configured tests.
+ * @param[in] source Borrowed normalised source path, valid during this call.
+ * @param[in] path Borrowed complete dotted case or group path, valid during this call.
+ * @param enabled Effective JSON selection, including disabled ancestors.
+ * @return True selects the entry; false excludes it. The callback must not modify the configuration.
  */
-typedef enum {
-    TEST_CONFIG_NONE,   /**< Disable config file reads/writes entirely */
-    TEST_CONFIG_GLOBAL, /**< Use tests/test_config.json */
-    TEST_CONFIG_LOCAL   /**< Use tests/<basename>.json */
-} test_config_mode_t;
+typedef bool (*test_config_selection_fn)(const string_t *source, const string_t *path, bool enabled);
+
+/**
+ * @brief Count selected leaf cases for one module without executing tests or opening test storage.
+ * @details A global snapshot selects source files in the suite source's directory. A local snapshot contains
+ * the suite's own groups. Parent paths are indexed across source files so cross-file groups are not counted
+ * as cases. Disabled cases and disabled groups are excluded; README/output cases count as ordinary work items.
+ * Configuration absent for this module returns false, allowing callers to show discovery activity instead.
+ * @param[in] configuration Borrowed immutable JSON snapshot; not modified or retained.
+ * @param[in] suite_source Borrowed primary suite source, identifying the module directory.
+ * @param mode GLOBAL or LOCAL; NONE has no configured count.
+ * @param[in] selection Optional borrowed callback overriding JSON selection, or NULL to use JSON alone.
+ * @param[out] count Required destination, initialised to zero; receives the count on success.
+ * @return True when the module is represented, including a valid zero count; false for missing configuration,
+ * invalid arguments, allocation failure or excessive nesting. No ownership is transferred. Call serially with
+ * configuration changes; callbacks and supplied inputs need only remain valid for this call.
+ */
+bool test_config_count_enabled(const json_t *configuration, const string_t *suite_source, test_config_mode_t mode,
+                               test_config_selection_fn selection, size_t *count);
 
 /**
  * @brief Default configuration mode if the test file does not override it.
@@ -104,6 +82,13 @@ typedef enum {
  * @param mode  The configuration mode to activate.
  */
 void test_config_set_mode(test_config_mode_t mode);
+
+/**
+ * @brief Choose whether saving may prune configuration keys not discovered in this session.
+ * @param enabled True permits pruning; false preserves undiscovered selections after an interrupted run.
+ * @return No value. Changes process-local policy; file I/O happens only when test_config_save is called.
+ * @note Sequential use only. No ownership is transferred and no release is required.
+ */
 void test_config_set_prune_enabled(bool enabled);
 
 /**
@@ -113,8 +98,8 @@ void test_config_set_prune_enabled(bool enabled);
  * associated dynamically allocated state, including the cached local filename.
  *
  * It is intended to be called once at program shutdown to ensure that all
- * memory owned by the test configuration subsystem is released.  After this
- * call, the test configuration API must not be used again.
+ * memory owned by the test configuration subsystem is released. To start a fresh
+ * independent configuration session afterwards, call test_config_set_mode() before making another query.
  */
 void test_config_shutdown(void);
 

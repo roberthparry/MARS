@@ -6,6 +6,7 @@
  * three reaches a spawned fixture; other listeners retain close-on-exec. Peer
  * cleanup is bounded and escalates to SIGKILL before reaping when necessary.
  * Globe reader examples use a tiny disposable SQLite file with child-only configuration.
+ * Examples requiring installed resources lazily load the application's saved settings once, before execution.
  */
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE
@@ -21,6 +22,7 @@
 #include <fcntl.h>
 #include <signal.h>
 #include <spawn.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <sys/socket.h>
 #include <sys/wait.h>
@@ -28,6 +30,7 @@
 #include <unistd.h>
 
 #include "sqlite-t.h"
+#include "mars_settings.h"
 #include "checks_process.h"
 #include "checks_fixtures.h"
 #define MARS_CHECKS_FIXTURES_INTERNAL_ACCESS
@@ -44,6 +47,7 @@ struct peer {
 typedef struct checks_fixtures {
     string_t *root;
     string_t *executable;
+    bool settings_loaded;
     struct peer peers[3];
 } checks_fixtures_t;
 
@@ -238,6 +242,15 @@ bool checks_fixtures_programme(checks_fixtures_t *fixtures, const string_t *path
         string_free(database);
         if (!ready)
             return false;
+    } else if (string_find(code, "almanac_open(") >= 0 || string_find(code, "jurisdict_open(") >= 0 ||
+               string_find(code, "globe_open_configured(") >= 0) {
+        if (!fixtures->settings_loaded) {
+            if (!mars_settings_isolate() || !mars_settings_load()) {
+                fputs("Cannot load configured databases for the README example.\n", stderr);
+                return false;
+            }
+            fixtures->settings_loaded = true;
+        }
     }
     checks_strings_add(arguments, string_clone(binary));
     return checks_fixtures_arguments(fixtures, path, code, arguments);

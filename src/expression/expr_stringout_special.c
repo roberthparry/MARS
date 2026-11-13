@@ -96,7 +96,7 @@ int expr_has_legendre_chi_order(const expr_t *f)
     return expr_legendre_chi_order(f, &order);
 }
 
-void emit_expr_lambert_wn(const expr_t *f, sbuf_t *b)
+void emit_expr_lambert_Wn(const expr_t *f, sbuf_t *b)
 {
     sbuf_puts(b, expr_ops_expression_name(f->ops));
     sbuf_putc(b, '(');
@@ -152,7 +152,7 @@ void emit_expr_legendre_chi(const expr_t *f, sbuf_t *b)
     sbuf_putc(b, ')');
 }
 
-void emit_expr_appell_f1(const expr_t *f, sbuf_t *b)
+void emit_expr_appell_F1(const expr_t *f, sbuf_t *b)
 {
     const expr_t *a = NULL;
     const expr_t *b1 = NULL;
@@ -161,7 +161,7 @@ void emit_expr_appell_f1(const expr_t *f, sbuf_t *b)
     const expr_t *x = NULL;
     const expr_t *y = NULL;
 
-    if (!expr_appell_f1_unpack(f, &a, &b1, &b2, &c, &x, &y))
+    if (!expr_appell_F1_unpack(f, &a, &b1, &b2, &c, &x, &y))
         return;
     sbuf_puts(b, expr_ops_expression_name(f->ops));
     sbuf_putc(b, '(');
@@ -179,7 +179,7 @@ void emit_expr_appell_f1(const expr_t *f, sbuf_t *b)
     sbuf_putc(b, ')');
 }
 
-void emit_expr_lauricella_f(const expr_t *f, sbuf_t *out)
+void emit_expr_lauricella_F(const expr_t *f, sbuf_t *out)
 {
     const expr_t *a = NULL;
     const expr_t **parameters = NULL;
@@ -188,7 +188,7 @@ void emit_expr_lauricella_f(const expr_t *f, sbuf_t *out)
     size_t count = 0u;
     char prefix[64];
 
-    if (!expr_lauricella_f_unpack(f, &a, &parameters, &c, &variables, &count))
+    if (!expr_lauricella_F_unpack(f, &a, &parameters, &c, &variables, &count))
         return;
     snprintf(prefix, sizeof(prefix), "(%zu, ", count);
     sbuf_puts(out, expr_ops_expression_name(f->ops));
@@ -238,13 +238,13 @@ void emit_expr_hypergeometric_pFq(const expr_t *f, sbuf_t *b)
     free(upper);
 }
 
-void emit_expr_lommel_s(const expr_t *f, sbuf_t *b)
+void emit_expr_lommel_S(const expr_t *f, sbuf_t *b)
 {
     const expr_t *mu = NULL;
     const expr_t *nu = NULL;
     const expr_t *argument = NULL;
 
-    if (!expr_lommel_s_unpack(f, &mu, &nu, &argument))
+    if (!expr_lommel_S_unpack(f, &mu, &nu, &argument))
         return;
     sbuf_puts(b, expr_ops_expression_name(f->ops));
     sbuf_putc(b, '(');
@@ -272,7 +272,7 @@ void emit_func_polygamma(const expr_t *f, sbuf_t *b)
     sbuf_putc(b, ')');
 }
 
-void emit_func_appell_f1(const expr_t *f, sbuf_t *b)
+void emit_func_appell_F1(const expr_t *f, sbuf_t *b)
 {
     const expr_t *a = NULL;
     const expr_t *b1 = NULL;
@@ -281,7 +281,7 @@ void emit_func_appell_f1(const expr_t *f, sbuf_t *b)
     const expr_t *x = NULL;
     const expr_t *y = NULL;
 
-    if (!expr_appell_f1_unpack(f, &a, &b1, &b2, &c, &x, &y))
+    if (!expr_appell_F1_unpack(f, &a, &b1, &b2, &c, &x, &y))
         return;
     emit_function_builtin_name(b, f->ops);
     sbuf_putc(b, '(');
@@ -299,7 +299,7 @@ void emit_func_appell_f1(const expr_t *f, sbuf_t *b)
     sbuf_putc(b, ')');
 }
 
-void emit_func_lauricella_f(const expr_t *f, sbuf_t *out)
+void emit_func_lauricella_F(const expr_t *f, sbuf_t *out)
 {
     const expr_t *a = NULL;
     const expr_t **parameters = NULL;
@@ -308,7 +308,7 @@ void emit_func_lauricella_f(const expr_t *f, sbuf_t *out)
     size_t count = 0u;
     char prefix[64];
 
-    if (!expr_lauricella_f_unpack(f, &a, &parameters, &c, &variables, &count))
+    if (!expr_lauricella_F_unpack(f, &a, &parameters, &c, &variables, &count))
         return;
     snprintf(prefix, sizeof(prefix), "(%zu, ", count);
     emit_function_builtin_name(out, f->ops);
@@ -358,13 +358,13 @@ void emit_func_hypergeometric_pFq(const expr_t *f, sbuf_t *b)
     free(upper);
 }
 
-void emit_func_lommel_s(const expr_t *f, sbuf_t *b)
+void emit_func_lommel_S(const expr_t *f, sbuf_t *b)
 {
     const expr_t *mu = NULL;
     const expr_t *nu = NULL;
     const expr_t *argument = NULL;
 
-    if (!expr_lommel_s_unpack(f, &mu, &nu, &argument))
+    if (!expr_lommel_S_unpack(f, &mu, &nu, &argument))
         return;
     emit_function_builtin_name(b, f->ops);
     sbuf_putc(b, '(');
@@ -376,7 +376,7 @@ void emit_func_lommel_s(const expr_t *f, sbuf_t *b)
     sbuf_putc(b, ')');
 }
 
-void emit_func_lambert_wn(const expr_t *f, sbuf_t *b)
+void emit_func_lambert_Wn(const expr_t *f, sbuf_t *b)
 {
     emit_function_builtin_name(b, f->ops);
     sbuf_putc(b, '(');

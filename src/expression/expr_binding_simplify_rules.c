@@ -2760,7 +2760,7 @@ static const expr_binding_expr_t *binding_expr_lambert_arg(const expr_binding_ex
         return NULL;
 
     if (expr->kind == EXPR_BINDING_EXPR_BINARY_OP) {
-        if (expr->u.binary_op.ops == &ops_lambert_wn)
+        if (expr->u.binary_op.ops == &ops_lambert_Wn)
             return expr->u.binary_op.right;
         return NULL;
     }

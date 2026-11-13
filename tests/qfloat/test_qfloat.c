@@ -9,12 +9,13 @@
  * run suites sequentially; this source is not part of the installed library.
  */
 
+#include "string-t.h"
 #include "test_qfloat.h"
 
 TEST_SUITE_CONFIG(TEST_CONFIG_GLOBAL);
 
 static int qfloat_validity_equal(const void *got, const void *want, void *ctx);
-static int qfloat_validity_format(const void *value, string_t *out, void *ctx);
+static int qfloat_validity_format(const void *value, test_text_t *out, void *ctx);
 static bool test_qfloat_suite_setup(void);
 
 static const double qfloat_validity_rel_tol = 1e-28;
@@ -87,7 +88,7 @@ static int qfloat_validity_equal(const void *got, const void *want, void *ctx)
     return qf_eq(*a, *b) || qf_close(*a, *b, rel) || qf_close_rel(*a, *b, rel);
 }
 
-static int qfloat_validity_format(const void *value, string_t *out, void *ctx)
+static int qfloat_validity_format(const void *value, test_text_t *out, void *ctx)
 {
     int needed;
     char *text;
@@ -98,14 +99,14 @@ static int qfloat_validity_format(const void *value, string_t *out, void *ctx)
 
     needed = qf_sprintf(NULL, 0u, "%q", *(const qfloat_t *)value);
     if (needed < 0)
-        return string_append_cstr(out, "<qfloat format failed>");
+        return test_text_append_cstr(out, "<qfloat format failed>");
 
     text = malloc((size_t)needed + 1u);
     if (!text)
         return -1;
 
     if (qf_sprintf(text, (size_t)needed + 1u, "%q", *(const qfloat_t *)value) < 0 ||
-        string_append_cstr(out, text) != 0) {
+        test_text_append_cstr(out, text) != 0) {
         free(text);
         return -1;
     }

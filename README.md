@@ -238,7 +238,7 @@ sample output.
 
 int main(void) {
     qfloat_t x = qf_from_string("1");
-    qfloat_t w = qf_lambert_w0(x);
+    qfloat_t w = qf_lambert_W0(x);
 
     qf_printf("W0(1) = %.34q\n", w);
     return 0;

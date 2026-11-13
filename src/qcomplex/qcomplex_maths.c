@@ -713,7 +713,7 @@ static qcomplex_t qc_lambert_w_asymptotic_guess(qcomplex_t z, int branch)
     return qc_add(qc_sub(L1, L2), qc_div(L2, L1));
 }
 
-static qcomplex_t qc_lambert_wm1_complex(qcomplex_t z)
+static qcomplex_t qc_lambert_Wm1_complex(qcomplex_t z)
 {
     qfloat_t zero_tol = qf_from_double(1e-30);
 
@@ -721,7 +721,7 @@ static qcomplex_t qc_lambert_wm1_complex(qcomplex_t z)
         return qc_make(QF_NAN, QF_NAN);
 
     if (qf_eq(qc_imag(z), qf_from_double(0.0)) && qf_ge(qc_real(z), QF_NEG_INV_E) && qf_lt(qc_real(z), QF_ZERO))
-        return qc_make(qf_lambert_wm1(qc_real(z)), QF_ZERO);
+        return qc_make(qf_lambert_Wm1(qc_real(z)), QF_ZERO);
 
     if (qf_eq(qc_real(z), QF_ZERO) && qf_eq(qc_imag(z), QF_ZERO))
         return qc_make(QF_NINF, QF_NAN);
@@ -754,12 +754,12 @@ static qcomplex_t qc_lambert_wm1_complex(qcomplex_t z)
     return w;
 }
 
-qcomplex_t qc_lambert_wm1(qcomplex_t z)
+qcomplex_t qc_lambert_Wm1(qcomplex_t z)
 {
-    return qc_lambert_wm1_complex(z);
+    return qc_lambert_Wm1_complex(z);
 }
 
-qcomplex_t qc_lambert_wn(int branch, qcomplex_t z)
+qcomplex_t qc_lambert_Wn(int branch, qcomplex_t z)
 {
     qfloat_t zero_tol = qf_from_double(1e-30);
     qcomplex_t w;
@@ -767,7 +767,7 @@ qcomplex_t qc_lambert_wn(int branch, qcomplex_t z)
     if (branch == 0)
         return qc_productlog(z);
     if (branch == -1)
-        return qc_lambert_wm1_complex(z);
+        return qc_lambert_Wm1_complex(z);
     if (qc_isnan(z))
         return QC_NAN;
     if (qf_eq(qc_real(z), QF_ZERO) && qf_eq(qc_imag(z), QF_ZERO))
@@ -1137,7 +1137,7 @@ static int qc_lauricella_factor(qcomplex_t parameter, qcomplex_t variable, qfloa
     return 0;
 }
 
-qcomplex_t qc_lauricella_f(qcomplex_t a, const qcomplex_t *b, qcomplex_t c, const qcomplex_t *x, size_t variable_count)
+qcomplex_t qc_lauricella_F(qcomplex_t a, const qcomplex_t *b, qcomplex_t c, const qcomplex_t *x, size_t variable_count)
 {
     qcomplex_t *coefficients = NULL;
     qcomplex_t sum = QC_ONE;
@@ -1213,12 +1213,12 @@ qcomplex_t qc_lauricella_f(qcomplex_t a, const qcomplex_t *b, qcomplex_t c, cons
     return sum;
 }
 
-qcomplex_t qc_appell_f1(qcomplex_t a, qcomplex_t b1, qcomplex_t b2, qcomplex_t c, qcomplex_t x, qcomplex_t y)
+qcomplex_t qc_appell_F1(qcomplex_t a, qcomplex_t b1, qcomplex_t b2, qcomplex_t c, qcomplex_t x, qcomplex_t y)
 {
     const qcomplex_t b[2] = {b1, b2};
     const qcomplex_t variables[2] = {x, y};
 
-    return qc_lauricella_f(a, b, c, variables, 2u);
+    return qc_lauricella_F(a, b, c, variables, 2u);
 }
 
 qcomplex_t qc_hypergeometric_pFq(const qcomplex_t *upper, size_t upper_count, const qcomplex_t *lower,

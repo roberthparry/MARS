@@ -255,8 +255,8 @@ INSERT OR IGNORE INTO TeX_cases(name, operation, input, expected) VALUES ('case_
 INSERT OR IGNORE INTO TeX_cases(name, operation, input, expected) VALUES ('case_9856709ccfe272f1', 'test_TeX_native_aggregate_contexts_cases', '{1/s^2 | s = ?; Re(s)>0}', '\mathfrak{Re}(s) > 0');
 INSERT OR IGNORE INTO TeX_cases(name, operation, input, expected) VALUES ('case_c5b55e71c526e3fb', 'test_TeX_native_aggregate_contexts_cases', 'LerchPhi(z,s,a)', '\Phi\left(z, s, a\right)');
 INSERT OR IGNORE INTO TeX_cases(name, operation, input, expected) VALUES ('case_fb105dc79f93fe6c', 'test_TeX_native_aggregate_contexts_cases', 'LommelS(mu,nu,x)', 's_{');
-INSERT OR IGNORE INTO TeX_cases(name, operation, input, expected) VALUES ('case_239a2156891235a0', 'test_TeX_native_aggregate_contexts_cases', 'appell_f1(a,b1,b2,c,x,y)', '\operatorname{F}_{1}\left(');
-INSERT OR IGNORE INTO TeX_cases(name, operation, input, expected) VALUES ('case_36caf3340a929547', 'test_TeX_native_aggregate_contexts_cases', 'lauricella_f(2,a,b1,b2,c,x,y)', 'F_D^{');
+INSERT INTO TeX_cases(name, operation, input, expected) VALUES ('case_239a2156891235a0', 'test_TeX_native_aggregate_contexts_cases', 'appell_F1(a,b1,b2,c,x,y)', '\operatorname{F}_{1}\left(') ON CONFLICT(name) DO UPDATE SET input=excluded.input, expected=excluded.expected;
+INSERT INTO TeX_cases(name, operation, input, expected) VALUES ('case_36caf3340a929547', 'test_TeX_native_aggregate_contexts_cases', 'lauricella_F(2,a,b1,b2,c,x,y)', 'F_D^{') ON CONFLICT(name) DO UPDATE SET input=excluded.input, expected=excluded.expected;
 INSERT OR IGNORE INTO TeX_cases(name, operation, input, expected) VALUES ('case_527ff8afc117bd66', 'test_TeX_native_aggregate_contexts_cases', 'hypergeometric_pFq(1,1,a,b,x)', '{}_{1}F_{1}');
 INSERT OR IGNORE INTO TeX_cases(name, operation, input, expected) VALUES ('case_9dd41d6053973bb2', 'test_TeX_native_aggregate_contexts_cases', '@S x^2 dx', '\int x^{2}\, dx');
 INSERT OR IGNORE INTO TeX_cases(name, operation, input, expected) VALUES ('case_7a72c1f12d6007a2', 'test_TeX_native_aggregate_contexts_cases', 'x+x^2+1', 'x^{2} + x + 1');

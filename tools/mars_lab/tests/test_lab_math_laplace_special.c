@@ -50,10 +50,10 @@ static double lab_math_special_ei(double x)
     return NAN;
 }
 
-static double complex lab_math_special_bessel_j(double order, double complex x)
+static double complex lab_math_special_bessel_J(double order, double complex x)
 {
     if (order < 0 && order == floor(order))
-        return pow(-1, -order) * lab_math_special_bessel_j(-order, x);
+        return pow(-1, -order) * lab_math_special_bessel_J(-order, x);
     double complex term = order == 0 ? 1 : cpow(x / 2, order) / tgamma(order + 1), total = term;
     for (unsigned k = 1; k < 1000; ++k) {
         term *= -(x * x / 4) / (k * (k + order));
@@ -65,7 +65,7 @@ static double complex lab_math_special_bessel_j(double order, double complex x)
     return NAN;
 }
 
-static double lab_math_special_bessel_y(double x)
+static double lab_math_special_bessel_Y(double x)
 {
     double term = 1, harmonic = 0, correction = 0;
     for (unsigned k = 1; k < 1000; ++k) {
@@ -75,7 +75,7 @@ static double lab_math_special_bessel_y(double x)
         correction += contribution;
         if (fabs(contribution) < 2e-16 * fmax(1, fabs(correction)))
             return 2 / acos(-1) * ((log(x / 2) + 0.5772156649015328606) *
-                                   creal(lab_math_special_bessel_j(0, x)) + correction);
+                                   creal(lab_math_special_bessel_J(0, x)) + correction);
     }
     lab_math_check(false, "Bessel Y defining series converged");
     return NAN;
@@ -110,12 +110,12 @@ static double complex lab_math_special_ei_source(double t, const lab_math_specia
 
 static double complex lab_math_special_j_source(double t, const lab_math_special_context_t *c)
 {
-    return lab_math_special_bessel_j(c->order, c->rate * t);
+    return lab_math_special_bessel_J(c->order, c->rate * t);
 }
 
 static double complex lab_math_special_y_source(double t, const lab_math_special_context_t *c)
 {
-    return lab_math_special_bessel_y(creal(c->rate) * t);
+    return lab_math_special_bessel_Y(creal(c->rate) * t);
 }
 
 static double complex lab_math_special_gamma_source(double t, const lab_math_special_context_t *c)

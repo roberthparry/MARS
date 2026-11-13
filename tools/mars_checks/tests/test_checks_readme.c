@@ -13,10 +13,13 @@
 
 #include <errno.h>
 #include <signal.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <sys/wait.h>
+#include <unistd.h>
 
 #include "file-t.h"
+#include "mars_settings.h"
 #include "test_harness.h"
 #include "checks_process.h"
 #include "checks_readme.h"
@@ -97,6 +100,92 @@ static void test_checks_readme_fixture_startup_cleanup(void)
                          "and reap the recovered child");
 }
 
+static string_t *test_checks_readme_key(bool create)
+{
+    (void)create;
+    return checks_text("readme-settings-fixture-key");
+}
+
+static bool test_checks_readme_resource_child(const string_t *root, bool broken)
+{
+    string_t *locator = checks_path(root, "mars.json");
+    string_t *override = checks_path(root, "explicit-globe.db");
+    static const char *const settings[] = {
+        "MARS_ALMANAC_DB_PATH", "MARS_ALMANAC_DB_KEY", "MARS_GLOBE_DB_PATH", "MARS_GLOBE_DB_KEY",
+        "MARS_JURISDICTION_DB_PATH", "MARS_JURISDICTION_DB_KEY"
+    };
+    bool ok = locator && override && !setenv("MARS_CONFIG_FILE", string_c_str(locator), 1) &&
+              !setenv("MARS_HOME", string_c_str(root), 1);
+    for (size_t i = 0; ok && i < sizeof settings / sizeof *settings; ++i)
+        ok = !unsetenv(settings[i]);
+    mars_settings_key_provider(test_checks_readme_key);
+    string_t *configuration = checks_text("{\"MARS_ALMANAC_DB_PATH\":\"almanac.db\",\"MARS_ALMANAC_DB_KEY\":\"\","
+        "\"MARS_GLOBE_DB_PATH\":\"globe.db\",\"MARS_GLOBE_DB_KEY\":\"unused-override-key\","
+        "\"MARS_JURISDICTION_DB_PATH\":\"jurisdiction.db\",\"MARS_JURISDICTION_DB_KEY\":\"\"}");
+    ok = ok && test_checks_write(root, "mars.json", broken ? "not JSON\n" : "{\"database\":\"mars.db\"}\n");
+    if (ok && !broken)
+        ok = mars_settings_import(configuration, true);
+    ok = ok && !setenv("MARS_GLOBE_DB_PATH", string_c_str(override), 1) &&
+         !setenv("MARS_GLOBE_DB_KEY", "", 1);
+    checks_fixtures_t *fixtures = checks_fixtures_new(root);
+    string_t *path = checks_text("docs/almanac.md"), *binary = checks_text("/example");
+    string_t *code = checks_text("int main(void) { return 0; }");
+    checks_strings_t *arguments = checks_strings_new();
+    ok = checks_fixtures_programme(fixtures, path, code, binary, root, arguments) &&
+         !getenv("MARS_ALMANAC_DB_PATH") && !getenv("MARS_JURISDICTION_DB_PATH") && ok;
+    checks_strings_free(arguments);
+    string_free(code);
+    code = checks_text("almanac_open(); globe_open_configured(NULL); jurisdict_open(NULL);");
+    arguments = checks_strings_new();
+    bool loaded = checks_fixtures_programme(fixtures, path, code, binary, root, arguments);
+    if (broken)
+        ok = !loaded && checks_strings_count(arguments) == 0 && !getenv("MARS_ALMANAC_DB_PATH") && ok;
+    else {
+        string_t *almanac = checks_path(root, "almanac.db");
+        string_t *jurisdiction = checks_path(root, "jurisdiction.db");
+        const char *almanac_key = getenv("MARS_ALMANAC_DB_KEY"), *globe_key = getenv("MARS_GLOBE_DB_KEY");
+        const char *jurisdiction_key = getenv("MARS_JURISDICTION_DB_KEY");
+        ok = loaded && checks_strings_count(arguments) == 1 &&
+             checks_equal(almanac, getenv("MARS_ALMANAC_DB_PATH")) &&
+             checks_equal(jurisdiction, getenv("MARS_JURISDICTION_DB_PATH")) &&
+             checks_equal(override, getenv("MARS_GLOBE_DB_PATH")) &&
+             almanac_key && !*almanac_key && globe_key && !*globe_key && jurisdiction_key && !*jurisdiction_key && ok;
+        string_free(almanac);
+        string_free(jurisdiction);
+    }
+    checks_strings_free(arguments);
+    string_free(code);
+    string_free(binary);
+    string_free(path);
+    checks_fixtures_free(fixtures);
+    mars_settings_isolation_close();
+    string_free(configuration);
+    string_free(override);
+    string_free(locator);
+    return ok;
+}
+
+static void test_checks_readme_resource_settings(void)
+{
+    bool ok = true;
+    for (unsigned broken = 0; broken < 2; ++broken) {
+        string_t *root = test_checks_root();
+        fflush(NULL);
+        pid_t child = fork();
+        if (!child)
+            _exit(test_checks_readme_resource_child(root, broken != 0) ? 0 : 1);
+        int status = 0;
+        pid_t waited;
+        do {
+            waited = child > 0 ? waitpid(child, &status, 0) : -1;
+        } while (waited < 0 && errno == EINTR);
+        ok = waited == child && child > 0 && WIFEXITED(status) && WEXITSTATUS(status) == 0 && ok;
+        ok = test_checks_finish(root) && ok;
+    }
+    TEST_ASSERT_TRUE(ok, "README resources load lazily from encrypted settings, preserve overrides and empty keys, "
+                         "keep credentials out of commands and reject broken configuration");
+}
+
 static bool test_checks_readme_result(const string_t *root, size_t count, const char *error)
 {
     string_t *path = checks_path(root, "build/readme-examples/results.json");
@@ -116,6 +205,50 @@ static int test_checks_run_readme(const string_t *root, bool compile_only)
 {
     char *arguments[] = {"--cc=cc", "--archive=/dev/null", "--libs=", "--timeout=0.1", "--compile-only"};
     return checks_readme(root, compile_only ? 5 : 4, arguments);
+}
+
+static void test_checks_readme_progress(void)
+{
+    string_t *root = test_checks_root();
+    bool ok = test_checks_write(root, "tests/test_config.json",
+        "{\"tools/mars_checks/src/readme/checks_readme.c\":{\"readme_examples\":{\"README_003\":false}}}\n");
+    for (unsigned attempt = 0; ok && attempt < 2; ++attempt) {
+        string_t *markdown = string_sprintf(
+            "```c\n#include <stdio.h>\nint main(void) { puts(\"hello\"); return 0; }\n```\n"
+            "```text\nhello\n```\n"
+            "```c\n#include <stdio.h>\nint main(void) { puts(\"%s\"); return 0; }\n```\n"
+            "```text\nexpected\n```\n"
+            "```c\ncall();\n```\n", attempt ? "expected" : "wrong");
+        ok = markdown && test_checks_write(root, "README.md", string_c_str(markdown));
+        string_free(markdown);
+        checks_strings_t *arguments = checks_strings_new();
+        checks_strings_add(arguments, checks_text("env"));
+        checks_strings_add(arguments, string_sprintf("MARS_ROOT=%s", string_c_str(root)));
+        checks_strings_add(arguments, checks_text(MARS_CHECKS_PROGRAM_PATH));
+        checks_strings_add(arguments, checks_text("readme-examples"));
+        checks_strings_add(arguments, checks_text("--cc=cc"));
+        checks_strings_add(arguments, checks_text("--archive=/dev/null"));
+        checks_strings_add(arguments, checks_text("--libs="));
+        string_t *output = NULL, *errors = NULL;
+        int status = -1;
+        ok = ok && checks_process_run(arguments, root, 5, &output, &errors, &status) &&
+             status == (attempt ? 0 : 1) && output && test_checks_readme_result(root, 2, NULL) &&
+             string_find(output, "0/2") >= 0 && string_find(output, "2/2 100%") >= 0 &&
+             string_find(output, "█") >= 0 && string_find(output, "elapsed ") >= 0 &&
+             string_find(output, attempt ? "\033[1;32mPASS\033[0m (" : "\033[1;31mFAIL\033[0m (") >= 0 &&
+             string_find(output, attempt ? "2 passed, 0 failed" : "1 passed, 1 failed") >= 0 &&
+             string_find(output, "PASS README") < 0 && string_find(output, "SKIP README") < 0;
+        if (!attempt)
+            ok = ok && string_find(output,
+                "\033[1;31mFAIL\033[0m README README_002: documented output differs (README.md:") >= 0;
+        if (!ok)
+            fprintf(stderr, "README progress: status=%d, output=%s, stderr=%s\n", status,
+                    output ? string_c_str(output) : "missing", errors ? string_c_str(errors) : "missing");
+        string_free(output); string_free(errors); checks_strings_free(arguments);
+    }
+    ok = test_checks_finish(root) && ok;
+    TEST_ASSERT_TRUE(ok, "README progress counts enabled examples, retains coloured failure evidence and exit status, "
+                         "then summarises the corrected examples without per-example success or skip rows");
 }
 
 static void test_checks_readme_success_and_separate_stderr(void)
@@ -277,6 +410,8 @@ static void test_checks_readme_interrupt_cleanup(void)
 void test_checks_readme_cases(void)
 {
     TEST_RUN_IN_GROUP(test_checks_readme_fixture_startup_cleanup, tests, NULL);
+    TEST_RUN_IN_GROUP(test_checks_readme_resource_settings, tests, NULL);
+    TEST_RUN_IN_GROUP(test_checks_readme_progress, tests, NULL);
     TEST_RUN_IN_GROUP(test_checks_readme_option_errors, readme_examples, NULL);
     TEST_RUN_IN_GROUP(test_checks_readme_config_and_compile_only, readme_examples, NULL);
     TEST_RUN_IN_GROUP(test_checks_readme_negative_results, readme_examples, NULL);

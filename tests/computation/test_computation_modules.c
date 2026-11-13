@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "string-t.h"
 #include "computation-t.h"
 #include "csv-t.h"
 #include "sqlite-t.h"
@@ -312,11 +313,15 @@ static void test_computation_almanac_stop(void)
 {
     almanac_job_t job = {.engine = almanac_open(), .after = datetime_alloc()};
     TEST_ASSERT_TRUE(job.engine && job.after && datetime_init_jd(job.after, 2461041.5), "configured engine");
+    TEST_ASSERT_TRUE(!*almanac_last_error(job.engine), almanac_last_error(job.engine));
     module_observer_t observer;
     computation_t *control = module_control(&observer, "almanac.phase", 2);
     TEST_ASSERT_TRUE(!computation_run(control, module_almanac, &job) && observer.hits == 2,
                      "phase refinement observes cancellation");
-    TEST_ASSERT_TRUE(module_almanac(&job), "engine and date remain reusable");
+    bool reused = module_almanac(&job);
+    if (!reused)
+        fprintf(stderr, "Almanac reuse failed: %s\n", almanac_last_error(job.engine));
+    TEST_ASSERT_TRUE(reused, "engine and date remain reusable");
     computation_free(control);
     datetime_dealloc(job.after);
     almanac_close(job.engine);

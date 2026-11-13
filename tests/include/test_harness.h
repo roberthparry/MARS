@@ -2,9 +2,9 @@
  * @file test_harness.h
  * @brief Sequential native test registration, assertions, fixtures and result reporting.
  *
- * Suites register compiled C callbacks and use JSON selection by default. Optional test-database profiles are
- * loaded and closed before execution, and reports are persisted afterwards. Database implementation suites
- * can disable all automatic test-storage access independently of their own disposable fixtures.
+ * The sequential core uses only C/POSIX facilities and builds without libmars. Optional adapters provide JSON
+ * selection and database reporting. Suites supply mathematical comparisons through opaque callbacks; diagnostic
+ * text is copied into a core-owned sink. tests_main remains the suite entry point, called by the core's main.
  */
 #ifndef TEST_HARNESS_H
 #define TEST_HARNESS_H
@@ -12,35 +12,102 @@
 #include <stdbool.h>
 #include <stddef.h>
 
-#include "test_config.h"
-#include "string-t.h"
+/**
+ * @brief Selection scope interpreted by an optional configuration adapter.
+ * @details Without an adapter, all cases run and no configuration is read or written.
+ */
+typedef enum {
+    TEST_CONFIG_NONE, /**< Ignore persistent selections. */
+    TEST_CONFIG_GLOBAL, /**< Use the adapter's shared suite configuration. */
+    TEST_CONFIG_LOCAL /**< Use the adapter's source-local configuration. */
+} test_config_mode_t;
 
+/** @brief Core-owned diagnostic sink; callbacks may append but must not retain or free it. */
+typedef struct _test_text_t test_text_t;
+
+/**
+ * @brief Copy ordinary C text into a diagnostic sink without calling a module under test.
+ * @param[in,out] out Core-owned sink valid only during the formatter callback; never retained or freed by callers.
+ * @param[in] text Caller-owned NUL-terminated text, copied synchronously and not consumed.
+ * @return Zero on success, -1 on invalid input, size overflow or allocation failure; previous contents survive.
+ * @note Sequential use only; the core releases the sink after formatting the assertion.
+ */
+int test_text_append_cstr(test_text_t *out, const char *text);
+
+/**
+ * @brief Append standard printf-formatted diagnostic text.
+ * @param[in,out] out Core-owned sink valid only during the formatter callback; not retained or consumed.
+ * @param[in] fmt Caller-owned standard printf format; MARS-specific extensions are not supported.
+ * @param[in] ... Arguments matching fmt, copied synchronously.
+ * @return Zero on success or -1 on invalid input, formatting or allocation failure.
+ * @note Sequential use only; the core owns and releases the sink, including its copied bytes.
+ */
+int test_text_append_format(test_text_t *out, const char *fmt, ...);
+
+/** @brief Execute one selected case synchronously; assertions record failures, and no return value is required. */
 typedef void (*test_fn)(void);
 
+/** @brief Prepare a suite; return true on readiness, false on failure. Release owned resources through fixtures/hooks. */
 typedef bool (*test_suite_setup_fn)(void);
 
+/** @brief Prepare one case; true permits execution, false reports failure unless an assertion/skip already explains it. */
 typedef bool (*test_fixture_setup_fn)(void);
 
+/** @brief Release case resources synchronously; return true on success, false to record a teardown failure. */
 typedef bool (*test_fixture_teardown_fn)(void);
 
+/** @brief Run final suite-owned cleanup after reporting; all harness-owned case resources have already been released. */
 typedef void (*test_post_summary_fn)(void);
 
+/**
+ * @brief Compare two opaque domain values without transferring ownership.
+ * @param[in] got Observed caller-owned value, valid throughout the call.
+ * @param[in] want Expected caller-owned value, valid throughout the call.
+ * @param[in,out] ctx Optional contract-owner context, not released by the harness.
+ * @return Non-zero for equal values, zero for a mismatch. The suite defines any domain-specific tolerance.
+ * @note Synchronous use only; neither values nor context are retained by the core.
+ */
 typedef int (*test_validity_equal_fn)(const void *got, const void *want, void *ctx);
 
-typedef int (*test_validity_format_fn)(const void *value, string_t *out, void *ctx);
+/**
+ * @brief Describe an opaque value through the independent core's append-only sink.
+ * @param[in] value Caller-owned domain value, valid during the call.
+ * @param[in,out] out Core-owned diagnostic sink; append using test_text_append_cstr or test_text_append_format.
+ * @param[in,out] ctx Optional contract-owner context; not consumed or retained by the core.
+ * @return Zero on success, non-zero on failure; the harness then prints a generic pointer description.
+ * @note Do not retain or free out. Domain-specific rendering and any intermediate allocations belong to the callback.
+ */
+typedef int (*test_validity_format_fn)(const void *value, test_text_t *out, void *ctx);
 
-typedef struct {
-    const char *name;
-    test_validity_equal_fn equal;
-    test_validity_format_fn format;
-    void *ctx;
+/** @brief Caller-owned domain comparison contract; registered contracts and their context must outlive suite execution. */
+typedef struct _test_validity_contract_t {
+    const char *name; /**< Caller-owned diagnostic label, valid while the contract is registered. */
+    test_validity_equal_fn equal; /**< Required semantic comparison callback. */
+    test_validity_format_fn format; /**< Optional domain formatter; NULL uses a pointer description. */
+    void *ctx; /**< Optional caller-owned callback context, never released by the core. */
 } test_validity_contract_t;
 
+/**
+ * @brief Obtain the built-in int comparison contract.
+ * @return Immutable process-lifetime contract owned by the core; never free it. Cannot fail.
+ */
 const test_validity_contract_t *test_validity_contract_int(void);
+/**
+ * @brief Obtain the built-in long comparison contract.
+ * @return Immutable process-lifetime contract owned by the core; never free it. Cannot fail.
+ */
 const test_validity_contract_t *test_validity_contract_long(void);
+/**
+ * @brief Obtain the built-in cstr comparison contract.
+ * @return Immutable process-lifetime contract owned by the core; never free it. Cannot fail.
+ */
 const test_validity_contract_t *test_validity_contract_cstr(void);
 
+/** @brief Immutable configuration mode defined once by the suite's primary source. */
 extern const test_config_mode_t test_suite_mode;
+
+/** @brief Static, caller-independent primary suite source, supplied by TEST_SUITE_CONFIG for module planning. */
+extern const char *const test_suite_source;
 
 /**
  * @brief Report whether this suite may load shared database selections and case data before execution.
@@ -90,7 +157,15 @@ extern test_post_summary_fn test_post_summary_hook;
  *    setup, not parallel assertion subsystems.
  */
 
-#define TEST_SUITE_CONFIG(mode) const test_config_mode_t test_suite_mode = (mode)
+/**
+ * @brief Define the suite's configuration mode and primary source for progress planning.
+ * @param mode Constant test_config_mode_t selection, normally TEST_CONFIG_GLOBAL.
+ * @details Invoke once at file scope in the suite's primary translation unit. Both definitions have static
+ * storage duration and need no release; the primary source identifies helper files belonging to the same module.
+ */
+#define TEST_SUITE_CONFIG(mode) \
+    const test_config_mode_t test_suite_mode = (mode); \
+    const char *const test_suite_source = __FILE__
 
 #define TEST_SUITE_SETUP(fn) test_suite_setup_fn test_suite_setup_hook = (fn)
 
@@ -121,16 +196,49 @@ extern test_post_summary_fn test_post_summary_hook;
  */
 void test_program_setup(void);
 
-/** Print a labelled section heading in test output. */
+/**
+ * @brief Print a labelled section heading in test output.
+ * @param[in] title Caller-owned NUL-terminated heading, copied during this call.
+ * @return No value; failures are recorded or reported by the sequential harness.
+ * @note Synchronous, sequential use only. Caller-owned inputs are not retained unless explicitly documented.
+ */
 void test_section(const char *title);
 
-/** Run one top-level test case if enabled by the active test config. */
+/**
+ * @brief Run one top-level test case if enabled by the active test config.
+ * @param[in] file Source identity, copied for reporting; caller retains ownership.
+ * @param[in] line Registration or assertion source line.
+ * @param[in] name Caller-owned stable case or checker name.
+ * @param[in] tags Optional caller-owned comma-separated tags.
+ * @param[in] fn Caller-owned synchronous callback, invoked only when selected.
+ * @return No value; failures are recorded or reported by the sequential harness.
+ * @note Synchronous, sequential use only. Caller-owned inputs are not retained unless explicitly documented.
+ */
 void test_run_case(const char *file, int line, const char *name, const char *tags, test_fn fn);
 
-/** Run one nested test case under the currently active group path. */
+/**
+ * @brief Run one nested test case under the currently active group path.
+ * @param[in] file Source identity, copied for reporting; caller retains ownership.
+ * @param[in] line Registration or assertion source line.
+ * @param[in] name Caller-owned stable case or checker name.
+ * @param[in] tags Optional caller-owned comma-separated tags.
+ * @param[in] fn Caller-owned synchronous callback, invoked only when selected.
+ * @return No value; failures are recorded or reported by the sequential harness.
+ * @note Synchronous, sequential use only. Caller-owned inputs are not retained unless explicitly documented.
+ */
 void test_run_subtest(const char *file, int line, const char *name, const char *tags, test_fn fn);
 
-/** Run one test case beneath an explicit parent group. */
+/**
+ * @brief Run one test case beneath an explicit parent group.
+ * @param[in] file Source identity, copied for reporting; caller retains ownership.
+ * @param[in] line Registration or assertion source line.
+ * @param[in] name Caller-owned stable case or checker name.
+ * @param[in] parent Optional caller-owned dotted parent path; NULL selects the top level.
+ * @param[in] tags Optional caller-owned comma-separated tags.
+ * @param[in] fn Caller-owned synchronous callback, invoked only when selected.
+ * @return No value; failures are recorded or reported by the sequential harness.
+ * @note Synchronous, sequential use only. Caller-owned inputs are not retained unless explicitly documented.
+ */
 void test_run_in_group(const char *file, int line, const char *name, const char *parent, const char *tags, test_fn fn);
 
 /**
@@ -161,99 +269,307 @@ void test_run_data_case(const char *file, int line, const char *name, const char
 void test_run_database_cases(const char *file, int line, const char *module, const char *parent,
                               void (*check)(const void *data));
 
-/** Run an output/demo case, counted separately from correctness cases. */
+/**
+ * @brief Run an output/demo case, counted separately from correctness cases.
+ * @param[in] file Source identity, copied for reporting; caller retains ownership.
+ * @param[in] line Registration or assertion source line.
+ * @param[in] tags Optional caller-owned comma-separated tags.
+ * @param[in] name Caller-owned stable case or checker name.
+ * @param[in] fn Caller-owned synchronous callback, invoked only when selected.
+ * @return No value; failures are recorded or reported by the sequential harness.
+ * @note Synchronous, sequential use only. Caller-owned inputs are not retained unless explicitly documented.
+ */
 void test_run_output_case(const char *file, int line, const char *tags, const char *name, test_fn fn);
 
-/** Run an output/demo case beneath an explicit parent group. */
+/**
+ * @brief Run an output/demo case beneath an explicit parent group.
+ * @param[in] file Source identity, copied for reporting; caller retains ownership.
+ * @param[in] line Registration or assertion source line.
+ * @param[in] name Caller-owned stable case or checker name.
+ * @param[in] parent Optional caller-owned dotted parent path; NULL selects the top level.
+ * @param[in] tags Optional caller-owned comma-separated tags.
+ * @param[in] fn Caller-owned synchronous callback, invoked only when selected.
+ * @return No value; failures are recorded or reported by the sequential harness.
+ * @note Synchronous, sequential use only. Caller-owned inputs are not retained unless explicitly documented.
+ */
 void test_run_output_in_group(const char *file, int line, const char *name, const char *parent, const char *tags,
                               test_fn fn);
 
-/** Return the process exit code implied by the recorded test results. */
+/**
+ * @brief Return the process exit code implied by the recorded test results.
+ * @return Zero if no assertion/setup failure was recorded, otherwise one.
+ * @note Synchronous, sequential use only. Caller-owned inputs are not retained unless explicitly documented.
+ */
 int test_exit_code(void);
 
-/** Record a failure unless @p expr is true. */
+/**
+ * @brief Record a failure unless @p expr is true.
+ * @param[in] expr Boolean condition to check.
+ * @param[in] file Source identity, copied for reporting; caller retains ownership.
+ * @param[in] line Registration or assertion source line.
+ * @param[in] detail Optional caller-owned explanation, copied when recorded.
+ * @return True on success or when the condition holds, otherwise false. Assertion failures are recorded.
+ * @note Synchronous, sequential use only. Caller-owned inputs are not retained unless explicitly documented.
+ */
 bool test_assert_true(bool expr, const char *file, int line, const char *detail);
 
-/** Record a failure unless @p expr is false. */
+/**
+ * @brief Record a failure unless @p expr is false.
+ * @param[in] expr Boolean condition to check.
+ * @param[in] file Source identity, copied for reporting; caller retains ownership.
+ * @param[in] line Registration or assertion source line.
+ * @param[in] detail Optional caller-owned explanation, copied when recorded.
+ * @return True on success or when the condition holds, otherwise false. Assertion failures are recorded.
+ * @note Synchronous, sequential use only. Caller-owned inputs are not retained unless explicitly documented.
+ */
 bool test_assert_false(bool expr, const char *file, int line, const char *detail);
 
-/** Record a failure unless two int values are equal. */
+/**
+ * @brief Record a failure unless two int values are equal.
+ * @param[in] got Observed value; not consumed.
+ * @param[in] want Expected value; not consumed.
+ * @param[in] file Source identity, copied for reporting; caller retains ownership.
+ * @param[in] line Registration or assertion source line.
+ * @return True on success or when the condition holds, otherwise false. Assertion failures are recorded.
+ * @note Synchronous, sequential use only. Caller-owned inputs are not retained unless explicitly documented.
+ */
 bool test_assert_int_eq(int got, int want, const char *file, int line);
 
-/** Record a failure unless two long values are equal. */
+/**
+ * @brief Record a failure unless two long values are equal.
+ * @param[in] got Observed value; not consumed.
+ * @param[in] want Expected value; not consumed.
+ * @param[in] file Source identity, copied for reporting; caller retains ownership.
+ * @param[in] line Registration or assertion source line.
+ * @return True on success or when the condition holds, otherwise false. Assertion failures are recorded.
+ * @note Synchronous, sequential use only. Caller-owned inputs are not retained unless explicitly documented.
+ */
 bool test_assert_long_eq(long got, long want, const char *file, int line);
 
-/** Record a failure unless two double values differ by no more than @p eps. */
+/**
+ * @brief Record a failure unless two double values differ by no more than @p eps.
+ * @param[in] got Observed value; not consumed.
+ * @param[in] want Expected value; not consumed.
+ * @param[in] eps Non-negative absolute error tolerance.
+ * @param[in] file Source identity, copied for reporting; caller retains ownership.
+ * @param[in] line Registration or assertion source line.
+ * @return True on success or when the condition holds, otherwise false. Assertion failures are recorded.
+ * @note Synchronous, sequential use only. Caller-owned inputs are not retained unless explicitly documented.
+ */
 bool test_assert_double_eq(double got, double want, double eps, const char *file, int line);
 
-/** Record a failure unless @p ptr is non-null. */
+/**
+ * @brief Record a failure unless @p ptr is non-null.
+ * @param[in] ptr Pointer to check without dereferencing or retaining it.
+ * @param[in] file Source identity, copied for reporting; caller retains ownership.
+ * @param[in] line Registration or assertion source line.
+ * @return True on success or when the condition holds, otherwise false. Assertion failures are recorded.
+ * @note Synchronous, sequential use only. Caller-owned inputs are not retained unless explicitly documented.
+ */
 bool test_assert_not_null(const void *ptr, const char *file, int line);
 
-/** Record a failure unless @p ptr is null. */
+/**
+ * @brief Record a failure unless @p ptr is null.
+ * @param[in] ptr Pointer to check without dereferencing or retaining it.
+ * @param[in] file Source identity, copied for reporting; caller retains ownership.
+ * @param[in] line Registration or assertion source line.
+ * @return True on success or when the condition holds, otherwise false. Assertion failures are recorded.
+ * @note Synchronous, sequential use only. Caller-owned inputs are not retained unless explicitly documented.
+ */
 bool test_assert_null(const void *ptr, const char *file, int line);
 
-/** Record a failure unless @p got and @p want satisfy @p contract. */
+/**
+ * @brief Record a failure unless @p got and @p want satisfy @p contract.
+ * @param[in] contract Caller-owned comparison contract, valid during this call.
+ * @param[in] got Observed value; not consumed.
+ * @param[in] want Expected value; not consumed.
+ * @param[in] file Source identity, copied for reporting; caller retains ownership.
+ * @param[in] line Registration or assertion source line.
+ * @return True on success or when the condition holds, otherwise false. Assertion failures are recorded.
+ * @note Synchronous, sequential use only. Caller-owned inputs are not retained unless explicitly documented.
+ */
 bool test_assert_validity(const test_validity_contract_t *contract, const void *got, const void *want,
                           const char *file, int line);
 
-/** Record a validity failure using a checker registered by name. */
+/**
+ * @brief Record a validity failure using a checker registered by name.
+ * @param[in] name Caller-owned stable case or checker name.
+ * @param[in] got Observed value; not consumed.
+ * @param[in] want Expected value; not consumed.
+ * @param[in] file Source identity, copied for reporting; caller retains ownership.
+ * @param[in] line Registration or assertion source line.
+ * @return True on success or when the condition holds, otherwise false. Assertion failures are recorded.
+ * @note Synchronous, sequential use only. Caller-owned inputs are not retained unless explicitly documented.
+ */
 bool test_assert_validity_named(const char *name, const void *got, const void *want, const char *file, int line);
 
-/** Record a failure unless two C-string boundary values are equal. */
+/**
+ * @brief Record a failure unless two C-string boundary values are equal.
+ * @param[in] got Observed value; not consumed.
+ * @param[in] want Expected value; not consumed.
+ * @param[in] file Source identity, copied for reporting; caller retains ownership.
+ * @param[in] line Registration or assertion source line.
+ * @return True on success or when the condition holds, otherwise false. Assertion failures are recorded.
+ * @note Synchronous, sequential use only. Caller-owned inputs are not retained unless explicitly documented.
+ */
 bool test_assert_cstr_eq(const char *got, const char *want, const char *file, int line);
 
-/** Register a named semantic validity checker for later assertions. */
+/**
+ * @brief Register a named semantic validity checker for later assertions.
+ * @param[in] name Caller-owned name, copied into the registry; duplicate registration replaces the contract.
+ * @param[in] contract Caller-owned contract and context; both must remain valid until the suite finishes.
+ * @return No value; invalid inputs or allocation failure leave the registry unchanged.
+ * @note Sequential use only. The registry copies the name and retains the contract pointer; it never frees the contract.
+ */
 void test_register_validity_checker(const char *name, const test_validity_contract_t *contract);
 
-/** Find a previously registered semantic validity checker. */
+/**
+ * @brief Find a previously registered semantic validity checker.
+ * @param[in] name Caller-owned stable case or checker name.
+ * @return Caller-owned registered contract valid until its owner releases it, or NULL when absent.
+ * @note Synchronous, sequential use only. Caller-owned inputs are not retained unless explicitly documented.
+ */
 const test_validity_contract_t *test_find_validity_checker(const char *name);
 
-/** Require that a named validity checker exists before a suite runs. */
+/**
+ * @brief Require that a named validity checker exists before a suite runs.
+ * @param[in] name Caller-owned stable case or checker name.
+ * @param[in] file Source identity, copied for reporting; caller retains ownership.
+ * @param[in] line Registration or assertion source line.
+ * @return True on success or when the condition holds, otherwise false. Assertion failures are recorded.
+ * @note Synchronous, sequential use only. Caller-owned inputs are not retained unless explicitly documented.
+ */
 bool test_require_validity_checker(const char *name, const char *file, int line);
 
-/** Query whether a case is enabled by the active test config. */
+/**
+ * @brief Query whether a case is enabled by the active test config.
+ * @param[in] file Source identity, copied for reporting; caller retains ownership.
+ * @param[in] func Caller-owned local case name.
+ * @param[in] parent Optional caller-owned dotted parent path; NULL selects the top level.
+ * @return Effective enabled state, defaulting to true when no optional configuration adapter is linked.
+ * @note Synchronous, sequential use only. Caller-owned inputs are not retained unless explicitly documented.
+ */
 bool test_harness_config_is_enabled(const char *file, const char *func, const char *parent);
 
-/** Query whether a case has an explicit key in the active test config. */
+/**
+ * @brief Query whether a case has an explicit key in the active test config.
+ * @param[in] file Source identity, copied for reporting; caller retains ownership.
+ * @param[in] func Caller-owned local case name.
+ * @param[in] parent Optional caller-owned dotted parent path; NULL selects the top level.
+ * @return Adapter-reported key presence. Without an adapter returns true to suppress configuration-discovery warnings.
+ * @note Synchronous, sequential use only. Caller-owned inputs are not retained unless explicitly documented.
+ */
 bool test_harness_config_has_key(const char *file, const char *func, const char *parent);
 
-/** Store formatted failure detail for the current case. */
+/**
+ * @brief Store formatted failure detail for the current case.
+ * @param[in] fmt Caller-owned standard printf format; MARS-specific extensions are unsupported.
+ * @param[in] ... Arguments matching fmt; copied synchronously.
+ * @return No value; failures are recorded or reported by the sequential harness.
+ * @note Synchronous, sequential use only. Caller-owned inputs are not retained unless explicitly documented.
+ */
 void test_set_failure_detailf(const char *fmt, ...);
 
-/** Clear any recorded failure or skip detail for the current case. */
+/**
+ * @brief Clear any recorded failure or skip detail for the current case.
+ * @return No value; failures are recorded or reported by the sequential harness.
+ * @note Synchronous, sequential use only. Caller-owned inputs are not retained unless explicitly documented.
+ */
 void test_clear_failure_detail(void);
 
-/** Mark the current case as failed at @p file:@p line. */
+/**
+ * @brief Mark the current case as failed at @p file:@p line.
+ * @param[in] file Source identity, copied for reporting; caller retains ownership.
+ * @param[in] line Registration or assertion source line.
+ * @param[in] detail Optional caller-owned explanation, copied when recorded.
+ * @return No value; failures are recorded or reported by the sequential harness.
+ * @note Synchronous, sequential use only. Caller-owned inputs are not retained unless explicitly documented.
+ */
 void test_mark_failure(const char *file, int line, const char *detail);
 
-/** Mark the current case as explicitly failed at @p file:@p line. */
+/**
+ * @brief Mark the current case as explicitly failed at @p file:@p line.
+ * @param[in] file Source identity, copied for reporting; caller retains ownership.
+ * @param[in] line Registration or assertion source line.
+ * @return No value; failures are recorded or reported by the sequential harness.
+ * @note Synchronous, sequential use only. Caller-owned inputs are not retained unless explicitly documented.
+ */
 void test_fail(const char *file, int line);
 
-/** Mark the current case as skipped at @p file:@p line. */
+/**
+ * @brief Mark the current case as skipped at @p file:@p line.
+ * @param[in] file Source identity, copied for reporting; caller retains ownership.
+ * @param[in] line Registration or assertion source line.
+ * @param[in] detail Optional caller-owned explanation, copied when recorded.
+ * @return No value; failures are recorded or reported by the sequential harness.
+ * @note Synchronous, sequential use only. Caller-owned inputs are not retained unless explicitly documented.
+ */
 void test_mark_skip(const char *file, int line, const char *detail);
 
-/** Mark the current case as skipped and return false for assertion-style macros. */
+/**
+ * @brief Mark the current case as skipped and return false for assertion-style macros.
+ * @param[in] file Source identity, copied for reporting; caller retains ownership.
+ * @param[in] line Registration or assertion source line.
+ * @param[in] detail Optional caller-owned explanation, copied when recorded.
+ * @return True on success or when the condition holds, otherwise false. Assertion failures are recorded.
+ * @note Synchronous, sequential use only. Caller-owned inputs are not retained unless explicitly documented.
+ */
 bool test_request_skip(const char *file, int line, const char *detail);
 
-/** Return the temporary directory allocated for the current case. */
+/**
+ * @brief Return the temporary directory allocated for the current case.
+ * @return Core-owned directory path, valid until case cleanup, or NULL on allocation or filesystem failure.
+ * @note Synchronous, sequential use only. Caller-owned inputs are not retained unless explicitly documented.
+ */
 const char *test_case_temp_dir(void);
 
-/** Return a temporary file path beneath the current case directory. */
+/**
+ * @brief Return a temporary file path beneath the current case directory.
+ * @param[in] leafname Optional caller-owned file basename; NULL or empty uses tmp.
+ * @return Core-owned path, valid until case cleanup, or NULL on allocation or filesystem failure; no file is created.
+ * @note Synchronous, sequential use only. Caller-owned inputs are not retained unless explicitly documented.
+ */
 const char *test_case_temp_path(const char *leafname);
 
-/** Redirect stdout to a temporary capture file for the current case. */
+/**
+ * @brief Redirect stdout to a temporary capture file for the current case.
+ * @param[in] leafname Optional caller-owned file basename; NULL or empty uses tmp.
+ * @param[out] path_out Optional output receiving a core-owned path, valid until case cleanup; do not free it.
+ * @return Owned saved descriptor on success, or -1 on failure; pass it to test_case_end_stdout_capture.
+ * @note Synchronous, sequential use only. Caller-owned inputs are not retained unless explicitly documented.
+ */
 int test_case_begin_stdout_capture(const char *leafname, const char **path_out);
 
-/** Restore stdout after a capture started by test_case_begin_stdout_capture(). */
+/**
+ * @brief Restore stdout after a capture started by test_case_begin_stdout_capture().
+ * @param[in] saved_stdout Original descriptor returned by test_case_begin_stdout_capture; consumed and closed.
+ * @return True on success or when the condition holds, otherwise false. Assertion failures are recorded.
+ * @note Synchronous, sequential use only. Caller-owned inputs are not retained unless explicitly documented.
+ */
 bool test_case_end_stdout_capture(int saved_stdout);
 
-/** Redirect stderr to a temporary capture file for the current case. */
+/**
+ * @brief Redirect stderr to a temporary capture file for the current case.
+ * @param[in] leafname Optional caller-owned file basename; NULL or empty uses tmp.
+ * @param[out] path_out Optional output receiving a core-owned path, valid until case cleanup; do not free it.
+ * @return Owned saved descriptor on success, or -1 on failure; pass it to test_case_end_stderr_capture.
+ * @note Synchronous, sequential use only. Caller-owned inputs are not retained unless explicitly documented.
+ */
 int test_case_begin_stderr_capture(const char *leafname, const char **path_out);
 
-/** Restore stderr after a capture started by test_case_begin_stderr_capture(). */
+/**
+ * @brief Restore stderr after a capture started by test_case_begin_stderr_capture().
+ * @param[in] saved_stderr Original descriptor returned by test_case_begin_stderr_capture; consumed and closed.
+ * @return True on success or when the condition holds, otherwise false. Assertion failures are recorded.
+ * @note Synchronous, sequential use only. Caller-owned inputs are not retained unless explicitly documented.
+ */
 bool test_case_end_stderr_capture(int saved_stderr);
 
-/** Run the registered test suite. */
+/**
+ * @brief Run the registered test suite.
+ * @return Suite-supplied status; zero defers to assertion results, non-zero becomes the executable's exit status.
+ * @note Synchronous, sequential use only. Caller-owned inputs are not retained unless explicitly documented.
+ */
 int tests_main(void);
 
 #define TEST_SECTION(title) test_section((title))

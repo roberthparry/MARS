@@ -43,7 +43,7 @@ static bool attach_previous(sqlite_t *db, const string_t *path)
     sqlite_stmt_t *q = sqlite_stmt_prepare(db, "ATTACH DATABASE ?1 AS previous KEY ''");
     bool ok = q && sqlite_stmt_bind_text(q, 1, string_c_str(path)) && sqlite_stmt_step(q) == SQLITE_STEP_DONE;
     sqlite_stmt_finalize(q);
-    return ok && sqlite_exec_cstr(db, "PRAGMA previous.cache_size=-8192");
+    return ok && sqlite_set_cache_budget(db, "previous", 8192);
 }
 
 /* Replace the connection as well as the file: callers must never keep using the old inode after publication. */
@@ -74,8 +74,8 @@ bool cfg_database_rebuild_globe(sqlite_t **source, const string_t *path, const s
          file_close(temporary) && file_chmod(temporary, 0600);
     sqlite_t *db = ok ? sqlite_open_plain(temporary_path) : NULL;
     ok = ok && db && sqlite_exec_cstr(db,
-        "PRAGMA page_size=65536; PRAGMA cache_size=-65536; PRAGMA temp.cache_size=-512;\n"
-        "PRAGMA journal_mode=DELETE; PRAGMA synchronous=FULL; PRAGMA foreign_keys=OFF;");
+        "PRAGMA page_size=65536; PRAGMA journal_mode=DELETE; PRAGMA synchronous=FULL; PRAGMA foreign_keys=OFF;") &&
+        sqlite_set_cache_budget(db, NULL, 65536) && sqlite_set_cache_budget(db, "temp", 512);
     bool attached = ok && attach_previous(db, path);
     ok = ok && attached;
     bool transaction = ok && sqlite_exec_cstr(db, "BEGIN");

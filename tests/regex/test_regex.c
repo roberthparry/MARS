@@ -10,6 +10,7 @@
 #include <locale.h>
 #include <string.h>
 
+#include "string-t.h"
 #include "regex-t.h"
 #include "test_harness.h"
 

@@ -118,14 +118,14 @@ void expr_store_value_num(expr_t *expr, number_t value)
 
 bool expr_ops_is_lambert(const expr_ops_t *ops)
 {
-    return ops == &ops_lambert_w || ops == &ops_lambert_wn || ops == &ops_lambert_w0 || ops == &ops_lambert_wm1;
+    return ops == &ops_lambert_w || ops == &ops_lambert_Wn || ops == &ops_lambert_W0 || ops == &ops_lambert_Wm1;
 }
 
 const expr_t *expr_lambert_arg(const expr_t *expr)
 {
     if (!expr || !expr_ops_is_lambert(expr->ops))
         return NULL;
-    return expr_is_op(expr, &ops_lambert_wn) ? expr->b : expr->a;
+    return expr_is_op(expr, &ops_lambert_Wn) ? expr->b : expr->a;
 }
 
 bool expr_ops_is_floor_or_ceil(const expr_ops_t *ops)
@@ -179,20 +179,20 @@ static bool expr_lambert_w_candidate_ok(number_t value)
     return ok;
 }
 
-static bool expr_lambert_w0_candidate_ok(number_t value)
+static bool expr_lambert_W0_candidate_ok(number_t value)
 {
     return num_is_finite(value) && num_is_real(value) && num_ge(value, NUM_NEG_ONE);
 }
 
-static bool expr_lambert_wm1_candidate_ok(number_t value)
+static bool expr_lambert_Wm1_candidate_ok(number_t value)
 {
     return num_is_finite(value) && num_is_real(value) && num_le(value, NUM_NEG_ONE);
 }
 
 static const expr_inverse_unary_rule_t s_inverse_unary_rules[EXPR_KIND_COUNT] = {
     [EXPR_KIND_LAMBERT_W] = {true, expr_lambert_w_candidate_ok},
-    [EXPR_KIND_LAMBERT_W0] = {true, expr_lambert_w0_candidate_ok},
-    [EXPR_KIND_LAMBERT_WM1] = {true, expr_lambert_wm1_candidate_ok},
+    [EXPR_KIND_LAMBERT_W0] = {true, expr_lambert_W0_candidate_ok},
+    [EXPR_KIND_LAMBERT_WM1] = {true, expr_lambert_Wm1_candidate_ok},
     [EXPR_KIND_LOG10] = {true, NULL},
 };
 

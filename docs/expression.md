@@ -610,8 +610,8 @@ All three symbolic cards use the same native expression and conditions.
 | `normal_logpdf`, `logpdf` | Affine arguments reduce to a quadratic polynomial. |
 | `Ei`, `E1` | Homogeneous arguments with supported rates; conservative right half-planes avoid removable quotient singularities at `s=0`. |
 | `gammainc_lower`, `gammainc_upper`, `gammainc_P`, `gammainc_Q` | Source in the second argument, with `Re(shape)>0` and a supported positive scale. |
-| `bessel_j` | Positive real scales and orders with `Re(order)>-1`; known negative integers use the exact order-reflection identity. The existing zero-order rule also supports complex scales with appropriate bounds. |
-| `bessel_y` | Order zero with positive real scale; its logarithmic origin is integrable. Higher orders are not inferred from this rule. |
+| `bessel_J` | Positive real scales and orders with `Re(order)>-1`; known negative integers use the exact order-reflection identity. The existing zero-order rule also supports complex scales with appropriate bounds. |
+| `bessel_Y` | Order zero with positive real scale; its logarithmic origin is integrable. Higher orders are not inferred from this rule. |
 | `clausen2`, `clausen` | Known integer orders 1–32 and non-zero known real scales; digamma and zeta formulas derived from the periodic Fourier series, with `Re(s)>0`. |
 
 Linearity, source-independent factors, exponential frequency shifts and finite
@@ -725,11 +725,11 @@ additional special functions, parameter conditions or continuation machinery.
 | `lgamma` | Logarithmic origin and `t*log(t)` growth allow a transform, but no general closed form is implemented. |
 | `Li` | Its logarithmic singularity at `t=1` is integrable; a closed-form rule is not implemented. |
 | `erfinv`, `erfcinv`, `gammainv` | The full positive axis can leave a real inverse's domain; complex branches need separate definitions and growth checks. |
-| `lambert_w`, `lambert_wn`, `lambert_w0`, `lambert_wm1` | Branch-specific transforms are not currently represented in closed form. |
+| `lambert_w`, `lambert_Wn`, `lambert_W0`, `lambert_Wm1` | Branch-specific transforms are not currently represented in closed form. |
 | `dilog`, `polylog1`, `polylog`, `legendre_chi` | Source on a branch cut needs explicit boundary-value conventions. Exponentially composed arguments are a separate potentially convergent family. |
 | `qdigamma` | Depends on the base, poles and the source's position; a direct zero argument can be singular. |
 | `zetah`, `zatahp` | Varying the order or the offset gives different convergence and pole conditions. |
-| `lerch_phi`, `lommel_s`, `appell_f1`, `lauricella_f`, `hypergeometric_pFq` | Parameter-dependent growth, cuts and singularities prevent a universal formula for arbitrary argument placement. |
+| `lerch_phi`, `lommel_S`, `appell_F1`, `lauricella_F`, `hypergeometric_pFq` | Parameter-dependent growth, cuts and singularities prevent a universal formula for arbitrary argument placement. |
 | `beta`, `logbeta`, `beta_pdf`, `logbeta_pdf`, `binomial`, `harmonic_poly` | Parameter positions matter. Polynomial specialisations may reduce to existing rules. The current beta-density constructor is an analytic expression, not an automatically compactly supported density. |
 | `chebyshev_Tn`, `chebyshev_Un`, `hermite_Hn` | Fixed non-negative integral degrees give polynomials with ordinary Laplace transforms. Direct named-polynomial Laplace rules are not yet implemented; their Fourier pairs are documented separately. |
 
@@ -763,7 +763,7 @@ They are exercised after the ordinary regression tests as README examples.
 | `{@L(floor(t)) \| s=1}` | `0.581976706869326` |
 | `{@L(sech(t)) \| s=1}` | `0.693147180559945` |
 | `{@L(E1(t)) \| s=1}` | `0.693147180559945` |
-| `{@L(bessel_j(1,t)) \| s=1}` | `0.292893218813452` |
+| `{@L(bessel_J(1,t)) \| s=1}` | `0.292893218813452` |
 | `{@L(atanh(t)) \| s=1}` | `0.646761122779130 + 0.577863674895461i` |
 | `{@L{acosh(t)} \| s=1}` | `0.421024438240708 + 0.697712084144029i` |
 | `{@L{asin(t)} \| s=1}` | `0.873084242650868 + 0.421024438240708i` |
@@ -1102,10 +1102,22 @@ exponential notation. Exponentially damped reciprocal spectra may also carry
 a real modulation. Increasing exponentials and unrelated pole exclusions are
 not treated as this pair.
 
+### Special-function spellings
+
+The underscore spellings follow their mathematical letter case: `appell_F1`,
+`bessel_I`, `bessel_J`, `bessel_K`, `bessel_Y`, `lambert_W0`, `lambert_Wm1`,
+`lambert_Wn`, `lauricella_F`, `struve_H`, `struve_L` and `lommel_S`.
+These work both in expressions and in binding values. Corresponding C APIs use
+the same spelling after their module prefix. Established compact aliases such
+as `besselj` and indexed mathematical output remain available.
+
+`lommel_S` retains the existing small Lommel function $s_{\mu,\nu}(z)$;
+the API spelling does not change it to the distinct capital Lommel function.
+
 ### Bessel Y function
 
-`expr_bessel_y(order, argument)` constructs the principal Bessel function
-of the second kind. Besides `bessely`, `bessel_y` and `BesselY`,
+`expr_bessel_Y(order, argument)` constructs the principal Bessel function
+of the second kind. Besides `bessely`, `bessel_Y` and `BesselY`,
 the parser accepts indexed `Y_n(z)` and the order-zero aliases `Y0(z)`,
 `Y_0(z)` and `Y₀(z)`. Expression output uses `Y₀(z)` for order zero,
 TeX uses $Y_0(z)$, and Function output calls `bessely(0,z)`.
@@ -1124,8 +1136,8 @@ README examples (Value-card outputs, rounded):
 
 ### Ordinary Struve function
 
-`expr_struve_h(order, argument)` constructs the principal ordinary Struve
-function $\mathbf H_\nu(z)$. The parser accepts `struve_h`, `struveh`,
+`expr_struve_H(order, argument)` constructs the principal ordinary Struve
+function $\mathbf H_\nu(z)$. The parser accepts `struve_H`, `struveh`,
 `StruveH` and `𝐇` with two arguments, indexed `H_n(z)` and `𝐇_n(z)`,
 and the order-zero aliases `H0(z)`, `H_0(z)`, `H₀(z)` and `𝐇₀(z)`.
 The Hermite polynomial retains its distinct `ℋ` symbol.
@@ -1149,8 +1161,8 @@ README examples (Value-card outputs, rounded):
 
 ### Modified Struve function
 
-`expr_struve_l(order, argument)` constructs the principal modified Struve
-function $\mathbf L_\nu(z)$. The parser accepts `struve_l`, `struvel`,
+`expr_struve_L(order, argument)` constructs the principal modified Struve
+function $\mathbf L_\nu(z)$. The parser accepts `struve_L`, `struvel`,
 `StruveL` and `𝐋` with two arguments, indexed `L_n(z)` and `𝐋_n(z)`,
 and the order-zero aliases `L0(z)`, `L_0(z)`, `L₀(z)` and `𝐋₀(z)`.
 Expression output uses indexed Unicode notation such as `𝐋₀(z)` (or `𝐋_{n}(z)`
@@ -1171,7 +1183,7 @@ README examples (Value-card outputs, rounded):
 
 | Input | Output |
 | --- | --- |
-| `struve_l(0,1)` | `0.710243185937891` |
+| `struve_L(0,1)` | `0.710243185937891` |
 | `{Dx(L0(x)) \| x=0}` | `0.636619772367581` |
 
 Definitions and recurrences follow [DLMF §11.2](https://dlmf.nist.gov/11.2)
@@ -1179,13 +1191,13 @@ and [DLMF §11.4](https://dlmf.nist.gov/11.4).
 
 ### Modified Bessel I function
 
-`expr_bessel_i(order, argument)` constructs the principal modified Bessel
-function $I_\nu(z)$. The parser accepts `bessel_i`, `besseli` and `BesselI`
+`expr_bessel_I(order, argument)` constructs the principal modified Bessel
+function $I_\nu(z)$. The parser accepts `bessel_I`, `besseli` and `BesselI`
 with two arguments, indexed `I_n(z)`, and the order-zero aliases `I0(z)`,
 `I_0(z)` and `I₀(z)`. Expression output uses `I₀(z)` for order zero and
 `I_{n}(z)` for a symbolic order, Function
 output uses `besseli(n,z)`, and TeX uses $I_n(z)$. The underscored spelling
-`bessel_i` remains an accepted input alias.
+`bessel_I` remains an accepted input alias.
 
 Negative integer orders use $I_{-n}(z)=I_n(z)$. Fixed-order argument
 derivatives and numerical-order affine primitives are supported, with formal
@@ -1218,10 +1230,10 @@ uses a non-zero frequency condition, emitted as a conditional in Function style.
 This follows by differentiating `asinh` and applying the
 [DLMF cosine-transform identity for K₀](https://dlmf.nist.gov/10.32.E6).
 
-The public constructor `expr_bessel_k(order, argument)` retains both operands
+The public constructor `expr_bessel_K(order, argument)` retains both operands
 and returns an owning expression, or `NULL` if either operand is missing.
 Release the result with `expr_free`. Modified Bessel K accepts `besselk`,
-`bessel_k` and `BesselK` with order and
+`bessel_K` and `BesselK` with order and
 argument; indexed `K_n` and `Kₙ` calls are also supported. `K0`, `K_0` and `K₀`
 denote order zero. Expression output uses Unicode integer subscripts, such as
 `K₀(z)`, consistently with `J₀(z)`, `Y₀(z)`, `I₀(z)` and `𝐋₀(z)`.
@@ -2786,8 +2798,8 @@ placement and displacement data together, while retaining the aligned layout.
 - `expr_t *expr_gammainc_P(const expr_t *s, const expr_t *x)` — regularised lower incomplete gamma P(s, x)
 - `expr_t *expr_gammainc_Q(const expr_t *s, const expr_t *x)` — regularised upper incomplete gamma Q(s, x)
 - `expr_t *expr_lambert_w(const expr_t *expr)` — branch-choosing Lambert W/ProductLog helper
-- `expr_t *expr_lambert_w0(const expr_t *expr)` — Lambert W principal branch W₀(x)
-- `expr_t *expr_lambert_wm1(const expr_t *expr)` — Lambert W branch W₋₁(x)
+- `expr_t *expr_lambert_W0(const expr_t *expr)` — Lambert W principal branch W₀(x)
+- `expr_t *expr_lambert_Wm1(const expr_t *expr)` — Lambert W branch W₋₁(x)
 - `expr_t *expr_beta(const expr_t *left, const expr_t *right)` — $\mathrm B(a,b)$;
   Expression style uses `B`, TeX uses $\mathrm B$, and Function style uses `beta`.
   The parser accepts `beta`, `B`, and Greek capital beta `Β`.
@@ -2810,11 +2822,11 @@ placement and displacement data together, while retaining the aligned layout.
 - `expr_t *expr_harmonic_poly(const expr_t *degree, const expr_t *argument)` — native harmonic polynomial Hₙ(x) = Σₖ₌₁ⁿ xᵏ/k with a symbolic degree expression
 - `expr_t *expr_lerch_phi(const expr_t *z, const expr_t *s, const expr_t *a)` — Lerch transcendent Φ(z,s,a), with derivatives in all three arguments
 - `expr_t *expr_legendre_chi(unsigned int order, const expr_t *expr)` — Legendre chi χₙ(x) for non-negative integer orders currently supported by the implementation
-- `expr_t *expr_bessel_j(const expr_t *order, const expr_t *argument)` — Bessel function of the first kind J_order(argument), with a symbolic real order
-- `expr_t *expr_bessel_y(const expr_t *order, const expr_t *argument)` — Bessel function of the second kind Y_order(argument), with a symbolic real order
-- `expr_t *expr_lommel_s(const expr_t *mu, const expr_t *nu, const expr_t *argument)` — lower-case Lommel function s_mu,nu(argument); differentiation with respect to the argument is supported
-- `expr_t *expr_appell_f1(const expr_t *a, const expr_t *b1, const expr_t *b2, const expr_t *c, const expr_t *x, const expr_t *y)` — Appell hypergeometric function F₁(a; b₁, b₂; c; x, y)
-- `expr_t *expr_lauricella_f(const expr_t *a, size_t variable_count, const expr_t *const *b, const expr_t *c, const expr_t *const *x)` — Lauricella F_D in `variable_count` variables; Appell F₁ is the two-variable member of this family
+- `expr_t *expr_bessel_J(const expr_t *order, const expr_t *argument)` — Bessel function of the first kind J_order(argument), with a symbolic real order
+- `expr_t *expr_bessel_Y(const expr_t *order, const expr_t *argument)` — Bessel function of the second kind Y_order(argument), with a symbolic real order
+- `expr_t *expr_lommel_S(const expr_t *mu, const expr_t *nu, const expr_t *argument)` — lower-case Lommel function s_mu,nu(argument); differentiation with respect to the argument is supported
+- `expr_t *expr_appell_F1(const expr_t *a, const expr_t *b1, const expr_t *b2, const expr_t *c, const expr_t *x, const expr_t *y)` — Appell hypergeometric function F₁(a; b₁, b₂; c; x, y)
+- `expr_t *expr_lauricella_F(const expr_t *a, size_t variable_count, const expr_t *const *b, const expr_t *c, const expr_t *const *x)` — Lauricella F_D in `variable_count` variables; Appell F₁ is the two-variable member of this family
 - `expr_t *expr_hypergeometric_pFq(size_t upper_count, const expr_t *const *upper, size_t lower_count, const expr_t *const *lower, const expr_t *argument)` — generalised hypergeometric pFq with explicit upper and lower parameter arrays
 
 The parser accepts `Li1(x)` and `Li₁(x)` for the dedicated order-one
@@ -3368,20 +3380,20 @@ bindings.
   - `Hn(n, x)` and `harmonic_poly(n, x)` for the finite harmonic polynomial
     Hₙ(x) = Σₖ₌₁ⁿ xᵏ/k
   - `chi(n, x)` and `legendre_chi(n, x)` for the Legendre chi function χₙ(x)
-  - `BesselJ(order, x)` or `bessel_j(order, x)` for J_order(x)
-  - `BesselY(order, x)` or `bessel_y(order, x)` for Y_order(x)
-  - `LommelS(mu, nu, x)` or `lommel_s(mu, nu, x)` for s_mu,nu(x)
+  - `BesselJ(order, x)` or `bessel_J(order, x)` for J_order(x)
+  - `BesselY(order, x)` or `bessel_Y(order, x)` for Y_order(x)
+  - `LommelS(mu, nu, x)` or `lommel_S(mu, nu, x)` for s_mu,nu(x)
   - `pFq(p, q, a1, ..., ap, b1, ..., bq, x)`,
     `HypergeometricpFq(...)`, or `hypergeometric_pFq(...)` for the generalised
     hypergeometric function with `p` upper and `q` lower parameters
   - `LauricellaF(n, a, b1, ..., bn, c, x1, ..., xn)` or
-    `lauricella_f(...)` for Lauricella F_D in `n` variables
-  - `appell_f1(a, b1, b2, c, x, y)`, `F1(a, b1, b2, c, x, y)`,
+    `lauricella_F(...)` for Lauricella F_D in `n` variables
+  - `appell_F1(a, b1, b2, c, x, y)`, `F1(a, b1, b2, c, x, y)`,
     `F_1(a, b1, b2, c, x, y)`, and `F₁(a, b1, b2, c, x, y)` for
     Appell's hypergeometric function F₁(a; b₁, b₂; c; x, y)
   - `W(x)` and `productlog(x)` for branch-choosing Lambert W/ProductLog
-  - `W0(x)`, `W_0(x)`, `W₀(x)`, and `lambert_w0(x)` for W₀
-  - `W-1(x)`, `W_-1(x)`, `W₋₁(x)`, and `lambert_wm1(x)` for W₋₁
+  - `W0(x)`, `W_0(x)`, `W₀(x)`, and `lambert_W0(x)` for W₀
+  - `W-1(x)`, `W_-1(x)`, `W₋₁(x)`, and `lambert_Wm1(x)` for W₋₁
   - exact value-only helpers such as `factorial(n)`, `fibonacci(n)`,
     `partition(n)`, `factors(n)`, `next_prime(n)`, `prev_prime(n)`,
     `AND(a, b)`, `OR(a, b)`, `XOR(a, b)`, `NOT(a)`, `SHL(a, n)`, and
@@ -3659,12 +3671,12 @@ Reports whether the condition described by is variable holds.
 bool expr_is_variable(const expr_t *expr);
 ```
 
-### `expr_lambert_wn()`
+### `expr_lambert_Wn()`
 
 Returns the public result described by lambert wn.
 
 ```c
-expr_t *expr_lambert_wn(const expr_t *branch, const expr_t *expr);
+expr_t *expr_lambert_Wn(const expr_t *branch, const expr_t *expr);
 ```
 
 ### `expr_logpdf()`

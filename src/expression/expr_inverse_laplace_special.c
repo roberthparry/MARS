@@ -419,7 +419,7 @@ static expr_t *pair_bessel_order(special_pair_t *c, const expr_t *order, const e
     if (pair_uses(order, c->s))
         return NULL;
     expr_t *argument = pair_clean(c, pair_mul(c, rate, c->t));
-    return pair_verify(c, pair_keep(c, expr_bessel_j(order, argument)), NULL);
+    return pair_verify(c, pair_keep(c, expr_bessel_J(order, argument)), NULL);
 }
 
 /* A single walk over algebraic powers supplies orders; it does not enumerate possible integers. */
@@ -455,7 +455,7 @@ static expr_t *pair_radical(special_pair_t *c, const expr_t *node)
         out = pair_bessel_order(c, pair_integer(c, 1), rate);
     if (!out) {
         expr_t *argument = pair_clean(c, pair_mul(c, rate, c->t));
-        out = pair_verify(c, pair_keep(c, expr_bessel_y(pair_integer(c, 0), argument)), NULL);
+        out = pair_verify(c, pair_keep(c, expr_bessel_Y(pair_integer(c, 0), argument)), NULL);
     }
     return out ? out : pair_bessel_powers(c, c->f, node, rate);
 }

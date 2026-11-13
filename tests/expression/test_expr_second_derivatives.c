@@ -959,13 +959,13 @@ void test_second_deriv_erfcinv(void)
 void test_second_deriv_lambert_w0(void)
 {
     expr_t *x = test_expr_new_var_d(1.0);
-    expr_t *f = expr_lambert_w0(x);
+    expr_t *f = expr_lambert_W0(x);
     expr_t *df = expr_create_deriv(f, x);
     const expr_t *ddf = expr_get_deriv(df, x);
 
     /* d²/dx²{W0(x)} = -W0^2 * (2 + W0) / (x^2 * (1 + W0)^3) */
     qfloat_t X = qf_from_double(1.0);
-    qfloat_t W = qf_lambert_w0(X);
+    qfloat_t W = qf_lambert_W0(X);
     qfloat_t W1 = qf_add(qf_from_double(1.0), W);
     qfloat_t W2 = qf_add(qf_from_double(2.0), W);
     qfloat_t want = qf_neg(qf_div(qf_mul(qf_mul(W, W), W2), qf_mul(qf_mul(X, X), qf_mul(W1, qf_mul(W1, W1)))));
@@ -1005,13 +1005,13 @@ void test_second_deriv_gammainv(void)
 void test_second_deriv_lambert_wm1(void)
 {
     expr_t *x = test_expr_new_var_qf(qf_from_string("-0.1"));
-    expr_t *f = expr_lambert_wm1(x);
+    expr_t *f = expr_lambert_Wm1(x);
     expr_t *df = expr_create_deriv(f, x);
     const expr_t *ddf = expr_get_deriv(df, x);
 
     /* d²/dx²{Wm1(x)} = -Wm1^2 * (2 + Wm1) / (x^2 * (1 + Wm1)^3) */
     qfloat_t X = qf_from_string("-0.1");
-    qfloat_t W = qf_lambert_wm1(X);
+    qfloat_t W = qf_lambert_Wm1(X);
     qfloat_t W1 = qf_add(qf_from_double(1.0), W);
     qfloat_t W2 = qf_add(qf_from_double(2.0), W);
     qfloat_t want = qf_neg(qf_div(qf_mul(qf_mul(W, W), W2), qf_mul(qf_mul(X, X), qf_mul(W1, qf_mul(W1, W1)))));

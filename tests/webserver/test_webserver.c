@@ -16,6 +16,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+#include "string-t.h"
 #include "webserver-t.h"
 #include "test_harness.h"
 

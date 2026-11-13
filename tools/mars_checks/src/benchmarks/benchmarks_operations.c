@@ -97,9 +97,9 @@ static qcomplex_t benchmark_c_root(qcomplex_t a, qcomplex_t b)
     return qc_root(a, (unsigned)qf_to_double(b.re));
 }
 
-static qcomplex_t benchmark_c_lambert_wn(qcomplex_t a, qcomplex_t b)
+static qcomplex_t benchmark_c_lambert_Wn(qcomplex_t a, qcomplex_t b)
 {
-    return qc_lambert_wn((int)qf_to_double(a.re), b);
+    return qc_lambert_Wn((int)qf_to_double(a.re), b);
 }
 
 static number_t benchmark_n_factorial(number_t a)
@@ -258,19 +258,19 @@ static qcomplex_t benchmark_c_hypergeometric_pFq(qcomplex_t a, qcomplex_t b, qco
     return qc_hypergeometric_pFq(&a, 1, &b, 1, c);
 }
 
-static number_t benchmark_n_lauricella_f(number_t a, number_t b, number_t c)
+static number_t benchmark_n_lauricella_F(number_t a, number_t b, number_t c)
 {
-    return num_lauricella_f(a, &b, c, &b, 1);
+    return num_lauricella_F(a, &b, c, &b, 1);
 }
 
-static qfloat_t benchmark_r_lauricella_f(qfloat_t a, qfloat_t b, qfloat_t c)
+static qfloat_t benchmark_r_lauricella_F(qfloat_t a, qfloat_t b, qfloat_t c)
 {
-    return qf_lauricella_f(a, &b, c, &b, 1);
+    return qf_lauricella_F(a, &b, c, &b, 1);
 }
 
-static qcomplex_t benchmark_c_lauricella_f(qcomplex_t a, qcomplex_t b, qcomplex_t c)
+static qcomplex_t benchmark_c_lauricella_F(qcomplex_t a, qcomplex_t b, qcomplex_t c)
 {
-    return qc_lauricella_f(a, &b, c, &b, 1);
+    return qc_lauricella_F(a, &b, c, &b, 1);
 }
 
 static number_t benchmark_n_add_long(number_t a, number_t b)
@@ -424,9 +424,9 @@ static const benchmark_operation_t operations[] = {
     {"add_long", 2,
      {.n2 = benchmark_n_add_long}, {0}, {0},
      {"17", "3"}, 1, false},
-    {"appell_f1", 6,
-     {.n6 = num_appell_f1},
-     {.r6 = qf_appell_f1}, {.c6 = qc_appell_f1},
+    {"appell_F1", 6,
+     {.n6 = num_appell_F1},
+     {.r6 = qf_appell_F1}, {.c6 = qc_appell_F1},
      {"0.5", "0.7", "0.8", "2.5", "0.2", "0.3"}, 63, false},
     {"arccovercos", 1,
      {.n1 = num_arccovercos},
@@ -490,19 +490,19 @@ static const benchmark_operation_t operations[] = {
      {.n1 = num_atanh},
      {.r1 = qf_atanh}, {.c1 = qc_atanh},
      {"0.7"}, 1, false},
-    {"bessel_i", 2,
-     {.n2 = num_bessel_i},
-     {.r2 = qf_bessel_i}, {.c2 = qc_bessel_i},
+    {"bessel_I", 2,
+     {.n2 = num_bessel_I},
+     {.r2 = qf_bessel_I}, {.c2 = qc_bessel_I},
      {"2", "0.7"}, 2, false},
-    {"bessel_j", 2,
-     {.n2 = num_bessel_j}, {.r2 = qf_bessel_j}, {.c2 = qc_bessel_j}, {"2", "0.7"}, 2, false},
-    {"bessel_k", 2,
-     {.n2 = num_bessel_k},
-     {.r2 = qf_bessel_k}, {.c2 = qc_bessel_k},
+    {"bessel_J", 2,
+     {.n2 = num_bessel_J}, {.r2 = qf_bessel_J}, {.c2 = qc_bessel_J}, {"2", "0.7"}, 2, false},
+    {"bessel_K", 2,
+     {.n2 = num_bessel_K},
+     {.r2 = qf_bessel_K}, {.c2 = qc_bessel_K},
      {"2", "0.7"}, 2, false},
-    {"bessel_y", 2,
-     {.n2 = num_bessel_y},
-     {.r2 = qf_bessel_y}, {.c2 = qc_bessel_y},
+    {"bessel_Y", 2,
+     {.n2 = num_bessel_Y},
+     {.r2 = qf_bessel_Y}, {.c2 = qc_bessel_Y},
      {"2", "0.7"}, 2, false},
     {"beta", 2,
      {.n2 = num_beta},
@@ -706,19 +706,19 @@ static const benchmark_operation_t operations[] = {
      {benchmark_integer_prime}, 0, true},
     {"isqrt", 1,
      {.n1 = num_isqrt}, {0}, {0}, {benchmark_integer_wide}, 0, true},
-    {"lambert_w0", 1,
-     {.n1 = num_lambert_w0},
-     {.r1 = qf_lambert_w0}, {.c1 = qc_productlog},
+    {"lambert_W0", 1,
+     {.n1 = num_lambert_W0},
+     {.r1 = qf_lambert_W0}, {.c1 = qc_productlog},
      {"0.7"}, 1, false},
-    {"lambert_wm1", 1,
-     {.n1 = num_lambert_wm1},
-     {.r1 = qf_lambert_wm1}, {.c1 = qc_lambert_wm1},
+    {"lambert_Wm1", 1,
+     {.n1 = num_lambert_Wm1},
+     {.r1 = qf_lambert_Wm1}, {.c1 = qc_lambert_Wm1},
      {"-0.2"}, 1, false},
-    {"lambert_wn", 2,
-     {.n2 = num_lambert_wn}, {0}, {.c2 = benchmark_c_lambert_wn}, {"1", "0.7"}, 2, false},
-    {"lauricella_f", 3,
-     {.n3 = benchmark_n_lauricella_f},
-     {.r3 = benchmark_r_lauricella_f}, {.c3 = benchmark_c_lauricella_f},
+    {"lambert_Wn", 2,
+     {.n2 = num_lambert_Wn}, {0}, {.c2 = benchmark_c_lambert_Wn}, {"1", "0.7"}, 2, false},
+    {"lauricella_F", 3,
+     {.n3 = benchmark_n_lauricella_F},
+     {.r3 = benchmark_r_lauricella_F}, {.c3 = benchmark_c_lauricella_F},
      {"0.5", "0.3", "2.5"}, 7, false},
     {"lcm", 2,
      {.n2 = num_lcm}, {0}, {0}, {benchmark_integer_wide, benchmark_integer_divisor}, 0, true},
@@ -762,8 +762,8 @@ static const benchmark_operation_t operations[] = {
      {.n3 = num_logbeta_pdf},
      {.r3 = qf_logbeta_pdf}, {.c3 = qc_logbeta_pdf},
      {"0.5", "2.5", "3.5"}, 7, false},
-    {"lommel_s", 3,
-     {.n3 = num_lommel_s}, {.r3 = qf_lommel_s}, {.c3 = qc_lommel_s}, {"0.5", "0.7", "1.2"}, 7, false},
+    {"lommel_S", 3,
+     {.n3 = num_lommel_S}, {.r3 = qf_lommel_S}, {.c3 = qc_lommel_S}, {"0.5", "0.7", "1.2"}, 7, false},
     {"mod", 2,
      {.n2 = num_mod}, {0}, {0}, {benchmark_integer_wide, benchmark_integer_divisor}, 0, true},
     {"modinv", 2,
@@ -904,13 +904,13 @@ static const benchmark_operation_t operations[] = {
      {.n1 = num_step},
      {.r1 = qf_step}, {.c1 = qc_step},
      {"0.7"}, 0, false},
-    {"struve_h", 2,
-     {.n2 = num_struve_h},
-     {.r2 = qf_struve_h}, {.c2 = qc_struve_h},
+    {"struve_H", 2,
+     {.n2 = num_struve_H},
+     {.r2 = qf_struve_H}, {.c2 = qc_struve_H},
      {"2", "0.7"}, 2, false},
-    {"struve_l", 2,
-     {.n2 = num_struve_l},
-     {.r2 = qf_struve_l}, {.c2 = qc_struve_l},
+    {"struve_L", 2,
+     {.n2 = num_struve_L},
+     {.r2 = qf_struve_L}, {.c2 = qc_struve_L},
      {"2", "0.7"}, 2, false},
     {"sub", 2,
      {.n2 = num_sub},

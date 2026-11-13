@@ -306,7 +306,7 @@ static expr_t *laplace_affine_exponential(const expr_t *f, const expr_t *t, cons
 static expr_t *laplace_scaled_bessel_zero(const expr_t *f, const expr_t *t, const expr_t *s,
                                         number_t *bound, expr_t **conditions)
 {
-    if (f->ops != &ops_bessel_j || !expr_is_exact_zero(f->a))
+    if (f->ops != &ops_bessel_J || !expr_is_exact_zero(f->a))
         return NULL;
     expr_t *raw_rate = NULL;
     expr_t *raw_offset = NULL;
@@ -1641,7 +1641,7 @@ const char *expr_transform_value_note(const expr_t *expr)
         if (!known)
             return "Fourier transform left symbolic: no supported closed form has been established for this "
                    "function and its parameters. This does not establish non-existence of its transform.";
-        if (expr->a->ops == &ops_bessel_j) {
+        if (expr->a->ops == &ops_bessel_J) {
             expr_free(known);
             return "The integer-order Bessel spectrum has inverse-square-root singularities at its support edges. "
                    "No finite pointwise value is assigned at those frequencies.";

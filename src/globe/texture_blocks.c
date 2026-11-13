@@ -216,7 +216,8 @@ bool globe_texture_pyramid_import(sqlite_t *db, file_t *source)
     const char *name = source ? file_path(source) : NULL;
     string_t *path = name ? string_new_with(name) : NULL;
     sqlite_t *input = path && file_exists(source) ? sqlite_open_plain(path) : NULL;
-    bool ok = input && sqlite_exec_cstr(input, "PRAGMA query_only=ON; PRAGMA cache_size=-512;");
+    bool ok = input && sqlite_set_cache_budget(input, NULL, 512) &&
+        sqlite_exec_cstr(input, "PRAGMA query_only=ON;");
     sqlite_stmt_t *q = ok ? sqlite_stmt_prepare(input,
         "SELECT sha256, width, format_version, block_count FROM globe_texture_block_source ORDER BY sha256") : NULL;
     sqlite_step_result_t step = SQLITE_STEP_ERROR;

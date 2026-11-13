@@ -11,6 +11,8 @@
  * Used by the normal tests_main harness; this is test support, not installed code.
  * Explicit /bin/sh invocations provide child fixtures only: the process helper must
  * never interpret argument strings itself. All cases run sequentially.
+ * Synthetic encrypted fixtures retain memory protection and error logging while suppressing repetitive
+ * memory-lock quota warnings that would otherwise exhaust a worker's bounded protocol capture.
  */
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE
@@ -27,12 +29,27 @@
 #include <unistd.h>
 
 #include "file-t.h"
+#include "sqlite-t.h"
 #include "lab_process.h"
 #include "lab_worker.h"
 #include "test_harness.h"
 #include "test_lab_support.h"
 
 TEST_SUITE_CONFIG(TEST_CONFIG_GLOBAL);
+
+/* Keep encrypted fixture warnings from exhausting a calculation's bounded protocol output. */
+void test_program_setup(void)
+{
+    string_t *path = string_new_with(":memory:");
+    sqlite_t *database = path ? sqlite_open_plain(path) : NULL;
+    bool ready = database && sqlite_exec_cstr(database, "PRAGMA cipher_log_level = ERROR");
+    sqlite_close(database);
+    string_free(path);
+    if (!ready) {
+        fputs("Could not initialise Lab fixture diagnostics.\n", stderr);
+        exit(EXIT_FAILURE);
+    }
+}
 
 static bool output_equals(const string_t *output, const char *expected)
 {

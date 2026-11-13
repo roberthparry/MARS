@@ -1,5 +1,10 @@
 # MARS Lab
 
+The screenshots in this guide were refreshed on 12 November 2026. Each linked PNG
+is an uncropped, full-page browser capture, taken after the calculation and drawing
+finished. Datetime and Almanac use that date; the Almanac capture also records its
+GMT time. Open an image to inspect the complete page at its original resolution.
+
 Startup restores the saved worksheet before revealing mode-specific controls or
 starting the initial evaluation. A neutral, dark startup shell is shown meanwhile;
 Expression is not painted or evaluated as an intermediate mode when Almanac,
@@ -69,12 +74,18 @@ before the close-view handoff at zoom eight. Sharper photographic imagery remain
 available when reopening directly at close zoom. Photography stays world-anchored
 at every zoom; a local land/water palette corrects only pixels that disagree with
 the detailed shoreline, rather than flattening the entire view.
-Sentinel-2 coverage adds 10-metre source detail throughout Wales, including Anglesey
-and coastal islands. A Wales-wide overview and 42 overlapping detail tiles are stored
-in `globe.db`; the surface worker decodes one photograph at a time. The overview is used
-for windows at most four degrees across, with detail tiles added below one degree.
-Coverage spans 5.51–2.61° W and 51.24–53.493333° N. Overlapping feathered edges blend
-neighbouring tiles; existing river, shoreline and water colouring remain in use.
+The photographic catalogue combines NASA's 86400 × 43200 global source mosaic with
+5,358 regional Sentinel-2 photographs. Regional coverage includes the British Isles,
+France, Denmark, Netherlands, Iberia and its Atlantic islands, Italy, Greece, Cyprus,
+Finland, Sweden, Norway, Iceland, selected Australian areas, New Zealand, Cape
+Peninsula, the Nile Delta, Suez Canal and selected Nile Valley areas. Other covered
+islands and source resolutions are listed in the [globe guide](globe.md#photographic-textures).
+These are historical reference photographs, not live observations.
+PNG photographs, their complete provenance manifest and prepared source-block
+pyramids are stored in `globe.db`. Indexed geographic queries select visible
+coverage; native WASM planning chooses blocks at the required resolution. Bounded
+decoded-image and GPU caches reuse completed work while neighbouring cells load.
+Existing river, shoreline and water colouring remain in use.
 Photographic surface requests include a margin around the visible area and start
 during dragging, before the current coverage runs out. A pending tile continues
 loading while it still covers the view. Failed loads retry automatically with
@@ -82,8 +93,9 @@ delays increasing from one to eight seconds; existing imagery remains visible.
 Calendar calculations also retry connection failures without replacing the last
 worksheet with an error card. A reconnecting status identifies the retained result
 as the previous worksheet. Changing the selection cancels the obsolete retry.
-Other areas retain NASA imagery. `make release` installs this layer through globe
-managed-data revision 11, preserving the installed geographic and river data.
+Areas outside regional coverage retain NASA imagery. `make release` installs changed
+catalogue content while preserving the installed geographic and river data; an
+unchanged prepared catalogue does not require a fresh import.
 Drag samples predict up to 400 ms ahead with a bounded quarter-viewport lead;
 native coverage checks keep the current view inside each prefetched region.
 Natural Earth retains covered portions of the previous detailed frame while the
@@ -124,6 +136,9 @@ The globe's GLSL sources are native-owned and compiled once per context.
 `data-mask-submit-ms` measures CPU-side GPU mask submission, not completed GPU time.
 The single native surface service also retains its configured plaintext or encrypted database connection
 through `globe_reader_t`, checking configuration and database/WAL metadata before reuse.
+Each configured reader has an on-demand 8 MiB SQLite main page-cache allowance and
+512 KiB for temporary tables. Image routes retain a reader per server worker, so
+these allowances apply per active connection, separately from decoded-image and GPU caches.
 
 Native shoreline selection already omits unrelated rings and uses four cached
 display resolutions, selecting a coarser one as the geographic tolerance grows.
@@ -803,8 +818,11 @@ produces A → B → D → C. Forward still reaches C. Re-evaluating an unchange
 worksheet does not add another entry, and Clear also retains later entries.
 
 In the history editor, each row shows its worksheet input, with **Current** marking
-the active worksheet. Select the input to open it, use **↑ Earlier** and **↓ Later**
-to reorder it, or choose **Remove**. Moving entries keeps the current worksheet
+the active worksheet. Select the input to open it. Drag its grip to reorder it
+with a mouse, touch or pen; the insertion line shows where it will land, and the
+list scrolls when held near an edge. Release to save the move, or press Escape
+to cancel. **↑ Earlier** and **↓ Later** remain available for keyboard use.
+Choose **Remove** to delete an entry. Moving entries keeps the current worksheet
 open. Removing the current entry opens its successor, or its predecessor at the
 end. The sole remaining open worksheet cannot be removed. Changes use the same
 browser-separated persistence and offline recovery as normal navigation; other
@@ -818,6 +836,9 @@ observer or recalculating the worksheet. Existing history needs no reimport.
 The entry list scrolls independently, so the heading, instructions and Close
 button remain visible. Opening or closing the editor preserves the page position.
 Custom coordinates use the same degrees-and-minutes notation as the globe.
+
+See the [Almanac history screenshot](#almanac-history) for the location names,
+flags, saved observation times and drag handles shown in the editor.
 
 Persistent history has these fixed limits:
 
@@ -4314,7 +4335,7 @@ variables from −3 to 3. The output is the principal-value surface
 `u(x,y) = acos(sin(2-x*y))`, with equal coordinate units and the compact
 azimuth, elevation, roll and coordinate-volume zoom controls beneath it.
 
-[![MARS Lab expression mode plotting the principal-value inverse-cosine surface with compact 3-D controls](images/mars-lab/expression.png?v=20261025-full-page)](images/mars-lab/expression.png?v=20261025-full-page)
+[![MARS Lab expression mode plotting the principal-value inverse-cosine surface with compact 3-D controls](images/mars-lab/expression.png?v=20261112-full-page)](images/mars-lab/expression.png?v=20261112-full-page)
 
 Function cards use MARS syntax rather than C syntax. A full stop terminates a
 statement, `.` within a statement denotes multiplication, and `/` is printed
@@ -4706,7 +4727,7 @@ The captured input is `(sqrt(x^2+y^2)-2)^2+z^2=1`. The symbolic output is
 `z = ±sqrt(1-(sqrt(x^2+y^2)-2)^2)`; the automatic implicit plot shows the
 complete torus, with equal coordinate units and the retained 3-D controls.
 
-[![MARS Lab equation mode showing a torus and its symbolic height branches in automatic mode](images/mars-lab/equation.png?v=20261025-full-page)](images/mars-lab/equation.png?v=20261025-full-page)
+[![MARS Lab equation mode showing a torus and its symbolic height branches in automatic mode](images/mars-lab/equation.png?v=20261112-full-page)](images/mars-lab/equation.png?v=20261112-full-page)
 
 ## Differential-equation mode
 
@@ -4745,7 +4766,7 @@ $\quad\begin{array}{l}\displaystyle y = \frac{C_1(2C_1x+1)}{2C_1x(C_1x+1)+1}.\en
 The zero-slope condition removes one arbitrary constant. The compact TeX
 fraction, representative real solution curves and solver working are shown together.
 
-[![MARS Lab differential-equation mode displaying the modified Emden solution family, representative curves and solver working](images/mars-lab/differential-equation.png?v=20261025-full-page)](images/mars-lab/differential-equation.png?v=20261025-full-page)
+[![MARS Lab differential-equation mode displaying the modified Emden solution family, representative curves and solver working](images/mars-lab/differential-equation.png?v=20261112-full-page)](images/mars-lab/differential-equation.png?v=20261112-full-page)
 
 Select **Help** in this mode for the accepted prime, `D`, partial-derivative and
 differential-form notation. Arbitrary constants are preserved when the problem
@@ -4865,22 +4886,22 @@ ordered higher and mixed derivatives and iterated integrals, and is not limited
 to `2 x 2` matrices.
 
 <figure>
-  <a href="images/mars-lab/matrix.png?v=20261025-full-page"><img src="images/mars-lab/matrix.png?v=20261025-full-page" alt="MARS Lab evaluating the symbolic matrix power (1 2; 3 4) raised to x"></a>
+  <a href="images/mars-lab/matrix.png?v=20261112-full-page"><img src="images/mars-lab/matrix.png?v=20261112-full-page" alt="MARS Lab evaluating the symbolic matrix power (1 2; 3 4) raised to x"></a>
   <figcaption><em>After clicking <strong>Evaluate</strong>.</em></figcaption>
 </figure>
 
 <br>
 
 <figure>
-  <a href="images/mars-lab/matrix-power-derivative.png?v=20261025-full-page"><img src="images/mars-lab/matrix-power-derivative.png?v=20261025-full-page" alt="MARS Lab differentiating the symbolic matrix power with respect to x"></a>
-  <figcaption><em>After clicking <strong>x derivative</strong>, with the TeX card at 67% to show the complete matrix.</em></figcaption>
+  <a href="images/mars-lab/matrix-power-derivative.png?v=20261112-full-page"><img src="images/mars-lab/matrix-power-derivative.png?v=20261112-full-page" alt="MARS Lab differentiating the symbolic matrix power with respect to x"></a>
+  <figcaption><em>After clicking <strong>x derivative</strong>, with the TeX card at 80% to show the complete matrix.</em></figcaption>
 </figure>
 
 <br>
 
 <figure>
-  <a href="images/mars-lab/matrix-power-integral.png?v=20261025-full-page"><img src="images/mars-lab/matrix-power-integral.png?v=20261025-full-page" alt="MARS Lab integrating the symbolic matrix power with respect to x and displaying the constant matrix"></a>
-  <figcaption><em>After clicking <strong>x integral</strong>.</em></figcaption>
+  <a href="images/mars-lab/matrix-power-integral.png?v=20261112-full-page"><img src="images/mars-lab/matrix-power-integral.png?v=20261112-full-page" alt="MARS Lab integrating the symbolic matrix power with respect to x and displaying the constant matrix"></a>
+  <figcaption><em>After clicking <strong>x integral</strong>, with the TeX card at 80%.</em></figcaption>
 </figure>
 
 Result cards have distinct purposes:
@@ -4999,7 +5020,7 @@ use the same native beautification pass, including rational radical cancellation
 The infinite endpoint has reduced to its exact limit; the plot shades the
 visible portion of the integration interval under the Gaussian curve.
 
-[![MARS Lab integrator mode showing the Gaussian improper integral with its simplified endpoint and shaded plot](images/mars-lab/integrator.png?v=20261025-full-page)](images/mars-lab/integrator.png?v=20261025-full-page)
+[![MARS Lab integrator mode showing the Gaussian improper integral with its simplified endpoint and shaded plot](images/mars-lab/integrator.png?v=20261112-full-page)](images/mars-lab/integrator.png?v=20261112-full-page)
 
 ## Datetime mode
 
@@ -5008,11 +5029,11 @@ weather calculations. Enter a selected date, a date range and an observer
 location. A Julian day number may be used in place of the selected civil date.
 The GMT offset includes daylight saving when applicable.
 
-The captured request uses 16 October 2026 in Shrewsbury, with a date range
+The captured request uses 12 November 2026 in Shrewsbury, with a date range
 from 1 January 2026 to 1 January 2027. Its output includes the weekday,
 sunrise and sunset, moonrise and moonset, moon phase, clock changes, the
-selected date range and the year's calendar observances. The optional Weather
-section is collapsed in this capture.
+selected date range and the year's calendar observances. Weather is disabled in
+the capture session; the Weather section explains how to configure a personal key.
 
 The ten calendar sections retain datetime's observance calculations, including
 estimated festivals and local sunset-start times. Jurisdiction rules continue
@@ -5028,7 +5049,7 @@ The native presentation layer supplies and escapes these tooltips for fresh and
 cached results alike; copied text, dates and estimation qualifiers are unchanged.
 No database migration is needed, and unknown names receive no guessed translation.
 
-[![MARS Lab datetime mode showing Shrewsbury calendar and astronomical results for 16 October 2026](images/mars-lab/datetime.png?v=20261025-full-page)](images/mars-lab/datetime.png?v=20261025-full-page)
+[![MARS Lab datetime mode showing Shrewsbury calendar and astronomical results for 12 November 2026](images/mars-lab/datetime.png?v=20261112-full-page)](images/mars-lab/datetime.png?v=20261112-full-page)
 
 MARS supplies no shared WeatherAPI account or key. Weather is shown only when
 the person installing MARS Lab creates their own WeatherAPI account, configures
@@ -5320,15 +5341,28 @@ date and time in GMT, matching the worksheet inputs. Its label and event contact
 times remain local civil time, and the destination's zone remains selected for
 display. A non-zero zone must not shift the observation away from totality.
 
-The captured request is for London at `2026-10-25 12:00:00` GMT, at an observer
+The captured request is for London at `2026-11-12 19:27:23` GMT, at an observer
 elevation of 25 metres. The globe and observer controls appear beside the
 navigational-body table, including bodies below the horizon. The summary identifies
-London as land and shows both the estimated observer pressure used for refraction
-and WeatherAPI's sea-level pressure; sea-horizon dip is therefore excluded.
-Weather values reflect the captured response and may vary
-when the request is repeated.
+London as land, so sea-horizon dip is excluded. This capture uses the labelled
+seasonal temperature and standard-atmosphere pressure estimates because WeatherAPI
+is disabled in the capture session. A configured WeatherAPI response instead shows
+both the estimated observer pressure used for refraction and the supplied sea-level
+pressure. Weather values may vary when the request is repeated.
 
-[![Full-page MARS Lab Almanac showing the London observer globe, land classification, weather inputs, corrected body altitudes and upcoming events](images/mars-lab/almanac.png?v=20261025-pressure-lines)](images/mars-lab/almanac.png?v=20261025-pressure-lines)
+[![Full-page MARS Lab Almanac showing the London observer globe, land classification, weather inputs, corrected body altitudes and upcoming events](images/mars-lab/almanac.png?v=20261112-full-page)](images/mars-lab/almanac.png?v=20261112-full-page)
+
+### Almanac history
+
+Select **History** to browse saved locations. Each entry shows its town and country
+names, flag, date and GMT time; **Current** identifies the open worksheet. Drag a
+row's grip to reorder it, select its location to open the worksheet, or use
+**Earlier**, **Later** and **Remove**.
+
+[![Full-page MARS Lab Almanac History showing town and country names, location flags, the current worksheet and drag handles](images/mars-lab/almanac-history.png)](images/mars-lab/almanac-history.png)
+
+This uncropped capture shows completed worksheets for several locations. Open the
+image to inspect the complete page at its original resolution.
 
 ## Mobile and private remote access
 

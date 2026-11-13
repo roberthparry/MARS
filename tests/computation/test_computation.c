@@ -5,7 +5,8 @@
  * Uses native thread and lock APIs to test concurrent owners within sequential
  * test cases. Covers sticky stop reasons, monotonic deadlines, re-entrant
  * cancellation from progress observers and nested numerical work. README
- * examples exercise the public interface and run after ordinary tests.
+ * examples exercise the public interface and run after ordinary tests. Configured
+ * almanac coverage loads the application's resolved settings before opening the engine.
  */
 #include <errno.h>
 #include <inttypes.h>
@@ -17,10 +18,18 @@
 #include "computation-t.h"
 #include "thread-t.h"
 #include "integrator-t.h"
+#include "mars_settings.h"
 #include "test_harness.h"
 #include "test_computation_support.h"
 
 TEST_SUITE_CONFIG(TEST_CONFIG_GLOBAL);
+
+static bool computation_suite_setup(void)
+{
+    return mars_settings_isolate() && mars_settings_load();
+}
+
+TEST_SUITE_SETUP(computation_suite_setup);
 
 static void computation_require(bool ok)
 {

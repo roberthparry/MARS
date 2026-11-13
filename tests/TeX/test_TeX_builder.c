@@ -11,6 +11,7 @@
 #include <stdint.h>
 #include <string.h>
 
+#include "string-t.h"
 #include "TeX-t.h"
 #include "test_harness.h"
 #include "test_TeX_builder.h"

@@ -296,13 +296,13 @@ int expr_eval_derivatives(const expr_t *expr, size_t nvars, const expr_t *const 
  * zero/invalid to derive a significant-digits tolerance of roughly
  * max(1, abs(target)) * 10^-precision_digits.
  */
-typedef struct expr_goal_seek_options {
-    size_t precision_digits;
-    size_t max_iterations;
-    bool allow_complex;
-    bool simplify_result;
-    number_t tolerance;
-} expr_goal_seek_options_t;
+typedef struct {
+    size_t precision_digits; /**< Requested decimal digits; zero selects the library default. */
+    size_t max_iterations; /**< Iteration limit; zero selects a limit based on the requested precision. */
+    bool allow_complex; /**< Permit complex Newton iteration if a real-valued solve fails. */
+    bool simplify_result; /**< Simplify the returned expression when possible. */
+    number_t tolerance; /**< Borrowed residual bound; finite, non-zero values override the derived tolerance. */
+} _expr_goal_seek_options_t, expr_goal_seek_options_t;
 
 /**
  * @brief Result returned by expr_goal_seek().
@@ -313,15 +313,15 @@ typedef struct expr_goal_seek_options {
  * @p expr, @p value, and @p residual are owning outputs and must be released
  * with expr_goal_seek_result_clear().
  */
-typedef struct expr_goal_seek_result {
-    expr_t *expr;
-    expr_bindings_t *bindings;
-    number_t value;
-    number_t residual;
-    size_t iterations;
-    bool used_complex;
-    bool converged;
-} expr_goal_seek_result_t;
+typedef struct {
+    expr_t *expr; /**< Owned expression reference; released by expr_goal_seek_result_clear(). */
+    expr_bindings_t *bindings; /**< Borrowed input binding table, whose variable values were updated in place. */
+    number_t value; /**< Owned expression value at the solution; released by expr_goal_seek_result_clear(). */
+    number_t residual; /**< Owned value minus target; released by expr_goal_seek_result_clear(). */
+    size_t iterations; /**< Iterations used by the converged solve. */
+    bool used_complex; /**< Whether the successful solve used complex Newton iteration. */
+    bool converged; /**< Whether the residual met the requested tolerance. */
+} _expr_goal_seek_result_t, expr_goal_seek_result_t;
 
 /**
  * @brief Adjust variable bindings so @p expr evaluates to @p target.
@@ -1246,11 +1246,11 @@ expr_t *expr_new_finite_product_range(const expr_t *term, const expr_t *index, c
  *                    expr_gammainc_upper, expr_gammainc_P, expr_gammainc_Q
  * Polylogarithms:    expr_dilog (Li₂), expr_polylog (Liₙ), expr_harmonic_poly (Hₙ),
  *                    expr_lerch_phi (Lerch Φ),
- *                    expr_legendre_chi (χₙ), expr_appell_f1 (F₁)
- * Bessel functions:  expr_bessel_j (Jᵥ), expr_bessel_y (Yᵥ)
- * Lommel function:    expr_lommel_s (s_(μ,ν))
- * Lambert W:         expr_lambert_w0 (principal branch), expr_lambert_wm1 (k=-1),
- *                    expr_lambert_wn (integer branch n)
+ *                    expr_legendre_chi (χₙ), expr_appell_F1 (F₁)
+ * Bessel functions:  expr_bessel_J (Jᵥ), expr_bessel_Y (Yᵥ)
+ * Lommel function:    expr_lommel_S (s_(μ,ν))
+ * Lambert W:         expr_lambert_W0 (principal branch), expr_lambert_Wm1 (k=-1),
+ *                    expr_lambert_Wn (integer branch n)
  * Beta/binomial:     expr_beta (B), expr_logbeta (log B), expr_beta_pdf,
  *                    expr_logbeta_pdf, expr_binomial
  * Normal dist.:      expr_normal_pdf, expr_normal_cdf, expr_normal_logpdf
@@ -1516,7 +1516,7 @@ expr_t *expr_legendre_chi(unsigned int order, const expr_t *expr);
  * @param argument Borrowed function argument expression; retained, not consumed.
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
-expr_t *expr_bessel_j(const expr_t *order, const expr_t *argument);
+expr_t *expr_bessel_J(const expr_t *order, const expr_t *argument);
 
 /**
  * @brief Construct the principal modified Bessel function I_order(argument).
@@ -1529,7 +1529,7 @@ expr_t *expr_bessel_j(const expr_t *order, const expr_t *argument);
  * @param argument Argument expression; it is retained.
  * @return A newly allocated expression, or NULL for a missing operand.
  */
-expr_t *expr_bessel_i(const expr_t *order, const expr_t *argument);
+expr_t *expr_bessel_I(const expr_t *order, const expr_t *argument);
 
 /**
  * @brief Construct the principal modified Bessel function K_order(argument).
@@ -1538,7 +1538,7 @@ expr_t *expr_bessel_i(const expr_t *order, const expr_t *argument);
  * @param argument Borrowed function argument expression; retained, not consumed.
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
-expr_t *expr_bessel_k(const expr_t *order, const expr_t *argument);
+expr_t *expr_bessel_K(const expr_t *order, const expr_t *argument);
 
 /**
  * @brief Construct the principal modified Struve function L_order(argument).
@@ -1553,7 +1553,7 @@ expr_t *expr_bessel_k(const expr_t *order, const expr_t *argument);
  * @param argument Argument expression; it is retained.
  * @return A newly allocated expression, or NULL for a missing operand or allocation failure.
  */
-expr_t *expr_struve_l(const expr_t *order, const expr_t *argument);
+expr_t *expr_struve_L(const expr_t *order, const expr_t *argument);
 
 /**
  * @brief Construct the principal ordinary Struve function H_order(argument).
@@ -1568,7 +1568,7 @@ expr_t *expr_struve_l(const expr_t *order, const expr_t *argument);
  * @param argument Argument expression; it is retained.
  * @return A newly allocated expression, or NULL for a missing operand.
  */
-expr_t *expr_struve_h(const expr_t *order, const expr_t *argument);
+expr_t *expr_struve_H(const expr_t *order, const expr_t *argument);
 
 /**
  * @brief Construct the principal Bessel function of the second kind Y_order(argument).
@@ -1582,7 +1582,7 @@ expr_t *expr_struve_h(const expr_t *order, const expr_t *argument);
  * @param argument Argument expression; it is retained.
  * @return A newly allocated expression, or NULL for a missing operand.
  */
-expr_t *expr_bessel_y(const expr_t *order, const expr_t *argument);
+expr_t *expr_bessel_Y(const expr_t *order, const expr_t *argument);
 
 /**
  * @brief Construct the Lommel function s_(mu,nu)(argument).
@@ -1591,7 +1591,7 @@ expr_t *expr_bessel_y(const expr_t *order, const expr_t *argument);
  * @param argument Borrowed function argument expression; retained, not consumed.
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
-expr_t *expr_lommel_s(const expr_t *mu, const expr_t *nu, const expr_t *argument);
+expr_t *expr_lommel_S(const expr_t *mu, const expr_t *nu, const expr_t *argument);
 
 /**
  * @brief Construct the Appell hypergeometric function F1(a; b1, b2; c; x, y).
@@ -1603,7 +1603,7 @@ expr_t *expr_lommel_s(const expr_t *mu, const expr_t *nu, const expr_t *argument
  * @param y Borrowed second coordinate expression; retained, not consumed.
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
-expr_t *expr_appell_f1(const expr_t *a, const expr_t *b1, const expr_t *b2, const expr_t *c, const expr_t *x,
+expr_t *expr_appell_F1(const expr_t *a, const expr_t *b1, const expr_t *b2, const expr_t *c, const expr_t *x,
                        const expr_t *y);
 
 /**
@@ -1615,7 +1615,7 @@ expr_t *expr_appell_f1(const expr_t *a, const expr_t *b1, const expr_t *b2, cons
  * @param x Borrowed array of variable_count arguments; may be NULL for zero count. Nodes are retained.
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
-expr_t *expr_lauricella_f(const expr_t *a, size_t variable_count, const expr_t *const *b, const expr_t *c,
+expr_t *expr_lauricella_F(const expr_t *a, size_t variable_count, const expr_t *const *b, const expr_t *c,
                           const expr_t *const *x);
 
 /**
@@ -1682,21 +1682,21 @@ expr_t *expr_lambert_w(const expr_t *expr);
  * @param expr Borrowed input expression; not consumed. Its evaluation caches may be updated.
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
-expr_t *expr_lambert_wn(const expr_t *branch, const expr_t *expr);
+expr_t *expr_lambert_Wn(const expr_t *branch, const expr_t *expr);
 
 /**
  * @brief Construct a principal Lambert W branch expression.
  * @param expr Borrowed input expression; not consumed. Its evaluation caches may be updated.
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
-expr_t *expr_lambert_w0(const expr_t *expr);
+expr_t *expr_lambert_W0(const expr_t *expr);
 
 /**
  * @brief Construct a Lambert W branch -1 expression.
  * @param expr Borrowed input expression; not consumed. Its evaluation caches may be updated.
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
-expr_t *expr_lambert_wm1(const expr_t *expr);
+expr_t *expr_lambert_Wm1(const expr_t *expr);
 
 /**
  * @brief Construct the beta function B(expr1, expr2).

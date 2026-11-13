@@ -11,6 +11,7 @@
 
 #include <math.h>
 
+#include "string-t.h"
 #include "expr_context-t.h"
 #include "computation-t.h"
 
@@ -1357,8 +1358,8 @@ static void test_eval_num_function_values(void)
         {"lgamma", "2.5", expr_lgamma, num_lgamma, NULL},
         {"digamma", "2.5", expr_digamma, num_digamma, NULL},
         {"trigamma", "2.5", expr_trigamma, num_trigamma, NULL},
-        {"W₀", "0.2", expr_lambert_w0, num_lambert_w0, NULL},
-        UCASE_TOL("W₋₁", "-0.1", expr_lambert_wm1, num_lambert_wm1, "1e-30"),
+        {"W₀", "0.2", expr_lambert_W0, num_lambert_W0, NULL},
+        UCASE_TOL("W₋₁", "-0.1", expr_lambert_Wm1, num_lambert_Wm1, "1e-30"),
         {"normal_pdf", "1.0", expr_normal_pdf, num_normal_pdf, NULL},
         {"normal_cdf", "1.0", expr_normal_cdf, num_normal_cdf, NULL},
         {"normal_logpdf", "1.0", expr_normal_logpdf, num_normal_logpdf, NULL},
@@ -1414,8 +1415,8 @@ static void test_eval_num_function_derivatives(void)
         UCASE("lgamma", "2.5", expr_lgamma, num_lgamma),
         UCASE("digamma", "2.5", expr_digamma, num_digamma),
         UCASE("trigamma", "2.5", expr_trigamma, num_trigamma),
-        UCASE("W₀", "0.2", expr_lambert_w0, num_lambert_w0),
-        UCASE_TOL("W₋₁", "-0.1", expr_lambert_wm1, num_lambert_wm1, "1e-30"),
+        UCASE("W₀", "0.2", expr_lambert_W0, num_lambert_W0),
+        UCASE_TOL("W₋₁", "-0.1", expr_lambert_Wm1, num_lambert_Wm1, "1e-30"),
         UCASE("normal_pdf", "1.0", expr_normal_pdf, num_normal_pdf),
         UCASE("normal_cdf", "1.0", expr_normal_cdf, num_normal_cdf),
         UCASE("normal_logpdf", "1.0", expr_normal_logpdf, num_normal_logpdf),
@@ -1462,8 +1463,8 @@ static void test_high_precision_mpfr_function_values(void)
         UCASE("lgamma", "2.5", expr_lgamma, num_lgamma),
         UCASE("digamma", "2.5", expr_digamma, num_digamma),
         UCASE("trigamma", "2.5", expr_trigamma, num_trigamma),
-        UCASE("W₀", "0.2", expr_lambert_w0, num_lambert_w0),
-        UCASE("W₋₁", "-0.1", expr_lambert_wm1, num_lambert_wm1),
+        UCASE("W₀", "0.2", expr_lambert_W0, num_lambert_W0),
+        UCASE("W₋₁", "-0.1", expr_lambert_Wm1, num_lambert_Wm1),
         UCASE("normal_pdf", "1.0", expr_normal_pdf, num_normal_pdf),
         UCASE("normal_cdf", "1.0", expr_normal_cdf, num_normal_cdf),
         UCASE("normal_logpdf", "1.0", expr_normal_logpdf, num_normal_logpdf),
@@ -1506,8 +1507,8 @@ static void test_high_precision_mpfr_function_derivatives(void)
         UCASE("lgamma", "2.5", expr_lgamma, num_lgamma),
         UCASE("digamma", "2.5", expr_digamma, num_digamma),
         UCASE("trigamma", "2.5", expr_trigamma, num_trigamma),
-        UCASE("W₀", "0.2", expr_lambert_w0, num_lambert_w0),
-        UCASE("W₋₁", "-0.1", expr_lambert_wm1, num_lambert_wm1),
+        UCASE("W₀", "0.2", expr_lambert_W0, num_lambert_W0),
+        UCASE("W₋₁", "-0.1", expr_lambert_Wm1, num_lambert_Wm1),
         UCASE("normal_pdf", "1.0", expr_normal_pdf, num_normal_pdf),
         UCASE("normal_cdf", "1.0", expr_normal_cdf, num_normal_cdf),
         UCASE("normal_logpdf", "1.0", expr_normal_logpdf, num_normal_logpdf),

@@ -190,8 +190,9 @@ static jsref lab_bootstrap_step_fail_7(struct lab_bootstrap_step_context *ctx)
                              lab_dom_string("The Lab catalogue is invalid"));
     int scripts = lab_dom_object(LAB_VALUE_ARRAY);
     static const char *const names[] = {"api", "bindings_controller", "bindings", "locations", "place_search", "globe", "results",
-                                       "results_services", "state", "history", "surface_camera", "surface_export", "surface_hover",
-                                       "surface_volume", "surface", "workspace_native", "workspace_controllers"};
+                                       "results_services", "state", "history_drag", "history", "surface_camera",
+                                       "surface_export", "surface_hover", "surface_volume", "surface", "workspace_native",
+                                       "workspace_controllers"};
     for (unsigned i = 0; i < sizeof names / sizeof *names; ++i)
         lab_dom_push(scripts, lab_dom_string(names[i]));
     return lab_flow_call(ctx->frame, LAB_BOOTSTRAP_LOAD_WORKSPACE, "definitions", 0, 1, 1, scripts);

@@ -107,8 +107,8 @@ static matrix_t *mat_gammainv_number_triangular_equal_diag(const matrix_t *A);
 static matrix_t *mat_normal_pdf_number_triangular_equal_diag(const matrix_t *A);
 static matrix_t *mat_normal_cdf_number_triangular_equal_diag(const matrix_t *A);
 static matrix_t *mat_normal_logpdf_number_triangular_equal_diag(const matrix_t *A);
-static matrix_t *mat_lambert_w0_number_triangular_equal_diag(const matrix_t *A);
-static matrix_t *mat_lambert_wm1_number_triangular_equal_diag(const matrix_t *A);
+static matrix_t *mat_lambert_W0_number_triangular_equal_diag(const matrix_t *A);
+static matrix_t *mat_lambert_Wm1_number_triangular_equal_diag(const matrix_t *A);
 static matrix_t *mat_productlog_number_triangular_equal_diag(const matrix_t *A);
 static matrix_t *mat_Ei_number_triangular_equal_diag(const matrix_t *A);
 static matrix_t *mat_E1_number_triangular_equal_diag(const matrix_t *A);
@@ -1618,19 +1618,19 @@ static matrix_t *mat_normal_logpdf_number_triangular_equal_diag(const matrix_t *
     return mat_number_unary_taylor_from_expr(A, expr_normal_logpdf);
 }
 
-static matrix_t *mat_lambert_w0_number_triangular_equal_diag(const matrix_t *A)
+static matrix_t *mat_lambert_W0_number_triangular_equal_diag(const matrix_t *A)
 {
-    return mat_number_unary_taylor_from_expr(A, expr_lambert_w0);
+    return mat_number_unary_taylor_from_expr(A, expr_lambert_W0);
 }
 
-static matrix_t *mat_lambert_wm1_number_triangular_equal_diag(const matrix_t *A)
+static matrix_t *mat_lambert_Wm1_number_triangular_equal_diag(const matrix_t *A)
 {
-    return mat_number_unary_taylor_from_expr(A, expr_lambert_wm1);
+    return mat_number_unary_taylor_from_expr(A, expr_lambert_Wm1);
 }
 
 static matrix_t *mat_productlog_number_triangular_equal_diag(const matrix_t *A)
 {
-    return mat_number_unary_taylor_from_expr(A, expr_lambert_w0);
+    return mat_number_unary_taylor_from_expr(A, expr_lambert_W0);
 }
 
 static matrix_t *mat_Ei_number_triangular_equal_diag(const matrix_t *A)
@@ -4360,31 +4360,31 @@ matrix_t *mat_normal_logpdf(const matrix_t *A)
                            A && A->elem && A->elem->fun ? A->elem->fun->normal_logpdf : NULL);
 }
 
-matrix_t *mat_lambert_w0(const matrix_t *A)
+matrix_t *mat_lambert_W0(const matrix_t *A)
 {
     if (A && A->elem == &expr_elem && matrix_is_symbolic(A))
-        return mat_fun_elementwise_same_type(A, expr_elem.fun->lambert_w0);
+        return mat_fun_elementwise_same_type(A, expr_elem.fun->lambert_W0);
 
     if (A && A->elem == &number_elem && A->rows == A->cols &&
         (mat_is_upper_triangular(A) || mat_is_lower_triangular(A)) && mat_number_diagonal_equal_local(A)) {
-        matrix_t *structured = mat_lambert_w0_number_triangular_equal_diag(A);
+        matrix_t *structured = mat_lambert_W0_number_triangular_equal_diag(A);
         if (structured)
             return structured;
     }
-    return mat_apply_unary(A, number_elem.fun->lambert_w0, expr_elem.fun->lambert_w0,
-                           A && A->elem && A->elem->fun ? A->elem->fun->lambert_w0 : NULL);
+    return mat_apply_unary(A, number_elem.fun->lambert_W0, expr_elem.fun->lambert_W0,
+                           A && A->elem && A->elem->fun ? A->elem->fun->lambert_W0 : NULL);
 }
 
-matrix_t *mat_lambert_wm1(const matrix_t *A)
+matrix_t *mat_lambert_Wm1(const matrix_t *A)
 {
     if (A && A->elem == &number_elem && A->rows == A->cols &&
         (mat_is_upper_triangular(A) || mat_is_lower_triangular(A)) && mat_number_diagonal_equal_local(A)) {
-        matrix_t *structured = mat_lambert_wm1_number_triangular_equal_diag(A);
+        matrix_t *structured = mat_lambert_Wm1_number_triangular_equal_diag(A);
         if (structured)
             return structured;
     }
-    return mat_apply_unary(A, number_elem.fun->lambert_wm1, expr_elem.fun->lambert_wm1,
-                           A && A->elem && A->elem->fun ? A->elem->fun->lambert_wm1 : NULL);
+    return mat_apply_unary(A, number_elem.fun->lambert_Wm1, expr_elem.fun->lambert_Wm1,
+                           A && A->elem && A->elem->fun ? A->elem->fun->lambert_Wm1 : NULL);
 }
 
 matrix_t *mat_productlog(const matrix_t *A)

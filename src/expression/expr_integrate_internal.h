@@ -174,7 +174,7 @@ expr_t *integrate_cubed_unary_affine(const expr_t *expr, const expr_t *wrt, expr
 expr_t *integrate_sec_double_angle_log_tan_cot(const expr_t *expr, const expr_t *wrt);
 expr_t *integrate_sec_squared_log_tan_cot(const expr_t *expr, const expr_t *wrt);
 expr_t *integrate_inverse_sqrt_sin_cos_sin3_cos(const expr_t *expr, const expr_t *wrt);
-expr_t *integrate_inverse_quartic_appell_f1(const expr_t *expr, const expr_t *wrt);
+expr_t *integrate_inverse_quartic_appell_F1(const expr_t *expr, const expr_t *wrt);
 expr_t *integrate_matching_squared_unary_affine(const expr_t *expr, const expr_t *wrt);
 expr_t *integrate_matching_cubed_unary_affine(const expr_t *expr, const expr_t *wrt);
 expr_t *integrate_same_affine_special_product(const expr_t *expr, const expr_t *wrt);
@@ -252,9 +252,9 @@ expr_t *integrate_normal_logpdf_rule(const expr_t *expr, const expr_t *wrt);
 expr_t *integrate_Ei_rule(const expr_t *expr, const expr_t *wrt);
 expr_t *integrate_Li_rule(const expr_t *expr, const expr_t *wrt);
 expr_t *integrate_E1_rule(const expr_t *expr, const expr_t *wrt);
-expr_t *integrate_bessel_j_rule(const expr_t *expr, const expr_t *wrt);
-expr_t *integrate_bessel_y_rule(const expr_t *expr, const expr_t *wrt);
-expr_t *integrate_lommel_s_rule(const expr_t *expr, const expr_t *wrt);
+expr_t *integrate_bessel_J_rule(const expr_t *expr, const expr_t *wrt);
+expr_t *integrate_bessel_Y_rule(const expr_t *expr, const expr_t *wrt);
+expr_t *integrate_lommel_S_rule(const expr_t *expr, const expr_t *wrt);
 expr_t *integrate_hypergeometric_pFq_rule(const expr_t *expr, const expr_t *wrt);
 
 #endif /* EXPR_INTEGRATE_INTERNAL_H */

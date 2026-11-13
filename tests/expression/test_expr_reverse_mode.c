@@ -313,8 +313,8 @@ static void test_reverse_modified_cylindrical_arguments(void)
     for (size_t i = 0u; i < sizeof(orders) / sizeof(orders[0]); ++i) {
         expr_t *order = test_expr_new_const_d(orders[i]);
         expr_t *x = test_expr_new_named_var_d(1.2, "x");
-        expr_t *bessel = expr_bessel_i(order, x), *struve = expr_struve_l(order, x);
-        expr_t *ordinary = expr_struve_h(order, x);
+        expr_t *bessel = expr_bessel_I(order, x), *struve = expr_struve_L(order, x);
+        expr_t *ordinary = expr_struve_H(order, x);
         expr_t *variables[] = {x};
         assert_reverse_matches_symbolic(bessel, 1u, variables);
         assert_reverse_matches_symbolic(struve, 1u, variables);
@@ -337,7 +337,7 @@ static void test_reverse_bessel_y_complex_arguments(void)
         expr_t *order = test_expr_new_const_d(orders[i]);
         expr_t *x = test_expr_new_named_var_d(1.0, "x");
         expr_set_val(x, value);
-        expr_t *function = expr_bessel_y(order, x), *variables[] = {x};
+        expr_t *function = expr_bessel_Y(order, x), *variables[] = {x};
         number_t evaluated = expr_eval(function);
         ASSERT_TRUE(num_is_finite(evaluated));
         num_destroy(&evaluated);
@@ -353,21 +353,21 @@ static void test_reverse_special_function_arguments(void)
     expr_t *mu = test_expr_new_const_d(0.5);
     expr_t *nu = test_expr_new_const_d(0.25);
     expr_t *x = test_expr_new_named_var_d(1.2, "x");
-    expr_t *bessel_j = expr_bessel_j(order, x);
-    expr_t *bessel_y = expr_bessel_y(order, x);
-    expr_t *lommel = expr_lommel_s(mu, nu, x);
+    expr_t *bessel_J = expr_bessel_J(order, x);
+    expr_t *bessel_Y = expr_bessel_Y(order, x);
+    expr_t *lommel = expr_lommel_S(mu, nu, x);
     expr_t *variables[] = {x};
 
-    ASSERT_NOT_NULL(bessel_j);
-    ASSERT_NOT_NULL(bessel_y);
+    ASSERT_NOT_NULL(bessel_J);
+    ASSERT_NOT_NULL(bessel_Y);
     ASSERT_NOT_NULL(lommel);
-    assert_reverse_matches_symbolic(bessel_j, 1u, variables);
-    assert_reverse_matches_symbolic(bessel_y, 1u, variables);
+    assert_reverse_matches_symbolic(bessel_J, 1u, variables);
+    assert_reverse_matches_symbolic(bessel_Y, 1u, variables);
     assert_reverse_matches_symbolic(lommel, 1u, variables);
 
     expr_free(lommel);
-    expr_free(bessel_y);
-    expr_free(bessel_j);
+    expr_free(bessel_Y);
+    expr_free(bessel_J);
     expr_free(x);
     expr_free(nu);
     expr_free(mu);
@@ -454,7 +454,7 @@ static void test_reverse_appell_variables(void)
     expr_t *c = test_expr_new_const_d(1.5);
     expr_t *x = test_expr_new_named_var_d(0.1, "x");
     expr_t *y = test_expr_new_named_var_d(0.2, "y");
-    expr_t *function = expr_appell_f1(a, b1, b2, c, x, y);
+    expr_t *function = expr_appell_F1(a, b1, b2, c, x, y);
     expr_t *variables[] = {x, y};
 
     ASSERT_NOT_NULL(function);
@@ -481,7 +481,7 @@ static void test_reverse_lauricella_variables(void)
     expr_t *z = test_expr_new_named_var_d(0.2, "z");
     const expr_t *parameters[] = {b1, b2, b3};
     const expr_t *arguments[] = {x, y, z};
-    expr_t *function = expr_lauricella_f(a, 3u, parameters, c, arguments);
+    expr_t *function = expr_lauricella_F(a, 3u, parameters, c, arguments);
     expr_t *variables[] = {x, y, z};
 
     ASSERT_NOT_NULL(function);

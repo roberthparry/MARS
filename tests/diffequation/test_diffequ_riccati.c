@@ -11,6 +11,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "string-t.h"
 #include "diffequation-t.h"
 #include "expression-t.h"
 #include "test_harness.h"

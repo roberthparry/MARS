@@ -84,13 +84,13 @@ static expr_t *expr_math_wrap_binary(const expr_ops_t *ops, const expr_t *a, con
     return expr_new_binary_internal(ops, a, b);
 }
 
-static expr_t *expr_appell_f1_pack(const expr_t *left, const expr_t *right);
-static expr_t *expr_appell_f1_from_packs(const expr_t *params, const expr_t *vars);
-static expr_t *expr_lauricella_f_from_packs(const expr_t *params, const expr_t *vars);
+static expr_t *expr_appell_F1_pack(const expr_t *left, const expr_t *right);
+static expr_t *expr_appell_F1_from_packs(const expr_t *params, const expr_t *vars);
+static expr_t *expr_lauricella_F_from_packs(const expr_t *params, const expr_t *vars);
 static expr_t *expr_hypergeometric_pFq_pack(const expr_t *left, const expr_t *right);
 static expr_t *expr_hypergeometric_pFq_from_pack(const expr_t *parameters, const expr_t *argument);
-static expr_t *expr_lommel_s_pack(const expr_t *mu, const expr_t *nu);
-static expr_t *expr_lommel_s_from_pack(const expr_t *parameters, const expr_t *argument);
+static expr_t *expr_lommel_S_pack(const expr_t *mu, const expr_t *nu);
+static expr_t *expr_lommel_S_from_pack(const expr_t *parameters, const expr_t *argument);
 expr_t *expr_finite_progression_closed_form(const expr_t *expr);
 
 static number_t eval_formal_series_component(expr_t *expr)
@@ -4698,76 +4698,76 @@ const expr_ops_t ops_legendre_chi = {.eval = eval_legendre_chi,
                                      .apply_binary = expr_legendre_chi_xp,
                                      .simplify = expr_simplify_binary_operator,
                                      .fold_const_unary = NULL};
-const expr_ops_t ops_bessel_j = {.eval = eval_bessel_j,
-                                 .deriv = deriv_bessel_j,
-                                 .reverse = expr_reverse_bessel_j,
+const expr_ops_t ops_bessel_J = {.eval = eval_bessel_J,
+                                 .deriv = deriv_bessel_J,
+                                 .reverse = expr_reverse_bessel_J,
                                  .kind = EXPR_KIND_BESSEL_J,
                                  .arity = EXPR_OP_BINARY,
                                  .expression_name = "BesselJ",
                                  .function_name = "besselj",
                                  .apply_unary = NULL,
-                                 .apply_binary = expr_bessel_j,
+                                 .apply_binary = expr_bessel_J,
                                  .integrate = expr_integrate_dispatch_primitive,
                                  .simplify = expr_simplify_binary_operator,
                                  .fold_const_unary = NULL};
-const expr_ops_t ops_lommel_s = {.eval = eval_lommel_s,
-                                 .deriv = deriv_lommel_s,
-                                 .reverse = expr_reverse_lommel_s,
+const expr_ops_t ops_lommel_S = {.eval = eval_lommel_S,
+                                 .deriv = deriv_lommel_S,
+                                 .reverse = expr_reverse_lommel_S,
                                  .kind = EXPR_KIND_LOMMEL_S,
                                  .arity = EXPR_OP_BINARY,
                                  .expression_name = "LommelS",
                                  .function_name = "lommels",
                                  .apply_unary = NULL,
-                                 .apply_binary = expr_lommel_s_from_pack,
+                                 .apply_binary = expr_lommel_S_from_pack,
                                  .integrate = expr_integrate_dispatch_primitive,
                                  .simplify = expr_simplify_rebuild_binary_operator,
                                  .fold_const_unary = NULL};
-const expr_ops_t ops_lommel_s_pack = {.eval = eval_lommel_s_pack,
-                                      .deriv = deriv_lommel_s_pack,
+const expr_ops_t ops_lommel_S_pack = {.eval = eval_lommel_S_pack,
+                                      .deriv = deriv_lommel_S_pack,
                                       .reverse = expr_reverse_parameter_pack,
                                       .kind = EXPR_KIND_LOMMEL_S_PACK,
                                       .arity = EXPR_OP_BINARY,
                                       .diff_kind = EXPR_DIFF_NONE,
-                                      .expression_name = "lommel_s_pack",
+                                      .expression_name = "lommel_S_pack",
                                       .function_name = "lommelspack",
                                       .apply_unary = NULL,
-                                      .apply_binary = expr_lommel_s_pack,
+                                      .apply_binary = expr_lommel_S_pack,
                                       .simplify = expr_simplify_rebuild_binary_operator,
                                       .fold_const_unary = NULL};
-const expr_ops_t ops_appell_f1 = {.eval = eval_appell_f1,
-                                  .deriv = deriv_appell_f1,
+const expr_ops_t ops_appell_F1 = {.eval = eval_appell_F1,
+                                  .deriv = deriv_appell_F1,
                                   .reverse = expr_reverse_not_differentiable,
-                                  .reverse_many = expr_reverse_appell_f1_many,
+                                  .reverse_many = expr_reverse_appell_F1_many,
                                   .kind = EXPR_KIND_APPELL_F1,
                                   .arity = EXPR_OP_BINARY,
                                   .expression_name = "F₁",
                                   .function_name = "appellf1",
                                   .apply_unary = NULL,
-                                  .apply_binary = expr_appell_f1_from_packs,
+                                  .apply_binary = expr_appell_F1_from_packs,
                                   .simplify = expr_simplify_rebuild_binary_operator,
                                   .fold_const_unary = NULL};
-const expr_ops_t ops_appell_f1_pack = {.eval = eval_appell_f1_pack,
-                                       .deriv = deriv_appell_f1_pack,
+const expr_ops_t ops_appell_F1_pack = {.eval = eval_appell_F1_pack,
+                                       .deriv = deriv_appell_F1_pack,
                                        .reverse = expr_reverse_parameter_pack,
                                        .kind = EXPR_KIND_APPELL_F1_PACK,
                                        .arity = EXPR_OP_BINARY,
                                        .diff_kind = EXPR_DIFF_NONE,
-                                       .expression_name = "appell_f1_pack",
+                                       .expression_name = "appell_F1_pack",
                                        .function_name = "appellf1pack",
                                        .apply_unary = NULL,
-                                       .apply_binary = expr_appell_f1_pack,
+                                       .apply_binary = expr_appell_F1_pack,
                                        .simplify = expr_simplify_rebuild_binary_operator,
                                        .fold_const_unary = NULL};
-const expr_ops_t ops_lauricella_f = {.eval = eval_lauricella_f,
-                                     .deriv = deriv_lauricella_f,
+const expr_ops_t ops_lauricella_F = {.eval = eval_lauricella_F,
+                                     .deriv = deriv_lauricella_F,
                                      .reverse = expr_reverse_not_differentiable,
-                                     .reverse_many = expr_reverse_lauricella_f_many,
+                                     .reverse_many = expr_reverse_lauricella_F_many,
                                      .kind = EXPR_KIND_LAURICELLA_F,
                                      .arity = EXPR_OP_BINARY,
                                      .expression_name = "LauricellaF",
                                      .function_name = "lauricellaf",
                                      .apply_unary = NULL,
-                                     .apply_binary = expr_lauricella_f_from_packs,
+                                     .apply_binary = expr_lauricella_F_from_packs,
                                      .simplify = expr_simplify_rebuild_binary_operator,
                                      .fold_const_unary = NULL};
 const expr_ops_t ops_hypergeometric_pFq = {.eval = eval_hypergeometric_pFq,
@@ -4818,38 +4818,38 @@ const expr_ops_t ops_lambert_w = {.eval = eval_lambert_w,
                                   .apply_binary = NULL,
                                   .simplify = expr_simplify_unary_operator,
                                   .fold_const_unary = NULL};
-const expr_ops_t ops_lambert_wn = {.eval = eval_lambert_wn,
-                                   .deriv = deriv_lambert_wn,
-                                   .reverse = expr_reverse_lambert_wn,
+const expr_ops_t ops_lambert_Wn = {.eval = eval_lambert_Wn,
+                                   .deriv = deriv_lambert_Wn,
+                                   .reverse = expr_reverse_lambert_Wn,
                                    .kind = EXPR_KIND_LAMBERT_WN,
                                    .arity = EXPR_OP_BINARY,
                                    .expression_name = "Wₙ",
                                    .function_name = "wn",
                                    .apply_unary = NULL,
-                                   .apply_binary = expr_lambert_wn_xp,
+                                   .apply_binary = expr_lambert_Wn_xp,
                                    .simplify = expr_simplify_binary_operator,
                                    .fold_const_unary = NULL};
-const expr_ops_t ops_lambert_w0 = {.eval = eval_lambert_w0,
-                                   .deriv = deriv_lambert_w0,
-                                   .reverse = expr_reverse_lambert_w0,
+const expr_ops_t ops_lambert_W0 = {.eval = eval_lambert_W0,
+                                   .deriv = deriv_lambert_W0,
+                                   .reverse = expr_reverse_lambert_W0,
                                    .kind = EXPR_KIND_LAMBERT_W0,
                                    .arity = EXPR_OP_UNARY,
                                    .expression_name = "W₀",
                                    .function_name = "w0",
                                    .inverse_unary = expr_inverse_lambert_internal,
-                                   .apply_unary = expr_lambert_w0,
+                                   .apply_unary = expr_lambert_W0,
                                    .apply_binary = NULL,
                                    .simplify = expr_simplify_unary_operator,
                                    .fold_const_unary = NULL};
-const expr_ops_t ops_lambert_wm1 = {.eval = eval_lambert_wm1,
-                                    .deriv = deriv_lambert_wm1,
-                                    .reverse = expr_reverse_lambert_wm1,
+const expr_ops_t ops_lambert_Wm1 = {.eval = eval_lambert_Wm1,
+                                    .deriv = deriv_lambert_Wm1,
+                                    .reverse = expr_reverse_lambert_Wm1,
                                     .kind = EXPR_KIND_LAMBERT_WM1,
                                     .arity = EXPR_OP_UNARY,
                                     .expression_name = "W₋₁",
                                     .function_name = "wm1",
                                     .inverse_unary = expr_inverse_lambert_internal,
-                                    .apply_unary = expr_lambert_wm1,
+                                    .apply_unary = expr_lambert_Wm1,
                                     .apply_binary = NULL,
                                     .simplify = expr_simplify_unary_operator,
                                     .fold_const_unary = NULL};
@@ -5372,9 +5372,9 @@ expr_t *expr_apply_unary_kind(expr_op_kind_t kind, const expr_t *arg)
         [EXPR_KIND_POLYLOG1] = &ops_polylog1,
         [EXPR_KIND_GAMMAINV] = &ops_gammainv,
         [EXPR_KIND_LAMBERT_W] = &ops_lambert_w,
-        [EXPR_KIND_LAMBERT_WN] = &ops_lambert_wn,
-        [EXPR_KIND_LAMBERT_W0] = &ops_lambert_w0,
-        [EXPR_KIND_LAMBERT_WM1] = &ops_lambert_wm1,
+        [EXPR_KIND_LAMBERT_WN] = &ops_lambert_Wn,
+        [EXPR_KIND_LAMBERT_W0] = &ops_lambert_W0,
+        [EXPR_KIND_LAMBERT_WM1] = &ops_lambert_Wm1,
         [EXPR_KIND_NORMAL_PDF] = &ops_normal_pdf,
         [EXPR_KIND_NORMAL_CDF] = &ops_normal_cdf,
         [EXPR_KIND_NORMAL_LOGPDF] = &ops_normal_logpdf,
@@ -5765,21 +5765,21 @@ expr_t *expr_legendre_chi(unsigned int order, const expr_t *a)
     expr_free(order_xp);
     return out;
 }
-expr_t *expr_bessel_j(const expr_t *order, const expr_t *argument)
+expr_t *expr_bessel_J(const expr_t *order, const expr_t *argument)
 {
-    return expr_math_wrap_binary(&ops_bessel_j, order, argument);
+    return expr_math_wrap_binary(&ops_bessel_J, order, argument);
 }
 
-expr_t *expr_lommel_s(const expr_t *mu, const expr_t *nu, const expr_t *argument)
+expr_t *expr_lommel_S(const expr_t *mu, const expr_t *nu, const expr_t *argument)
 {
-    expr_t *parameters = expr_lommel_s_pack(mu, nu);
-    expr_t *out = parameters ? expr_math_wrap_binary(&ops_lommel_s, parameters, argument) : NULL;
+    expr_t *parameters = expr_lommel_S_pack(mu, nu);
+    expr_t *out = parameters ? expr_math_wrap_binary(&ops_lommel_S, parameters, argument) : NULL;
 
     expr_free(parameters);
     return out;
 }
 
-static expr_t *expr_lommel_s_hypergeometric_argument_derivative_expansion(const expr_t *mu, const expr_t *nu,
+static expr_t *expr_lommel_S_hypergeometric_argument_derivative_expansion(const expr_t *mu, const expr_t *nu,
                                                                           const expr_t *argument)
 {
     expr_t *one = expr_new_const(NUM_ONE);
@@ -5858,23 +5858,23 @@ static expr_t *expr_lommel_s_hypergeometric_argument_derivative_expansion(const 
     return out;
 }
 
-expr_t *expr_lommel_s_argument_derivative_expansion(const expr_t *mu, const expr_t *nu, const expr_t *argument)
+expr_t *expr_lommel_S_argument_derivative_expansion(const expr_t *mu, const expr_t *nu, const expr_t *argument)
 {
     expr_t *mu_plus_nu = expr_add(mu, nu);
     expr_t *coefficient = mu_plus_nu ? expr_add_long(mu_plus_nu, -1) : NULL;
     expr_t *simplified_coefficient = coefficient ? expr_simplify(coefficient) : NULL;
     expr_t *mu_minus_one = expr_add_long(mu, -1);
     expr_t *nu_minus_one = expr_add_long(nu, -1);
-    expr_t *shifted = (mu_minus_one && nu_minus_one) ? expr_lommel_s(mu_minus_one, nu_minus_one, argument) : NULL;
+    expr_t *shifted = (mu_minus_one && nu_minus_one) ? expr_lommel_S(mu_minus_one, nu_minus_one, argument) : NULL;
     expr_t *left = (coefficient && shifted) ? expr_mul(coefficient, shifted) : NULL;
-    expr_t *original = expr_lommel_s(mu, nu, argument);
+    expr_t *original = expr_lommel_S(mu, nu, argument);
     expr_t *nu_times_original = original ? expr_mul(nu, original) : NULL;
     expr_t *right = nu_times_original ? expr_div(nu_times_original, argument) : NULL;
     expr_t *raw = (left && right) ? expr_sub(left, right) : NULL;
     expr_t *out = NULL;
 
     if (simplified_coefficient && expr_is_exact_zero(simplified_coefficient))
-        out = expr_lommel_s_hypergeometric_argument_derivative_expansion(mu, nu, argument);
+        out = expr_lommel_S_hypergeometric_argument_derivative_expansion(mu, nu, argument);
     else
         out = raw ? expr_simplify(raw) : NULL;
 
@@ -5892,27 +5892,27 @@ expr_t *expr_lommel_s_argument_derivative_expansion(const expr_t *mu, const expr
     return out;
 }
 
-static expr_t *expr_lommel_s_pack(const expr_t *mu, const expr_t *nu)
+static expr_t *expr_lommel_S_pack(const expr_t *mu, const expr_t *nu)
 {
-    return expr_math_wrap_binary(&ops_lommel_s_pack, mu, nu);
+    return expr_math_wrap_binary(&ops_lommel_S_pack, mu, nu);
 }
 
-static expr_t *expr_lommel_s_from_pack(const expr_t *parameters, const expr_t *argument)
+static expr_t *expr_lommel_S_from_pack(const expr_t *parameters, const expr_t *argument)
 {
-    return expr_math_wrap_binary(&ops_lommel_s, parameters, argument);
+    return expr_math_wrap_binary(&ops_lommel_S, parameters, argument);
 }
 
-static expr_t *expr_appell_f1_pack(const expr_t *left, const expr_t *right)
+static expr_t *expr_appell_F1_pack(const expr_t *left, const expr_t *right)
 {
-    return expr_math_wrap_binary(&ops_appell_f1_pack, left, right);
+    return expr_math_wrap_binary(&ops_appell_F1_pack, left, right);
 }
 
-static expr_t *expr_appell_f1_from_packs(const expr_t *params, const expr_t *vars)
+static expr_t *expr_appell_F1_from_packs(const expr_t *params, const expr_t *vars)
 {
-    return expr_math_wrap_binary(&ops_appell_f1, params, vars);
+    return expr_math_wrap_binary(&ops_appell_F1, params, vars);
 }
 
-expr_t *expr_appell_f1(const expr_t *a, const expr_t *b1, const expr_t *b2, const expr_t *c, const expr_t *x,
+expr_t *expr_appell_F1(const expr_t *a, const expr_t *b1, const expr_t *b2, const expr_t *c, const expr_t *x,
                        const expr_t *y)
 {
     expr_t *ab = NULL;
@@ -5924,11 +5924,11 @@ expr_t *expr_appell_f1(const expr_t *a, const expr_t *b1, const expr_t *b2, cons
     if (!a || !b1 || !b2 || !c || !x || !y)
         return NULL;
 
-    ab = expr_appell_f1_pack(a, b1);
-    bc = expr_appell_f1_pack(b2, c);
-    params = ab && bc ? expr_appell_f1_pack(ab, bc) : NULL;
-    vars = expr_appell_f1_pack(x, y);
-    out = params && vars ? expr_math_wrap_binary(&ops_appell_f1, params, vars) : NULL;
+    ab = expr_appell_F1_pack(a, b1);
+    bc = expr_appell_F1_pack(b2, c);
+    params = ab && bc ? expr_appell_F1_pack(ab, bc) : NULL;
+    vars = expr_appell_F1_pack(x, y);
+    out = params && vars ? expr_math_wrap_binary(&ops_appell_F1, params, vars) : NULL;
 
     expr_free(vars);
     expr_free(params);
@@ -5947,9 +5947,9 @@ static expr_t *expr_hypergeometric_pFq_from_pack(const expr_t *parameters, const
     return expr_math_wrap_binary(&ops_hypergeometric_pFq, parameters, argument);
 }
 
-static expr_t *expr_lauricella_f_from_packs(const expr_t *params, const expr_t *vars)
+static expr_t *expr_lauricella_F_from_packs(const expr_t *params, const expr_t *vars)
 {
-    return expr_math_wrap_binary(&ops_lauricella_f, params, vars);
+    return expr_math_wrap_binary(&ops_lauricella_F, params, vars);
 }
 
 static expr_t *expr_hypergeometric_parameter_values(size_t count, const expr_t *const *values, const expr_t *empty)
@@ -6041,7 +6041,7 @@ expr_t *expr_hypergeometric_pFq_from_args(size_t argument_count, expr_t *const *
                                    (const expr_t *const *)&arguments[2u + upper_count], arguments[argument_count - 1u]);
 }
 
-expr_t *expr_lauricella_f(const expr_t *a, size_t variable_count, const expr_t *const *b, const expr_t *c,
+expr_t *expr_lauricella_F(const expr_t *a, size_t variable_count, const expr_t *const *b, const expr_t *c,
                           const expr_t *const *x)
 {
     expr_t *a_c = NULL;
@@ -6056,7 +6056,7 @@ expr_t *expr_lauricella_f(const expr_t *a, size_t variable_count, const expr_t *
     b_set = expr_hypergeometric_parameter_set(variable_count, b);
     x_set = expr_hypergeometric_parameter_set(variable_count, x);
     parameters = a_c && b_set ? expr_hypergeometric_pFq_pack(a_c, b_set) : NULL;
-    out = parameters && x_set ? expr_math_wrap_binary(&ops_lauricella_f, parameters, x_set) : NULL;
+    out = parameters && x_set ? expr_math_wrap_binary(&ops_lauricella_F, parameters, x_set) : NULL;
     expr_free(parameters);
     expr_free(x_set);
     expr_free(b_set);
@@ -6064,7 +6064,7 @@ expr_t *expr_lauricella_f(const expr_t *a, size_t variable_count, const expr_t *
     return out;
 }
 
-expr_t *expr_lauricella_f_from_args(size_t argument_count, expr_t *const *arguments)
+expr_t *expr_lauricella_F_from_args(size_t argument_count, expr_t *const *arguments)
 {
     double count_value;
     size_t variable_count;
@@ -6078,7 +6078,7 @@ expr_t *expr_lauricella_f_from_args(size_t argument_count, expr_t *const *argume
     variable_count = (size_t)count_value;
     if (argument_count != 2u * variable_count + 3u)
         return NULL;
-    return expr_lauricella_f(arguments[1], variable_count, (const expr_t *const *)&arguments[2],
+    return expr_lauricella_F(arguments[1], variable_count, (const expr_t *const *)&arguments[2],
                              arguments[2u + variable_count], (const expr_t *const *)&arguments[3u + variable_count]);
 }
 
@@ -6094,31 +6094,31 @@ expr_t *expr_lambert_w(const expr_t *a)
         return inverse;
     return expr_math_wrap_unary(&ops_lambert_w, a);
 }
-expr_t *expr_lambert_wn_xp(const expr_t *branch, const expr_t *arg)
+expr_t *expr_lambert_Wn_xp(const expr_t *branch, const expr_t *arg)
 {
     if (branch && expr_is_const(branch)) {
         if (num_eq(branch->c, NUM_ZERO))
-            return expr_lambert_w0(arg);
+            return expr_lambert_W0(arg);
         if (num_eq(branch->c, NUM_NEG_ONE))
-            return expr_lambert_wm1(arg);
+            return expr_lambert_Wm1(arg);
     }
-    return expr_math_wrap_binary(&ops_lambert_wn, branch, arg);
+    return expr_math_wrap_binary(&ops_lambert_Wn, branch, arg);
 }
-expr_t *expr_lambert_wn(const expr_t *branch, const expr_t *arg)
+expr_t *expr_lambert_Wn(const expr_t *branch, const expr_t *arg)
 {
-    return expr_lambert_wn_xp(branch, arg);
+    return expr_lambert_Wn_xp(branch, arg);
 }
-expr_t *expr_lambert_w0(const expr_t *a)
+expr_t *expr_lambert_W0(const expr_t *a)
 {
     expr_t *inverse = expr_simplify_try_lambert_argument((expr_t *)a);
 
     if (inverse)
         return inverse;
-    return expr_math_wrap_unary(&ops_lambert_w0, a);
+    return expr_math_wrap_unary(&ops_lambert_W0, a);
 }
-expr_t *expr_lambert_wm1(const expr_t *a)
+expr_t *expr_lambert_Wm1(const expr_t *a)
 {
-    return expr_math_wrap_unary(&ops_lambert_wm1, a);
+    return expr_math_wrap_unary(&ops_lambert_Wm1, a);
 }
 expr_t *expr_normal_pdf(const expr_t *a)
 {

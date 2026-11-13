@@ -6,6 +6,19 @@
     "test_missing_nested_path_is_materialized": true
   },
   "test_builtin_string_validity_contract_success": true,
+  "test_config_progress_plans": {
+    "cross_file_group": true,
+    "disabled_cross_file_group": true,
+    "disabled_entire_module": true,
+    "disabled_leaf_and_group": true,
+    "enabled": true,
+    "local_disabled_group": true,
+    "missing_module": true,
+    "nested_group_is_not_a_case": true,
+    "profile_overrides_json": true,
+    "tool_namespaces_are_distinct": true,
+    "wiped_configuration": true
+  },
   "test_explicit_skip_example": true,
   "test_fixture_balance_after_nested_group": true,
   "test_fixture_is_active_for_case": true,

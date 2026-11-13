@@ -1037,7 +1037,8 @@ static int cfg_globe_river_stage_run(const char *input_path, const char *output_
     if (output && file_is_open(output)) ok = file_close(output) && ok;
     if (ok && !resume) ok = file_chmod(output, 0600);
     sqlite_t *db = ok ? sqlite_open_plain(path) : NULL;
-    ok = ok && db && sqlite_exec_cstr(db, "PRAGMA cache_size=-8192;PRAGMA temp_store=FILE;PRAGMA temp.cache_size=-1024;");
+    ok = ok && db && sqlite_set_cache_budget(db, NULL, 8192) && sqlite_set_cache_budget(db, "temp", 1024) &&
+        sqlite_exec_cstr(db, "PRAGMA temp_store=FILE;");
     if (ok) {
         puts("Staging rivers with an 8 m error ceiling and a 7 GB final size limit; installed globe unchanged.");
         fflush(stdout);
@@ -1212,9 +1213,8 @@ int cfg_globe_river_install(const char *candidate_path)
               cfg_storage_safe_regular(source_file, &source_exists) && source_exists;
     sqlite_t *source = ok ? sqlite_open_plain(candidate) : NULL;
     sqlite_t *target = source ? sqlite_open_plain(path) : NULL;
-    ok = ok && source && target &&
-         sqlite_exec_cstr(source, "PRAGMA query_only=ON;PRAGMA cache_size=-8192;") &&
-         sqlite_exec_cstr(target, "PRAGMA cache_size=-65536;");
+    ok = ok && source && target && sqlite_set_cache_budget(source, NULL, 8192) &&
+         sqlite_exec_cstr(source, "PRAGMA query_only=ON;") && sqlite_set_cache_budget(target, NULL, 65536);
     globe_t *globe = ok ? globe_open_databases(target, NULL, NULL) : NULL;
     ok = ok && globe && globe_has_layer(globe, GLOBE_LAYER_SHORELINE);
     globe_close(globe);
@@ -1372,7 +1372,7 @@ static int cfg_globe_execute(const char *action, const char *explicit_key)
             ok = cfg_database_rebuild_globe(&db, expanded, root, staging, cfg_globe_refresh_all,
                                             CFG_GLOBE_DATA_REVISION, true);
         bool transaction = !staged_update && db && root &&
-            sqlite_exec_cstr(db, "PRAGMA cache_size=-16384; PRAGMA temp.cache_size=-512;") &&
+            sqlite_set_cache_budget(db, NULL, 16384) && sqlite_set_cache_budget(db, "temp", 512) &&
             cfg_globe_valid(db) && sqlite_exec_cstr(db, "begin immediate");
         if (!staged_update)
             ok = transaction && cfg_globe_refresh_all(db, root, staging) &&
@@ -1383,7 +1383,7 @@ static int cfg_globe_execute(const char *action, const char *explicit_key)
         sqlite_close(db);
     } else if (ok && check) {
         db = exists ? cfg_database_open(expanded, key) : NULL;
-        ok = db && sqlite_exec_cstr(db, "PRAGMA query_only=ON; PRAGMA cache_size=-512;") &&
+        ok = db && sqlite_set_cache_budget(db, NULL, 512) && sqlite_exec_cstr(db, "PRAGMA query_only=ON;") &&
              cfg_globe_valid(db) && cfg_database_textures_valid(db);
         sqlite_close(db);
     } else if (ok && install) {
@@ -1393,9 +1393,8 @@ static int cfg_globe_execute(const char *action, const char *explicit_key)
         temporary = temporary_path ? file_new(temporary_path) : NULL;
         db = temporary && root ? cfg_database_open(temporary_path, key) : NULL;
         ok = ok && db && (string_byte_length(key) || sqlite_exec_cstr(db, "PRAGMA page_size=65536")) &&
-             sqlite_exec_cstr(db, string_byte_length(key) ?
-                 "PRAGMA cache_size=-16384; PRAGMA temp.cache_size=-512;" :
-                 "PRAGMA cache_size=-65536; PRAGMA temp.cache_size=-512;") &&
+             sqlite_set_cache_budget(db, NULL, string_byte_length(key) ? 16384 : 65536) &&
+             sqlite_set_cache_budget(db, "temp", 512) &&
              cfg_database_coast(db, root, staging) && cfg_globe_countries(db, root, staging) && cfg_globe_valid(db) &&
              cfg_globe_regions(db, root) && cfg_database_textures(db, root) &&
              cfg_database_source(db, root, "packaging/globe-db/jurisdiction_subdivisions.sql", false) &&

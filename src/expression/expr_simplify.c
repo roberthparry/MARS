@@ -2900,7 +2900,7 @@ expr_t *expr_simplify_unary_operator(const expr_t *expr, expr_t *a, expr_t *b)
         }
     }
 
-    if (expr_is_op(expr, &ops_lambert_w) || expr_is_op(expr, &ops_lambert_w0)) {
+    if (expr_is_op(expr, &ops_lambert_w) || expr_is_op(expr, &ops_lambert_W0)) {
         lambert_argument = expr_simplify_try_lambert_argument(a);
         if (lambert_argument) {
             expr_free(a);

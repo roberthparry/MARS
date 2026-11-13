@@ -847,12 +847,12 @@ void test_deriv_gammainv(void)
 void test_deriv_lambert_w0(void)
 {
     expr_t *x = test_expr_new_var_d(1.0);
-    expr_t *f = expr_lambert_w0(x);
+    expr_t *f = expr_lambert_W0(x);
     const expr_t *df = expr_get_deriv(f, x);
 
     /* d/dx{W0(x)} = W0(x) / (x * (1 + W0(x))) */
     qfloat_t X = qf_from_double(1.0);
-    qfloat_t w = qf_lambert_w0(X);
+    qfloat_t w = qf_lambert_W0(X);
     qfloat_t want = qf_div(w, qf_mul(X, qf_add(qf_from_double(1.0), w)));
 
     check_q_at(__FILE__, __LINE__, 1, "d/dx{W0(x)} | x=1", expr_eval_qf(df), want);
@@ -865,12 +865,12 @@ void test_deriv_lambert_w0(void)
 void test_deriv_lambert_wm1(void)
 {
     expr_t *x = test_expr_new_var_qf(qf_from_string("-0.1"));
-    expr_t *f = expr_lambert_wm1(x);
+    expr_t *f = expr_lambert_Wm1(x);
     const expr_t *df = expr_get_deriv(f, x);
 
     /* d/dx{Wm1(x)} = Wm1(x) / (x * (1 + Wm1(x))) */
     qfloat_t X = qf_from_string("-0.1");
-    qfloat_t w = qf_lambert_wm1(X);
+    qfloat_t w = qf_lambert_Wm1(X);
     qfloat_t want = qf_div(w, qf_mul(X, qf_add(qf_from_double(1.0), w)));
 
     check_q_at(__FILE__, __LINE__, 1, "d/dx{Wm1(x)} | x=-0.1", expr_eval_qf(df), want);

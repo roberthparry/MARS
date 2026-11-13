@@ -656,33 +656,33 @@ expr_t *expr_clausen_sum_closed_form(const expr_t *expr);
 extern const expr_ops_t ops_lerch_phi;
 extern const expr_ops_t ops_lerch_phi_pack;
 extern const expr_ops_t ops_legendre_chi;
-extern const expr_ops_t ops_bessel_j;
-extern const expr_ops_t ops_bessel_y;
-extern const expr_ops_t ops_bessel_k;
-extern const expr_ops_t ops_bessel_i;
+extern const expr_ops_t ops_bessel_J;
+extern const expr_ops_t ops_bessel_Y;
+extern const expr_ops_t ops_bessel_K;
+extern const expr_ops_t ops_bessel_I;
 
 /** Expand a finite numerical Bessel I order into its principal hypergeometric form, reflecting negative integers. */
-expr_t *expr_bessel_i_hypergeometric(const expr_t *order, const expr_t *argument);
-extern const expr_ops_t ops_struve_l;
-extern const expr_ops_t ops_struve_h;
+expr_t *expr_bessel_I_hypergeometric(const expr_t *order, const expr_t *argument);
+extern const expr_ops_t ops_struve_L;
+extern const expr_ops_t ops_struve_H;
 
 /** Expand a finite numerical Struve H order into its alternating hypergeometric form, or return NULL at poles. */
-expr_t *expr_struve_h_hypergeometric(const expr_t *order, const expr_t *argument);
+expr_t *expr_struve_H_hypergeometric(const expr_t *order, const expr_t *argument);
 
 /** Expand a finite numerical Struve order into its principal hypergeometric form, or return NULL at parameter poles. */
-expr_t *expr_struve_l_hypergeometric(const expr_t *order, const expr_t *argument);
-extern const expr_ops_t ops_lommel_s;
-extern const expr_ops_t ops_lommel_s_pack;
-extern const expr_ops_t ops_appell_f1;
-extern const expr_ops_t ops_appell_f1_pack;
-extern const expr_ops_t ops_lauricella_f;
+expr_t *expr_struve_L_hypergeometric(const expr_t *order, const expr_t *argument);
+extern const expr_ops_t ops_lommel_S;
+extern const expr_ops_t ops_lommel_S_pack;
+extern const expr_ops_t ops_appell_F1;
+extern const expr_ops_t ops_appell_F1_pack;
+extern const expr_ops_t ops_lauricella_F;
 extern const expr_ops_t ops_hypergeometric_pFq;
 extern const expr_ops_t ops_hypergeometric_pFq_pack;
 extern const expr_ops_t ops_gammainv;
 extern const expr_ops_t ops_lambert_w;
-extern const expr_ops_t ops_lambert_wn;
-extern const expr_ops_t ops_lambert_w0;
-extern const expr_ops_t ops_lambert_wm1;
+extern const expr_ops_t ops_lambert_Wn;
+extern const expr_ops_t ops_lambert_W0;
+extern const expr_ops_t ops_lambert_Wm1;
 extern const expr_ops_t ops_normal_pdf;
 extern const expr_ops_t ops_normal_cdf;
 extern const expr_ops_t ops_normal_logpdf;
@@ -951,11 +951,11 @@ expr_t *expr_polygamma_xp(const expr_t *order, const expr_t *arg);
 expr_t *expr_polylog_xp(const expr_t *order, const expr_t *arg);
 bool expr_lerch_phi_unpack(const expr_t *expr, const expr_t **z, const expr_t **s, const expr_t **a);
 expr_t *expr_legendre_chi_xp(const expr_t *order, const expr_t *arg);
-expr_t *expr_lambert_wn_xp(const expr_t *branch, const expr_t *arg);
-bool expr_lommel_s_unpack(const expr_t *expr, const expr_t **mu, const expr_t **nu, const expr_t **argument);
-bool expr_appell_f1_unpack(const expr_t *expr, const expr_t **a, const expr_t **b1, const expr_t **b2, const expr_t **c,
+expr_t *expr_lambert_Wn_xp(const expr_t *branch, const expr_t *arg);
+bool expr_lommel_S_unpack(const expr_t *expr, const expr_t **mu, const expr_t **nu, const expr_t **argument);
+bool expr_appell_F1_unpack(const expr_t *expr, const expr_t **a, const expr_t **b1, const expr_t **b2, const expr_t **c,
                            const expr_t **x, const expr_t **y);
-bool expr_lauricella_f_unpack(const expr_t *expr, const expr_t **a, const expr_t ***b, const expr_t **c,
+bool expr_lauricella_F_unpack(const expr_t *expr, const expr_t **a, const expr_t ***b, const expr_t **c,
                               const expr_t ***x, size_t *variable_count);
 bool expr_hypergeometric_pFq_unpack(const expr_t *expr, const expr_t ***upper, size_t *upper_count,
                                     const expr_t ***lower, size_t *lower_count, const expr_t **argument);
@@ -1171,22 +1171,22 @@ void expr_reverse_dilog(const expr_t *expr, const number_t *out_bar, number_t *a
 void expr_reverse_polylog1(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
 void expr_reverse_polylog(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
 void expr_reverse_legendre_chi(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_bessel_j(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_bessel_y(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_lommel_s(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_bessel_J(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_bessel_Y(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_lommel_S(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
 void expr_reverse_parameter_pack(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
 void expr_reverse_hypergeometric_pFq(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-int expr_reverse_appell_f1_many(const expr_t *expr, const number_t *out_bar, expr_reverse_accumulate_fn accumulate,
+int expr_reverse_appell_F1_many(const expr_t *expr, const number_t *out_bar, expr_reverse_accumulate_fn accumulate,
                                 void *context);
 int expr_reverse_lerch_phi_many(const expr_t *expr, const number_t *out_bar, expr_reverse_accumulate_fn accumulate,
                                 void *context);
-int expr_reverse_lauricella_f_many(const expr_t *expr, const number_t *out_bar, expr_reverse_accumulate_fn accumulate,
+int expr_reverse_lauricella_F_many(const expr_t *expr, const number_t *out_bar, expr_reverse_accumulate_fn accumulate,
                                    void *context);
 void expr_reverse_gammainv(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
 void expr_reverse_lambert_w(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_lambert_wn(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_lambert_w0(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
-void expr_reverse_lambert_wm1(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_lambert_Wn(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_lambert_W0(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void expr_reverse_lambert_Wm1(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
 void expr_reverse_normal_pdf(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
 void expr_reverse_normal_cdf(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
 void expr_reverse_normal_logpdf(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar);

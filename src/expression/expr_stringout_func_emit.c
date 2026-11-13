@@ -652,8 +652,8 @@ void emit_func(const expr_t *f, sbuf_t *b, int parent_prec)
             emit_func_polygamma(f, b);
             return;
         }
-        if (expr_is_op(f, &ops_lommel_s)) {
-            emit_func_lommel_s(f, b);
+        if (expr_is_op(f, &ops_lommel_S)) {
+            emit_func_lommel_S(f, b);
             return;
         }
         if ((expr_is_op(f, &ops_lerch_phi) && f->a && expr_is_op(f->a, &ops_lerch_phi_pack)) ||
@@ -668,20 +668,20 @@ void emit_func(const expr_t *f, sbuf_t *b, int parent_prec)
             sbuf_putc(b, ')');
             return;
         }
-        if (expr_is_op(f, &ops_appell_f1)) {
-            emit_func_appell_f1(f, b);
+        if (expr_is_op(f, &ops_appell_F1)) {
+            emit_func_appell_F1(f, b);
             return;
         }
-        if (expr_is_op(f, &ops_lauricella_f)) {
-            emit_func_lauricella_f(f, b);
+        if (expr_is_op(f, &ops_lauricella_F)) {
+            emit_func_lauricella_F(f, b);
             return;
         }
         if (expr_is_op(f, &ops_hypergeometric_pFq)) {
             emit_func_hypergeometric_pFq(f, b);
             return;
         }
-        if (expr_is_op(f, &ops_lambert_wn)) {
-            emit_func_lambert_wn(f, b);
+        if (expr_is_op(f, &ops_lambert_Wn)) {
+            emit_func_lambert_Wn(f, b);
             return;
         }
         emit_function_builtin_name(b, f->ops);

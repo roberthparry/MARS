@@ -9,8 +9,7 @@
  * implementation.
  */
 
-/* Shared expression value adapters for the expression and matrix suites. */
-#include "../expression/test_expr.h"
+#include "test_expr_support.h"
 
 /* Create a constant from a double and release the temporary number. */
 expr_t *test_expr_new_const_d(double x)

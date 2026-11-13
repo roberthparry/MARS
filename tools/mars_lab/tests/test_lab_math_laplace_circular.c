@@ -171,8 +171,8 @@ static void test_laplace_circular_independent_inverses(void)
         lab_math_laplace_circular_check_inverse(spectrum, 0, sign * 2, 1, 0, false);
         lab_math_laplace_circular_check_inverse(lab_math_format("3*(%s)+2/s", spectrum), 0, sign * 2, 3, 2, false);
     }
-    const char *spectra[] = {"@pi/(2*s)*(bessel_i(0,s)-struve_l(0,s))+i*besselk(0,s)/s",
-                             "@pi/(2*s)*(1-bessel_i(0,s)+struve_l(0,s))-i*besselk(0,s)/s"};
+    const char *spectra[] = {"@pi/(2*s)*(bessel_I(0,s)-struve_L(0,s))+i*besselk(0,s)/s",
+                             "@pi/(2*s)*(1-bessel_I(0,s)+struve_L(0,s))-i*besselk(0,s)/s"};
     for (unsigned family = 1; family < 3; ++family) {
         lab_math_laplace_circular_check_inverse(spectra[family - 1], family, 1, 1, 0, false);
         lab_math_laplace_circular_check_inverse(lab_math_format("3*(%s)+2/s", spectra[family - 1]), family, 1, 3, 2, false);

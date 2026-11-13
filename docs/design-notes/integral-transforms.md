@@ -464,10 +464,10 @@ In the Bessel rows, write $r=\sqrt{s^2+a^2}$ and $u=a/(s+r)$.
 | `gammainc_upper`: $\Gamma(\nu,at)$ | $\Gamma(\nu)(1-P_\nu)/s$ | Same restrictions |
 | `gammainc_P`: $P(\nu,at)$ | $P_\nu/s$ | Same restrictions |
 | `gammainc_Q`: $Q(\nu,at)$ | $(1-P_\nu)/s$ | Same restrictions |
-| `bessel_j`: $J_\nu(at)$ | $u^\nu/r$ | Known real $a>0,\ \mathfrak{Re}(\nu)>-1,\ \sigma>0$ |
-| `bessel_j`: $J_{-n}(at)$ | $(-1)^n u^n/r$ | Known positive integer $n$, known real $a>0,\ \sigma>0$ |
-| `bessel_j(0,...)`, `J_0`: $J_0(at)$ | $1/\sqrt{s^2+a^2}$ | $C(a)$; this zero-order rule also supports symbolic and complex scales |
-| `bessel_y`: $Y_0(at)$ | $-2\ln((s+r)/a)/(\pi r)$ | Known real $a>0,\ \sigma>0$ |
+| `bessel_J`: $J_\nu(at)$ | $u^\nu/r$ | Known real $a>0,\ \mathfrak{Re}(\nu)>-1,\ \sigma>0$ |
+| `bessel_J`: $J_{-n}(at)$ | $(-1)^n u^n/r$ | Known positive integer $n$, known real $a>0,\ \sigma>0$ |
+| `bessel_J(0,...)`, `J_0`: $J_0(at)$ | $1/\sqrt{s^2+a^2}$ | $C(a)$; this zero-order rule also supports symbolic and complex scales |
+| `bessel_Y`: $Y_0(at)$ | $-2\ln((s+r)/a)/(\pi r)$ | Known real $a>0,\ \sigma>0$ |
 
 ### Clausen functions
 

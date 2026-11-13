@@ -9,6 +9,7 @@
  * run suites sequentially; this source is not part of the installed library.
  */
 
+#include "string-t.h"
 #include "file-t.h"
 #include "test_timeseries.h"
 

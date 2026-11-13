@@ -959,14 +959,14 @@ __HOLIDAY_JURISDICTION_OPTIONS__
             <li>Error functions: <code>erf(x)</code>, <code>erfc(x)</code>, <code>erfinv(x)</code>, <code>erfcinv(x)</code>.</li>
             <li>Exponential integrals: <code>Ei(x)</code>, <code>E1(x)</code>. The logarithmic integral is <code>Li(x)</code>; it is distinct from the polylogarithm <code>polylog(n,x)</code>.</li>
             <li>Zeta functions: <code>zeta(s)</code>, its derivative <code>zetap(s)</code>, and Hurwitz <code>zeta(s,a)</code>. Special functions retain their domain and branch restrictions.</li>
-            <li>Order-dependent special functions include <code>BesselJ(n,x)</code>, <code>BesselY(n,x)</code>, <code>struve_h(n,x)</code> and <code>struve_l(n,x)</code>.</li>
+            <li>Order-dependent special functions include <code>BesselJ(n,x)</code>, <code>BesselY(n,x)</code>, <code>struve_H(n,x)</code> and <code>struve_L(n,x)</code>.</li>
           </ul>
         </div>
         <div class="help-card" data-help-modes="expression,equation,integrator">
           <h3>Lambert W And Normal Functions</h3>
           <ul>
-            <li>Principal Lambert W: <code>W0(x)</code>, <code>W_0(x)</code>, <code>W₀(x)</code>, <code>lambert_w0(x)</code>. Use these explicit names when the principal branch is required.</li>
-            <li>Minus-one Lambert W branch: <code>W-1(x)</code>, <code>W_-1(x)</code>, <code>W₋₁(x)</code>, <code>lambert_wm1(x)</code>.</li>
+            <li>Principal Lambert W: <code>W0(x)</code>, <code>W_0(x)</code>, <code>W₀(x)</code>, <code>lambert_W0(x)</code>. Use these explicit names when the principal branch is required.</li>
+            <li>Minus-one Lambert W branch: <code>W-1(x)</code>, <code>W_-1(x)</code>, <code>W₋₁(x)</code>, <code>lambert_Wm1(x)</code>.</li>
             <li>Normal distribution: <code>normal_pdf(x)</code>, <code>normal_cdf(x)</code>, <code>normal_logpdf(x)</code>.</li>
           </ul>
         </div>
@@ -1014,7 +1014,8 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       <button class="secondary" id="historyEditorClose" type="button">Close</button>
     </div>
     <p>Select a worksheet to open it. “Current” marks the worksheet you are viewing.
-      Use Earlier and Later to reorder entries, or Remove to delete one. Changes are saved automatically.
+      Drag the grip beside an entry to reorder it, or use Earlier and Later. Remove deletes an entry.
+      Changes are saved automatically.
       New evaluations are inserted after the current entry; later entries are kept.</p>
     <p id="historyEditorStatus" role="status"></p>
     <ol id="historyEditorEntries"></ol>

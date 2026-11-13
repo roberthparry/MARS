@@ -39,8 +39,8 @@ bool cfg_database_select_main_rivers(sqlite_t *source, const string_t *output)
                     sqlite_stmt_step(q) == SQLITE_STEP_DONE;
     sqlite_stmt_finalize(q);
     cfg_progress_t *progress = attached ? cfg_progress_start("Selecting main river channels") : NULL;
-    ok = ok && attached && sqlite_exec_cstr(source,
-        "pragma mars_selected.cache_size=-16384;pragma mars_selected.synchronous=full;");
+    ok = ok && attached && sqlite_set_cache_budget(source, "mars_selected", 16384) &&
+        sqlite_exec_cstr(source, "pragma mars_selected.synchronous=full;");
     bool transaction = ok && sqlite_exec_cstr(source, "begin");
     ok = transaction && sqlite_exec_cstr(source,
         "create table mars_selected.rivers_chunk("

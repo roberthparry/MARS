@@ -57,7 +57,7 @@ static expr_t *branch_spectrum(fourier_context_t *c, expr_op_kind_t kind, const 
         /* Use a unit cutoff in the frequency coordinate. Rescaling its logarithmic primitive
          * contributes ln|rate| to the impulse; omitting it would change the inverse by a constant. */
         expr_t *reciprocal = ft_finite_part(c, ft_div(c, ft_step(c, q), w));
-        expr_t *kernel = ft_mul(c, expr_fourier_keep(c, expr_bessel_j(integer(c, 0), q)), reciprocal);
+        expr_t *kernel = ft_mul(c, expr_fourier_keep(c, expr_bessel_J(integer(c, 0), q)), reciprocal);
         expr_t *gamma = expr_fourier_euler_constant(c);
         expr_t *correction = ft_sub(c, ft_ln(c, ft_mul(c, integer(c, 2), expr_fourier_abs(c, rate))), gamma);
         expr_t *regularised = ft_sub(c, ft_mul(c, correction, impulse),
@@ -110,7 +110,7 @@ static const expr_t *branch_marker(const expr_t *f)
 {
     if (!f)
         return NULL;
-    if (f->ops == &ops_sinc || (f->ops == &ops_bessel_j && expr_const_is_zero(f->a)))
+    if (f->ops == &ops_sinc || (f->ops == &ops_bessel_J && expr_const_is_zero(f->a)))
         return f;
     const expr_t *left = branch_marker(f->a);
     return left ? left : branch_marker(f->b);
@@ -143,7 +143,7 @@ static void canonical_arguments(fourier_context_t *c, expr_t *f, const expr_t *x
         return;
     canonical_arguments(c, f->a, x);
     canonical_arguments(c, f->b, x);
-    expr_t **argument = f->ops == &ops_bessel_j ? &f->b :
+    expr_t **argument = f->ops == &ops_bessel_J ? &f->b :
                         (f->ops == &ops_step || f->ops == &ops_sinc || f->ops == &ops_abs || f->ops == &ops_exp)
                             ? &f->a : NULL;
     expr_t *rate = NULL, *offset = NULL;
@@ -183,7 +183,7 @@ static bool smooth_impulse_coefficient(fourier_context_t *c, const expr_t *f, co
     if (f->ops == &ops_neg)
         return smooth_impulse_coefficient(c, f->a, x);
     const expr_t *argument = f->ops == &ops_exp ? f->a :
-                            (f->ops == &ops_bessel_j && expr_const_is_zero(f->a) ? f->b : NULL);
+                            (f->ops == &ops_bessel_J && expr_const_is_zero(f->a) ? f->b : NULL);
     expr_t *rate = NULL, *offset = NULL;
     return argument && expr_fourier_affine(c, argument, x, &rate, &offset);
 }

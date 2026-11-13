@@ -86,22 +86,22 @@ typedef enum number_primality_t {
     NUMBER_PRIMALITY_PRIME = 1
 } number_primality_t;
 
-typedef struct number_factor_t {
+typedef struct {
     number_t prime;
     unsigned long exponent;
 } number_factor_t;
 
-typedef struct number_factors_t {
+typedef struct {
     size_t count;
     number_factor_t *items;
 } number_factors_t;
 
-typedef union number_inline_qfloat_bits_t {
+typedef union {
     qfloat_t value;
     uint64_t words[2];
 } number_inline_qfloat_bits_t;
 
-typedef union number_inline_qcomplex_bits_t {
+typedef union {
     qcomplex_t value;
     uint64_t words[4];
 } number_inline_qcomplex_bits_t;
@@ -1064,9 +1064,19 @@ number_t num_hermite_Hn(number_t degree, number_t argument);
  * @return Owning result at the participating precision; NaN on a pole, unsupported range or exhausted guard.
  * Release with num_destroy(), or use an enclosing NUM_SCOPE. No input is consumed or modified.
  */
-number_t num_appell_f1(const number_t a, const number_t b1, const number_t b2, const number_t c, const number_t x,
+number_t num_appell_F1(const number_t a, const number_t b1, const number_t b2, const number_t c, const number_t x,
                        const number_t y);
-number_t num_lauricella_f(const number_t a, const number_t *b, const number_t c, const number_t *x,
+/**
+ * @brief Evaluate the Lauricella F_D series at the participating numeric precision.
+ * @param[in] a Borrowed common upper parameter; not consumed.
+ * @param[in] b Borrowed array of variable_count upper parameters; valid during the call.
+ * @param[in] c Borrowed lower parameter; denominator poles are unsupported.
+ * @param[in] x Borrowed array of variable_count arguments in the supported convergence region.
+ * @param[in] variable_count Number of entries in each array.
+ * @return Owned result, or NaN for invalid parameters or failed convergence; release with num_destroy().
+ * Inputs are neither retained nor modified; callers must observe the number module's threading rules.
+ */
+number_t num_lauricella_F(const number_t a, const number_t *b, const number_t c, const number_t *x,
                           size_t variable_count);
 number_t num_hypergeometric_pFq(const number_t *upper, size_t upper_count, const number_t *lower, size_t lower_count,
                                 const number_t argument);
@@ -1079,10 +1089,10 @@ number_t num_legendre_chi(const number_t order, const number_t number);
  * Complex series inputs above magnitude 1000 and work above 65536 bits are unsupported. Release with
  * num_destroy(), or use an enclosing NUM_SCOPE. Inputs are not consumed or modified.
  */
-number_t num_bessel_j(const number_t order, const number_t argument);
+number_t num_bessel_J(const number_t order, const number_t argument);
 
 /** @brief Principal modified Bessel K; zero arguments and unsupported numerical ranges return NaN. */
-number_t num_bessel_k(const number_t order, const number_t argument);
+number_t num_bessel_K(const number_t order, const number_t argument);
 
 /**
  * @brief Evaluate principal modified Bessel I, returning an owning number at the widest input precision.
@@ -1091,7 +1101,7 @@ number_t num_bessel_k(const number_t order, const number_t argument);
  * The negative real axis takes the upper-bank value. Input magnitudes above 1000, undefined zero limits,
  * work precision above 65536 bits and exhausted numerical guards return NaN. See docs/number.md.
  */
-number_t num_bessel_i(const number_t order, const number_t argument);
+number_t num_bessel_I(const number_t order, const number_t argument);
 
 /**
  * @brief Evaluate the principal modified Struve function L_order(argument), returning an owning number.
@@ -1100,7 +1110,7 @@ number_t num_bessel_i(const number_t order, const number_t argument);
  * The negative real axis takes the upper-bank value. Input magnitudes above 1000, undefined zero limits,
  * work precision above 65536 bits and exhausted numerical guards return NaN. See docs/number.md for details.
  */
-number_t num_struve_l(const number_t order, const number_t argument);
+number_t num_struve_L(const number_t order, const number_t argument);
 
 /**
  * @brief Evaluate principal ordinary Struve H, returning an owning number at the widest input precision.
@@ -1109,7 +1119,7 @@ number_t num_struve_l(const number_t order, const number_t argument);
  * half-integer orders. The negative real axis takes the upper-bank value. Input magnitudes above 1000,
  * undefined zero limits or exhausted numerical guards return NaN. See docs/number.md for numerical limits.
  */
-number_t num_struve_h(const number_t order, const number_t argument);
+number_t num_struve_H(const number_t order, const number_t argument);
 
 /**
  * @brief Evaluate principal Bessel Y, returning an owning number at the widest input precision.
@@ -1118,7 +1128,7 @@ number_t num_struve_h(const number_t order, const number_t argument);
  * half-integer orders return zero; other orders return NaN. Exact negative real arguments take the upper-bank
  * value. Non-finite inputs, unsupported ranges and exhausted guards return NaN. See docs/number.md.
  */
-number_t num_bessel_y(const number_t order, const number_t argument);
+number_t num_bessel_Y(const number_t order, const number_t argument);
 /**
  * @brief Evaluate the principal Lommel s function for real or complex parameters.
  * @param mu First parameter, retained by the caller.
@@ -1128,7 +1138,7 @@ number_t num_bessel_y(const number_t order, const number_t argument);
  * The complex series supports |argument| <= 1000 and work up to 65536 bits. Release with num_destroy(), or
  * use an enclosing NUM_SCOPE. Inputs are not consumed or modified.
  */
-number_t num_lommel_s(const number_t mu, const number_t nu, const number_t argument);
+number_t num_lommel_S(const number_t mu, const number_t nu, const number_t argument);
 number_t num_gammainv(const number_t number);
 /**
  * @brief Evaluate the Gaussian error function without reducing multiprecision inputs to double.
@@ -1161,9 +1171,28 @@ number_t num_erfinv(const number_t number);
  * enclosing NUM_SCOPE. The input is retained by the caller and is not modified.
  */
 number_t num_erfcinv(const number_t number);
-number_t num_lambert_wn(const number_t branch, const number_t number);
-number_t num_lambert_w0(const number_t number);
-number_t num_lambert_wm1(const number_t number);
+/**
+ * @brief Evaluate an integer branch of Lambert W.
+ * @param[in] branch Borrowed integer branch selector; not consumed.
+ * @param[in] number Borrowed real or complex argument; not consumed or modified.
+ * @return Owned value, or NaN for an invalid branch, unsupported domain or failed convergence.
+ * Release with num_destroy(); numeric precision follows the participating operands.
+ */
+number_t num_lambert_Wn(const number_t branch, const number_t number);
+
+/**
+ * @brief Evaluate the principal branch W_0 of Lambert W.
+ * @param[in] number Borrowed real or complex argument; not consumed or modified.
+ * @return Owned value at the participating precision, or NaN on failure; release with num_destroy().
+ */
+number_t num_lambert_W0(const number_t number);
+
+/**
+ * @brief Evaluate the minus-one branch W_-1 of Lambert W.
+ * @param[in] number Borrowed real or complex argument; not consumed or modified.
+ * @return Owned value at the participating precision, or NaN on failure; release with num_destroy().
+ */
+number_t num_lambert_Wm1(const number_t number);
 number_t num_beta(const number_t a, const number_t b);
 number_t num_logbeta(const number_t a, const number_t b);
 number_t num_binomial(const number_t n, const number_t k);

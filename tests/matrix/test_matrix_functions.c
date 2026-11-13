@@ -9,6 +9,7 @@
  * run suites sequentially; this source is not part of the installed library.
  */
 
+#include "string-t.h"
 #include "test_matrix.h"
 
 #define GAMMAINV_HP_INPUT_TEXT                                                                                         \
@@ -152,12 +153,12 @@ static void test_mat_struve_h_numeric(void)
     matrix_t *scalar = mat_create(1u, 1u, &complex_value);
 
     for (size_t k = 0u; k < sizeof(orders) / sizeof(orders[0]); ++k) {
-        number_t f1 = num_struve_h(orders[k], NUM_ONE);
-        number_t f3 = num_struve_h(orders[k], num_create_from_long(3));
-        number_t derivative = num_sub(num_struve_h(num_sub(orders[k], NUM_ONE), NUM_ONE), num_mul(orders[k], f1));
-        matrix_t *dense_result = mat_struve_h(dense, &orders[k]);
-        matrix_t *jordan_result = mat_struve_h(jordan, &orders[k]);
-        matrix_t *scalar_result = mat_struve_h(scalar, &orders[k]);
+        number_t f1 = num_struve_H(orders[k], NUM_ONE);
+        number_t f3 = num_struve_H(orders[k], num_create_from_long(3));
+        number_t derivative = num_sub(num_struve_H(num_sub(orders[k], NUM_ONE), NUM_ONE), num_mul(orders[k], f1));
+        matrix_t *dense_result = mat_struve_H(dense, &orders[k]);
+        matrix_t *jordan_result = mat_struve_H(jordan, &orders[k]);
+        matrix_t *scalar_result = mat_struve_H(scalar, &orders[k]);
 
         check_cylindrical_entry("Struve H dense diagonal", dense_result, 0u, 0u, num_mul(NUM_HALF, num_add(f1, f3)));
         check_cylindrical_entry("Struve H dense off-diagonal", dense_result, 0u, 1u,
@@ -166,7 +167,7 @@ static void test_mat_struve_h_numeric(void)
         check_cylindrical_entry("Struve H Jordan derivative including exceptional negative order", jordan_result,
                                 0u, 1u, num_mul(NUM_TWO, derivative));
         check_cylindrical_entry("Struve H complex scalar parity", scalar_result, 0u, 0u,
-                                num_struve_h(orders[k], complex_value));
+                                num_struve_H(orders[k], complex_value));
         mat_free(scalar_result);
         mat_free(jordan_result);
         mat_free(dense_result);
@@ -190,7 +191,7 @@ static void test_mat_struve_h_nilpotent(void)
     number_t cubic = num_neg(num_div(linear, num_create_from_long(9)));
 
     for (size_t k = 0u; k < sizeof(orders) / sizeof(orders[0]); ++k) {
-        matrix_t *result = mat_struve_h(A, &orders[k]);
+        matrix_t *result = mat_struve_H(A, &orders[k]);
 
         for (size_t row = 0u; row < 4u; ++row) {
             for (size_t col = 0u; col < 4u; ++col) {
@@ -210,9 +211,9 @@ static void test_mat_struve_h_nilpotent(void)
     matrix_t *rectangular = mat_create(2u, 3u, NULL);
     matrix_t *nonfinite = mat_create(1u, 1u, &NUM_NAN);
     number_t negative_two = num_create_from_long(-2);
-    matrix_t *invalid[] = {mat_struve_h(NULL, &NUM_ZERO), mat_struve_h(A, NULL), mat_struve_h(A, &NUM_NAN),
-                           mat_struve_h(rectangular, &NUM_ZERO), mat_struve_h(nonfinite, &NUM_ZERO),
-                           mat_struve_h(A, &NUM_HALF), mat_struve_h(A, &negative_two)};
+    matrix_t *invalid[] = {mat_struve_H(NULL, &NUM_ZERO), mat_struve_H(A, NULL), mat_struve_H(A, &NUM_NAN),
+                           mat_struve_H(rectangular, &NUM_ZERO), mat_struve_H(nonfinite, &NUM_ZERO),
+                           mat_struve_H(A, &NUM_HALF), mat_struve_H(A, &negative_two)};
 
     for (size_t i = 0u; i < sizeof(invalid) / sizeof(invalid[0]); ++i) {
         check_bool("Struve H rejects invalid inputs and nonanalytic zero eigenvalues", invalid[i] == NULL);
@@ -223,14 +224,14 @@ static void test_mat_struve_h_nilpotent(void)
     mat_free(A);
 }
 
-static void check_mat_bessel_y_numeric_dense(number_t order)
+static void check_mat_bessel_Y_numeric_dense(number_t order)
 {
     NUM_SCOPE(scope);
     number_t values[] = {NUM_TWO, NUM_ONE, NUM_ONE, NUM_TWO};
     matrix_t *A = mat_create(2u, 2u, values);
-    number_t f1 = num_bessel_y(order, NUM_ONE);
-    number_t f3 = num_bessel_y(order, num_create_from_long(3));
-    matrix_t *result = mat_bessel_y(A, &order);
+    number_t f1 = num_bessel_Y(order, NUM_ONE);
+    number_t f3 = num_bessel_Y(order, num_create_from_long(3));
+    matrix_t *result = mat_bessel_Y(A, &order);
 
     check_cylindrical_entry("Bessel Y dense diagonal", result, 0u, 0u, num_mul(NUM_HALF, num_add(f1, f3)));
     check_cylindrical_entry("Bessel Y dense upper entry", result, 0u, 1u, num_mul(NUM_HALF, num_sub(f3, f1)));
@@ -241,16 +242,16 @@ static void check_mat_bessel_y_numeric_dense(number_t order)
     mat_free(A);
 }
 
-static void check_mat_bessel_y_numeric_diagonal(number_t order)
+static void check_mat_bessel_Y_numeric_diagonal(number_t order)
 {
     NUM_SCOPE(scope);
     number_t diagonal_values[] = {NUM_ONE, num_add(NUM_ONE, NUM_I)};
     matrix_t *diagonal = mat_create_diagonal(2u, diagonal_values);
-    matrix_t *diagonal_result = mat_bessel_y(diagonal, &order);
-    number_t f1 = num_bessel_y(order, NUM_ONE);
+    matrix_t *diagonal_result = mat_bessel_Y(diagonal, &order);
+    number_t f1 = num_bessel_Y(order, NUM_ONE);
 
     check_cylindrical_entry("Bessel Y diagonal matches scalar", diagonal_result, 0u, 0u, f1);
-    number_t complex_value = num_bessel_y(order, diagonal_values[1]);
+    number_t complex_value = num_bessel_Y(order, diagonal_values[1]);
 
     check_cylindrical_entry("Bessel Y complex diagonal matches scalar", diagonal_result, 1u, 1u, complex_value);
     num_destroy(&complex_value);
@@ -260,31 +261,31 @@ static void check_mat_bessel_y_numeric_diagonal(number_t order)
     mat_free(diagonal);
 }
 
-static void check_mat_bessel_y_numeric_order(number_t order)
+static void check_mat_bessel_Y_numeric_order(number_t order)
 {
-    check_mat_bessel_y_numeric_dense(order);
-    check_mat_bessel_y_numeric_diagonal(order);
+    check_mat_bessel_Y_numeric_dense(order);
+    check_mat_bessel_Y_numeric_diagonal(order);
 }
 
 /* Keep each original order independently selectable for resource-bounded memory checks. */
 static void test_mat_bessel_y_numeric_zero_order(void)
 {
-    check_mat_bessel_y_numeric_order(NUM_ZERO);
+    check_mat_bessel_Y_numeric_order(NUM_ZERO);
 }
 
 static void test_mat_bessel_y_numeric_first_order(void)
 {
-    check_mat_bessel_y_numeric_order(NUM_ONE);
+    check_mat_bessel_Y_numeric_order(NUM_ONE);
 }
 
 static void test_mat_bessel_y_numeric_negative_order(void)
 {
-    check_mat_bessel_y_numeric_order(NUM_NEG_ONE);
+    check_mat_bessel_Y_numeric_order(NUM_NEG_ONE);
 }
 
 static void test_mat_bessel_y_numeric_half_order(void)
 {
-    check_mat_bessel_y_numeric_order(NUM_HALF);
+    check_mat_bessel_Y_numeric_order(NUM_HALF);
 }
 
 static void test_mat_bessel_y_numeric_complex_order_dense(void)
@@ -292,7 +293,7 @@ static void test_mat_bessel_y_numeric_complex_order_dense(void)
     NUM_SCOPE(scope);
     number_t order = num_add(NUM_HALF, num_mul(NUM_HALF, NUM_I));
 
-    check_mat_bessel_y_numeric_dense(order);
+    check_mat_bessel_Y_numeric_dense(order);
 }
 
 static void test_mat_bessel_y_numeric_complex_order_diagonal(void)
@@ -300,7 +301,7 @@ static void test_mat_bessel_y_numeric_complex_order_diagonal(void)
     NUM_SCOPE(scope);
     number_t order = num_add(NUM_HALF, num_mul(NUM_HALF, NUM_I));
 
-    check_mat_bessel_y_numeric_diagonal(order);
+    check_mat_bessel_Y_numeric_diagonal(order);
 }
 
 static void test_mat_bessel_y_jordan(void)
@@ -316,9 +317,9 @@ static void test_mat_bessel_y_jordan(void)
                              NUM_ZERO, NUM_ZERO, NUM_ZERO, z};
         matrix_t *A = mat_create(4u, 4u, values);
         matrix_t *lower = mat_transpose(A);
-        matrix_t *result = mat_bessel_y(A, &NUM_ZERO);
-        matrix_t *lower_result = mat_bessel_y(lower, &NUM_ZERO);
-        number_t y0 = num_bessel_y(NUM_ZERO, z), y1 = num_bessel_y(NUM_ONE, z);
+        matrix_t *result = mat_bessel_Y(A, &NUM_ZERO);
+        matrix_t *lower_result = mat_bessel_Y(lower, &NUM_ZERO);
+        number_t y0 = num_bessel_Y(NUM_ZERO, z), y1 = num_bessel_Y(NUM_ONE, z);
         number_t second = num_mul(NUM_HALF, num_sub(num_div(y1, z), y0));
         number_t third = num_div(num_sub(num_add(y1, num_div(y0, z)), num_div(num_mul(NUM_TWO, y1), num_mul(z, z))),
                                  num_create_from_long(6));
@@ -339,10 +340,10 @@ static void test_mat_bessel_y_jordan(void)
                                    NUM_ZERO, NUM_TWO, NUM_ONE,
                                    NUM_ZERO, NUM_ZERO, NUM_ONE};
     matrix_t *separated = mat_create(3u, 3u, separated_values);
-    matrix_t *separated_result = mat_bessel_y(separated, &NUM_ZERO);
-    number_t y0_at_two = num_bessel_y(NUM_ZERO, NUM_TWO);
-    number_t y0_at_one = num_bessel_y(NUM_ZERO, NUM_ONE);
-    number_t y1_at_one = num_bessel_y(NUM_ONE, NUM_ONE);
+    matrix_t *separated_result = mat_bessel_Y(separated, &NUM_ZERO);
+    number_t y0_at_two = num_bessel_Y(NUM_ZERO, NUM_TWO);
+    number_t y0_at_one = num_bessel_Y(NUM_ZERO, NUM_ONE);
+    number_t y1_at_one = num_bessel_Y(NUM_ONE, NUM_ONE);
     number_t confluent = num_add(num_sub(y0_at_two, y0_at_one), y1_at_one);
 
     check_cylindrical_entry("Bessel Y separated repeated eigenvalues retain derivative", separated_result, 0u, 2u, confluent);
@@ -359,10 +360,10 @@ static void test_mat_bessel_y_invalid(void)
     matrix_t *rectangular = mat_create(2u, 3u, NULL);
     matrix_t *nonfinite = mat_create(1u, 1u, &NUM_NAN);
     matrix_t *identity = mat_create_identity(2u);
-    matrix_t *invalid[] = {mat_bessel_y(NULL, &NUM_ZERO), mat_bessel_y(identity, NULL),
-                           mat_bessel_y(identity, &NUM_NAN), mat_bessel_y(zero, &NUM_ZERO),
-                           mat_bessel_y(zero, &NUM_NEG_ONE), mat_bessel_y(rectangular, &NUM_ZERO),
-                           mat_bessel_y(nonfinite, &NUM_ZERO)};
+    matrix_t *invalid[] = {mat_bessel_Y(NULL, &NUM_ZERO), mat_bessel_Y(identity, NULL),
+                           mat_bessel_Y(identity, &NUM_NAN), mat_bessel_Y(zero, &NUM_ZERO),
+                           mat_bessel_Y(zero, &NUM_NEG_ONE), mat_bessel_Y(rectangular, &NUM_ZERO),
+                           mat_bessel_Y(nonfinite, &NUM_ZERO)};
 
     for (size_t i = 0u; i < sizeof(invalid) / sizeof(invalid[0]); ++i) {
         check_bool("Bessel Y rejects invalid inputs and zero eigenvalues", invalid[i] == NULL);
@@ -378,21 +379,21 @@ static void test_mat_ordinary_cylindrical_symbolic(void)
 {
     mat_bindings_t *bindings = NULL;
     matrix_t *A = mat_from_string_expr("(x, 1, 0, 0; 0, x, 1, 0; 0, 0, x, 1; 0, 0, 0, x)", &bindings);
-    matrix_t *h0 = mat_struve_h(A, &NUM_ZERO);
-    matrix_t *y0 = mat_bessel_y(A, &NUM_ZERO);
+    matrix_t *h0 = mat_struve_H(A, &NUM_ZERO);
+    matrix_t *y0 = mat_bessel_Y(A, &NUM_ZERO);
 
     check_bool("symbolic Struve H matrix is available", h0 != NULL);
     check_bool("symbolic Bessel Y matrix is available", y0 != NULL);
     for (long pass = 1; pass <= 2; ++pass) {
         NUM_SCOPE(scope);
         number_t x = num_create_from_long(pass);
-        number_t y0_value = num_bessel_y(NUM_ZERO, x), y1_value = num_bessel_y(NUM_ONE, x);
+        number_t y0_value = num_bessel_Y(NUM_ZERO, x), y1_value = num_bessel_Y(NUM_ONE, x);
         number_t third = num_div(num_sub(num_add(y1_value, num_div(y0_value, x)),
                                          num_div(num_mul(NUM_TWO, y1_value), num_mul(x, x))), num_create_from_long(6));
 
         check_bool("ordinary cylindrical matrices retain bindings", test_mat_bindings_set_d(bindings, "x", pass) == 0);
-        check_cylindrical_entry("symbolic Struve H0 follows binding", h0, 0u, 0u, num_struve_h(NUM_ZERO, x));
-        check_cylindrical_entry("symbolic Struve H0 derivative follows binding", h0, 0u, 1u, num_struve_h(NUM_NEG_ONE, x));
+        check_cylindrical_entry("symbolic Struve H0 follows binding", h0, 0u, 0u, num_struve_H(NUM_ZERO, x));
+        check_cylindrical_entry("symbolic Struve H0 derivative follows binding", h0, 0u, 1u, num_struve_H(NUM_NEG_ONE, x));
         check_cylindrical_entry("symbolic Bessel Y0 follows binding", y0, 0u, 0u, y0_value);
         check_cylindrical_entry("symbolic Bessel Y0 derivative follows binding", y0, 0u, 1u, num_neg(y1_value));
         check_cylindrical_entry("symbolic Bessel Y0 third derivative follows binding", y0, 0u, 3u, third);
@@ -413,20 +414,20 @@ static void test_mat_struve_l_diagonal(void)
     matrix_t *A = mat_create_diagonal(2u, values);
 
     for (size_t k = 0u; k < sizeof(orders) / sizeof(orders[0]); ++k) {
-        matrix_t *result = mat_struve_l(A, &orders[k]);
+        matrix_t *result = mat_struve_L(A, &orders[k]);
 
         check_bool("Struve L diagonal matrix is available", result != NULL);
         for (size_t i = 0u; i < 2u; ++i)
             check_cylindrical_entry("Struve L diagonal matches scalar API", result, i, i,
-                                 num_struve_l(orders[k], values[i]));
+                                 num_struve_L(orders[k], values[i]));
         check_cylindrical_entry("Struve L preserves off-diagonal zeros", result, 0u, 1u, NUM_ZERO);
         mat_free(result);
     }
     matrix_t *scalar = mat_create(1u, 1u, values);
-    matrix_t *scalar_result = mat_struve_l(scalar, &NUM_ZERO);
+    matrix_t *scalar_result = mat_struve_L(scalar, &NUM_ZERO);
 
     check_cylindrical_entry("Struve L 1x1 matches scalar API", scalar_result, 0u, 0u,
-                         num_struve_l(NUM_ZERO, NUM_ONE));
+                         num_struve_L(NUM_ZERO, NUM_ONE));
     mat_free(scalar_result);
     mat_free(scalar);
     mat_free(A);
@@ -441,11 +442,11 @@ static void test_mat_struve_l_nondiagonal(void)
     matrix_t *A = mat_create(2u, 2u, values);
 
     for (size_t k = 0u; k < sizeof(orders) / sizeof(orders[0]); ++k) {
-        number_t f1 = num_struve_l(orders[k], NUM_ONE);
-        number_t f3 = num_struve_l(orders[k], three);
+        number_t f1 = num_struve_L(orders[k], NUM_ONE);
+        number_t f3 = num_struve_L(orders[k], three);
         number_t diagonal = num_mul(NUM_HALF, num_add(f1, f3));
         number_t off_diagonal = num_mul(NUM_HALF, num_sub(f3, f1));
-        matrix_t *result = mat_struve_l(A, &orders[k]);
+        matrix_t *result = mat_struve_L(A, &orders[k]);
 
         check_bool("Struve L dense matrix is available", result != NULL);
         check_cylindrical_entry("Struve L dense spectral diagonal 0", result, 0u, 0u, diagonal);
@@ -467,10 +468,10 @@ static void test_mat_struve_l_jordan(void)
     matrix_t *A = mat_create(2u, 2u, values);
 
     for (size_t k = 0u; k < sizeof(orders) / sizeof(orders[0]); ++k) {
-        number_t value = num_struve_l(orders[k], NUM_ONE);
-        number_t previous = num_struve_l(num_sub(orders[k], NUM_ONE), NUM_ONE);
+        number_t value = num_struve_L(orders[k], NUM_ONE);
+        number_t previous = num_struve_L(num_sub(orders[k], NUM_ONE), NUM_ONE);
         number_t derivative = num_sub(previous, num_mul(orders[k], value));
-        matrix_t *result = mat_struve_l(A, &orders[k]);
+        matrix_t *result = mat_struve_L(A, &orders[k]);
 
         check_bool("Struve L Jordan matrix is available", result != NULL);
         check_cylindrical_entry("Struve L Jordan scalar value", result, 0u, 0u, value);
@@ -479,10 +480,10 @@ static void test_mat_struve_l_jordan(void)
         mat_free(result);
     }
     matrix_t *lower = mat_transpose(A);
-    matrix_t *lower_result = mat_struve_l(lower, &NUM_ZERO);
+    matrix_t *lower_result = mat_struve_L(lower, &NUM_ZERO);
 
     check_cylindrical_entry("Struve L lower Jordan derivative", lower_result, 1u, 0u,
-                         num_mul(NUM_TWO, num_struve_l(NUM_NEG_ONE, NUM_ONE)));
+                         num_mul(NUM_TWO, num_struve_L(NUM_NEG_ONE, NUM_ONE)));
     mat_free(lower_result);
     mat_free(lower);
     mat_free(A);
@@ -492,9 +493,9 @@ static void test_mat_struve_l_jordan(void)
                             NUM_ZERO, NUM_ZERO, NUM_ZERO, NUM_ONE,
                             NUM_ZERO, NUM_ZERO, NUM_ZERO, NUM_ZERO};
     matrix_t *N = mat_create(4u, 4u, nilpotent);
-    matrix_t *L0 = mat_struve_l(N, &NUM_ZERO);
-    matrix_t *L1 = mat_struve_l(N, &NUM_ONE);
-    matrix_t *Lm1 = mat_struve_l(N, &NUM_NEG_ONE);
+    matrix_t *L0 = mat_struve_L(N, &NUM_ZERO);
+    matrix_t *L1 = mat_struve_L(N, &NUM_ONE);
+    matrix_t *Lm1 = mat_struve_L(N, &NUM_NEG_ONE);
     number_t two_over_pi = num_div(NUM_TWO, NUM_PI);
     number_t quadratic = num_div(two_over_pi, num_create_from_long(3));
     number_t cubic = num_div(two_over_pi, num_create_from_long(9));
@@ -526,10 +527,10 @@ static void test_mat_struve_l_invalid(void)
     matrix_t *nonfinite = mat_create(1u, 1u, &NUM_NAN);
     number_t negative_two = num_create_from_long(-2);
 
-    matrix_t *results[] = {mat_struve_l(NULL, &NUM_ZERO), mat_struve_l(A, NULL), mat_struve_l(A, &NUM_NAN),
-                           mat_struve_l(rectangular, &NUM_ZERO),
-                           mat_struve_l(nonfinite, &NUM_ZERO), mat_struve_l(singular, &NUM_HALF),
-                           mat_struve_l(singular, &negative_two)};
+    matrix_t *results[] = {mat_struve_L(NULL, &NUM_ZERO), mat_struve_L(A, NULL), mat_struve_L(A, &NUM_NAN),
+                           mat_struve_L(rectangular, &NUM_ZERO),
+                           mat_struve_L(nonfinite, &NUM_ZERO), mat_struve_L(singular, &NUM_HALF),
+                           mat_struve_L(singular, &negative_two)};
 
     for (size_t i = 0u; i < sizeof(results) / sizeof(results[0]); ++i) {
         check_bool("Struve L rejects invalid inputs and singular branch points", results[i] == NULL);
@@ -555,13 +556,13 @@ static void test_mat_bessel_i_numeric(void)
     matrix_t *scalar = mat_create(1u, 1u, &complex_value);
 
     for (size_t k = 0u; k < sizeof(orders) / sizeof(orders[0]); ++k) {
-        number_t f1 = num_bessel_i(orders[k], NUM_ONE);
-        number_t f3 = num_bessel_i(orders[k], num_create_from_long(3));
-        number_t derivative = num_mul(NUM_HALF, num_add(num_bessel_i(num_sub(orders[k], NUM_ONE), NUM_ONE),
-                                                        num_bessel_i(num_add(orders[k], NUM_ONE), NUM_ONE)));
-        matrix_t *dense_result = mat_bessel_i(dense, &orders[k]);
-        matrix_t *jordan_result = mat_bessel_i(jordan, &orders[k]);
-        matrix_t *scalar_result = mat_bessel_i(scalar, &orders[k]);
+        number_t f1 = num_bessel_I(orders[k], NUM_ONE);
+        number_t f3 = num_bessel_I(orders[k], num_create_from_long(3));
+        number_t derivative = num_mul(NUM_HALF, num_add(num_bessel_I(num_sub(orders[k], NUM_ONE), NUM_ONE),
+                                                        num_bessel_I(num_add(orders[k], NUM_ONE), NUM_ONE)));
+        matrix_t *dense_result = mat_bessel_I(dense, &orders[k]);
+        matrix_t *jordan_result = mat_bessel_I(jordan, &orders[k]);
+        matrix_t *scalar_result = mat_bessel_I(scalar, &orders[k]);
 
         check_cylindrical_entry("Bessel I dense diagonal", dense_result, 0u, 0u, num_mul(NUM_HALF, num_add(f1, f3)));
         check_cylindrical_entry("Bessel I dense off-diagonal", dense_result, 0u, 1u,
@@ -569,7 +570,7 @@ static void test_mat_bessel_i_numeric(void)
         check_cylindrical_entry("Bessel I Jordan scalar value", jordan_result, 0u, 0u, f1);
         check_cylindrical_entry("Bessel I Jordan derivative", jordan_result, 0u, 1u, num_mul(NUM_TWO, derivative));
         check_cylindrical_entry("Bessel I complex 1x1 matches scalar", scalar_result, 0u, 0u,
-                             num_bessel_i(orders[k], complex_value));
+                             num_bessel_I(orders[k], complex_value));
         mat_free(scalar_result);
         mat_free(jordan_result);
         mat_free(dense_result);
@@ -593,7 +594,7 @@ static void test_mat_bessel_i_nilpotent(void)
     number_t sixteenth = num_create_from_frac(1, 16);
 
     for (size_t k = 0u; k < sizeof(orders) / sizeof(orders[0]); ++k) {
-        matrix_t *result = mat_bessel_i(N, &orders[k]);
+        matrix_t *result = mat_bessel_I(N, &orders[k]);
 
         for (size_t row = 0u; row < 4u; ++row) {
             for (size_t col = 0u; col < 4u; ++col) {
@@ -612,11 +613,11 @@ static void test_mat_bessel_i_nilpotent(void)
         mat_free(result);
     }
     matrix_t *zero = mat_create(1u, 1u, &NUM_ZERO);
-    matrix_t *I0 = mat_bessel_i(zero, &NUM_ZERO);
-    matrix_t *fractional = mat_bessel_i(N, &NUM_HALF);
-    matrix_t *invalid = mat_bessel_i(N, &NUM_NAN);
-    matrix_t *null_matrix = mat_bessel_i(NULL, &NUM_ZERO);
-    matrix_t *null_order = mat_bessel_i(N, NULL);
+    matrix_t *I0 = mat_bessel_I(zero, &NUM_ZERO);
+    matrix_t *fractional = mat_bessel_I(N, &NUM_HALF);
+    matrix_t *invalid = mat_bessel_I(N, &NUM_NAN);
+    matrix_t *null_matrix = mat_bessel_I(NULL, &NUM_ZERO);
+    matrix_t *null_order = mat_bessel_I(N, NULL);
 
     check_cylindrical_entry("Bessel I0(0) is one", I0, 0u, 0u, NUM_ONE);
     check_bool("Bessel I rejects fractional-order branch point", fractional == NULL);
@@ -636,9 +637,9 @@ static void test_mat_cylindrical_symbolic(void)
 {
     mat_bindings_t *bindings = NULL;
     matrix_t *A = mat_from_string_expr("(x, 1; 0, x)", &bindings);
-    matrix_t *L0 = mat_struve_l(A, &NUM_ZERO);
-    matrix_t *I0 = mat_bessel_i(A, &NUM_ZERO);
-    matrix_t *Iminus1 = mat_bessel_i(A, &NUM_NEG_ONE);
+    matrix_t *L0 = mat_struve_L(A, &NUM_ZERO);
+    matrix_t *I0 = mat_bessel_I(A, &NUM_ZERO);
+    matrix_t *Iminus1 = mat_bessel_I(A, &NUM_NEG_ONE);
 
     check_bool("symbolic Struve L0 Jordan matrix is available", L0 != NULL);
     check_bool("symbolic Bessel I0 Jordan matrix is available", I0 != NULL);
@@ -648,13 +649,13 @@ static void test_mat_cylindrical_symbolic(void)
         number_t x = num_create_from_long(pass);
 
         check_bool("cylindrical symbolic matrices retain bindings", test_mat_bindings_set_d(bindings, "x", pass) == 0);
-        check_cylindrical_entry("symbolic Struve L0 value follows binding", L0, 0u, 0u, num_struve_l(NUM_ZERO, x));
+        check_cylindrical_entry("symbolic Struve L0 value follows binding", L0, 0u, 0u, num_struve_L(NUM_ZERO, x));
         check_cylindrical_entry("symbolic Struve L0 derivative follows binding", L0, 0u, 1u,
-                             num_struve_l(NUM_NEG_ONE, x));
-        check_cylindrical_entry("symbolic Bessel I0 value follows binding", I0, 0u, 0u, num_bessel_i(NUM_ZERO, x));
-        check_cylindrical_entry("symbolic Bessel I0 derivative follows binding", I0, 0u, 1u, num_bessel_i(NUM_ONE, x));
+                             num_struve_L(NUM_NEG_ONE, x));
+        check_cylindrical_entry("symbolic Bessel I0 value follows binding", I0, 0u, 0u, num_bessel_I(NUM_ZERO, x));
+        check_cylindrical_entry("symbolic Bessel I0 derivative follows binding", I0, 0u, 1u, num_bessel_I(NUM_ONE, x));
         check_cylindrical_entry("symbolic Bessel I-1 derivative follows binding", Iminus1, 0u, 1u,
-                             num_mul(NUM_HALF, num_add(num_bessel_i(NUM_ZERO, x), num_bessel_i(NUM_TWO, x))));
+                             num_mul(NUM_HALF, num_add(num_bessel_I(NUM_ZERO, x), num_bessel_I(NUM_TWO, x))));
     }
     mat_free(Iminus1);
     mat_free(I0);
@@ -3949,7 +3950,7 @@ static int matrix_validity_equal(const void *got_input, const void *want_input, 
     return 1;
 }
 
-static int matrix_validity_format(const void *value, string_t *out, void *ctx)
+static int matrix_validity_format(const void *value, test_text_t *out, void *ctx)
 {
     const matrix_t *matrix = value;
     char *text;
@@ -3958,13 +3959,13 @@ static int matrix_validity_format(const void *value, string_t *out, void *ctx)
     if (!out)
         return -1;
     if (!matrix)
-        return string_append_cstr(out, "<null>");
+        return test_text_append_cstr(out, "<null>");
 
     text = mat_to_string(matrix, MAT_STRING_LAYOUT_PRETTY);
     if (!text)
-        return string_append_cstr(out, "<format-error>");
+        return test_text_append_cstr(out, "<format-error>");
 
-    if (string_append_cstr(out, text) != 0) {
+    if (test_text_append_cstr(out, text) != 0) {
         free(text);
         return -1;
     }
@@ -4251,12 +4252,12 @@ static void test_mat_special_unary_extensions(void)
         check_unary_jordan_2x2_mp_real("mp-real digamma(aI+N)=digamma(a)I+trigamma(a)N", mat_digamma, x, qf_digamma(x),
                                        qf_trigamma(x), 1e-25);
 
-        check_unary_jordan_2x2_mp_real("mp-real lambert_w0(aI+N)=W0(a)I+W0'(a)N", mat_lambert_w0, a, qf_lambert_w0(a),
-                                       qf_div(qf_lambert_w0(a), qf_mul(a, qf_add(QF_ONE, qf_lambert_w0(a)))), 1e-25);
+        check_unary_jordan_2x2_mp_real("mp-real lambert_W0(aI+N)=W0(a)I+W0'(a)N", mat_lambert_W0, a, qf_lambert_W0(a),
+                                       qf_div(qf_lambert_W0(a), qf_mul(a, qf_add(QF_ONE, qf_lambert_W0(a)))), 1e-25);
 
-        check_unary_jordan_2x2_mp_real("mp-real lambert_wm1(aI+N)=Wm1(a)I+Wm1'(a)N", mat_lambert_wm1, b,
-                                       qf_lambert_wm1(b),
-                                       qf_div(qf_lambert_wm1(b), qf_mul(b, qf_add(QF_ONE, qf_lambert_wm1(b)))), 1e-25);
+        check_unary_jordan_2x2_mp_real("mp-real lambert_Wm1(aI+N)=Wm1(a)I+Wm1'(a)N", mat_lambert_Wm1, b,
+                                       qf_lambert_Wm1(b),
+                                       qf_div(qf_lambert_Wm1(b), qf_mul(b, qf_add(QF_ONE, qf_lambert_Wm1(b)))), 1e-25);
 
         check_unary_jordan_2x2_mp_real("mp-real ei(aI+N)=Ei(a)I+Ei'(a)N", mat_Ei, ei_x, qf_Ei(ei_x),
                                        qf_div(qf_exp(ei_x), ei_x), 1e-25);
@@ -4279,9 +4280,9 @@ static void test_mat_special_unary_extensions(void)
         check_unary_diagonal_2x2_complex("complex productlog(diag(a,b)) = diag(W0(a),W0(b))", mat_productlog, w0a, w0b,
                                          qc_productlog(w0a), qc_productlog(w0b), 1e-24);
 
-        check_unary_diagonal_2x2_complex("complex lambert_wm1(diag(a,b)) = diag(Wm1(a),Wm1(b))", mat_lambert_wm1, wm1a,
-                                         wm1b, qc_make(qf_lambert_wm1(qf_from_double(-0.2)), QF_ZERO),
-                                         qc_lambert_wm1(wm1b), 1e-24);
+        check_unary_diagonal_2x2_complex("complex lambert_Wm1(diag(a,b)) = diag(Wm1(a),Wm1(b))", mat_lambert_Wm1, wm1a,
+                                         wm1b, qc_make(qf_lambert_Wm1(qf_from_double(-0.2)), QF_ZERO),
+                                         qc_lambert_Wm1(wm1b), 1e-24);
 
         check_unary_diagonal_2x2_complex("complex ei(diag(z1,z2)) = diag(Ei(z1),Ei(z2))", mat_Ei, z1, z2, qc_Ei(z1),
                                          qc_Ei(z2), 1e-24);
@@ -4421,17 +4422,17 @@ static void test_mat_special_unary_square_extensions(void)
 
         {
             qfloat_t a = qf_from_double(0.2);
-            qfloat_t w = qf_lambert_w0(a);
+            qfloat_t w = qf_lambert_W0(a);
             qfloat_t wp = qf_div(w, qf_mul(a, qf_add(one, w)));
-            check_unary_jordan_2x2_d("lambert_w0(aI+N)=W0(a)I+W0'(a)N", mat_lambert_w0, 0.2, qf_to_double(w),
+            check_unary_jordan_2x2_d("lambert_W0(aI+N)=W0(a)I+W0'(a)N", mat_lambert_W0, 0.2, qf_to_double(w),
                                      qf_to_double(wp), 1e-12);
         }
 
         {
             qfloat_t a = qf_from_double(-0.2);
-            qfloat_t w = qf_lambert_wm1(a);
+            qfloat_t w = qf_lambert_Wm1(a);
             qfloat_t wp = qf_div(w, qf_mul(a, qf_add(one, w)));
-            check_unary_jordan_2x2_d("lambert_wm1(aI+N)=Wm1(a)I+Wm1'(a)N", mat_lambert_wm1, -0.2, qf_to_double(w),
+            check_unary_jordan_2x2_d("lambert_Wm1(aI+N)=Wm1(a)I+Wm1'(a)N", mat_lambert_Wm1, -0.2, qf_to_double(w),
                                      qf_to_double(wp), 1e-12);
         }
 
@@ -4462,11 +4463,11 @@ static void test_mat_special_unary_square_extensions(void)
         check_unary_diagonal_2x2_complex("complex digamma(diag(z1,z2)) = diag(digamma(z1),digamma(z2))", mat_digamma,
                                          z1, z2, qc_digamma(z1), qc_digamma(z2), 1e-24);
 
-        check_unary_diagonal_2x2_complex("complex lambert_w0(diag(a,b)) = diag(W0(a),W0(b))", mat_lambert_w0, w0a, w0b,
+        check_unary_diagonal_2x2_complex("complex lambert_W0(diag(a,b)) = diag(W0(a),W0(b))", mat_lambert_W0, w0a, w0b,
                                          qc_productlog(w0a), qc_productlog(w0b), 1e-24);
 
-        check_unary_diagonal_2x2_complex("complex lambert_wm1(diag(a,b)) = diag(Wm1(a),Wm1(b))", mat_lambert_wm1, wm1a,
-                                         wm1b, qc_lambert_wm1(wm1a), qc_lambert_wm1(wm1b), 1e-24);
+        check_unary_diagonal_2x2_complex("complex lambert_Wm1(diag(a,b)) = diag(Wm1(a),Wm1(b))", mat_lambert_Wm1, wm1a,
+                                         wm1b, qc_lambert_Wm1(wm1a), qc_lambert_Wm1(wm1b), 1e-24);
 
         check_unary_diagonal_2x2_complex("complex ei(diag(z1,z2)) = diag(Ei(z1),Ei(z2))", mat_Ei, z1, z2, qc_Ei(z1),
                                          qc_Ei(z2), 1e-24);
@@ -4491,23 +4492,23 @@ static void test_mat_special_unary_square_extensions(void)
 
         {
             qfloat_t a = qf_from_double(0.2);
-            qfloat_t w = qf_lambert_w0(a);
+            qfloat_t w = qf_lambert_W0(a);
             qfloat_t wp = qf_div(w, qf_mul(a, qf_add(one, w)));
             qfloat_t wpp =
                 qf_neg(qf_div(qf_mul(qf_mul(w, w), qf_add(w, qf_from_double(2.0))),
                               qf_mul(qf_mul(a, a), qf_mul(qf_add(one, w), qf_mul(qf_add(one, w), qf_add(one, w))))));
-            check_unary_jordan_3x3_d("lambert_w0(aI+N+N^2)=W0(a)I+W0'(a)N+W0''(a)N^2/2", mat_lambert_w0, 0.2,
+            check_unary_jordan_3x3_d("lambert_W0(aI+N+N^2)=W0(a)I+W0'(a)N+W0''(a)N^2/2", mat_lambert_W0, 0.2,
                                      qf_to_double(w), qf_to_double(wp), qf_to_double(wpp) / 2.0, 1e-12);
         }
 
         {
             qfloat_t a = qf_from_double(-0.2);
-            qfloat_t w = qf_lambert_wm1(a);
+            qfloat_t w = qf_lambert_Wm1(a);
             qfloat_t wp = qf_div(w, qf_mul(a, qf_add(one, w)));
             qfloat_t wpp =
                 qf_neg(qf_div(qf_mul(qf_mul(w, w), qf_add(w, qf_from_double(2.0))),
                               qf_mul(qf_mul(a, a), qf_mul(qf_add(one, w), qf_mul(qf_add(one, w), qf_add(one, w))))));
-            check_unary_jordan_3x3_d("lambert_wm1(aI+N+N^2)=Wm1(a)I+Wm1'(a)N+Wm1''(a)N^2/2", mat_lambert_wm1, -0.2,
+            check_unary_jordan_3x3_d("lambert_Wm1(aI+N+N^2)=Wm1(a)I+Wm1'(a)N+Wm1''(a)N^2/2", mat_lambert_Wm1, -0.2,
                                      qf_to_double(w), qf_to_double(wp), qf_to_double(wpp) / 2.0, 1e-12);
         }
 
@@ -4546,13 +4547,13 @@ static void test_mat_special_unary_square_extensions(void)
                                          mat_digamma, z1, z2, z3, qc_digamma(z1), qc_digamma(z2), qc_digamma(z3),
                                          1e-24);
 
-        check_unary_diagonal_3x3_complex("complex lambert_w0(diag(a,b,c)) = diag(W0(a),W0(b),W0(c))", mat_lambert_w0,
+        check_unary_diagonal_3x3_complex("complex lambert_W0(diag(a,b,c)) = diag(W0(a),W0(b),W0(c))", mat_lambert_W0,
                                          w0a, w0b, w0c, qc_productlog(w0a), qc_productlog(w0b), qc_productlog(w0c),
                                          1e-24);
 
-        check_unary_diagonal_3x3_complex("complex lambert_wm1(diag(a,b,c)) = diag(Wm1(a),Wm1(b),Wm1(c))",
-                                         mat_lambert_wm1, wm1a, wm1b, wm1c, qc_lambert_wm1(wm1a), qc_lambert_wm1(wm1b),
-                                         qc_lambert_wm1(wm1c), 1e-24);
+        check_unary_diagonal_3x3_complex("complex lambert_Wm1(diag(a,b,c)) = diag(Wm1(a),Wm1(b),Wm1(c))",
+                                         mat_lambert_Wm1, wm1a, wm1b, wm1c, qc_lambert_Wm1(wm1a), qc_lambert_Wm1(wm1b),
+                                         qc_lambert_Wm1(wm1c), 1e-24);
 
         check_unary_diagonal_3x3_complex("complex ei(diag(z1,z2,z3)) = diag(Ei(z1),Ei(z2),Ei(z3))", mat_Ei, z1, z2, z3,
                                          qc_Ei(z1), qc_Ei(z2), qc_Ei(z3), 1e-24);
@@ -6415,11 +6416,11 @@ static void test_number_matrix_functions(void)
                                         "1e-90");
     check_number_upper_jordan_from_expr("gammainv(number upper Jordan)[0,0]", mat_gammainv, expr_gammainv,
                                         GAMMAINV_HP_INPUT_TEXT, 512u, "1e-90");
-    check_number_upper_jordan_from_expr("lambert_w0(number upper Jordan)[0,0]", mat_lambert_w0, expr_lambert_w0, "0.2",
+    check_number_upper_jordan_from_expr("lambert_W0(number upper Jordan)[0,0]", mat_lambert_W0, expr_lambert_W0, "0.2",
                                         512u, "1e-90");
-    check_number_upper_jordan_from_expr("productlog(number upper Jordan)[0,0]", mat_productlog, expr_lambert_w0, "0.2",
+    check_number_upper_jordan_from_expr("productlog(number upper Jordan)[0,0]", mat_productlog, expr_lambert_W0, "0.2",
                                         512u, "1e-90");
-    check_number_upper_jordan_from_expr("lambert_wm1(number upper Jordan)[0,0]", mat_lambert_wm1, expr_lambert_wm1,
+    check_number_upper_jordan_from_expr("lambert_Wm1(number upper Jordan)[0,0]", mat_lambert_Wm1, expr_lambert_Wm1,
                                         "-0.2", 512u, "1e-30");
     check_number_upper_jordan_from_expr("ei(number upper Jordan)[0,0]", mat_Ei, expr_Ei, "0.5", 512u, "1e-90");
     check_number_upper_jordan_from_expr("e1(number upper Jordan)[0,0]", mat_E1, expr_E1, "1.0", 512u, "1e-90");

@@ -143,9 +143,9 @@ static const expr_integrate_dispatch_rule_t integrate_dispatch_rules[EXPR_KIND_C
     [EXPR_KIND_EI] = {.primitive = integrate_Ei_rule},
     [EXPR_KIND_LI] = {.primitive = integrate_Li_rule},
     [EXPR_KIND_E1] = {.primitive = integrate_E1_rule},
-    [EXPR_KIND_BESSEL_J] = {.primitive = integrate_bessel_j_rule},
-    [EXPR_KIND_BESSEL_Y] = {.primitive = integrate_bessel_y_rule},
-    [EXPR_KIND_LOMMEL_S] = {.primitive = integrate_lommel_s_rule},
+    [EXPR_KIND_BESSEL_J] = {.primitive = integrate_bessel_J_rule},
+    [EXPR_KIND_BESSEL_Y] = {.primitive = integrate_bessel_Y_rule},
+    [EXPR_KIND_LOMMEL_S] = {.primitive = integrate_lommel_S_rule},
     [EXPR_KIND_HYPERGEOMETRIC_PFQ] = {.primitive = integrate_hypergeometric_pFq_rule}};
 
 static const expr_integrate_dispatch_rule_t *integrate_dispatch_rule_for_kind(expr_op_kind_t kind)

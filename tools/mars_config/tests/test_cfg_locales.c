@@ -4,7 +4,7 @@
  *
  * Runs the configuration executable sequentially in disposable directories, without
  * installing a jurisdiction database or invoking the retired generator. Generated SQL
- * is compared with the packaged body and queried through the public encrypted SQLite
+ * is compared with the packaged body and queried through the public plaintext SQLite
  * API. Invalid inputs must not publish partial SQL or replace an existing destination.
  * The documented check command registers separately, after all ordinary test groups.
  */
@@ -106,8 +106,7 @@ static bool test_cfg_locales_parity_fixture(const char *directory)
     bool ok = expected && test_cfg_locales_environment() && test_cfg_locales_run(directory, NULL, 0, 0, &output) &&
               test_cfg_locales_body_equal(output, expected);
     string_t *path = string_sprintf("%s/generated.db", directory);
-    string_t *key = string_new_with("locale-generator-regression-only");
-    sqlite_t *db = ok && path && key ? sqlite_open_encrypted(path, key) : NULL;
+    sqlite_t *db = ok && path ? sqlite_open_plain(path) : NULL;
     ok = ok && db && sqlite_exec(db, output) &&
          test_cfg_locales_query(db, "SELECT locale FROM calendar_territory_locale WHERE territory='CA-QC'", "fr_CA") &&
          test_cfg_locales_query(db, "SELECT native_name FROM calendar_language_name WHERE language='haw'",
@@ -127,7 +126,6 @@ static bool test_cfg_locales_parity_fixture(const char *directory)
              "calendar_locale_date_pattern l USING(pattern_id) WHERE l.locale='fr_CA' AND p.field='first_day_suffix'",
              "ᵉʳ");
     sqlite_close(db);
-    string_free(key);
     string_free(path);
     string_free(output);
     string_free(expected);
@@ -584,8 +582,8 @@ static bool test_cfg_locales_quoting_fixture(const char *directory)
     const char *args[] = {"--data-dir", data ? string_c_str(data) : ""};
     string_t *output = NULL;
     ok = ok && test_cfg_locales_run(directory, args, 2, 0, &output);
-    string_t *path = string_sprintf("%s/quoting.db", directory), *key = string_new_with("generator-quoting-only");
-    sqlite_t *db = ok && path && key ? sqlite_open_encrypted(path, key) : NULL;
+    string_t *path = string_sprintf("%s/quoting.db", directory);
+    sqlite_t *db = ok && path ? sqlite_open_plain(path) : NULL;
     ok = ok && db && sqlite_exec(db, output) &&
          test_cfg_locales_query(db, "SELECT native_name FROM calendar_language_name WHERE language='frc'", label) &&
          test_cfg_locales_query(
@@ -616,7 +614,6 @@ static bool test_cfg_locales_quoting_fixture(const char *directory)
     string_free(towns);
     string_free(encoded_town);
     sqlite_close(db);
-    string_free(key);
     string_free(path);
     string_free(output);
     output = NULL;

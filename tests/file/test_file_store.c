@@ -16,6 +16,7 @@
 #include <string.h>
 #include <sys/stat.h>
 
+#include "string-t.h"
 #include "file-t.h"
 #include "array-t.h"
 #include "sqlite-t.h"

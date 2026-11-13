@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "string-t.h"
 #include "file-t.h"
 #define MARS_TEST_DATABASE_INTERNAL_ACCESS
 #include "test_database_internal.h"

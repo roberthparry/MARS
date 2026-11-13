@@ -191,7 +191,7 @@ static int number_special_series_converged(mpfr_srcptr term, mpfr_srcptr sum, mp
     return gap > (uintmax_t)target_precision + 16u;
 }
 
-static int number_mpfr_bessel_j(mpfr_ptr out, mpfr_srcptr order, mpfr_srcptr argument, mpfr_rnd_t rounding)
+static int number_mpfr_bessel_J(mpfr_ptr out, mpfr_srcptr order, mpfr_srcptr argument, mpfr_rnd_t rounding)
 {
     mpfr_prec_t target_precision;
     mpfr_prec_t work_precision;
@@ -338,7 +338,7 @@ static int number_lommel_parameters_singular(mpfr_srcptr mu, mpfr_srcptr nu)
     return singular;
 }
 
-static int number_mpfr_lommel_s_series(mpfr_ptr out, mpfr_srcptr mu, mpfr_srcptr nu, mpfr_srcptr argument,
+static int number_mpfr_lommel_S_series(mpfr_ptr out, mpfr_srcptr mu, mpfr_srcptr nu, mpfr_srcptr argument,
                                        mpfr_rnd_t rounding, int derivative)
 {
     mpfr_prec_t target_precision;
@@ -456,15 +456,15 @@ done:
     return status;
 }
 
-static int number_mpfr_lommel_s(mpfr_ptr out, mpfr_srcptr mu, mpfr_srcptr nu, mpfr_srcptr argument, mpfr_rnd_t rounding)
+static int number_mpfr_lommel_S(mpfr_ptr out, mpfr_srcptr mu, mpfr_srcptr nu, mpfr_srcptr argument, mpfr_rnd_t rounding)
 {
-    return number_mpfr_lommel_s_series(out, mu, nu, argument, rounding, 0);
+    return number_mpfr_lommel_S_series(out, mu, nu, argument, rounding, 0);
 }
 
-static int number_mpfr_lommel_s_derivative(mpfr_ptr out, mpfr_srcptr mu, mpfr_srcptr nu, mpfr_srcptr argument,
+static int number_mpfr_lommel_S_derivative(mpfr_ptr out, mpfr_srcptr mu, mpfr_srcptr nu, mpfr_srcptr argument,
                                            mpfr_rnd_t rounding)
 {
-    return number_mpfr_lommel_s_series(out, mu, nu, argument, rounding, 1);
+    return number_mpfr_lommel_S_series(out, mu, nu, argument, rounding, 1);
 }
 
 static int number_mpfr_apply_unary(mpfr_t value, int (*op)(mpfr_ptr, mpfr_srcptr, mpfr_rnd_t))
@@ -604,35 +604,35 @@ static int number_mpfr_beta_mut(mpfr_t value, const mpfr_t other)
     return number_mpfr_apply_binary(value, other, mpfr_beta);
 }
 
-static int number_mpfr_bessel_j_mut(mpfr_t order, const mpfr_t argument)
+static int number_mpfr_bessel_J_mut(mpfr_t order, const mpfr_t argument)
 {
-    return number_mpfr_bessel_j(order, order, argument, MPFR_RNDN);
+    return number_mpfr_bessel_J(order, order, argument, MPFR_RNDN);
 }
 
-static double number_double_bessel_j(double order, double argument)
+static double number_double_bessel_J(double order, double argument)
 {
-    return qf_to_double(qf_bessel_j(qf_from_double(order), qf_from_double(argument)));
+    return qf_to_double(qf_bessel_J(qf_from_double(order), qf_from_double(argument)));
 }
 
-static int number_mpfr_lommel_s_mut(mpfr_t mu, const mpfr_t nu, const mpfr_t argument)
+static int number_mpfr_lommel_S_mut(mpfr_t mu, const mpfr_t nu, const mpfr_t argument)
 {
-    return number_mpfr_lommel_s(mu, mu, nu, argument, MPFR_RNDN);
+    return number_mpfr_lommel_S(mu, mu, nu, argument, MPFR_RNDN);
 }
 
-static int number_mpfr_lommel_s_derivative_mut(mpfr_t mu, const mpfr_t nu, const mpfr_t argument)
+static int number_mpfr_lommel_S_derivative_mut(mpfr_t mu, const mpfr_t nu, const mpfr_t argument)
 {
-    return number_mpfr_lommel_s_derivative(mu, mu, nu, argument, MPFR_RNDN);
+    return number_mpfr_lommel_S_derivative(mu, mu, nu, argument, MPFR_RNDN);
 }
 
-static double number_double_lommel_s(double mu, double nu, double argument)
+static double number_double_lommel_S(double mu, double nu, double argument)
 {
-    return qf_to_double(qf_lommel_s(qf_from_double(mu), qf_from_double(nu), qf_from_double(argument)));
+    return qf_to_double(qf_lommel_S(qf_from_double(mu), qf_from_double(nu), qf_from_double(argument)));
 }
 
-static double number_double_lommel_s_derivative(double mu, double nu, double argument)
+static double number_double_lommel_S_derivative(double mu, double nu, double argument)
 {
     return qf_to_double(
-        qf_lommel_s_derivative_internal(qf_from_double(mu), qf_from_double(nu), qf_from_double(argument)));
+        qf_lommel_S_derivative_internal(qf_from_double(mu), qf_from_double(nu), qf_from_double(argument)));
 }
 
 static int number_mpfr_recip_after_unary(mpfr_t value, int (*op)(mpfr_ptr, mpfr_srcptr, mpfr_rnd_t))
@@ -2043,19 +2043,19 @@ static int number_mpfr_lambert_w_mut(mpfr_t value, bool branch_m1)
     return 0;
 }
 
-static int number_mpfr_lambert_w0_mut(mpfr_t value)
+static int number_mpfr_lambert_W0_mut(mpfr_t value)
 {
     return number_mpfr_lambert_w_mut(value, false);
 }
 
-static int number_mpfr_lambert_wm1_mut(mpfr_t value)
+static int number_mpfr_lambert_Wm1_mut(mpfr_t value)
 {
     return number_mpfr_lambert_w_mut(value, true);
 }
 
 static int number_mpfr_productlog_mut(mpfr_t value)
 {
-    return number_mpfr_lambert_w0_mut(value);
+    return number_mpfr_lambert_W0_mut(value);
 }
 
 typedef struct {
@@ -2476,12 +2476,12 @@ static number_t number_apply_qcomplex_unary(const number_t number, number_qcompl
     return number_apply_unary_mpc_complex(&number, &ops);
 }
 
-static bool number_lambert_w0_requires_complex(const number_t *number)
+static bool number_lambert_W0_requires_complex(const number_t *number)
 {
     return number && num_is_real(*number) && num_lt(*number, NUM_NEG_INV_E);
 }
 
-static bool number_lambert_wm1_requires_complex(const number_t *number)
+static bool number_lambert_Wm1_requires_complex(const number_t *number)
 {
     return number && num_is_real(*number) && (num_lt(*number, NUM_NEG_INV_E) || num_ge(*number, NUM_ZERO));
 }
@@ -5495,7 +5495,7 @@ static size_t number_max_prec6(const number_t *a, const number_t *b1, const numb
     return precision_bits ? precision_bits : num_get_default_prec_bits();
 }
 
-static number_t number_mpfr_appell_f1_number(const number_t *a, const number_t *b1, const number_t *b2,
+static number_t number_mpfr_appell_F1_number(const number_t *a, const number_t *b1, const number_t *b2,
                                              const number_t *c, const number_t *x, const number_t *y)
 {
     number_t *na = NULL;
@@ -5524,7 +5524,7 @@ static number_t number_mpfr_appell_f1_number(const number_t *a, const number_t *
         number_mpfr_ensure(number_impl(nc)->value.mpfr, precision_bits) != 0 ||
         number_mpfr_ensure(number_impl(nx)->value.mpfr, precision_bits) != 0 ||
         number_mpfr_ensure(number_impl(ny)->value.mpfr, precision_bits) != 0 ||
-        number_mpfr_appell_f1(number_impl(na)->value.mpfr->value, number_impl_const(na)->value.mpfr->value,
+        number_mpfr_appell_F1(number_impl(na)->value.mpfr->value, number_impl_const(na)->value.mpfr->value,
                               number_impl_const(nb1)->value.mpfr->value, number_impl_const(nb2)->value.mpfr->value,
                               number_impl_const(nc)->value.mpfr->value, number_impl_const(nx)->value.mpfr->value,
                               number_impl_const(ny)->value.mpfr->value) != 0)
@@ -5547,7 +5547,7 @@ fail:
     return number_invalid();
 }
 
-static number_t number_mpc_appell_f1_number(const number_t *a, const number_t *b1, const number_t *b2,
+static number_t number_mpc_appell_F1_number(const number_t *a, const number_t *b1, const number_t *b2,
                                             const number_t *c, const number_t *x, const number_t *y)
 {
     number_t *values[6] = {NULL, NULL, NULL, NULL, NULL, NULL};
@@ -5579,7 +5579,7 @@ static number_t number_mpc_appell_f1_number(const number_t *a, const number_t *b
         if (number_complex_get_mpc(z[i], number_impl_const(values[i])->value.cx, precision_bits) != 0)
             goto done;
     }
-    if (number_mpc_appell_f1(out, z[0], z[1], z[2], z[3], z[4], z[5], MPC_RNDNN) == 0)
+    if (number_mpc_appell_F1(out, z[0], z[1], z[2], z[3], z[4], z[5], MPC_RNDNN) == 0)
         result = number_take_mpc_complex_result(out, precision_bits);
 
 done:
@@ -5672,7 +5672,7 @@ number_t num_harmonic_poly(const number_t degree, const number_t argument)
     return sum;
 }
 
-number_t num_lauricella_f(const number_t a, const number_t *b, const number_t c, const number_t *x,
+number_t num_lauricella_F(const number_t a, const number_t *b, const number_t c, const number_t *x,
                           size_t variable_count)
 {
     qfloat_t *b_qf = NULL;
@@ -5690,7 +5690,7 @@ number_t num_lauricella_f(const number_t a, const number_t *b, const number_t c,
         number_kind_value(&b[0]) != NUMBER_QFLOAT && number_kind_value(&b[1]) != NUMBER_QFLOAT &&
         number_kind_value(&c) != NUMBER_QFLOAT && number_kind_value(&x[0]) != NUMBER_QFLOAT &&
         number_kind_value(&x[1]) != NUMBER_QFLOAT) {
-        return number_mpfr_appell_f1_number(&a, &b[0], &b[1], &c, &x[0], &x[1]);
+        return number_mpfr_appell_F1_number(&a, &b[0], &b[1], &c, &x[0], &x[1]);
     }
 
     if (any_complex) {
@@ -5698,7 +5698,7 @@ number_t num_lauricella_f(const number_t a, const number_t *b, const number_t c,
             number_kind_value(&b[0]) != NUMBER_QCOMPLEX && number_kind_value(&b[1]) != NUMBER_QCOMPLEX &&
             number_kind_value(&c) != NUMBER_QCOMPLEX && number_kind_value(&x[0]) != NUMBER_QCOMPLEX &&
             number_kind_value(&x[1]) != NUMBER_QCOMPLEX) {
-            return number_mpc_appell_f1_number(&a, &b[0], &b[1], &c, &x[0], &x[1]);
+            return number_mpc_appell_F1_number(&a, &b[0], &b[1], &c, &x[0], &x[1]);
         }
         if (variable_count > 0u) {
             b_qc = malloc(variable_count * sizeof(*b_qc));
@@ -5711,7 +5711,7 @@ number_t num_lauricella_f(const number_t a, const number_t *b, const number_t c,
             x_qc[i] = number_value_to_qcomplex(&x[i]);
         }
         qcomplex_t result =
-            qc_lauricella_f(number_value_to_qcomplex(&a), b_qc, number_value_to_qcomplex(&c), x_qc, variable_count);
+            qc_lauricella_F(number_value_to_qcomplex(&a), b_qc, number_value_to_qcomplex(&c), x_qc, variable_count);
         free(x_qc);
         free(b_qc);
         return num_create_from_qcomplex(result);
@@ -5728,7 +5728,7 @@ number_t num_lauricella_f(const number_t a, const number_t *b, const number_t c,
         x_qf[i] = number_value_to_qfloat(&x[i]);
     }
     qfloat_t result =
-        qf_lauricella_f(number_value_to_qfloat(&a), b_qf, number_value_to_qfloat(&c), x_qf, variable_count);
+        qf_lauricella_F(number_value_to_qfloat(&a), b_qf, number_value_to_qfloat(&c), x_qf, variable_count);
     free(x_qf);
     free(b_qf);
     return num_create_from_qfloat(result);
@@ -5744,13 +5744,13 @@ real_failure:
     return NUM_NAN;
 }
 
-number_t num_appell_f1(const number_t a, const number_t b1, const number_t b2, const number_t c, const number_t x,
+number_t num_appell_F1(const number_t a, const number_t b1, const number_t b2, const number_t c, const number_t x,
                        const number_t y)
 {
     const number_t b[2] = {b1, b2};
     const number_t variables[2] = {x, y};
 
-    return num_lauricella_f(a, b, c, variables, 2u);
+    return num_lauricella_F(a, b, c, variables, 2u);
 }
 
 
@@ -5852,38 +5852,38 @@ number_t num_erfcinv(const number_t number)
     return number_error_math(number, number_double_erfcinv, qf_erfcinv, number_mpfr_erfcinv_mut, number_mpc_erfcinv);
 }
 
-number_t num_lambert_w0(const number_t number)
+number_t num_lambert_W0(const number_t number)
 {
     if (num_eq(number, NUM_NEG_INV_E))
         return number_const_return_like(&number, NUMBER_CONST_NEG_ONE);
-    if (number_lambert_w0_requires_complex(&number))
+    if (number_lambert_W0_requires_complex(&number))
         return number_apply_qcomplex_unary(number, qc_productlog);
-    return number_apply_nonreal_complex_unary_or_dispatch(number, NULL, qf_lambert_w0, qc_productlog,
-                                                          number_mpfr_lambert_w0_mut, NULL);
+    return number_apply_nonreal_complex_unary_or_dispatch(number, NULL, qf_lambert_W0, qc_productlog,
+                                                          number_mpfr_lambert_W0_mut, NULL);
 }
 
-number_t num_lambert_wm1(const number_t number)
+number_t num_lambert_Wm1(const number_t number)
 {
     if (num_eq(number, NUM_NEG_INV_E))
         return number_const_return_like(&number, NUMBER_CONST_NEG_ONE);
-    if (number_lambert_wm1_requires_complex(&number))
-        return number_apply_qcomplex_unary(number, qc_lambert_wm1);
-    return number_apply_nonreal_complex_unary_or_dispatch(number, NULL, qf_lambert_wm1, qc_lambert_wm1,
-                                                          number_mpfr_lambert_wm1_mut, NULL);
+    if (number_lambert_Wm1_requires_complex(&number))
+        return number_apply_qcomplex_unary(number, qc_lambert_Wm1);
+    return number_apply_nonreal_complex_unary_or_dispatch(number, NULL, qf_lambert_Wm1, qc_lambert_Wm1,
+                                                          number_mpfr_lambert_Wm1_mut, NULL);
 }
 
-number_t num_lambert_wn(const number_t branch, const number_t number)
+number_t num_lambert_Wn(const number_t branch, const number_t number)
 {
     int branch_int;
 
     if (!number_try_get_exact_int(branch, &branch_int))
         return NUM_NAN;
     if (branch_int == 0)
-        return num_lambert_w0(number);
+        return num_lambert_W0(number);
     if (branch_int == -1)
-        return num_lambert_wm1(number);
+        return num_lambert_Wm1(number);
 
-    return num_create_from_qcomplex(qc_lambert_wn(branch_int, number_value_to_qcomplex(&number)));
+    return num_create_from_qcomplex(qc_lambert_Wn(branch_int, number_value_to_qcomplex(&number)));
 }
 
 number_t num_beta(const number_t a, const number_t b)
@@ -5892,41 +5892,41 @@ number_t num_beta(const number_t a, const number_t b)
 }
 
 /* Preserve the real fast paths and use the guarded cylinder series for complex values and branch cuts. */
-number_t num_bessel_j(const number_t order, const number_t argument)
+number_t num_bessel_J(const number_t order, const number_t argument)
 {
     number_math_family_t family = number_math_family_binary(number_math_family_value(&order),
                                                            number_math_family_value(&argument));
     if (family == NUMBER_MATH_QCOMPLEX || family == NUMBER_MATH_COMPLEX ||
         (num_is_real(argument) && num_lt(argument, NUM_ZERO) && !num_is_integer(order)))
-        return number_bessel_j_complex(order, argument);
-    return number_apply_binary_math_with_double(order, argument, number_double_bessel_j, qf_bessel_j, NULL,
-                                                number_mpfr_bessel_j_mut, NULL);
+        return number_bessel_J_complex(order, argument);
+    return number_apply_binary_math_with_double(order, argument, number_double_bessel_J, qf_bessel_J, NULL,
+                                                number_mpfr_bessel_J_mut, NULL);
 }
 
 /* Evaluate real or complex Lommel s without narrowing a complex multiprecision operand. */
-number_t num_lommel_s(const number_t mu, const number_t nu, const number_t argument)
+number_t num_lommel_S(const number_t mu, const number_t nu, const number_t argument)
 {
     number_math_family_t family = number_math_family_binary(number_math_family_value(&mu),
         number_math_family_binary(number_math_family_value(&nu), number_math_family_value(&argument)));
     if (family == NUMBER_MATH_QCOMPLEX || family == NUMBER_MATH_COMPLEX) {
-        const number_ternary_math_ops_t ops = {.mpc_complex = number_mpc_lommel_s};
+        const number_ternary_math_ops_t ops = {.mpc_complex = number_mpc_lommel_S};
         return number_apply_ternary_mpc_complex(&mu, &nu, &argument, NUMBER_COMPLEX, &ops);
     }
-    return number_apply_ternary_math_with_double(mu, nu, argument, number_double_lommel_s, qf_lommel_s, NULL,
-                                                 number_mpfr_lommel_s_mut, NULL);
+    return number_apply_ternary_math_with_double(mu, nu, argument, number_double_lommel_S, qf_lommel_S, NULL,
+                                                 number_mpfr_lommel_S_mut, NULL);
 }
 
-number_t num_lommel_s_derivative_internal(const number_t mu, const number_t nu, const number_t argument)
+number_t num_lommel_S_derivative_internal(const number_t mu, const number_t nu, const number_t argument)
 {
     number_math_family_t family = number_math_family_binary(number_math_family_value(&mu),
         number_math_family_binary(number_math_family_value(&nu), number_math_family_value(&argument)));
     if (family == NUMBER_MATH_QCOMPLEX || family == NUMBER_MATH_COMPLEX) {
-        const number_ternary_math_ops_t ops = {.mpc_complex = number_mpc_lommel_s_derivative};
+        const number_ternary_math_ops_t ops = {.mpc_complex = number_mpc_lommel_S_derivative};
         return number_apply_ternary_mpc_complex(&mu, &nu, &argument, NUMBER_COMPLEX, &ops);
     }
-    return number_apply_ternary_math_with_double(mu, nu, argument, number_double_lommel_s_derivative,
-                                                 qf_lommel_s_derivative_internal, NULL,
-                                                 number_mpfr_lommel_s_derivative_mut, NULL);
+    return number_apply_ternary_math_with_double(mu, nu, argument, number_double_lommel_S_derivative,
+                                                 qf_lommel_S_derivative_internal, NULL,
+                                                 number_mpfr_lommel_S_derivative_mut, NULL);
 }
 
 number_t num_logbeta(const number_t a, const number_t b)
@@ -5997,7 +5997,7 @@ number_t num_productlog(const number_t number)
 {
     if (num_eq(number, NUM_NEG_INV_E))
         return number_const_return_like(&number, NUMBER_CONST_NEG_ONE);
-    if (number_lambert_w0_requires_complex(&number))
+    if (number_lambert_W0_requires_complex(&number))
         return number_apply_qcomplex_unary(number, qc_productlog);
     return number_apply_nonreal_complex_unary_or_dispatch(number, NULL, qf_productlog, qc_productlog,
                                                           number_mpfr_productlog_mut, NULL);

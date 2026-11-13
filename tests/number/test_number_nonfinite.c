@@ -32,7 +32,7 @@ void run_number_nonfinite_series_tests(void)
                    num_is_finite(dilog), num_is_nan(dilog), num_is_inf(dilog));
         ASSERT_TRUE(i < 2u ? num_is_nan(dilog) : !num_is_finite(dilog));
         ASSERT_TRUE(i < 2u ? num_is_nan(polylog) : !num_is_finite(polylog));
-        ASSERT_TRUE(num_is_nan(num_appell_f1(NUM_HALF, NUM_ONE, NUM_ONE, NUM_TWO, input, NUM_HALF)));
+        ASSERT_TRUE(num_is_nan(num_appell_F1(NUM_HALF, NUM_ONE, NUM_ONE, NUM_TWO, input, NUM_HALF)));
         if (i < 2u)
             ASSERT_TRUE(num_is_nan(num_Li(input)));
         num_destroy(&input);

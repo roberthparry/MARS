@@ -30,6 +30,7 @@
 #include <time.h>
 #include <unistd.h>
 
+#include "string-t.h"
 #include "http-t.h"
 #include "array-t.h"
 #include "file-t.h"

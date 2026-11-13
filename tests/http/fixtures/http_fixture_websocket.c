@@ -12,6 +12,7 @@
 #include <string.h>
 #include <openssl/evp.h>
 
+#include "string-t.h"
 #include "http_fixture.h"
 
 static bool fixture_ws_send(fixture_connection_t *connection, unsigned kind, const void *data, size_t size, bool final)

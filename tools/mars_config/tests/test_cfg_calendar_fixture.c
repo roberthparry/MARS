@@ -1,11 +1,12 @@
 /**
  * @file test_cfg_calendar_fixture.c
- * @brief One immutable encrypted installation for isolated calendar regression copies.
+ * @brief One immutable plaintext installation for isolated calendar regression copies.
  *
  * Builds the packaged jurisdiction database once in a disposable child home, then
  * retains only its closed database in a private runner-owned directory. Ordinary
  * and README cases copy that read-only seed through the file module and receive freshly
- * encrypted, home-specific saved configuration. Production installers and SQLCipher
+ * encrypted, home-specific saved configuration. Catalogue copies use the normal plaintext
+ * storage mode; separate installer regressions exercise encrypted content. Production installers and SQLCipher
  * security settings are unchanged. Explicit finalisation reports cleanup errors;
  * an owner-PID-guarded exit hook is a fallback for early runner termination.
  */
@@ -26,7 +27,7 @@ static file_t *test_calendar_seed;
 static pid_t test_calendar_seed_owner;
 static bool test_calendar_seed_attempted;
 static bool test_calendar_seed_ready;
-static const char *test_calendar_seed_password = "calendar-regression-only";
+static const char *test_calendar_seed_password = "";
 
 static bool test_calendar_seed_environment(void)
 {
@@ -130,8 +131,8 @@ sqlite_t *test_cfg_calendar_database(const char *directory, string_t **path, str
     bool ok = destination && body && test_calendar_seed_environment() &&
               file_copy(test_calendar_seed, destination, false) && file_chmod(destination, 0600) &&
               mars_settings_sync(body);
-    sqlite_t *db = ok ? sqlite_open_encrypted(*path, *key) : NULL;
-    if (db && !sqlite_exec_cstr(db, "PRAGMA cache_size=-512; PRAGMA temp.cache_size=-512;")) {
+    sqlite_t *db = ok ? sqlite_open_plain(*path) : NULL;
+    if (db && !sqlite_exec_cstr(db, "PRAGMA cache_size=-8192; PRAGMA temp.cache_size=-512;")) {
         sqlite_close(db);
         db = NULL;
     }
@@ -150,4 +151,55 @@ sqlite_t *test_cfg_calendar_database(const char *directory, string_t **path, str
 void test_cfg_calendar_fixture_finish(void)
 {
     TEST_ASSERT_TRUE(test_calendar_seed_remove(), "remove immutable calendar regression fixture");
+}
+
+/* Selection cases need the core town catalogue, complete languages and real schema/manual rules.
+ * The immutable calendar seed separately retains the full worldwide-town and generated-rule imports. */
+bool test_cfg_calendar_sources(const char *directory)
+{
+    string_t *root = string_sprintf("%s/selection-sources", directory);
+    string_t *folder_path = root ? string_sprintf("%s/packaging/jurisdiction-db", string_c_str(root)) : NULL;
+    file_t *folder = folder_path ? file_new(folder_path) : NULL;
+    bool ok = folder && file_create_directory(folder, 0700, true);
+    static const char *const sources[] = {"mars_holiday_rules.sql",
+                                          "mars_country_jurisdictions.sql",
+                                          "mars_target_subdivisions.sql",
+                                          "mars_timezone_rules.sql",
+                                          "mars_jurisdiction_location_defaults.sql",
+                                          "mars_jurisdiction_towns.sql",
+                                          "town_catalogue_seed.sql",
+                                          "location_additions.sql",
+                                          "location_subdivisions.sql",
+                                          "town_search.sql",
+                                          "mars_manual_first_class_rules.sql",
+                                          "mars_holiday_localized_names.sql",
+                                          "mars_calendar_locale_names.sql",
+                                          "mars_calendar_local.sql"};
+    for (size_t i = 0; i < sizeof(sources) / sizeof(*sources) && ok; ++i) {
+        string_t *source_path = string_sprintf("%s/packaging/jurisdiction-db/%s", MARS_CONFIG_ROOT_DIR, sources[i]);
+        string_t *target_path = string_sprintf("%s/%s", string_c_str(folder_path), sources[i]);
+        file_t *source = source_path ? file_new(source_path) : NULL;
+        file_t *target = target_path ? file_new(target_path) : NULL;
+        ok = source && target && file_copy(source, target, false);
+        file_free(source);
+        file_free(target);
+        string_free(source_path);
+        string_free(target_path);
+    }
+    static const char *const omitted[] = {
+        "mars_generated_first_class_rules.sql", "mars_jurisdiction_world_towns.sql"
+    };
+    string_t *empty = string_new_with("-- Core selection fixture; the complete calendar seed covers bulk imports.\n");
+    for (size_t i = 0; ok && i < sizeof omitted / sizeof *omitted; ++i) {
+        string_t *path = string_sprintf("%s/%s", string_c_str(folder_path), omitted[i]);
+        file_t *file = path ? file_new(path) : NULL;
+        ok = file && empty && file_write_all_text(file, empty);
+        file_free(file); string_free(path);
+    }
+    ok = ok && !setenv("MARS_ROOT", string_c_str(root), 1);
+    string_free(empty);
+    file_free(folder);
+    string_free(folder_path);
+    string_free(root);
+    return ok;
 }

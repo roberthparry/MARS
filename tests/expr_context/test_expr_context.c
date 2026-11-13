@@ -11,6 +11,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "string-t.h"
 #include "expr_context-t.h"
 #include "equation-t.h"
 #include "matrix-t.h"

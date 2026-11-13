@@ -9,6 +9,7 @@
  * run suites sequentially; this source is not part of the installed library.
  */
 
+#include "string-t.h"
 #include "test_matrix.h"
 
 static void test_mat_sprintf_formats(void)

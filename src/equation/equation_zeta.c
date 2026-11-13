@@ -137,7 +137,7 @@ static number_t equ_zeta_zero_seed(long index)
 {
     number_t order = num_create_from_frac(8L * index - 11L, 8L);
     number_t argument = num_div(order, NUM_E);
-    number_t lambert = num_lambert_w0(argument);
+    number_t lambert = num_lambert_W0(argument);
     number_t turn = num_mul(NUM_TWO, NUM_PI);
     number_t numerator = num_mul(turn, order);
     number_t height = num_div(numerator, lambert);

@@ -386,7 +386,7 @@ const char *expr_fourier_atan_note(const expr_t *transform)
 /* Find a numerator K0 factor, not a similar function buried inside an unrelated composition. */
 static const expr_t *k0_factor(const expr_t *f)
 {
-    if (f->ops == &ops_bessel_k && expr_const_is_zero(f->a))
+    if (f->ops == &ops_bessel_K && expr_const_is_zero(f->a))
         return f;
     if (f->ops == &ops_neg || f->ops == &ops_div)
         return k0_factor(f->a);
@@ -440,7 +440,7 @@ expr_t *expr_fourier_asinh_pair(fourier_context_t *c, const expr_t *f, const exp
             !expr_fourier_positive(c, expr_fourier_abs(c, w)))
             return NULL;
         expr_t *argument = ft_div(c, expr_fourier_abs(c, w), magnitude);
-        expr_t *kernel = expr_fourier_keep(c, expr_bessel_k(integer(c, 0), argument));
+        expr_t *kernel = expr_fourier_keep(c, expr_bessel_K(integer(c, 0), argument));
         expr_t *phase = ft_exp(c, ft_div(c, ft_mul(c, ft_mul(c, i, w), offset), rate));
         expr_t *coefficient = ft_neg(c, ft_mul(c, ft_mul(c, integer(c, 2), i), ft_div(c, rate, magnitude)));
         return ft_div(c, ft_mul(c, coefficient, ft_mul(c, phase, kernel)), w);

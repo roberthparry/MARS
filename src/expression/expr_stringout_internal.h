@@ -277,20 +277,20 @@ const char *expr_cylindrical_symbol(const expr_t *f);
 int expr_has_polygamma_order(const expr_t *f);
 int expr_has_polylog_order(const expr_t *f);
 int expr_has_legendre_chi_order(const expr_t *f);
-void emit_expr_lambert_wn(const expr_t *f, sbuf_t *b);
+void emit_expr_lambert_Wn(const expr_t *f, sbuf_t *b);
 void emit_expr_polygamma(const expr_t *f, sbuf_t *b);
 void emit_expr_polylog(const expr_t *f, sbuf_t *b);
 void emit_expr_legendre_chi(const expr_t *f, sbuf_t *b);
-void emit_expr_appell_f1(const expr_t *f, sbuf_t *b);
-void emit_expr_lauricella_f(const expr_t *f, sbuf_t *out);
+void emit_expr_appell_F1(const expr_t *f, sbuf_t *b);
+void emit_expr_lauricella_F(const expr_t *f, sbuf_t *out);
 void emit_expr_hypergeometric_pFq(const expr_t *f, sbuf_t *b);
-void emit_expr_lommel_s(const expr_t *f, sbuf_t *b);
+void emit_expr_lommel_S(const expr_t *f, sbuf_t *b);
 void emit_func_polygamma(const expr_t *f, sbuf_t *b);
-void emit_func_appell_f1(const expr_t *f, sbuf_t *b);
-void emit_func_lauricella_f(const expr_t *f, sbuf_t *out);
+void emit_func_appell_F1(const expr_t *f, sbuf_t *b);
+void emit_func_lauricella_F(const expr_t *f, sbuf_t *out);
 void emit_func_hypergeometric_pFq(const expr_t *f, sbuf_t *b);
-void emit_func_lommel_s(const expr_t *f, sbuf_t *b);
-void emit_func_lambert_wn(const expr_t *f, sbuf_t *b);
+void emit_func_lommel_S(const expr_t *f, sbuf_t *b);
+void emit_func_lambert_Wn(const expr_t *f, sbuf_t *b);
 void emit_function_builtin_name(sbuf_t *b, const expr_ops_t *ops);
 
 /* TeX emit formatting. */

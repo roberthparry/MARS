@@ -9,6 +9,7 @@
 #include <string.h>
 #include <sodium.h>
 
+#include "string-t.h"
 #include "array-t.h"
 #include "file-t.h"
 #define MARS_TEST_DATABASE_INTERNAL_ACCESS
@@ -31,6 +32,12 @@ static int test_sql_source_compare(const void *left, const void *right)
     return string_compare(((const test_sql_source_t *)left)->module, ((const test_sql_source_t *)right)->module);
 }
 
+static string_t *test_sql_relative_path(const char *module)
+{
+    const char *prefix = strncmp(module, "test_", 5) ? "test_" : "";
+    return string_sprintf("tests/%s/%s%s.sql", module, prefix, module);
+}
+
 static array_t *test_sql_sources(const string_t *root)
 {
     const char *base = root ? string_c_str(root) : ".";
@@ -42,8 +49,10 @@ static array_t *test_sql_sources(const string_t *root)
     while (ok && (ok = file_read_directory(directory, &entry)) && entry) {
         if (file_info_type(entry) == FILE_TYPE_DIRECTORY) {
             const char *name = file_info_name(entry);
+            string_t *relative = test_sql_relative_path(name);
             test_sql_source_t source = {.module = string_new_with(name),
-                .path = string_sprintf("%s/tests/%s/test_%s.sql", base, name, name)};
+                .path = relative ? string_sprintf("%s/%s", base, string_c_str(relative)) : NULL};
+            string_free(relative);
             file_t *candidate = source.path ? file_new(source.path) : NULL;
             ok = source.module && candidate;
             if (ok && file_exists(candidate)) {
@@ -96,7 +105,7 @@ string_t *test_database_sources_fingerprint(const string_t *root)
               test_sql_hash_file(&hash, root, "tests/test_config.json");
     for (size_t i = 0u; ok && i < array_size(sources); ++i) {
         const char *module = string_c_str(((const test_sql_source_t *)array_get(sources, i))->module);
-        string_t *relative = string_sprintf("tests/%s/test_%s.sql", module, module);
+        string_t *relative = test_sql_relative_path(module);
         ok = relative && test_sql_hash_file(&hash, root, string_c_str(relative));
         string_free(relative);
     }
@@ -181,6 +190,7 @@ bool test_database_seed(test_database_t *database, const string_t *root)
               test_database_history_upgrade(database);
     for (size_t i = 0u; ok && i < array_size(sources); ++i)
         ok = test_sql_import(database, ((const test_sql_source_t *)array_get(sources, i))->path);
+    if (ok) ok = test_database_relocate_sources(database);
     string_free(path);
     array_destroy(sources);
     if (!ok && !database->error)
@@ -213,8 +223,9 @@ bool test_database_sources_copy(const string_t *source_root, const string_t *des
         const test_sql_source_t *entry = array_get(sources, i);
         string_t *parent = string_sprintf("%s/tests/%s", destination, string_c_str(entry->module));
         file_t *folder = parent ? file_new(parent) : NULL;
-        string_t *target = string_sprintf("%s/tests/%s/test_%s.sql", destination,
-                                           string_c_str(entry->module), string_c_str(entry->module));
+        string_t *relative = test_sql_relative_path(string_c_str(entry->module));
+        string_t *target = relative ? string_sprintf("%s/%s", destination, string_c_str(relative)) : NULL;
+        string_free(relative);
         ok = folder && (file_exists(folder) || file_create_directory(folder, 0700u, true)) &&
              test_sql_copy(entry->path, target);
         string_free(target);

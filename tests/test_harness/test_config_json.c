@@ -11,6 +11,7 @@
 
 /* test_config_json.c - JSON helpers for test configuration */
 
+#include "string-t.h"
 #define MARS_TEST_CONFIG_INTERNAL_ACCESS
 #include "test_config_internal.h"
 

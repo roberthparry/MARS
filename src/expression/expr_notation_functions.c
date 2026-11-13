@@ -62,7 +62,7 @@ static const TeX_model_node_t *lerch(notation_build_t *build, const expr_t *expr
 static const TeX_model_node_t *lommel(notation_build_t *build, const expr_t *expression)
 {
     const expr_t *mu, *nu, *argument;
-    if (!expr_lommel_s_unpack(expression, &mu, &nu, &argument))
+    if (!expr_lommel_S_unpack(expression, &mu, &nu, &argument))
         return NULL;
     const expr_t *parameters[] = {mu, nu};
     const TeX_model_node_t *indexed[] = {
@@ -77,7 +77,7 @@ static const TeX_model_node_t *lommel(notation_build_t *build, const expr_t *exp
 static const TeX_model_node_t *appell(notation_build_t *build, const expr_t *expression)
 {
     const expr_t *a, *b1, *b2, *c, *x, *y;
-    if (!expr_appell_f1_unpack(expression, &a, &b1, &b2, &c, &x, &y))
+    if (!expr_appell_F1_unpack(expression, &a, &b1, &b2, &c, &x, &y))
         return NULL;
     const expr_t *parameters[] = {b1, b2}, *variables[] = {x, y};
     const TeX_model_node_t *groups[] = {
@@ -95,7 +95,7 @@ static const TeX_model_node_t *lauricella(notation_build_t *build, const expr_t 
 {
     const expr_t *a, **parameters = NULL, *c, **variables = NULL;
     size_t count = 0u;
-    if (!expr_lauricella_f_unpack(expression, &a, &parameters, &c, &variables, &count))
+    if (!expr_lauricella_F_unpack(expression, &a, &parameters, &c, &variables, &count))
         return NULL;
     const TeX_model_node_t *groups[] = {
         notation_build_expr(build, a), parameter_list(build, parameters, count),

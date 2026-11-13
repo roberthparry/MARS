@@ -261,8 +261,8 @@ while `qc_acos(2)` is
 | `qc_erfc(z)` | complementary error function `1 - erf(z)` |
 | `qc_erfinv(z)` | inverse error function |
 | `qc_erfcinv(z)` | inverse complementary error function |
-| `qc_bessel_j(order, z)` | principal Bessel function of the first kind |
-| `qc_lommel_s(mu, nu, z)` | principal Lommel s function |
+| `qc_bessel_J(order, z)` | principal Bessel function of the first kind |
+| `qc_lommel_S(mu, nu, z)` | principal Lommel s function |
 | `qc_gamma(z)` | Γ(z) |
 | `qc_lgamma(z)` | ln Γ(z) |
 | `qc_digamma(z)` | ψ(z) = Γ′(z)/Γ(z) |
@@ -283,7 +283,7 @@ while `qc_acos(2)` is
 | `qc_normal_pdf(z)` | standard normal PDF φ(z) |
 | `qc_normal_cdf(z)` | standard normal CDF Φ(z) |
 | `qc_normal_logpdf(z)` | log standard normal PDF |
-| `qc_lambert_wm1(z)` | Lambert W branch W₋₁(z) |
+| `qc_lambert_Wm1(z)` | Lambert W branch W₋₁(z) |
 | `qc_productlog(z)` | principal Lambert W function W₀(z): W·e^W = z |
 | `qc_gammainc_lower(s, x)` | lower incomplete gamma γ(s,x) |
 | `qc_gammainc_upper(s, x)` | upper incomplete gamma Γ(s,x) |
@@ -301,8 +301,8 @@ while `qc_acos(2)` is
 | `qc_harmonic_poly(degree, z)` | finite harmonic polynomial Hₙ(z) = Σₖ₌₁ⁿ zᵏ/k for an `unsigned long` degree |
 | `qc_legendre_chi(s, z)` | Legendre chi χ_s(z) for integer real orders currently supported by the implementation |
 | `qc_hypergeometric_pFq(upper, upper_count, lower, lower_count, argument)` | generalised hypergeometric pFq; either parameter array may be `NULL` when its count is zero |
-| `qc_lauricella_f(a, b, c, x, variable_count)` | Lauricella F_D in `variable_count` variables within the implemented convergence polydisc |
-| `qc_appell_f1(a, b1, b2, c, x, y)` | Appell F₁, implemented as the two-variable Lauricella F_D member |
+| `qc_lauricella_F(a, b, c, x, variable_count)` | Lauricella F_D in `variable_count` variables within the implemented convergence polydisc |
+| `qc_appell_F1(a, b1, b2, c, x, y)` | Appell F₁, implemented as the two-variable Lauricella F_D member |
 
 The Riemann and Hurwitz zeta Euler–Maclaurin paths reuse successive rising
 products and endpoint powers, and omit derivative work for value-only calls.
@@ -333,7 +333,7 @@ NaN. `qc_clausen2` uses the same branch and domain for order two.
 
 ### Bessel Y
 
-`qc_bessel_y(order, argument)` evaluates the principal Bessel function of
+`qc_bessel_Y(order, argument)` evaluates the principal Bessel function of
 the second kind for real or complex orders and arguments, including Y₀.
 It uses the [native arbitrary-precision evaluator](number.md#bessel-y),
 then rounds the real and imaginary components to qfloat precision.
@@ -356,7 +356,7 @@ The shared evaluator limits work precision to 65536 bits and series to
 
 int main(void)
 {
-    qcomplex_t value = qc_bessel_y(QC_ZERO, QC_ONE);
+    qcomplex_t value = qc_bessel_Y(QC_ZERO, QC_ONE);
     printf("Y_0(1) = %.15f + %.0fi\n", qf_to_double(qc_real(value)), qf_to_double(qc_imag(value)));
     return 0;
 }
@@ -368,7 +368,7 @@ Y_0(1) = 0.088256964215677 + 0i
 
 ### Modified Bessel K
 
-`qc_bessel_k(order, argument)` evaluates the principal modified Bessel function
+`qc_bessel_K(order, argument)` evaluates the principal modified Bessel function
 of the second kind for finite real or complex operands and a non-zero argument.
 Both operand magnitudes must be at most 1000. A zero argument, non-finite input,
 unsupported magnitude or exhausted numerical guard produces a NaN result.
@@ -384,7 +384,7 @@ components.
 
 ### Modified Bessel I
 
-`qc_bessel_i(order, argument)` evaluates the principal modified Bessel
+`qc_bessel_I(order, argument)` evaluates the principal modified Bessel
 function of the first kind for complex orders and arguments. Order zero
 selects `I_0(z)`. The leading power `(z/2)^order` uses
 `-pi < arg(z) <= pi`; an exactly negative real argument takes the upper-bank
@@ -408,7 +408,7 @@ there is no asymptotic large-argument implementation.
 
 int main(void)
 {
-    qcomplex_t bessel = qc_bessel_i(QC_ZERO, QC_ONE);
+    qcomplex_t bessel = qc_bessel_I(QC_ZERO, QC_ONE);
     qc_printf("I_0(1) = %.16z\n", bessel);
     return 0;
 }
@@ -420,7 +420,7 @@ I_0(1) = 1.2660658777520083
 
 ### Ordinary Struve H
 
-`qc_struve_h(order, argument)` accepts finite complex orders and arguments
+`qc_struve_H(order, argument)` accepts finite complex orders and arguments
 and returns the unscaled principal ordinary Struve function. The leading
 power `(z/2)^(order+1)` uses `-pi < arg(z) <= pi`. Exactly negative real
 arguments use the upper bank, even with negative imaginary zero; approaches
@@ -447,7 +447,7 @@ inside the input bounds is guaranteed to pass the numerical guards.
 
 int main(void)
 {
-    qcomplex_t ordinary = qc_struve_h(QC_ZERO, QC_ONE);
+    qcomplex_t ordinary = qc_struve_H(QC_ZERO, QC_ONE);
     qc_printf("H_0(1) = %.15z\n", ordinary);
     return 0;
 }
@@ -459,7 +459,7 @@ H_0(1) = 0.568656627048288
 
 ### Modified Struve L
 
-`qc_struve_l(order, argument)` accepts finite complex orders and arguments.
+`qc_struve_L(order, argument)` accepts finite complex orders and arguments.
 It evaluates the principal value, with the power `(z/2)^(order+1)` defined
 using `-pi < arg(z) <= pi`. An exactly negative real argument takes the upper
 bank, including an imaginary component of negative zero; approaching from
@@ -486,7 +486,7 @@ provided. See the number guide for the work-precision and iteration limits.
 
 int main(void)
 {
-    qcomplex_t value = qc_struve_l(QC_ZERO, QC_ONE);
+    qcomplex_t value = qc_struve_L(QC_ZERO, QC_ONE);
     qc_printf("L_0(1) = %.16z\n", value);
     return 0;
 }
@@ -503,7 +503,7 @@ path. The complex forward evaluator supports `|z| <= 140`, subject to its
 working precision and reject an
 unresolved forward residual. Failed guards return `QC_NAN`.
 
-`qc_bessel_j` and `qc_lommel_s` also round guarded number-layer series. Their
+`qc_bessel_J` and `qc_lommel_S` also round guarded number-layer series. Their
 complex argument magnitudes are limited to 1000, with a 65536-bit work limit.
 Principal powers use the upper bank on the negative real axis. Singular
 parameters, undefined zero limits and exhausted guards return `QC_NAN`.
@@ -567,12 +567,12 @@ Creates or reconstructs the public value described by from text.
 qcomplex_t qc_from_text(const string_t *text);
 ```
 
-### `qc_lambert_wn()`
+### `qc_lambert_Wn()`
 
 Returns the public result described by lambert wn.
 
 ```c
-qcomplex_t qc_lambert_wn(int branch, qcomplex_t z);
+qcomplex_t qc_lambert_Wn(int branch, qcomplex_t z);
 ```
 
 ## Implementation Notes
@@ -641,7 +641,7 @@ Failures and timeouts remain visible. † marks a retained slowdown outlier.
 | acot | 0.7+0.125i | 13.4 µs |
 | acoth | 2.345+0.125i | 5.6 µs |
 | add | 0.7+0.125i, 0.7+0.125i | 18.3 ns |
-| appell_f1 | <span style="display:inline-block;width:40ch;max-width:100%;white-space:normal;overflow-wrap:anywhere">0.5+0.125i, 0.7+0.125i, 0.8+0.125i, 2.5+<br/>0.125i, 0.2+0.125i, 0.3+0.125i</span> | 693.3 µs |
+| appell_F1 | <span style="display:inline-block;width:40ch;max-width:100%;white-space:normal;overflow-wrap:anywhere">0.5+0.125i, 0.7+0.125i, 0.8+0.125i, 2.5+<br/>0.125i, 0.2+0.125i, 0.3+0.125i</span> | 693.3 µs |
 | arccovercos | 0.5+0.125i | 9.7 µs |
 | arccoversin | 0.5+0.125i | 9.5 µs |
 | archacovercos | 0.5+0.125i | 6.6 µs |
@@ -658,10 +658,10 @@ Failures and timeouts remain visible. † marks a retained slowdown outlier.
 | atan | 0.7+0.125i | 12.7 µs |
 | atan2 | 0.5+0.125i, -0.75+0.125i | 12.6 µs |
 | atanh | 0.7+0.125i | 6.7 µs |
-| bessel_i | 2, 0.7+0.125i | 112.2 µs |
-| bessel_j | 2, 0.7+0.125i | 130.7 µs |
-| bessel_k | 2, 0.7+0.125i | 86.3 µs |
-| bessel_y | 2, 0.7+0.125i | 107.1 µs |
+| bessel_I | 2, 0.7+0.125i | 112.2 µs |
+| bessel_J | 2, 0.7+0.125i | 130.7 µs |
+| bessel_K | 2, 0.7+0.125i | 86.3 µs |
+| bessel_Y | 2, 0.7+0.125i | 107.1 µs |
 | beta | 2.3+0.125i, 4.5+0.125i | 41.2 µs |
 | beta_pdf | 0.5+0.125i, 2.5+0.125i, 3.5+0.125i | 60.9 µs |
 | binomial | 5+0.125i, 2+0.125i | 33.6 µs |
@@ -705,10 +705,10 @@ Failures and timeouts remain visible. † marks a retained slowdown outlier.
 | hypot | 0.7+0.125i, 1.2+0.125i | 1.8 µs |
 | imag_part | 0.7+0.125i | 3.3 ns |
 | inv | 0.7+0.125i | 199.8 ns |
-| lambert_w0 | 0.7+0.125i | 36.0 µs |
-| lambert_wm1 | -0.2+0.125i | 47.6 µs † |
-| lambert_wn | 1, 0.7+0.125i | 36.4 µs |
-| lauricella_f | 0.5+0.125i, 0.3+0.125i, 2.5+0.125i | 205.6 µs |
+| lambert_W0 | 0.7+0.125i | 36.0 µs |
+| lambert_Wm1 | -0.2+0.125i | 47.6 µs † |
+| lambert_Wn | 1, 0.7+0.125i | 36.4 µs |
+| lauricella_F | 0.5+0.125i, 0.3+0.125i, 2.5+0.125i | 205.6 µs |
 | ldexp | 1.23456789+0.125i, 3 | 32.8 ns |
 | legendre_chi | 2, 0.7+0.125i | 401.6 µs |
 | lerch_phi | 0.3+0.125i, 2+0.125i, 1.4+0.125i | 814.5 µs |
@@ -719,7 +719,7 @@ Failures and timeouts remain visible. † marks a retained slowdown outlier.
 | log10 | 2.345678+0.125i | 5.8 µs |
 | logbeta | 2.3+0.125i, 4.5+0.125i | 34.4 µs |
 | logbeta_pdf | 0.5+0.125i, 2.5+0.125i, 3.5+0.125i | 48.2 µs |
-| lommel_s | 0.5+0.125i, 0.7+0.125i, 1.2+0.125i | 143.7 µs |
+| lommel_S | 0.5+0.125i, 0.7+0.125i, 1.2+0.125i | 143.7 µs |
 | mul | 0.7+0.125i, 0.7+0.125i | 61.3 ns |
 | neg | 0.7+0.125i | 7.5 ns |
 | normal_cdf | 0.7+0.125i | 46.6 µs |
@@ -746,8 +746,8 @@ Failures and timeouts remain visible. † marks a retained slowdown outlier.
 | sqr | 0.7+0.125i | 57.5 ns |
 | sqrt | 1.23456789+0.125i | 4.1 µs |
 | step | 0.7 | 14.8 ns |
-| struve_h | 2, 0.7+0.125i | 175.6 µs |
-| struve_l | 2, 0.7+0.125i | 123.2 µs |
+| struve_H | 2, 0.7+0.125i | 175.6 µs |
+| struve_L | 2, 0.7+0.125i | 123.2 µs |
 | sub | 0.7+0.125i, 0.7+0.125i | 18.1 ns |
 | tan | 0.7+0.125i | 22.4 µs |
 | tanh | 0.7+0.125i | 18.7 µs |

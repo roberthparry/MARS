@@ -2024,7 +2024,7 @@ static void test_lab_screenshots_readme(void)
     json_free(fields);
 
     json_t *observer = test_lab_json(
-        "{\"date\":\"2026-10-25\",\"time\":\"12:00:00\",\"lat\":\"51.5085\",\"lon\":\"-0.1257\","
+        "{\"date\":\"2026-11-12\",\"time\":\"19:27:23\",\"lat\":\"51.5085\",\"lon\":\"-0.1257\","
         "\"elevation\":\"25\",\"zone\":\"0\",\"jurisdiction\":\"GB-ENG\","
         "\"country\":\"England\",\"observer_surface\":\"Land\",\"sea_horizon\":\"false\","
         "\"town\":\"London|51.5085|-0.1257|25\",\"visibility\":\"all\",\"defer_events\":\"true\"}");
@@ -2042,13 +2042,13 @@ static void test_lab_screenshots_readme(void)
     const json_t *summary = test_lab_member(fields, "observer_summary");
     const json_t *presentation = test_lab_member(test_lab_member(fields, "almanac_presentation"), "all");
     ok = status == 200 && test_lab_ok(fields, true) &&
-         strstr(test_lab_text(json_array_get(summary, 0), "value"), "2026-10-25 12:00:00") &&
+         strstr(test_lab_text(json_array_get(summary, 0), "value"), "2026-11-12 19:27:23") &&
          strstr(test_lab_text(json_array_get(summary, 1), "value"), "London") &&
          !strcmp(test_lab_text(json_array_get(summary, 5), "value"), "25 m · Land") &&
          strstr(test_lab_text(presentation, "html"), "hPa (observer)");
     if (!ok) show_failure(fields);
     TEST_ASSERT_TRUE(ok, "README Almanac screenshot retains London's GMT moment, whole-metre altitude and pressure reference");
-    string_printf("README Almanac screenshot: London; 2026-10-25 12:00:00 GMT; 25 m; estimated observer pressure\n");
+    string_printf("README Almanac screenshot: London; 2026-11-12 19:27:23 GMT; 25 m; estimated observer pressure\n");
     json_free(fields);
     json_free(snapshot);
     json_free(observer);

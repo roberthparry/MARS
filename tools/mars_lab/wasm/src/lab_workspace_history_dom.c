@@ -110,6 +110,14 @@ void lab_workspace_dom_history_row(jsref list, jsref snapshot, unsigned position
     lab_dom_write(row, LAB_DOM_ATTRIBUTE, "class", lab_dom_string("history-entry"));
     lab_dom_write(row, LAB_DOM_DATASET, "historyPosition", lab_dom_format(position, "", ""));
     if (position == current) lab_dom_write(row, LAB_DOM_ATTRIBUTE, "aria-current", lab_dom_string("step"));
+    if (count > 1) {
+        int grip = lab_dom_create("span");
+        lab_dom_write(grip, LAB_DOM_ATTRIBUTE, "class", lab_dom_string("history-drag-handle"));
+        lab_dom_write(grip, LAB_DOM_ATTRIBUTE, "aria-hidden", lab_dom_string("true"));
+        lab_dom_write(grip, LAB_DOM_ATTRIBUTE, "title", lab_dom_string("Drag to reorder"));
+        lab_dom_write(grip, LAB_DOM_TEXT, "", lab_dom_string("⠿"));
+        lab_dom_append(row, grip);
+    }
     lab_dom_write(label, LAB_DOM_ATTRIBUTE, "type", lab_dom_string("button"));
     lab_dom_write(label, LAB_DOM_ATTRIBUTE, "class", lab_dom_string("history-entry-open secondary"));
     lab_dom_write(label, LAB_DOM_DATASET, "historyAction", lab_dom_string("open"));

@@ -337,7 +337,7 @@ static number_t number_modified_series(number_t order, number_t argument, number
 }
 
 /* Reuse the guarded alternating cylinder series for complex Bessel J, preserving its principal branch. */
-number_t number_bessel_j_complex(number_t order, number_t argument)
+number_t number_bessel_J_complex(number_t order, number_t argument)
 {
     number_t value = number_modified_series(order, argument, NUMBER_ORDINARY_BESSEL_J);
     number_scope_register_value(&value);
@@ -345,7 +345,7 @@ number_t number_bessel_j_complex(number_t order, number_t argument)
 }
 
 /* Evaluate principal modified Bessel I, including its negative-integer order limits. */
-number_t num_bessel_i(const number_t order, const number_t argument)
+number_t num_bessel_I(const number_t order, const number_t argument)
 {
     number_t value = number_modified_series(order, argument, NUMBER_MODIFIED_BESSEL_I);
     number_scope_register_value(&value);
@@ -353,7 +353,7 @@ number_t num_bessel_i(const number_t order, const number_t argument)
 }
 
 /* Evaluate principal ordinary Struve H through the shared guarded alternating series. */
-number_t num_struve_h(const number_t order, const number_t argument)
+number_t num_struve_H(const number_t order, const number_t argument)
 {
     number_t value = number_modified_series(order, argument, NUMBER_MODIFIED_STRUVE_H);
     number_scope_register_value(&value);
@@ -361,7 +361,7 @@ number_t num_struve_h(const number_t order, const number_t argument)
 }
 
 /* Evaluate principal modified Struve L through the shared guarded series. */
-number_t num_struve_l(const number_t order, const number_t argument)
+number_t num_struve_L(const number_t order, const number_t argument)
 {
     number_t value = number_modified_series(order, argument, NUMBER_MODIFIED_STRUVE_L);
     number_scope_register_value(&value);

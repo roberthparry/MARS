@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "string-t.h"
 #include "thread-t.h"
 #include "diagnostic-t.h"
 #include "test_harness.h"

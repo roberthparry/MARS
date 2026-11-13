@@ -7,6 +7,7 @@
  */
 #include <stdio.h>
 
+#include "string-t.h"
 #include "computation-t.h"
 #include "csv-t.h"
 #include "sqlite-t.h"

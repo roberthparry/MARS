@@ -103,20 +103,20 @@ number_t eval_harmonic_poly(expr_t *expr);
 number_t eval_lerch_phi(expr_t *expr);
 number_t eval_lerch_phi_pack(expr_t *expr);
 number_t eval_legendre_chi(expr_t *expr);
-number_t eval_bessel_j(expr_t *expr);
-number_t eval_bessel_y(expr_t *expr);
-number_t eval_lommel_s(expr_t *expr);
-number_t eval_lommel_s_pack(expr_t *expr);
-number_t eval_appell_f1(expr_t *expr);
-number_t eval_appell_f1_pack(expr_t *expr);
-number_t eval_lauricella_f(expr_t *expr);
+number_t eval_bessel_J(expr_t *expr);
+number_t eval_bessel_Y(expr_t *expr);
+number_t eval_lommel_S(expr_t *expr);
+number_t eval_lommel_S_pack(expr_t *expr);
+number_t eval_appell_F1(expr_t *expr);
+number_t eval_appell_F1_pack(expr_t *expr);
+number_t eval_lauricella_F(expr_t *expr);
 number_t eval_hypergeometric_pFq(expr_t *expr);
 number_t eval_hypergeometric_pFq_pack(expr_t *expr);
 number_t eval_gammainv(expr_t *expr);
 number_t eval_lambert_w(expr_t *expr);
-number_t eval_lambert_wn(expr_t *expr);
-number_t eval_lambert_w0(expr_t *expr);
-number_t eval_lambert_wm1(expr_t *expr);
+number_t eval_lambert_Wn(expr_t *expr);
+number_t eval_lambert_W0(expr_t *expr);
+number_t eval_lambert_Wm1(expr_t *expr);
 
 /* Evaluation: distributions and multi-argument special functions. */
 number_t eval_normal_pdf(expr_t *expr);
@@ -235,26 +235,26 @@ expr_t *deriv_lerch_phi(expr_t *expr);
 expr_t *deriv_lerch_phi_pack(expr_t *expr);
 expr_t *deriv_harmonic_poly(expr_t *expr);
 expr_t *deriv_legendre_chi(expr_t *expr);
-expr_t *deriv_bessel_j(expr_t *expr);
-expr_t *deriv_bessel_y(expr_t *expr);
-expr_t *deriv_lommel_s(expr_t *expr);
-expr_t *deriv_lommel_s_pack(expr_t *expr);
-expr_t *deriv_appell_f1(expr_t *expr);
-expr_t *deriv_appell_f1_pack(expr_t *expr);
-expr_t *deriv_lauricella_f(expr_t *expr);
+expr_t *deriv_bessel_J(expr_t *expr);
+expr_t *deriv_bessel_Y(expr_t *expr);
+expr_t *deriv_lommel_S(expr_t *expr);
+expr_t *deriv_lommel_S_pack(expr_t *expr);
+expr_t *deriv_appell_F1(expr_t *expr);
+expr_t *deriv_appell_F1_pack(expr_t *expr);
+expr_t *deriv_lauricella_F(expr_t *expr);
 expr_t *deriv_hypergeometric_pFq(expr_t *expr);
 expr_t *deriv_hypergeometric_pFq_pack(expr_t *expr);
 expr_t *deriv_gammainv(expr_t *expr);
 expr_t *deriv_lambert_w(expr_t *expr);
-expr_t *deriv_lambert_wn(expr_t *expr);
-expr_t *deriv_lambert_w0(expr_t *expr);
-expr_t *deriv_lambert_wm1(expr_t *expr);
+expr_t *deriv_lambert_Wn(expr_t *expr);
+expr_t *deriv_lambert_W0(expr_t *expr);
+expr_t *deriv_lambert_Wm1(expr_t *expr);
 
-bool expr_lommel_s_unpack(const expr_t *expr, const expr_t **mu, const expr_t **nu, const expr_t **argument);
+bool expr_lommel_S_unpack(const expr_t *expr, const expr_t **mu, const expr_t **nu, const expr_t **argument);
 bool expr_hypergeometric_pFq_unpack(const expr_t *expr, const expr_t ***upper, size_t *upper_count,
                                     const expr_t ***lower, size_t *lower_count, const expr_t **argument);
 expr_t *expr_hypergeometric_pFq_from_args(size_t argument_count, expr_t *const *arguments);
-expr_t *expr_lauricella_f_from_args(size_t argument_count, expr_t *const *arguments);
+expr_t *expr_lauricella_F_from_args(size_t argument_count, expr_t *const *arguments);
 
 /* Derivatives: distributions and multi-argument special functions. */
 expr_t *deriv_normal_pdf(expr_t *expr);
@@ -278,6 +278,6 @@ expr_t *deriv_gammainc_Q(expr_t *expr);
 expr_t *deriv_not_differentiable(expr_t *expr);
 expr_t *deriv_atan2(expr_t *expr);
 
-expr_t *expr_lommel_s_argument_derivative_expansion(const expr_t *mu, const expr_t *nu, const expr_t *argument);
+expr_t *expr_lommel_S_argument_derivative_expansion(const expr_t *mu, const expr_t *nu, const expr_t *argument);
 
 #endif /* EXPR_MATHS_H */

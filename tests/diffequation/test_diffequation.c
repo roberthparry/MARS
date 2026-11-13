@@ -14,6 +14,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "string-t.h"
 #include "diffequation-t.h"
 #define MARS_EXPR_INTERNAL_ACCESS
 #include "expression/expr_internal.h"

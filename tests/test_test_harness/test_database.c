@@ -18,10 +18,11 @@
 #include "string-t.h"
 #include "test_harness.h"
 #include "test_database.h"
+#include "test_config.h"
 #define MARS_SHARED_TEST_DATABASE_INTERNAL_ACCESS
 #include "internal/test_database_internal.h"
-
-TEST_SUITE_CONFIG(TEST_CONFIG_GLOBAL);
+#define MARS_TEST_TEST_HARNESS_INTERNAL_ACCESS
+#include "test_test_harness.h"
 /* Keep the test-management implementation independent of its own reporting hooks. */
 bool test_suite_database_selection_enabled(void)
 {
@@ -90,6 +91,62 @@ static test_database_result_t result_record(void)
 {
     return (test_database_result_t){.source = "tests/example.c", .path = "group.original", .name = "original",
         .parent = "group", .tags = "fixture", .outcome = "pass", .enabled = true, .elapsed_ms = 2.5};
+}
+
+static void test_source_relocation_preserves_history(void)
+{
+    database_fixture_t fixture = {0};
+    TEST_ASSERT_TRUE(fixture_open(&fixture, true), "prepare source-relocation storage");
+    test_database_result_t row = result_record();
+    row.source = "tests/test_test_config/test_test_config.c";
+    row.path = "relocation.case";
+    bool ok = test_database_profile_create(fixture.database, "retained", true) &&
+        test_database_profile_set(fixture.database, "retained", row.source, row.path, false);
+    for (unsigned i = 0; ok && i < 9; ++i) {
+        row.elapsed_ms = i == 7 ? 100 : 2.5;
+        ok = test_database_run_begin(fixture.database, "relocation-fixture", NULL, i == 8) &&
+            test_database_run_record(fixture.database, &row) && test_database_run_finish(fixture.database, 0, 1);
+    }
+    test_database_close(fixture.database);
+    fixture.database = test_database_open(fixture.root, fixture.path, true, NULL);
+    ok = ok && fixture.database &&
+        scalar(&fixture, "SELECT count(*) FROM test_result WHERE source = 'tests/test_test_harness/test_test_harness.c'") == 9 &&
+        scalar(&fixture, "SELECT normal_count = 7 AND ordinary_count = 8 AND memory_test_count = 1"
+                         " AND timing_outlier_count = 1 AND median_ms = 2.5 AND mean_ms = 2.5"
+                         " FROM test_case_metrics WHERE source = 'tests/test_test_harness/test_test_harness.c'") == 1 &&
+        scalar(&fixture, "SELECT sum(sample_count) FROM test_timing_sample"
+                         " WHERE source = 'tests/test_test_harness/test_test_harness.c'") == 7 &&
+        scalar(&fixture, "SELECT enabled = 0 FROM test_selection"
+                         " WHERE source = 'tests/test_test_harness/test_test_harness.c'") == 1 &&
+        scalar(&fixture, "SELECT count(*) FROM test_catalogue WHERE source = 'tests/test_test_config/test_test_config.c'") == 0;
+    test_database_close(fixture.database);
+    fixture.database = test_database_open(fixture.root, fixture.path, true, NULL);
+    ok = ok && fixture.database && scalar(&fixture, "SELECT count(*) FROM test_result") == 9;
+    fixture_close(&fixture);
+    TEST_ASSERT_TRUE(ok, "renames preserve selections, reports, distributions, outliers and memory-test history exactly once");
+}
+
+static void test_source_relocation_collision_rolls_back(void)
+{
+    database_fixture_t fixture = {0};
+    TEST_ASSERT_TRUE(fixture_open(&fixture, true), "prepare conflicting source identities");
+    test_database_result_t row = result_record();
+    row.source = "tests/test_database/test_database.c";
+    bool ok = test_database_run_begin(fixture.database, "old-source", NULL, false) &&
+        test_database_run_record(fixture.database, &row) && test_database_run_finish(fixture.database, 0, 1);
+    row.source = "tests/test_test_harness/test_database.c";
+    ok = ok && test_database_run_begin(fixture.database, "new-source", NULL, false) &&
+        test_database_run_record(fixture.database, &row) && test_database_run_finish(fixture.database, 0, 1);
+    test_database_close(fixture.database);
+    fixture.database = test_database_open(fixture.root, fixture.path, true, NULL);
+    ok = ok && !fixture.database;
+    test_database_close(fixture.database);
+    fixture.database = test_database_open(fixture.root, fixture.path, false, NULL);
+    ok = ok && fixture.database && scalar(&fixture, "SELECT count(*) FROM test_catalogue") == 2 &&
+        scalar(&fixture, "SELECT count(*) FROM test_case_statistics") == 2 &&
+        scalar(&fixture, "SELECT count(*) FROM test_result") == 2;
+    fixture_close(&fixture);
+    TEST_ASSERT_TRUE(ok, "conflicting identities abort relocation without dropping either history");
 }
 
 static void test_catalogue_sync_preserves_every_identity(void)
@@ -980,7 +1037,7 @@ static void test_readme_case_table(void)
     TEST_ASSERT_TRUE(fixture_open(&fixture, true), "create isolated README fixture");
     const char *root = getenv("MARS_ROOT");
     string_t *document_path = string_sprintf("%s/docs/testing.md", root && *root ? root : ".");
-    string_t *programme_path = string_sprintf("%s/tests/test_database/readme_case_table.c", root && *root ? root : ".");
+    string_t *programme_path = string_sprintf("%s/tests/test_test_harness/readme_case_table.c", root && *root ? root : ".");
     file_t *document_file = document_path ? file_new(document_path) : NULL;
     file_t *programme_file = programme_path ? file_new(programme_path) : NULL;
     string_t *document = document_file ? file_read_all_text(document_file) : NULL;
@@ -1008,9 +1065,16 @@ static void test_readme_case_table(void)
     TEST_ASSERT_TRUE(ok, "README case-table output agrees with the testing guide");
 }
 
-int tests_main(void)
+/* Register database regressions and finish with the testing guide's runnable examples. */
+void test_harness_database_cases(void)
 {
+    /* Storage cases retain GLOBAL selection after the configuration regressions' LOCAL session. */
+    test_config_save();
+    test_config_shutdown();
+    test_config_set_mode(TEST_CONFIG_GLOBAL);
     TEST_SECTION("Test database safety");
+    TEST_RUN_CASE(test_source_relocation_preserves_history, "database,relocation,history");
+    TEST_RUN_CASE(test_source_relocation_collision_rolls_back, "database,relocation,rollback");
     TEST_RUN_CASE(test_catalogue_sync_preserves_every_identity, "database,sync,preservation");
     TEST_RUN_CASE(test_catalogue_failure_rolls_back, "database,sync,rollback");
     TEST_RUN_CASE(test_profile_selection_snapshot, "database,selection");
@@ -1032,5 +1096,4 @@ int tests_main(void)
     TEST_RUN_CASE(test_statistics_bold_headers_and_uppercase_outcomes, "database,statistics,formatting,bold");
     TEST_RUN_OUTPUT_TAGS(test_readme_statistics_formats, "README,database,statistics");
     TEST_RUN_OUTPUT_TAGS(test_readme_case_table, "README,database");
-    return TEST_EXIT_CODE();
 }

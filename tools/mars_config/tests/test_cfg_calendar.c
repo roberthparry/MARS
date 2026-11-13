@@ -566,13 +566,16 @@ static bool test_calendar_translated_snapshot(sqlite_t *db, const string_t *path
     bool ok =
         request && language && empty && cfg_calendar_catalogue(db) &&
         cfg_calendar_choose_place(db, request, NULL, false, &place) &&
-        cfg_calendar_snapshot(db, path, key, &place, empty, NULL) &&
+        cfg_calendar_snapshot_range(db, path, key, &place, empty, 2026, 2026, NULL) &&
         sqlite_exec_cstr(
             db,
             "DROP TABLE IF EXISTS temp.untranslated_days; DROP TABLE IF EXISTS temp.untranslated_events;"
             "CREATE TEMP TABLE untranslated_days AS SELECT calendar_date,is_weekend,utc_offset_hours "
             "FROM calendar_local_days; CREATE TEMP TABLE untranslated_events AS SELECT * FROM cfg_calendar_events;") &&
-        cfg_calendar_snapshot(db, path, key, &place, language, NULL) &&
+        cfg_calendar_snapshot_range(db, path, key, &place, language, 2026, 2026, NULL) &&
+        test_calendar_query(db,
+            "SELECT first_year||'|'||last_year FROM calendar_local_settings", "2026|2026") &&
+        test_calendar_query(db, "SELECT count(*) FROM calendar_local_days", "365") &&
         test_calendar_query(db,
                             "SELECT count(*) FROM (SELECT calendar_date,is_weekend,utc_offset_hours "
                             "FROM calendar_local_days EXCEPT SELECT * FROM untranslated_days)",
@@ -649,6 +652,19 @@ static bool test_calendar_translation_snapshots_fixture(const char *directory)
                  "(1005125,3279799,'previous_weekday','Independence Day (observed)','6,7','N',2026,2026,100)") &&
          test_calendar_translated_snapshot(db, path, key, "New York City, US-NY", "es_US", "2026-07-03",
                                            "Día de la Independencia (día de observancia)");
+    cfg_calendar_place_t place = {0};
+    string_t *request = string_new_with("Shrewsbury, GB-ENG"), *locale = string_new_with("en_GB");
+    ok = ok && request && locale && cfg_calendar_choose_place(db, request, NULL, false, &place) &&
+         cfg_calendar_snapshot_range(db, path, key, &place, locale, 2024, 2024, NULL) &&
+         test_calendar_query(db, "SELECT count(*) FROM calendar_local_days", "366") &&
+         test_calendar_query(db, "SELECT calendar_date FROM calendar_local_days WHERE calendar_date='2024-02-29'",
+                             "2024-02-29") &&
+         !cfg_calendar_snapshot_range(db, path, key, &place, locale, 2025, 2024, NULL) &&
+         !cfg_calendar_snapshot_range(db, path, key, &place, locale, 0, 2024, NULL) &&
+         test_calendar_query(db, "SELECT first_year||'|'||last_year FROM calendar_local_settings", "2024|2024") &&
+         test_calendar_query(db, "SELECT count(*) FROM calendar_local_days", "366");
+    cfg_calendar_place_clear(&place);
+    string_free(request); string_free(locale);
     sqlite_close(db);
     string_free(path);
     string_free(key);

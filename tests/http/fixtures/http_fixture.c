@@ -25,6 +25,7 @@
 #include <time.h>
 #include <unistd.h>
 
+#include "string-t.h"
 #include "file-t.h"
 #include "http_fixture.h"
 

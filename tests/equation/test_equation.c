@@ -16,6 +16,7 @@
 #include <string.h>
 #include <time.h>
 
+#include "string-t.h"
 #include "computation-t.h"
 #include "equation-t.h"
 #include "expression-t.h"
