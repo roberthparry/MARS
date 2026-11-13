@@ -272,7 +272,7 @@ Required libraries:
 - SQLCipher
 - Zstandard, with the streaming `ZSTD_compressStream2` API
 - libsodium, with the XChaCha20-Poly1305 secretstream API
-- libcurl 7.86.0 or newer, with HTTPS and thread-safe global initialisation
+- libcurl 7.86.0 or newer, with HTTPS, HTTP/2, WS/WSS and thread-safe global initialisation
 
 Optional libraries:
 
@@ -361,7 +361,14 @@ The [HTTP module](http.md) uses system libcurl. Install the development package
 `libcurl` pkg-config record and falls back to `-lcurl` if unavailable.
 `CURL_CFLAGS` and `CURL_LIBS` can override discovery for non-standard installs.
 Static archive consumers must also link libcurl and its transitive dependencies.
-`make check-deps` checks the minimum header version and links a transport probe.
+`make check-curl-deps` compiles and runs a transport probe against the same linked
+libcurl as MARS. It checks header/runtime versions, TLS, thread-safe global
+initialisation, HTTP/2, WS/WSS protocols and WebSocket URL configuration without
+contacting a server. `make check-native-deps`, `make check-deps` and `make release`
+include this check. Exported WebSocket API symbols alone are insufficient: some
+distribution builds provide the symbols while disabling the protocol.
+Success is silent; a failure identifies the missing capability, reports the
+runtime and header versions, and prints the upgrade commands below.
 The ordinary HTTP tests use native C loopback fixtures; they do not contact
 external services. The fixture executable is built in
 `tests/build/<mode>/http/fixtures/` and links OpenSSL for HTTPS and mutual TLS.
@@ -389,6 +396,65 @@ headers or linker flags. Both projects are acknowledged in the
 The web-server tests and example need loopback sockets and process creation; they do
 not need internet access. Source, header and test discovery includes the module
 automatically. Run `make -j1 test_webserver` for its dedicated suite.
+
+#### Updating libcurl on Debian or Ubuntu
+
+On the affected computer, first try the distribution update:
+
+```sh
+sudo apt update
+sudo apt install --only-upgrade libcurl4-openssl-dev
+make check-curl-deps
+```
+
+Output when the linked runtime has every required capability: no output; exit
+status zero. Otherwise, the check reports the missing features and repair steps.
+WebSocket support became enabled by default in
+[curl 8.11.0](https://curl.se/ch/8.11.0.html), but its availability depends on the
+library's build options. If the distribution still lacks WS/WSS, close MARS Lab
+and build the official curl 8.23.0 release with the required features. The
+following commands install under `/usr/local`, retain distribution packages,
+verify the downloaded archive's SHA-256, and remove the temporary source tree:
+
+```sh
+sudo apt install build-essential pkg-config curl ca-certificates xz-utils libssl-dev libnghttp2-dev libpsl-dev zlib1g-dev
+(
+    set -eu
+    curl_build=$(mktemp -d)
+    trap 'rm -rf "$curl_build"' EXIT
+    curl -fL https://curl.se/download/curl-8.23.0.tar.xz -o "$curl_build/curl.tar.xz"
+    printf '%s  %s\n' '8dadd7d2536a314f982ad05a651b713f426bf7d02cc2c76cffb9796f2218e6c5' "$curl_build/curl.tar.xz" | sha256sum -c -
+    tar -xJf "$curl_build/curl.tar.xz" -C "$curl_build"
+    cd "$curl_build/curl-8.23.0"
+    ./configure --prefix=/usr/local --libdir=/usr/local/lib \
+        --with-openssl --with-nghttp2 --with-libpsl --enable-websockets \
+        --enable-threaded-resolver --enable-shared --disable-static
+    make -j2
+    sudo make -j1 install
+    sudo ldconfig
+)
+export PKG_CONFIG_PATH="/usr/local/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
+make check-curl-deps
+```
+
+Expected output includes `OK` from the checksum check and the configure/build
+progress; the final MARS dependency check is silent on success. These commands
+follow curl's [source installation guide](https://curl.se/docs/install.html).
+`make curl-install-help` prints the same commands without downloading or
+installing anything.
+
+After the feature check passes, rebuild and rerun the HTTP tests:
+
+```sh
+make release
+make -j1 test_http
+```
+
+Expected outcome: the release completes and the HTTP cases pass, including the
+local WebSocket README example. Updating only the `curl` executable does not
+update the library MARS links. When using a different installation prefix, set
+`CURL_CFLAGS`, `CURL_LIBS` and the runtime library path consistently, then rerun
+the probe. No test is skipped because the linked library is missing a feature.
 
 ### File compression and encryption dependencies
 

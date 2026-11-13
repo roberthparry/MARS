@@ -4480,10 +4480,12 @@
   "tools/mars_checks/tests/test_checks_build.c": {
     "readme_examples": {
       "enabled": true,
+      "test_checks_curl_readme": true,
       "test_checks_sqlcipher_readme": true
     },
     "tests": {
       "enabled": true,
+      "test_checks_curl_dependencies": true,
       "test_checks_sqlcipher_dependencies": true,
       "test_checks_typescript_dependencies": true
     }

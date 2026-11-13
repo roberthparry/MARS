@@ -1,6 +1,6 @@
 /**
  * @file test_checks_build.c
- * @brief Native regressions for database runtime and browser compiler dependency diagnostics.
+ * @brief Native regressions for database, HTTP transport and browser compiler dependency diagnostics.
  *
  * Copies the maintained Makefiles into a disposable tree and invokes their
  * dependency and TypeScript targets sequentially. SQLCipher runtime probes reject old libraries and absent
@@ -23,6 +23,7 @@ static bool test_build_makefiles(const string_t *temporary)
     const char *const files[] = {
         "Makefile", "tools/mars_lab/Makefile", "tools/to_be_announced_lab/Makefile",
         "tools/mars_config/Makefile", "tools/mars_checks/Makefile", "tools/mars_checks/sqlcipher_probe.c",
+        "tools/mars_checks/curl_probe.c", "tools/mars_checks/tests/fixtures/checks_curl_fixture.c",
         "tools/mars_checks/tests/fixtures/checks_sqlcipher_fixture.c",
         "docs/building.md",
         "include/array-t.h", "include/string-t.h", "src/array/array.c", "src/array/array_mutex.h"
@@ -233,17 +234,85 @@ static void test_checks_sqlcipher_dependencies(void)
     TEST_ASSERT_TRUE(ok, "dependency checks report linked versions and stop unsupported SQLCipher before database work");
 }
 
-static void test_checks_sqlcipher_readme(void)
+static bool test_build_curl_probe(const string_t *root, const char *target, const char *mode,
+                                 const char *diagnostic, string_t **instructions)
 {
-    string_t *root = test_checks_root(), *instructions = NULL;
-    bool ok = test_build_makefiles(root) && test_build_sqlcipher_probe(root, "release", "fts5",
-        "required FTS5 with Unicode accent removal", &instructions, false);
+    checks_strings_t *arguments = checks_strings_new();
+    checks_strings_add(arguments, checks_text("env"));
+    const char *const inherited[] = {"MAKEFLAGS", "MFLAGS", "MAKEOVERRIDES", "MAKEFILES"};
+    for (size_t i = 0; i < sizeof inherited / sizeof *inherited; ++i) {
+        checks_strings_add(arguments, checks_text("-u"));
+        checks_strings_add(arguments, checks_text(inherited[i]));
+    }
+    checks_strings_add(arguments, string_sprintf("MARS_TEST_CURL=%s", mode));
+    checks_strings_add(arguments, checks_text("make"));
+    checks_strings_add(arguments, checks_text("--no-print-directory"));
+    checks_strings_add(arguments, checks_text("-j1"));
+    checks_strings_add(arguments, checks_text(target));
+    checks_strings_add(arguments, checks_text("MARS_LAB_LAUNCHER=/bin/true"));
+    checks_strings_add(arguments, checks_text(
+        "CURL_LIBS=$(shell pkg-config --libs libcurl 2>/dev/null || printf '%s' -lcurl) "
+        "tools/mars_checks/tests/fixtures/checks_curl_fixture.c "
+        "-Wl,--wrap=curl_version_info -Wl,--wrap=curl_url_set"));
+    string_t *output = NULL, *errors = NULL;
+    int status = -1;
+    bool ran = checks_process_run(arguments, root, 30, &output, &errors, &status);
+    bool help = !strcmp(target, "curl-install-help");
+    bool ok = ran && output && errors;
+    if (diagnostic)
+        ok = ok && status != 0 && string_find(errors, diagnostic) >= 0 &&
+            string_find(errors, "libcurl runtime ") >= 0 && string_find(errors, "; headers ") >= 0 &&
+            string_find(errors, "--enable-websockets") >= 0 && string_find(errors, "make check-curl-deps") >= 0 &&
+            string_find(errors, "Updating the curl command alone") >= 0 &&
+            string_find(output, "check-compliance") < 0 && string_find(output, "Updating jurisdiction") < 0;
+    else
+        ok = ok && status == 0 && !string_byte_length(errors) &&
+            (help ? string_find(output, "--enable-websockets") >= 0 : !string_byte_length(output));
+    if (!ok)
+        fprintf(stderr, "libcurl dependency probe %s/%s: status %d\n%s\n%s\n", target, mode, status,
+                output ? string_c_str(output) : "", errors ? string_c_str(errors) : "");
+    if (instructions) {
+        *instructions = help ? output : errors;
+        if (help) output = NULL;
+        else errors = NULL;
+    }
+    string_free(output);
+    string_free(errors);
+    checks_strings_free(arguments);
+    return ok;
+}
+
+static void test_checks_curl_dependencies(void)
+{
+    string_t *root = test_checks_root();
+    bool ok = test_build_makefiles(root);
+    static const struct { const char *target, *mode, *diagnostic; } cases[] = {
+        {"check-curl-deps", "current", NULL},
+        {"check-curl-deps", "old", "libcurl runtime >= 7.86.0"},
+        {"check-curl-deps", "no-ws", "required ws protocol support"},
+        {"check-curl-deps", "no-wss", "required wss protocol support"},
+        {"check-curl-deps", "no-tls", "required TLS support"},
+        {"check-curl-deps", "no-threads", "required thread-safe global initialisation support"},
+        {"check-curl-deps", "no-http2", "required HTTP/2 support"},
+        {"check-curl-deps", "url", "cannot configure WS/WSS transport"},
+        {"check-native-deps", "no-ws", "required ws protocol support"},
+        {"release", "no-wss", "required wss protocol support"}
+    };
+    for (size_t i = 0; ok && i < sizeof cases / sizeof *cases; ++i)
+        ok = test_build_curl_probe(root, cases[i].target, cases[i].mode, cases[i].diagnostic, NULL);
+    ok = test_checks_finish(root) && ok;
+    TEST_ASSERT_TRUE(ok, "dependency checks reject missing linked transport features before compilation or release");
+}
+
+static bool test_build_documented_commands(const string_t *root, const string_t *instructions, const char *heading)
+{
     string_t *path = checks_path(root, "docs/building.md"), *guide = checks_read(path);
     const char *text = guide ? string_c_str(guide) : "";
-    const char *section = strstr(text, "#### Updating SQLCipher on Debian or Ubuntu\n");
+    const char *section = strstr(text, heading);
     const char *end = section ? strstr(section, "\n### ") : NULL;
     const char *next = section;
-    ok = section && end && ok;
+    bool ok = section && end && instructions;
+    string_t *commands = checks_text("");
     /* README example: verify all three repair command blocks, without running sudo or modifying the host. */
     for (unsigned block = 0; ok && block < 3; ++block) {
         const char *begin = strstr(next, "```sh\n");
@@ -254,14 +323,14 @@ static void test_checks_sqlcipher_readme(void)
         begin += 6;
         string_t *example = checks_slice(guide, (size_t)(begin - text), (size_t)(close - begin + 1));
         ok = example && instructions && string_find(instructions, string_c_str(example)) >= 0;
+        if (!ok)
+            fprintf(stderr, "Documented commands differ in %s block %u:\n%s\n", heading, block + 1,
+                    example ? string_c_str(example) : "cannot read command block");
+        if (ok) checks_append(commands, example);
         string_free(example);
         next = close + 4;
     }
     if (ok) {
-        const char *begin = strstr(string_c_str(instructions), "sudo apt update\n");
-        const char *close = begin ? strstr(begin, "make check-native-deps\n") : NULL;
-        string_t *commands = close ? checks_slice(instructions, (size_t)(begin - string_c_str(instructions)),
-            (size_t)(close - begin) + strlen("make check-native-deps\n")) : NULL;
         ok = commands && test_checks_write(root, "upgrade-commands.sh", string_c_str(commands));
         checks_strings_t *arguments = checks_strings_new();
         checks_strings_add(arguments, checks_text("bash"));
@@ -273,19 +342,40 @@ static void test_checks_sqlcipher_readme(void)
         string_free(errors);
         string_free(output);
         checks_strings_free(arguments);
-        string_free(commands);
     }
+    string_free(commands);
     string_free(guide);
     string_free(path);
+    return ok;
+}
+
+static void test_checks_sqlcipher_readme(void)
+{
+    string_t *root = test_checks_root(), *instructions = NULL;
+    bool ok = test_build_makefiles(root) && test_build_sqlcipher_probe(root, "release", "fts5",
+        "required FTS5 with Unicode accent removal", &instructions, false);
+    ok = test_build_documented_commands(root, instructions, "#### Updating SQLCipher on Debian or Ubuntu\n") && ok;
     string_free(instructions);
     ok = test_checks_finish(root) && ok;
     TEST_ASSERT_TRUE(ok, "README SQLCipher repair commands match release diagnostics and parse as shell input");
+}
+
+static void test_checks_curl_readme(void)
+{
+    string_t *root = test_checks_root(), *instructions = NULL;
+    bool ok = test_build_makefiles(root) && test_build_curl_probe(root, "curl-install-help", "current", NULL,
+                                                                &instructions);
+    ok = test_build_documented_commands(root, instructions, "#### Updating libcurl on Debian or Ubuntu\n") && ok;
+    string_free(instructions);
+    ok = test_checks_finish(root) && ok;
+    TEST_ASSERT_TRUE(ok, "README libcurl repair commands match printed help and parse without modifying the host");
 }
 
 /* Register database and compiler dependency checks before the README examples. */
 void test_checks_build_cases(void)
 {
     TEST_RUN_IN_GROUP(test_checks_sqlcipher_dependencies, tests, "build,sqlcipher");
+    TEST_RUN_IN_GROUP(test_checks_curl_dependencies, tests, "build,http");
     TEST_RUN_IN_GROUP(test_checks_typescript_dependencies, tests, "build,typescript");
 }
 
@@ -293,4 +383,5 @@ void test_checks_build_cases(void)
 void test_checks_build_readme_cases(void)
 {
     TEST_RUN_IN_GROUP(test_checks_sqlcipher_readme, readme_examples, "build,sqlcipher");
+    TEST_RUN_IN_GROUP(test_checks_curl_readme, readme_examples, "build,http");
 }

@@ -1006,7 +1006,12 @@ Include `array-t.h` when inspecting or freeing returned byte arrays.
 internally to ws/wss. It uses the client's verified TLS trust, optional client
 certificate, timeouts, cancellation callback and byte limits, plus explicit
 request headers such as Authorization or Origin. Redirects are never followed.
-The libcurl build must support WebSockets; absence is reported as an error.
+The linked libcurl must support both `ws` and `wss`; having the API declarations
+or exported functions is insufficient. `make check-curl-deps` verifies the
+actual runtime features before release builds and prints upgrade commands when
+they are missing. See [libcurl installation](building.md#updating-libcurl-on-debian-or-ubuntu).
+At runtime, an unavailable protocol is reported as an error naming the linked
+libcurl and the dependency-check command.
 
 The connection reserves its client until `http_websocket_free`; do not free,
 reconfigure or send other requests through that client while it is reserved.

@@ -120,7 +120,7 @@ CFLAGS += $(ZSTD_CFLAGS) $(SODIUM_CFLAGS)
 LDLIBS += $(if $(strip $(ZSTD_LIBS)),$(ZSTD_LIBS),-lzstd)
 LDLIBS += $(if $(strip $(SODIUM_LIBS)),$(SODIUM_LIBS),-lsodium)
 
-# Verified HTTP/HTTPS transport (libcurl 7.86.0 or newer).
+# Verified HTTPS, HTTP/2 and WebSocket transport (libcurl 7.86.0 or newer).
 CURL_CFLAGS := $(shell pkg-config --cflags libcurl 2>/dev/null)
 CURL_LIBS := $(shell pkg-config --libs libcurl 2>/dev/null)
 CFLAGS += $(CURL_CFLAGS)
@@ -279,7 +279,7 @@ check-native-numeric-boundaries: $(QFLOAT_OBJS) $(QCOMPLEX_OBJS) | native-tools
 build-temporary:
 	@mkdir -p "$(TMPDIR)"
 
-check-native-deps check-sqlcipher-deps check-lab-wasm-deps check-tba-crypto-deps check-http-fixture-deps: | build-temporary
+check-native-deps check-sqlcipher-deps check-curl-deps curl-install-help check-lab-wasm-deps check-tba-crypto-deps check-http-fixture-deps: | build-temporary
 
 check-deps: check-native-deps check-lab-typescript-deps check-tba-typescript-deps check-lab-wasm-deps
 	@echo "All dependency checks passed (C development libraries, native TypeScript compilers and WebAssembly runtime)."
@@ -358,8 +358,23 @@ check-sqlcipher-deps:
 	fi; \
 	"$$probe_dir/probe" $(if $(and $(SQLCIPHER_REPORT_LEVEL),$(filter-out $(SQLCIPHER_REPORT_LEVEL),$(MAKELEVEL))),--quiet)
 
+.PHONY: check-curl-deps curl-install-help
+check-curl-deps curl-install-help:
+	@probe_dir=$$(mktemp -d -t mars-check-curl.XXXXXX) || exit 1; \
+	trap 'rm -f "$$probe_dir/probe"; rmdir "$$probe_dir"' EXIT; \
+	trap 'exit 1' HUP INT TERM; \
+	if ! $(CC) $(CFLAGS) $(CURL_CFLAGS) tools/mars_checks/curl_probe.c \
+	    $(LDFLAGS) -o "$$probe_dir/probe" $(if $(strip $(CURL_LIBS)),$(CURL_LIBS),-lcurl); then \
+	    printf '%s\n' 'Cannot compile/link the libcurl dependency probe; headers >= 7.86.0 are required.' \
+	        '  Debian/Ubuntu: sudo apt install libcurl4-openssl-dev' \
+	        '  Custom installations: check CURL_CFLAGS, CURL_LIBS and the runtime library path.' \
+	        '  Upgrade instructions: docs/building.md#updating-libcurl-on-debian-or-ubuntu' >&2; \
+	    exit 1; \
+	fi; \
+	"$$probe_dir/probe" $(if $(filter curl-install-help,$@),--install-help,--quiet)
+
 # Library, installation and maintenance-tool targets do not need TypeScript.
-check-native-deps: check-sqlcipher-deps
+check-native-deps: check-sqlcipher-deps check-curl-deps
 	@missing=0; \
 	probe_dir=$$(mktemp -d -t mars-check-deps.XXXXXX) || exit 1; \
 	trap 'rm -f "$$probe_dir/probe"; rmdir "$$probe_dir"' EXIT; \
@@ -378,7 +393,6 @@ check-native-deps: check-sqlcipher-deps
 	}; \
 	check_dep "POSIX threads" "pthread.h" "-pthread" "libc6-dev" "pthread_mutex_t m; pthread_mutex_init(&m, 0); pthread_mutex_destroy(&m)"; \
 	check_dep "GMP" "gmp.h" "-lgmp" "libgmp-dev" "mpz_t x; mpz_init(x); mpz_clear(x)"; \
-	check_dep "libcurl >= 7.86.0" "curl/curl.h" "$(CURL_CFLAGS) $(if $(strip $(CURL_LIBS)),$(CURL_LIBS),-lcurl)" "libcurl4-openssl-dev" "_Static_assert(LIBCURL_VERSION_NUM >= 0x075600, \"libcurl too old\"); CURL *c = curl_easy_init(); curl_easy_setopt(c, CURLOPT_PROTOCOLS_STR, \"https\"); size_t n = 0; char b = 0; curl_ws_send(c, &b, 0, &n, 0, CURLWS_TEXT); curl_easy_cleanup(c)"; \
 	check_dep "MPFR" "mpfr.h" "-lmpfr -lgmp" "libmpfr-dev" "mpfr_t x; mpfr_init2(x, 53); mpfr_clear(x)"; \
 	check_dep "MPC" "mpc.h" "-lmpc -lmpfr -lgmp" "libmpc-dev" "mpc_t x; mpc_init2(x, 53); mpc_clear(x)"; \
 	check_dep "Zstandard" "zstd.h" "$(ZSTD_CFLAGS) $(if $(strip $(ZSTD_LIBS)),$(ZSTD_LIBS),-lzstd)" "libzstd-dev" "ZSTD_CCtx *ctx = ZSTD_createCCtx(); ZSTD_inBuffer in = {0}; ZSTD_outBuffer out = {0}; ZSTD_compressStream2(ctx, &out, &in, ZSTD_e_end); ZSTD_freeCCtx(ctx)"; \
@@ -981,6 +995,8 @@ help:
 	@printf '  %-40s %s\n' "make check-deps" "Check development libraries and native TypeScript compilers"
 	@printf '  %-40s %s\n' "make check-native-deps" "Check development libraries without browser build tools"
 	@printf '  %-40s %s\n' "make check-sqlcipher-deps" "Report linked SQLCipher/SQLite versions and verify required SQL features"
+	@printf '  %-40s %s\n' "make check-curl-deps" "Verify linked libcurl TLS, HTTP/2 and WS/WSS support"
+	@printf '  %-40s %s\n' "make curl-install-help" "Print Debian/Ubuntu libcurl upgrade commands"
 	@printf '  %-40s %s\n' "make check-lab-deps" "Check development libraries and MARS Lab TypeScript/TeX/WebAssembly tools"
 	@printf '  %-40s %s\n' "make check-lab-wasm-deps" "Probe Clang's WebAssembly target and the LLVM linker"
 	@printf '  %-40s %s\n' "make typescript-install-help" "Print native compiler installation commands without installing anything"

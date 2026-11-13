@@ -55,6 +55,18 @@ window.checkLabAppearance = async function checkLabAppearance(): Promise<void> {
                 'the rendered selected row uses the current skin accent: ' + names[index]);
             check(document.querySelector<HTMLMetaElement>('meta[name="theme-color"]')?.content ===
                 style.getPropertyValue('--paper').trim(), 'browser chrome follows the palette');
+            for (const button of document.querySelectorAll<HTMLButtonElement>('.mars-date-picker-year-step')) {
+                const yearStyle = getComputedStyle(button);
+                if (index) {
+                    const menuStyle = getComputedStyle(menuButton!);
+                    check(yearStyle.backgroundImage === 'none' &&
+                        yearStyle.backgroundColor === menuStyle.backgroundColor && yearStyle.color === menuStyle.color &&
+                        yearStyle.borderTopColor === menuStyle.borderTopColor,
+                        'calendar year buttons follow the control palette: ' + names[index]);
+                } else {
+                    check(yearStyle.backgroundImage.includes('linear-gradient'), 'Earth retains its green year buttons');
+                }
+            }
             for (const panel of document.querySelectorAll<HTMLElement>('#workspacePanel, #resultWorkspacePanel')) {
                 const frame = getComputedStyle(panel);
                 const head = getComputedStyle(panel.querySelector<HTMLElement>('.panel-head')!);

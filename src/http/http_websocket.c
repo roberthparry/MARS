@@ -98,7 +98,8 @@ http_websocket_t *http_websocket_open(http_client_t *client, const http_request_
         curl_url_get(url, CURLUPART_SCHEME, &scheme, 0) ||
         curl_url_set(url, CURLUPART_SCHEME, scheme[4] == 's' ? "wss" : "ws", 0) ||
         curl_url_get(url, CURLUPART_URL, &address, 0)) {
-        http_fail(client, HTTP_ERROR_PROTOCOL, "WebSocket protocol is unavailable");
+        http_fail(client, HTTP_ERROR_PROTOCOL,
+                  "WebSocket support is unavailable in the linked libcurl; run make check-curl-deps");
         goto done;
     }
     if (!http_outgoing_headers(client, request, &socket->headers))

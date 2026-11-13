@@ -174,10 +174,12 @@
   background: color-mix(in srgb, var(--accent) 7%, var(--panel));
   border-color: var(--line);
 }
-:root[data-skin]:not([data-skin="0"]) :is(h2, .card-action, button.secondary, .mode-tab, .select-button) {
+:root[data-skin]:not([data-skin="0"]) :is(h2, .card-action, button.secondary, .mode-tab, .select-button,
+    .mars-date-picker-year-step, .mars-date-picker-foot button) {
   color: var(--ink);
 }
-:root[data-skin]:not([data-skin="0"]) :is(.card-action, button.secondary, .mode-tab, .select-button) {
+:root[data-skin]:not([data-skin="0"]) :is(.card-action, button.secondary, .mode-tab, .select-button,
+    .mars-date-picker-year-step) {
   background: color-mix(in srgb, var(--accent-2) 12%, var(--panel));
   border-color: var(--line);
 }
@@ -222,7 +224,17 @@
     .mars-date-picker-day.selected) {
   background: color-mix(in srgb, var(--accent) 12%, var(--panel));
 }
-:root[data-skin]:not([data-skin="0"]) .mars-date-picker-day.today { color: var(--accent-2); }
+:root[data-skin]:not([data-skin="0"]) .mars-date-picker-day.today {
+  color: var(--accent-2);
+  border-color: var(--accent-2);
+}
+:root[data-skin]:not([data-skin="0"]) .mars-date-picker-day:is(:hover, :focus-visible) {
+  background: color-mix(in srgb, var(--accent) 15%, var(--panel));
+}
+:root[data-skin]:not([data-skin="0"]) .mars-date-picker :is(button, input, select):is(:hover, :focus-visible) {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 20%, transparent);
+}
 :root[data-skin]:not([data-skin="0"]) :is(.history-entry[aria-current], .select-option:hover,
     .select-option:focus-visible) { background: color-mix(in srgb, var(--accent) 15%, var(--panel)); }
 :root[data-skin]:not([data-skin="0"]) :is(.select-option.selected, button[aria-pressed="true"], .card-action.copied) {
