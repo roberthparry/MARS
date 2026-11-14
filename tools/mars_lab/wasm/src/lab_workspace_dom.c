@@ -255,7 +255,21 @@ void lab_workspace_dom_tabs(jsref tabs, jsref mode)
         lab_dom_class(tab, "active", active);
         lab_workspace_dom_text(tab, LAB_DOM_ATTRIBUTE, "aria-selected", active ? "true" : "false");
         lab_workspace_dom_text(tab, LAB_DOM_ATTRIBUTE, "tabindex", active ? "0" : "-1");
+        if (active)
+            lab_dom_write(lab_dom_id("modeMenuCurrent"), LAB_DOM_TEXT, "", lab_dom_read(tab, LAB_DOM_TEXT, ""));
         lab_dom_release(mark);
+    }
+    int menu = lab_dom_id("modeMenu"), toggle = lab_dom_id("modeMenuToggle");
+    if (menu && toggle) {
+        bool mobile = lab_dom_measure(toggle, LAB_DOM_MEASURE_RECT_HEIGHT) > 0;
+        bool restore_focus = mobile && lab_dom_truth(lab_dom_get(menu, "open")) &&
+                             lab_dom_node_contains(menu, lab_dom_query(0, ":focus"));
+        if (mobile)
+            lab_dom_remove(menu, "open");
+        else
+            lab_workspace_dom_text(menu, LAB_DOM_ATTRIBUTE, "open", "");
+        if (restore_focus)
+            lab_dom_effect(toggle, LAB_DOM_EFFECT_FOCUS);
     }
 }
 

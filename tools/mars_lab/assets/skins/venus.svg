@@ -1,15 +1,43 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1000" fill="none">
+  <title>Venus, luminous gold and amber clouds</title>
+  <desc>Static decorative interpretation with finely mottled gold and amber clouds, pale yellow highlights and burnt-orange shadows. Reproducible vector noise supplies the illustrative cloud texture; no embedded bitmap or animation is used.</desc>
   <defs>
-    <radialGradient id="glow"><stop stop-color="#e8bf6f" stop-opacity=".3"/><stop offset="1" stop-color="#e8bf6f" stop-opacity="0"/></radialGradient>
-    <radialGradient id="surface" cx=".25" cy=".2" r=".9"><stop stop-color="#fff0b8"/><stop offset=".5" stop-color="#d3af70"/><stop offset="1" stop-color="#5b4932"/></radialGradient>
-    <clipPath id="disc"><circle cx="1200" cy="220" r="235"/></clipPath>
+    <clipPath id="disc"><circle cx="1200" cy="260" r="240"/></clipPath>
+    <radialGradient id="surface" cx=".27" cy=".32" r=".82">
+      <stop stop-color="#fff0ad"/>
+      <stop offset=".42" stop-color="#efb43f"/>
+      <stop offset=".72" stop-color="#bd6419"/>
+      <stop offset="1" stop-color="#532508"/>
+    </radialGradient>
+    <filter id="clouds" x="-1%" y="-1%" width="102%" height="102%" color-interpolation-filters="sRGB">
+      <feTurbulence type="fractalNoise" baseFrequency=".025 .03" numOctaves="5" seed="23" result="cloud"/>
+      <feTurbulence type="fractalNoise" baseFrequency=".008 .011" numOctaves="2" seed="7" result="flow"/>
+      <feDisplacementMap in="cloud" in2="flow" scale="42" xChannelSelector="R" yChannelSelector="G"/>
+      <feColorMatrix type="saturate" values="0"/>
+      <feComponentTransfer>
+        <feFuncR type="linear" slope="2" intercept="-.45"/>
+        <feFuncG type="linear" slope="2" intercept="-.45"/>
+        <feFuncB type="linear" slope="2" intercept="-.45"/>
+      </feComponentTransfer>
+      <feComponentTransfer>
+        <feFuncR type="table" tableValues=".40 .57 .78 .94 1 1"/>
+        <feFuncG type="table" tableValues=".16 .29 .47 .67 .84 .96"/>
+        <feFuncB type="table" tableValues=".04 .055 .09 .18 .35 .66"/>
+        <feFuncA type="linear" slope="0" intercept="1"/>
+      </feComponentTransfer>
+    </filter>
+    <radialGradient id="light" cx=".25" cy=".33" r=".8">
+      <stop stop-color="#fff4c0" stop-opacity=".46"/>
+      <stop offset=".32" stop-color="#ffe694" stop-opacity=".16"/>
+      <stop offset=".55" stop-color="#582104" stop-opacity="0"/>
+      <stop offset=".8" stop-color="#582104" stop-opacity=".26"/>
+      <stop offset="1" stop-color="#321307" stop-opacity=".78"/>
+    </radialGradient>
   </defs>
-  <ellipse cx="1200" cy="220" rx="500" ry="420" fill="url(#glow)"/>
   <g clip-path="url(#disc)">
-    <circle cx="1200" cy="220" r="235" fill="url(#surface)"/>
-    <path d="M950 36q160 150 360 80t180 115M940 137q160 150 360 80t180 115M940 239q160 150 360 80t180 115" stroke="#f9e1a6" stroke-width="29" opacity=".38"/>
-    <path d="M950 97q160 150 360 80t180 115M940 199q160 150 360 80t180 115M940 301q160 150 360 80t180 115" stroke="#ab8752" stroke-width="10" opacity=".3"/>
-    <path d="m1026 75 63 63 87 34 95-8 70 15" stroke="#fff4cc" stroke-width="11" stroke-linecap="round" opacity=".3"/>
+    <circle cx="1200" cy="260" r="240" fill="url(#surface)"/>
+    <circle cx="1200" cy="260" r="240" filter="url(#clouds)" opacity=".92"/>
+    <circle cx="1200" cy="260" r="240" fill="url(#light)"/>
   </g>
-  <circle cx="1200" cy="220" r="239" stroke="#f8df9f" stroke-opacity=".24" stroke-width="3"/>
+  <circle cx="1200" cy="260" r="240" stroke="#ffe7a0" stroke-opacity=".16" stroke-width="1.4"/>
 </svg>

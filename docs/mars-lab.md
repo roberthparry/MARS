@@ -1,9 +1,11 @@
 # MARS Lab
 
-The screenshots in this guide were refreshed on 12 November 2026. Each linked PNG
-is an uncropped, full-page browser capture, taken after the calculation and drawing
-finished. Datetime and Almanac use that date; the Almanac capture also records its
-GMT time. Open an image to inspect the complete page at its original resolution.
+The screenshots in this guide were refreshed on 13 November 2026 after the
+calculation and drawing finished. Desktop images are uncropped, full-page browser
+captures from a 1900-pixel browser window; phone History images show the complete
+portrait and landscape viewports.
+Datetime and Almanac retain the example date of 12 November 2026; the Almanac
+capture also records its GMT time. Open an image to inspect it at its original resolution.
 
 Startup restores the saved worksheet before revealing mode-specific controls or
 starting the initial evaluation. A neutral, dark startup shell is shown meanwhile;
@@ -546,8 +548,10 @@ unobstructed; a failed stage does not display successful completion.
 
 ### Appearance skins
 
-Use **Skin** at the top-right corner of the page header to change the appearance immediately, in any
-mode, including on a phone. **0. Earth (Default)** is the existing green design.
+Open the **Settings** cog at the top-right corner of the page header, then choose
+**Theme** to change the appearance immediately in any mode, including on a phone.
+Only the cog appears in the header. Close Settings with its close button, Escape,
+or a click outside the panel. **0. Earth (Default)** is the existing green design.
 The other choices use their own palette and static SVG background artwork.
 The skin menu uses MARS's accessible C/WASM selection control after startup, so
 its selected, hovered and keyboard-focused options use the current skin's accent
@@ -555,7 +559,10 @@ colour consistently. Arrow keys navigate it; Enter selects and Escape closes it.
 Variable and constant rows, their badges, input fields and focus highlights use
 the selected palette; the two binding roles retain distinct accent colours.
 Button, plot and globe tooltips also use the selected palette for their text,
-borders and backgrounds.
+borders and backgrounds. Help cards, section labels, links and inline examples
+follow the same palette on phones and larger screens.
+Almanac result tables and their phone-sized body cards use the skin's
+surface, border and label colours too.
 Calculations, plot colours, flags, globe imagery and worksheet history retain
 their existing behaviour when a skin changes.
 
@@ -571,20 +578,20 @@ its calculation completed. Backgrounds are decorative SVG illustrations.
 
 | Skin | Full-page preview |
 | :--- | :--- |
-| 0. Earth (Default) | [Existing green design](images/mars-lab/skin-earth.png) |
-| 1. Mars | [Ochre and rust, with canyons and a polar cap](images/mars-lab/skin-mars.png) |
-| 2. Mercury | [Charcoal and silver, with densely cratered terrain](images/mars-lab/skin-mercury.png) |
-| 3. Jupiter | [Cream zones, turbulent cloud belts and the Great Red Spot](images/mars-lab/skin-jupiter.png) |
-| 4. Venus | [Amber and gold](images/mars-lab/skin-venus.png) |
-| 5. Saturn | [Subtle cloud belts, fine ringlets and soft shadows](images/mars-lab/skin-saturn.png) |
-| 6. Neptune | [Deep blue and ice blue](images/mars-lab/skin-neptune.png) |
-| 7. Moon | [Slate and silver, with recognisable lunar seas and craters](images/mars-lab/skin-moon.png) |
-| 8. Galaxy | [The Milky Way, with a central bar and branching spiral arms](images/mars-lab/skin-galaxy.png) |
-| 9. Andromeda | [An inclined elliptical disc, with a warm bulge and soft dust lanes](images/mars-lab/skin-andromeda.png) |
-| 10. Nebula | [Pink and teal](images/mars-lab/skin-nebula.png) |
-| 11. Quasar | [Midnight and cyan](images/mars-lab/skin-quasar.png) |
-| 12. Asteroids | [Weathered rocks, impact pits and warm sunlight](images/mars-lab/skin-asteroids.png) |
-| 13. Exoplanet | [Lavender and turquoise](images/mars-lab/skin-exoplanet.png) |
+| 0. Earth (Default) | [Existing green design](images/mars-lab/skin-earth.png?v=20261113-inline-precision) |
+| 1. Mars | [Rust-orange terrain, dark canyons and a pale polar cap](images/mars-lab/skin-mars.png?v=20261113-inline-precision) |
+| 2. Mercury | [Blue-teal terrain, pale rays and muted gold crater highlights](images/mars-lab/skin-mercury.png?v=20261113-inline-precision) |
+| 3. Jupiter | [Ivory and pale blue clouds, copper belts and the Great Red Spot](images/mars-lab/skin-jupiter.png?v=20261113-inline-precision) |
+| 4. Venus | [Bright gold, amber clouds and burnt-orange shadows](images/mars-lab/skin-venus.png?v=20261113-inline-precision) |
+| 5. Saturn | [Cream and tan clouds, silver-white rings and a dark Cassini Division](images/mars-lab/skin-saturn.png?v=20261113-inline-precision) |
+| 6. Neptune | [Deep ocean blues, icy clouds and swirling storms](images/mars-lab/skin-neptune.png?v=20261113-inline-precision) |
+| 7. Moon | [Warm ivory, taupe lunar seas and pale cream crater rays](images/mars-lab/skin-moon.png?v=20261113-inline-precision) |
+| 8. Galaxy | [The Milky Way, with a central bar and branching spiral arms](images/mars-lab/skin-galaxy.png?v=20261113-inline-precision) |
+| 9. Andromeda | [An inclined elliptical disc, with a warm bulge and soft dust lanes](images/mars-lab/skin-andromeda.png?v=20261113-inline-precision) |
+| 10. Nebula | [Pink and teal](images/mars-lab/skin-nebula.png?v=20261113-inline-precision) |
+| 11. Quasar | [Midnight and cyan](images/mars-lab/skin-quasar.png?v=20261113-inline-precision) |
+| 12. Asteroids | [Weathered rocks, impact pits and warm sunlight](images/mars-lab/skin-asteroids.png?v=20261113-inline-precision) |
+| 13. Exoplanet | [Lavender and turquoise](images/mars-lab/skin-exoplanet.png?v=20261113-inline-precision) |
 
 Authored artwork lives in `tools/mars_lab/assets/skins/`, with the palettes and
 surface overrides in `assets/css/skins.css`. The small `appearance.ts` browser
@@ -592,30 +599,46 @@ adapter handles only selection, optional preference storage and browser theme
 colour. It runs before worksheet restoration and does not enter calculation or
 WASM scheduling. The artwork has no animation or external image dependency.
 The Moon uses simplified vector contours from NASA's north-up full-Moon rendering,
-retaining the familiar lunar seas and crater patterns. The SVG contains no embedded
-bitmap. Reference credit: NASA's Scientific Visualization Studio; LROC WAC mosaic,
+retaining the familiar lunar seas and crater patterns. Warm ivory highlands,
+taupe seas and pale cream rays accompany warm neutral panels and ivory accents.
+The SVG contains no embedded bitmap. Reference credit: NASA's Scientific Visualization Studio; LROC WAC mosaic,
 NASA/GSFC/Arizona State University. See [NASA's source and credits](https://svs.gsfc.nasa.gov/5048/).
 Mercury likewise uses simplified SVG contours, based on the MESSENGER globe
 centred at 0° N, 0° E (PIA15160), retaining its smaller craters and bright ray
-patterns. Reference credit: NASA/Johns Hopkins University Applied Physics
+patterns. Its decorative enhanced-colour palette uses blue-teal terrain, pale rays
+and muted gold crater highlights, with matching blue panels and gold accents.
+Reference credit: NASA/Johns Hopkins University Applied Physics
 Laboratory/Carnegie Institution of Washington. See [Mercury's source and credits](https://science.nasa.gov/photojournal/mercury-globe-0n-0e/).
 Mars uses simplified SVG contours from NASA's Viking Orbiter colour mosaic
-(PIA00407), preserving the Valles Marineris canyon region, ochre plains, darker
-terrain and north polar cap. Its subtle shading rounds the globe without adding
+(PIA00407), preserving the Valles Marineris canyon region, rust-orange plains, darker
+terrain and a pale north polar cap. The palette uses terracotta surfaces and
+rust-orange accents, with brighter artwork to retain the planet's colour.
+Its subtle shading rounds the globe without adding
 a raster texture. The reference has enhanced colour contrast; the skin is a
 decorative interpretation. Reference credit: NASA/JPL/USGS. See [Mars's source and credits](https://science.nasa.gov/photojournal/global-color-views-of-mars/).
-Jupiter's detailed SVG contours follow Hubble's 2019 portrait, rotated to present
-its cloud belts horizontally. Sixty-four colour classes preserve finer filaments,
-oval storms and the Great Red Spot; continuous limb shading and a light blend
-at contour edges soften the transitions. The artwork contains no embedded bitmap.
+Jupiter's detailed SVG contours follow Hubble's 2019 portrait, with gently
+diagonal cloud belts. Sixty-four colour classes preserve finer filaments, oval
+storms and the Great Red Spot; directional shading and gentle contour blending
+soften the transitions. Ivory and pale blue clouds contrast with copper and rust
+belts, alongside warm neutral panels, copper accents and pale cloud highlights.
+The artwork contains no embedded bitmap.
 Reference credit: NASA, ESA, A. Simon (Goddard Space Flight Center), and M.H. Wong
 (University of California, Berkeley). See [Jupiter's source and credits](https://science.nasa.gov/asset/hubble/jupiter-2019/).
-Saturn has an oblate globe, subdued cream and gold cloud belts and fine ringlets
-separated by the darker Cassini Division. The planet and rings share one tilted
+Venus uses luminous gold and amber cloud texture with burnt-orange shadows,
+matching bronze panels, gold highlights and orange accents. Static SVG filters
+give the decorative globe fine mottled detail without an embedded bitmap or animation.
+Saturn has an oblate globe, soft cream and tan cloud belts and fine silver-white
+ringlets separated by the dark Cassini Division. Neutral graphite panels, sand
+accents and cool silver highlights echo the artwork. The planet and rings share one gently tilted
 axis, with the near rings passing in front of the globe and shadows adding depth.
 Its static SVG is a decorative interpretation of Cassini's natural-colour views,
 without an embedded bitmap. Reference credit: NASA/JPL-Caltech/SSI/Cornell.
 See [Saturn's reference and credits](https://www.jpl.nasa.gov/images/pia17474-jewel-of-the-solar-system/).
+Neptune uses deep ocean-blue cloud belts, bright icy ribbons and fine storm
+filaments, with matching blue panels and ice-blue accents. Its illustrative cloud
+contours adapt the Hubble Jupiter artwork credited above into a blue atmospheric
+interpretation, rather than observed Neptune weather. Shading and gentle contour
+blending add depth; the static SVG contains no embedded bitmap or animation.
 Galaxy depicts the Milky Way as a barred spiral, with a warm stellar bar,
 branching blue-white arms, dark dust lanes and scattered starlight. Its static
 SVG contours adapt NASA's external-view artist's concept (PIA10748); this is a
@@ -833,9 +856,15 @@ and Almanac GMT time beneath. Flags load asynchronously from the jurisdiction
 database using the shared bounded country cache. Locations without a saved town
 show their coordinates; an unidentified country is resolved without moving the
 observer or recalculating the worksheet. Existing history needs no reimport.
-The entry list scrolls independently, so the heading, instructions and Close
+The entry list scrolls independently, so the heading and Close
 button remain visible. Opening or closing the editor preserves the page position.
 Custom coordinates use the same degrees-and-minutes notation as the globe.
+On phones, including landscape, History fills the available screen. Each entry
+keeps its drag grip beside the worksheet and its three actions together beneath
+it, or alongside in landscape, with touch targets at least 44 pixels high. The
+introduction and **Help with history** section are shown only on desktop, leaving
+more space for entries on phones. After an Earlier or Later move, focus follows
+the moved entry so the same control can be used again without selecting a neighbour.
 
 See the [Almanac history screenshot](#almanac-history) for the location names,
 flags, saved observation times and drag handles shown in the editor.
@@ -1071,11 +1100,19 @@ The styles are divided into:
 - `dates.css` and `forms.css`: date picker, local calendar results, input states and selection menus.
 - `bindings.css`, `mobile.css` and `buttons.css`: binding controls, mobile access and shared buttons.
 - `results.css` and `help.css`: result rendering, help cards and visibility utilities.
-- `responsive.css`: tablet and phone overrides, loaded last.
+- `responsive.css`: tablet and phone overrides.
+- `skins.css`: theme palettes and surfaces, applied after responsive styles.
 
-On phones the seven mode tabs form a compact, fully visible three-column grid
-with equal-width tabs. Precision controls sit at the top left beside Expression
-on the right, with the other six modes in two rows below. A compact, labelled precision
+The theme sets a 16-pixel root size so headings, controls and spacing share the
+body text's base scale even with an enlarged browser default font. Browser page
+zoom still scales the whole interface.
+
+On phones in portrait or landscape, a compact **Mode** button names the current worksheet. Open it to show
+the seven choices directly beneath the selector, covering the controls below
+without moving the worksheet; selecting one closes the menu. Landscape uses four
+columns so all seven choices fit on a short screen. Larger
+screens retain the mode tabs. Precision controls stay beside the mode selector at
+every width and never wrap underneath it. A compact, labelled precision
 slider shows the significant-digit count on both phones and wider screens.
 The header and decorative background are reduced, editors
 use a 16-pixel font and phone card action buttons use a compact 36-pixel minimum height
@@ -1108,9 +1145,22 @@ while keeping the offset control. They use quieter sentence-case labels
 and compact From/To rows. Date inputs incorporate a vector calendar button with
 an accessible name. Touch layouts suppress lingering hover tooltips while
 retaining hints for keyboard-focused buttons.
-On phones the calendar popup places the month and its navigation arrows on the
-first row, with an editable year and year-step buttons on a separate second row
-so neither button is clipped. The wider-screen popup layout is unchanged.
+On phones the date picker has its own full-screen view, including in landscape,
+regardless of the date input's scroll position. The worksheet and its header are
+hidden until the picker closes. The month selector uses the same themed menu as
+other Lab controls, including on iPhones. Its dropdown opens directly beneath the
+month selector with matching edges, above the year controls. Its twelve choices
+use two to four columns to fit the selector's width, with the selected month
+highlighted in the skin's accent colour. Portrait phones place the month
+and its navigation arrows on the first row, with an editable year and year-step
+buttons on a separate second row. Portrait date choices stay a compact 44 pixels
+high, with evenly spaced rows filling the available height and **Now** and **Close**
+at the bottom. Landscape brackets the month selector with its navigation arrows,
+followed by the separate year controls in one compact header. The full-width
+calendar fits all six weeks without scrolling, with **Now** and **Close** at the bottom;
+date cells adapt to the available height and retain even spacing without growing
+beyond 44 pixels. Navigation and action controls are 36 pixels high in landscape
+and at least 44 pixels high in portrait. Larger screens retain the anchored popup.
 Phone navigation, calendar group headings and field labels share a 12-pixel type
 size; non-editable calendar selector buttons use 14 pixels. Editable fields stay
 at 16 pixels to avoid focus-triggered zoom on iPhone.
@@ -1846,8 +1896,18 @@ the bounded display clock; the browser schedules frames and reports loading read
 Saving an unchanged observer does not reset a rotated view.
 
 In Almanac mode, **Back** and **Forward** sit in the globe toolbar alongside
-the grid, border and zoom controls. **Help** remains directly below the globe. Their former area below the observer
-fields remains empty to leave room for country and town dropdowns. Other modes
+**History** and the grid, border and zoom controls. Narrow phones show a single row
+with **Back**, **Forward**, **History** and **Map**. Open **Map** to reveal the grid,
+border, zoom and **Centre on observer** controls over the map; close it to reclaim
+the view. Pinch zoom and dragging remain available with the controls closed.
+The redundant visible heading is omitted on phones but
+remains available to screen readers. Buttons are at least 36 pixels high and
+follow the selected skin.
+Mobile layouts omit inline history status messages and prose in the globe toolbar,
+keeping its space for navigation and map controls.
+**Help** remains directly below the globe. Their former area below the observer
+fields remains empty on larger screens to leave room for country and town dropdowns;
+mobile layouts omit that empty spacer. Other modes
 retain the usual action-row position; the same buttons and handlers are reused.
 Almanac hides **Evaluate** and **Clear** because its results update automatically.
 Opening Almanac with no completed worksheet starts its calculation automatically,
@@ -4335,7 +4395,7 @@ variables from −3 to 3. The output is the principal-value surface
 `u(x,y) = acos(sin(2-x*y))`, with equal coordinate units and the compact
 azimuth, elevation, roll and coordinate-volume zoom controls beneath it.
 
-[![MARS Lab expression mode plotting the principal-value inverse-cosine surface with compact 3-D controls](images/mars-lab/expression.png?v=20261112-full-page)](images/mars-lab/expression.png?v=20261112-full-page)
+[![MARS Lab expression mode plotting the principal-value inverse-cosine surface with compact 3-D controls](images/mars-lab/expression.png?v=20261113-inline-precision)](images/mars-lab/expression.png?v=20261113-inline-precision)
 
 Function cards use MARS syntax rather than C syntax. A full stop terminates a
 statement, `.` within a statement denotes multiplication, and `/` is printed
@@ -4727,7 +4787,7 @@ The captured input is `(sqrt(x^2+y^2)-2)^2+z^2=1`. The symbolic output is
 `z = ±sqrt(1-(sqrt(x^2+y^2)-2)^2)`; the automatic implicit plot shows the
 complete torus, with equal coordinate units and the retained 3-D controls.
 
-[![MARS Lab equation mode showing a torus and its symbolic height branches in automatic mode](images/mars-lab/equation.png?v=20261112-full-page)](images/mars-lab/equation.png?v=20261112-full-page)
+[![MARS Lab equation mode showing a torus and its symbolic height branches in automatic mode](images/mars-lab/equation.png?v=20261113-inline-precision)](images/mars-lab/equation.png?v=20261113-inline-precision)
 
 ## Differential-equation mode
 
@@ -4766,7 +4826,7 @@ $\quad\begin{array}{l}\displaystyle y = \frac{C_1(2C_1x+1)}{2C_1x(C_1x+1)+1}.\en
 The zero-slope condition removes one arbitrary constant. The compact TeX
 fraction, representative real solution curves and solver working are shown together.
 
-[![MARS Lab differential-equation mode displaying the modified Emden solution family, representative curves and solver working](images/mars-lab/differential-equation.png?v=20261112-full-page)](images/mars-lab/differential-equation.png?v=20261112-full-page)
+[![MARS Lab differential-equation mode displaying the modified Emden solution family, representative curves and solver working](images/mars-lab/differential-equation.png?v=20261113-inline-precision)](images/mars-lab/differential-equation.png?v=20261113-inline-precision)
 
 Select **Help** in this mode for the accepted prime, `D`, partial-derivative and
 differential-form notation. Arbitrary constants are preserved when the problem
@@ -4886,21 +4946,21 @@ ordered higher and mixed derivatives and iterated integrals, and is not limited
 to `2 x 2` matrices.
 
 <figure>
-  <a href="images/mars-lab/matrix.png?v=20261112-full-page"><img src="images/mars-lab/matrix.png?v=20261112-full-page" alt="MARS Lab evaluating the symbolic matrix power (1 2; 3 4) raised to x"></a>
+  <a href="images/mars-lab/matrix.png?v=20261113-inline-precision"><img src="images/mars-lab/matrix.png?v=20261113-inline-precision" alt="MARS Lab evaluating the symbolic matrix power (1 2; 3 4) raised to x"></a>
   <figcaption><em>After clicking <strong>Evaluate</strong>.</em></figcaption>
 </figure>
 
 <br>
 
 <figure>
-  <a href="images/mars-lab/matrix-power-derivative.png?v=20261112-full-page"><img src="images/mars-lab/matrix-power-derivative.png?v=20261112-full-page" alt="MARS Lab differentiating the symbolic matrix power with respect to x"></a>
+  <a href="images/mars-lab/matrix-power-derivative.png?v=20261113-inline-precision"><img src="images/mars-lab/matrix-power-derivative.png?v=20261113-inline-precision" alt="MARS Lab differentiating the symbolic matrix power with respect to x"></a>
   <figcaption><em>After clicking <strong>x derivative</strong>, with the TeX card at 80% to show the complete matrix.</em></figcaption>
 </figure>
 
 <br>
 
 <figure>
-  <a href="images/mars-lab/matrix-power-integral.png?v=20261112-full-page"><img src="images/mars-lab/matrix-power-integral.png?v=20261112-full-page" alt="MARS Lab integrating the symbolic matrix power with respect to x and displaying the constant matrix"></a>
+  <a href="images/mars-lab/matrix-power-integral.png?v=20261113-inline-precision"><img src="images/mars-lab/matrix-power-integral.png?v=20261113-inline-precision" alt="MARS Lab integrating the symbolic matrix power with respect to x and displaying the constant matrix"></a>
   <figcaption><em>After clicking <strong>x integral</strong>, with the TeX card at 80%.</em></figcaption>
 </figure>
 
@@ -5020,7 +5080,7 @@ use the same native beautification pass, including rational radical cancellation
 The infinite endpoint has reduced to its exact limit; the plot shades the
 visible portion of the integration interval under the Gaussian curve.
 
-[![MARS Lab integrator mode showing the Gaussian improper integral with its simplified endpoint and shaded plot](images/mars-lab/integrator.png?v=20261112-full-page)](images/mars-lab/integrator.png?v=20261112-full-page)
+[![MARS Lab integrator mode showing the Gaussian improper integral with its simplified endpoint and shaded plot](images/mars-lab/integrator.png?v=20261113-inline-precision)](images/mars-lab/integrator.png?v=20261113-inline-precision)
 
 ## Datetime mode
 
@@ -5049,7 +5109,7 @@ The native presentation layer supplies and escapes these tooltips for fresh and
 cached results alike; copied text, dates and estimation qualifiers are unchanged.
 No database migration is needed, and unknown names receive no guessed translation.
 
-[![MARS Lab datetime mode showing Shrewsbury calendar and astronomical results for 12 November 2026](images/mars-lab/datetime.png?v=20261112-full-page)](images/mars-lab/datetime.png?v=20261112-full-page)
+[![MARS Lab datetime mode showing Shrewsbury calendar and astronomical results for 12 November 2026](images/mars-lab/datetime.png?v=20261113-inline-precision)](images/mars-lab/datetime.png?v=20261113-inline-precision)
 
 MARS supplies no shared WeatherAPI account or key. Weather is shown only when
 the person installing MARS Lab creates their own WeatherAPI account, configures
@@ -5350,7 +5410,7 @@ is disabled in the capture session. A configured WeatherAPI response instead sho
 both the estimated observer pressure used for refraction and the supplied sea-level
 pressure. Weather values may vary when the request is repeated.
 
-[![Full-page MARS Lab Almanac showing the London observer globe, land classification, weather inputs, corrected body altitudes and upcoming events](images/mars-lab/almanac.png?v=20261112-full-page)](images/mars-lab/almanac.png?v=20261112-full-page)
+[![Full-page MARS Lab Almanac showing the London observer globe, land classification, weather inputs, corrected body altitudes and upcoming events](images/mars-lab/almanac.png?v=20261113-inline-precision)](images/mars-lab/almanac.png?v=20261113-inline-precision)
 
 ### Almanac history
 
@@ -5359,10 +5419,19 @@ names, flag, date and GMT time; **Current** identifies the open worksheet. Drag 
 row's grip to reorder it, select its location to open the worksheet, or use
 **Earlier**, **Later** and **Remove**.
 
-[![Full-page MARS Lab Almanac History showing town and country names, location flags, the current worksheet and drag handles](images/mars-lab/almanac-history.png)](images/mars-lab/almanac-history.png)
+[![Full-page MARS Lab Almanac History showing town and country names, location flags, the current worksheet and drag handles](images/mars-lab/almanac-history.png?v=20261113-inline-precision)](images/mars-lab/almanac-history.png?v=20261113-inline-precision)
 
 This uncropped capture shows completed worksheets for several locations. Open the
 image to inspect the complete page at its original resolution.
+
+On a phone, the editor fills the available screen and keeps the entry list
+scrollable directly beneath its heading, omitting the introduction and help section.
+These captures show the complete portrait and landscape
+viewports, without cropping:
+
+[![Phone portrait History with flags, place names and grouped touch controls](images/mars-lab/history-mobile.png?v=20261113-inline-precision)](images/mars-lab/history-mobile.png?v=20261113-inline-precision)
+
+[![Phone landscape History with entry actions alongside the place names](images/mars-lab/history-mobile-landscape.png?v=20261113-inline-precision)](images/mars-lab/history-mobile-landscape.png?v=20261113-inline-precision)
 
 ## Mobile and private remote access
 

@@ -247,6 +247,13 @@ window.checkLabHistoryPersistence = async (): Promise<void> => {
             await settle(() => historyText(2) === '4+5', 'move a forward entry across the current worksheet');
             await LabTestBrowser.wait(20);
             check(native.lab_workspace_history_current(0) === 3 && historyText(3) === '5+6', 'moving keeps the active worksheet');
+            check(document.activeElement === historyButton(2, 'earlier'), 'focus follows the moved entry and its action');
+            (document.activeElement as HTMLButtonElement).click();
+            await settle(() => historyText(1) === '4+5', 'the same move control can be used repeatedly');
+            check(document.activeElement === historyButton(1, 'earlier'), 'a repeated move retains its control');
+            historyButton(1, 'later').click();
+            await settle(() => historyText(2) === '4+5', 'move the same entry back later');
+            check(document.activeElement === historyButton(2, 'later'), 'Later follows its entry rather than its old neighbour');
             historyButton(2, 'remove').click();
             await settle(() => native.lab_workspace_history_current(0) === 2, 'remove an archived entry');
             await LabTestBrowser.wait(20);
@@ -274,6 +281,76 @@ window.checkLabHistoryPersistence = async (): Promise<void> => {
             const dialog = document.getElementById('historyEditor') as HTMLDialogElement;
             const list = document.getElementById('historyEditorEntries')!;
             const heading = dialog.querySelector<HTMLElement>('.history-editor-heading')!;
+            const phone = document.createElement('iframe');
+            phone.style.cssText = 'position:fixed;left:-10000px;top:0;width:325px;height:672px;border:0';
+            try {
+                const loaded = new Promise<void>(resolve => { phone.onload = (): void => resolve(); });
+                phone.srcdoc = '<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1">' +
+                    '<link rel="stylesheet" href="/index.css"></head><body></body></html>';
+                document.body.append(phone);
+                await loaded;
+                const doc = phone.contentDocument!, view = phone.contentWindow!;
+                doc.documentElement.dataset.skin = document.documentElement.dataset.skin;
+                const copy = dialog.cloneNode(true) as HTMLDialogElement;
+                copy.open = false;
+                doc.body.append(copy);
+                const entries = copy.querySelector<HTMLElement>('#historyEditorEntries')!;
+                labDOM.call('lab_workspace_dom_history_row', entries, place, 46, 46, 48);
+                labDOM.call('lab_workspace_dom_history_row', entries, {...place, almanac: {...place.almanac,
+                    jurisdiction: 'AU-NSW', town: 'Sydney|0|0|0'}}, 47, 46, 48);
+                copy.querySelector<HTMLElement>('#historyEditorStatus')!.textContent = '';
+                copy.showModal();
+                await doc.fonts.ready;
+                for (const [width, height] of [[325, 672], [390, 844], [672, 325]]) {
+                    phone.style.width = width + 'px';
+                    phone.style.height = height + 'px';
+                    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+                    const box = copy.getBoundingClientRect(), listBox = entries.getBoundingClientRect();
+                    check(Math.abs(box.width - width) < 1 && Math.abs(box.height - height) < 1 && box.top === 0 && box.left === 0,
+                        `${width}x${height}: History fills the phone viewport`);
+                    check(listBox.height > height * .5 && entries.scrollWidth <= entries.clientWidth && copy.scrollTop === 0,
+                        `${width}x${height}: the entry list gets most of the screen without horizontal overflow`);
+                    check(view.getComputedStyle(copy.querySelector('#historyEditorStatus')!).display === 'none',
+                        'an empty live status does not reserve a blank paragraph');
+                    const help = copy.querySelector<HTMLDetailsElement>('.history-editor-help')!;
+                    check(view.getComputedStyle(help).display === 'none' &&
+                        view.getComputedStyle(copy.querySelector('.history-editor-intro')!).display === 'none',
+                        `${width}x${height}: mobile History omits the introduction and help section`);
+                    check(listBox.top - copy.querySelector('.history-editor-heading')!.getBoundingClientRect().bottom <= 8,
+                        `${width}x${height}: entries follow the heading without an instructions gap`);
+                    for (const row of entries.querySelectorAll<HTMLElement>('.history-entry')) {
+                        const open = row.querySelector<HTMLElement>('.history-entry-open')!;
+                        const grip = row.querySelector<HTMLElement>('.history-drag-handle')!;
+                        const actions = [...row.querySelectorAll<HTMLButtonElement>('.history-entry-actions button')];
+                        const rowBox = row.getBoundingClientRect(), openBox = open.getBoundingClientRect();
+                        check(grip.getBoundingClientRect().width >= 44 && openBox.width >= 180 && openBox.height >= 44 &&
+                            openBox.left >= listBox.left && openBox.right <= listBox.right && rowBox.width <= listBox.width,
+                            `${width}x${height}: grips and worksheet previews share a readable row`);
+                        const top = actions[0].getBoundingClientRect().top;
+                        check(actions.every(button => {
+                            const actionBox = button.getBoundingClientRect();
+                            return actionBox.height >= 44 && actionBox.width >= 44 && Math.abs(actionBox.top - top) < 1 &&
+                                actionBox.left >= listBox.left && actionBox.right <= listBox.right;
+                        }), `${width}x${height}: Earlier, Later and Remove stay together with finger-sized targets`);
+                    }
+                    entries.scrollTop = entries.scrollHeight;
+                    const closeBox = copy.querySelector<HTMLElement>('#historyEditorClose')!.getBoundingClientRect();
+                    check(copy.scrollTop === 0 && closeBox.top >= 0 && closeBox.bottom <= height &&
+                        entries.getBoundingClientRect().height > height * .3,
+                        `${width}x${height}: a scrolled list leaves Close and the entries accessible`);
+                }
+                entries.replaceChildren();
+                labDOM.call('lab_workspace_dom_history_row', entries, place, 0, 0, 1);
+                const soleOpen = entries.querySelector<HTMLElement>('.history-entry-open')!.getBoundingClientRect();
+                const soleAction = entries.querySelector<HTMLElement>('.history-entry-actions button')!.getBoundingClientRect();
+                check(soleOpen.width > 300 && soleAction.top >= soleOpen.bottom,
+                    'a single landscape entry uses the full width without its disabled actions overlapping the name');
+                phone.style.width = '900px';
+                phone.style.height = '900px';
+                check(view.getComputedStyle(copy.querySelector('.history-editor-help')!).display !== 'none' &&
+                    view.getComputedStyle(copy.querySelector('.history-editor-intro')!).display !== 'none',
+                    'desktop History retains its introduction and help section');
+            } finally { phone.remove(); }
             list.scrollTop = list.scrollHeight;
             await new Promise(requestAnimationFrame);
             const dialogBox = dialog.getBoundingClientRect(), headingBox = heading.getBoundingClientRect();

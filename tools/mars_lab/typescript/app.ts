@@ -563,6 +563,7 @@ class LabApplication {
         this.installEventServices();
         labDOM.call('lab_events_install', document, window);
         labDOM.call('lab_widget_events_install', document, window, WorksheetContext.marsDatePickerState);
+        this.listenResize(WorksheetWorkspace.presentation.syncModeTabs);
         if (typeof ResizeObserver === 'function') {
             for (const textarea of WorksheetContext.labTextareas) {
                 this.observe(textarea, WorksheetWorkspace.layout.scheduleEditorResizeGrip);

@@ -144,11 +144,12 @@
     window.addEventListener('error', function recordError(event) {
         const target = event.target;
         const source = target instanceof Element ? target.getAttribute('src') || target.getAttribute('href') || target.tagName : 'unknown';
-        failures.push(event.message || `Resource load failed: ${source.slice(0, 160)}`);
+        failures.push(event.error instanceof Error ? event.error.stack || event.message :
+            event.message || `Resource load failed: ${source.slice(0, 160)}`);
     }, true);
     window.addEventListener('unhandledrejection', function recordRejection(event) {
         if (!failureCase)
-            failures.push(String(event.reason));
+            failures.push(event.reason instanceof Error ? event.reason.stack || String(event.reason) : String(event.reason));
     });
     if (failureCase === 'catalogue') {
         window.fetch = (url, options) => String(url) === '/jurisdictions' ?
@@ -3550,7 +3551,21 @@
             initialiseLabTestAdapters();
             if (new URLSearchParams(location.search).get('appearance-check') === '1') {
                 await runBrowserGroup('appearance skins', window.checkLabAppearance);
-                await report('PASS: local skins preserve worksheets and survive unavailable storage');
+                await runBrowserGroup('responsive worksheet controls', async () => {
+                    const originalMode = WorksheetWorkspace.mode.currentMode();
+                    try {
+                        for (const mode of ['expression', 'equation', 'diffequation', 'matrix', 'integrator',
+                                            'datetime', 'almanac'] as const) {
+                            WorksheetWorkspace.mode.setMode(mode);
+                            WorksheetWorkspace.presentation.syncModeUI();
+                            await window.checkLabMobileLayout(mode + ' appearance');
+                        }
+                    } finally {
+                        WorksheetWorkspace.mode.setMode(originalMode);
+                        WorksheetWorkspace.presentation.syncModeUI();
+                    }
+                }, 120000);
+                await report('PASS: local skins and responsive controls preserve worksheets and survive unavailable storage');
                 return;
             }
             if (new URLSearchParams(location.search).get('ode-check') === '1') {
@@ -3748,7 +3763,7 @@
             const stylesheet = Array.from(document.styleSheets).find(sheet => sheet.href?.endsWith('/index.css'))!;
             const styleNames = [
                 'theme', 'layout', 'worksheets', 'dates', 'forms', 'bindings', 'mobile', 'buttons', 'results', 'help',
-                'responsive'
+                'responsive', 'skins'
             ];
             const imports = Array.from(stylesheet.cssRules);
             check(imports.length === styleNames.length, 'Stylesheet import count changed');
@@ -3797,28 +3812,34 @@
                 check(slice.querySelector<HTMLElement>('.slice-auto')!.matches(':checked') &&
                       getComputedStyle(slice.querySelector<HTMLElement>('.slice-limits')!).display === 'none',
                       'Evaluate defaults to Auto with no visible From/To fields');
-                async function waitForSlice(predicate: () => unknown) {
+                async function waitForSlice(predicate: () => unknown, expected: string) {
                     for (let n = 0; n < 600 && !predicate(); ++n)
                         await LabTestBrowser.wait(25);
-                    check(predicate(), 'Slice response must settle: ' + WorksheetContext.statusEl.textContent);
+                    check(predicate(), 'Slice response must settle (' + expected + '): ' +
+                        WorksheetContext.statusEl.textContent + '; feedback: ' +
+                        document.getElementById('plotFeedback')!.textContent + '; controls: ' +
+                        JSON.stringify([...slice.querySelectorAll<HTMLInputElement>('input')].map(input =>
+                            [input.className, input.value, input.checked])) + '; quality: ' +
+                        plotRendered.querySelector('[data-plot-quality]')?.getAttribute('data-plot-quality'));
                 }
                 sliceSlider.value = '625';
                 sliceSlider.dispatchEvent(new Event('input', {bubbles: true}));
                 await waitForSlice(() => plotRendered.querySelector<HTMLElement>('[data-plot-quality="preview"]')! &&
-                                         slice.querySelector<HTMLInputElement>('.slice-value')!.value === '½');
+                                         slice.querySelector<HTMLInputElement>('.slice-value')!.value === '0.5', 'preview at 0.5');
                 check(WorksheetBindings.editor.currentExpressionText() === sliceSource, 'Dragging a slice does not edit the worksheet bindings');
                 sliceSlider.dispatchEvent(new Event('change', {bubbles: true}));
-                await waitForSlice(() => plotRendered.querySelector<HTMLElement>('[data-plot-quality="full"]')!);
-                check(plotRendered.querySelector<LabTestPlotTitle>('title')?.textContent.includes('z = ½'),
-                      'The exported plot heading identifies its exact slice');
+                await waitForSlice(() => plotRendered.querySelector<HTMLElement>('[data-plot-quality="full"]')!, 'full detail');
+                check(plotRendered.querySelector<LabTestPlotTitle>('title')?.textContent.includes('z = 0.5'),
+                      'The exported plot heading identifies its slice value');
                 const exactSlice = slice.querySelector<HTMLInputElement>('.slice-value')!;
                 exactSlice.value = '1/3';
                 exactSlice.dispatchEvent(new Event('change', {bubbles: true}));
-                await waitForSlice(() => exactSlice.value === '⅓');
+                await waitForSlice(() => exactSlice.value.startsWith('0.3333333333333333'), 'typed one third');
+                const acceptedSlice = exactSlice.value;
                 check(slice.querySelector<HTMLInputElement>('.slice-position')!.value === '-1',
                       'The rounded slider handle cannot overwrite an exact typed value');
                 await WorksheetRequests.plots.takePlot('x');
-                check(exactSlice.value === '⅓', 'Redrawing preserves the exact slice rather than quantising it');
+                check(exactSlice.value === acceptedSlice, 'Redrawing preserves the native slice text rather than quantising it');
                 slice.querySelector<HTMLElement>('.slice-manual')!.click();
                 check(slice.querySelector<HTMLElement>('.slice-manual')!.matches(':checked') &&
                       getComputedStyle(slice.querySelector<HTMLElement>('.slice-limits')!).display !== 'none',
@@ -3827,8 +3848,8 @@
                 slice.querySelector<HTMLInputElement>('.slice-upper')!.value = '4';
                 await WorksheetRequests.plots.takePlot('x');
                 slice.querySelector<HTMLElement>('.slice-auto')!.click();
-                await waitForSlice(() => slice.querySelector<HTMLInputElement>('.slice-upper')!.value === '2');
-                check(exactSlice.value === '⅓' && slice.querySelector<HTMLInputElement>('.slice-lower')!.value === '-2' &&
+                await waitForSlice(() => slice.querySelector<HTMLInputElement>('.slice-upper')!.value === '2', 'automatic bounds');
+                check(exactSlice.value === acceptedSlice && slice.querySelector<HTMLInputElement>('.slice-lower')!.value === '-2' &&
                       getComputedStyle(slice.querySelector<HTMLElement>('.slice-limits')!).display === 'none',
                       'Auto restores native limits and preserves a valid exact slice value');
                 const stage = document.getElementById('plotStage')!;
@@ -3841,8 +3862,8 @@
                 stage.style.width = '';
                 await WorksheetWorkspace.mode.selectWorksheetMode('matrix');
                 await WorksheetWorkspace.mode.selectWorksheetMode('expression');
-                check(document.querySelector<HTMLInputElement>('#plotSlices .slice-value')?.value === '⅓',
-                      'Returning to the worksheet restores its accepted exact slice');
+                check(document.querySelector<HTMLInputElement>('#plotSlices .slice-value')?.value === acceptedSlice,
+                      'Returning to the worksheet restores its accepted native slice text');
                 WorksheetBindings.controller.setExpressionEditor('x+y+z+w');
                 await WorksheetRequests.evaluation.evaluateExpression();
                 await waitForAutomaticPlot();
@@ -3867,12 +3888,14 @@
                 const secondValue = rows[1].querySelector<HTMLInputElement>('.slice-value')!;
                 secondValue.value = '1/3';
                 secondValue.dispatchEvent(new Event('change', {bubbles: true}));
-                await waitForSlice(() => secondValue.value === '⅓');
+                await waitForSlice(() => secondValue.value.startsWith('0.3333333333333333'), 'second parameter one third');
+                const acceptedSecondValue = secondValue.value;
                 check(checkedSlice(1) && !rows[1].classList.contains('hidden'),
                       'A plot response preserves the selected parameter');
                 choices[0].click();
-                check(checkedSlice(0) && rows[0].querySelector<HTMLInputElement>('.slice-value')!.value === '0' && secondValue.value === '⅓',
-                      'Switching sliders preserves independent exact parameter values');
+                check(checkedSlice(0) && rows[0].querySelector<HTMLInputElement>('.slice-value')!.value === '0' &&
+                      secondValue.value === acceptedSecondValue,
+                      'Switching sliders preserves independent native parameter values');
                 choices[1].click();
                 await WorksheetWorkspace.mode.selectWorksheetMode('matrix');
                 await WorksheetWorkspace.mode.selectWorksheetMode('expression');

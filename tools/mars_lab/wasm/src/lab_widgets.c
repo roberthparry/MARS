@@ -12,6 +12,7 @@
  */
 #include "lab_dom.h"
 #include "lab_forms.h"
+#include "lab_select.h"
 #include "lab_view.h"
 #include "lab_widgets.h"
 
@@ -47,7 +48,8 @@ bool lab_widgets_picker(double year, double month, double selected_year, double 
     if (!picker || !days || !weekdays || !lab_dom_query(0, "#marsDatePickerTitle"))
         return false;
     int months = lab_dom_query(0, "#marsDatePickerMonth"), year_input = lab_dom_query(0, "#marsDatePickerYear");
-    if (months && !lab_dom_count(lab_dom_all(months, "option"))) {
+    bool created_months = months && !lab_dom_count(lab_dom_all(months, "option"));
+    if (created_months) {
         for (unsigned i = 0; i < 12; ++i) {
             int option = lab_dom_create("option");
             lab_dom_write(option, LAB_DOM_VALUE, "", lab_dom_format(i + 1, "", ""));
@@ -56,6 +58,10 @@ bool lab_widgets_picker(double year, double month, double selected_year, double 
         }
     }
     lab_dom_write(months, LAB_DOM_VALUE, "", lab_dom_format(month, "", ""));
+    if (created_months)
+        lab_select_rebuild(months, false);
+    else
+        lab_select_sync(months);
     char date[11];
     lab_widgets_date(date, year, month, 1);
     date[4] = 0;
@@ -193,6 +199,7 @@ void lab_widgets_picker_close(jsref state, bool restore_focus)
     if (!picker)
         return;
     int button = lab_dom_get(state, "button");
+    lab_select_event(lab_dom_query(0, "#marsDatePickerMonth"), LAB_SELECT_SOURCE_OUTSIDE, LAB_SELECT_KEY_CLICK, 0);
     lab_dom_class(picker, "hidden", 1);
     lab_dom_class(lab_dom_get(state, "shell"), "open", 0);
     lab_dom_set(state, "input", 0);

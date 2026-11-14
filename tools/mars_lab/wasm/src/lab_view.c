@@ -20,19 +20,17 @@ typedef struct {
 
 enum { lab_view_aux = 1, lab_view_value = 2, lab_view_value_if_present = 4, lab_view_calculus = 8, lab_view_goal = 16 };
 
-static const char lab_view_expression_subtitle[] =
-    "Switch between expression, equation, differential-equation, matrix, and integrator experiments. "
-    "Each mode runs through a local MARS worker binary and shows the result on the right.";
-static const char lab_view_equation_subtitle[] = "Enter an equation on the left. The lab tries symbolic isolation "
+static const char lab_view_expression_subtitle[] = "Mathematics, calendars and astronomy.";
+static const char lab_view_equation_subtitle[] = "Enter an equation. The lab tries symbolic isolation "
                                                  "first, then numeric solving for all variable bindings.";
 static const char lab_view_diffequation_subtitle[] =
     "Enter an ordinary differential equation and optional initial or boundary conditions. MARS selects a symbolic "
     "solver "
     "family and preserves arbitrary constants when conditions are absent.";
 static const char lab_view_matrix_subtitle[] =
-    "Enter a complete matrix expression on the left, press Evaluate, and inspect its TeX, expression, function, "
+    "Enter a complete matrix expression, press Evaluate, and inspect its TeX, expression, function, "
     "and numerical value.";
-static const char lab_view_integrator_subtitle[] = "Enter an integrand expression on the left, stack one or more "
+static const char lab_view_integrator_subtitle[] = "Enter an integrand expression, stack one or more "
                                                    "integral rows, and use Free when a symbol should stay "
                                                    "as a parameter. Leave both bounds blank for an antiderivative, or "
                                                    "leave lower blank and fill upper to evaluate it there.";

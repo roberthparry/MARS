@@ -95,6 +95,11 @@ static void lab_event_tab(lab_event_action_t action, event_jsref event, jsref pl
 {
     (void)action;
     (void)plan;
+    int toggle = lab_dom_query(0, "#modeMenuToggle");
+    if (toggle && lab_dom_measure(toggle, LAB_DOM_MEASURE_RECT_HEIGHT) > 0) {
+        lab_dom_remove(lab_dom_query(0, "#modeMenu"), "open");
+        lab_dom_effect(toggle, LAB_DOM_EFFECT_FOCUS);
+    }
     lab_event_emit(calls, "selectWorksheetMode",
                    lab_dom_read(lab_dom_get(event, "currentTarget"), LAB_DOM_DATASET, "mode"), 0, 1);
 }

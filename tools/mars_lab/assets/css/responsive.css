@@ -1,4 +1,11 @@
 /* Tablet and phone overrides; must follow the component styles. */
+@media (max-width: 900px), (max-height: 500px) {
+  #historyPersistenceStatus,
+  .almanac-globe-toolbar :is(p, [role="status"], [role="alert"]) {
+    display: none;
+  }
+}
+
 @media (max-width: 900px) {
   .status:has(.sky-status-strip) {
     display: none;
@@ -23,7 +30,7 @@
     padding: 1rem 0.75rem 0.45rem;
   }
 
-  header > .skin-picker {
+  header > .settings-toggle {
     position: static;
     grid-column: 2;
     grid-row: 1;
@@ -265,7 +272,7 @@
     padding: 0.65rem 0.45rem;
   }
 
-  body.almanac-mode #workspaceActionsHome { min-height: 7rem; }
+  body.almanac-mode #workspaceActionsHome { min-height: 0; }
 
   .derivative-controls {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -460,8 +467,112 @@
   }
 }
 
+/* Mobile dates occupy the viewport rather than the space below a scrolled input. */
+@media (max-width: 700px), (max-height: 500px) {
+  body:has(.mars-date-picker:not(.hidden)) { overflow: hidden; }
+  body:has(.mars-date-picker:not(.hidden)) > :is(header, main) {
+    visibility: hidden;
+    pointer-events: none;
+  }
+  .mars-date-picker:not(.hidden) {
+    display: grid;
+    grid-template-rows: auto auto minmax(0, 1fr) auto;
+    gap: .5rem;
+    /* Override the desktop anchor coordinates projected as inline styles. */
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    min-width: 0;
+    height: 100vh;
+    height: 100dvh;
+    max-height: 100vh !important;
+    max-height: 100dvh !important;
+    padding: max(.65rem, env(safe-area-inset-top)) max(.65rem, env(safe-area-inset-right))
+      max(.65rem, env(safe-area-inset-bottom)) max(.65rem, env(safe-area-inset-left));
+    border: 0;
+    border-radius: 0;
+    background: var(--panel);
+    overflow: hidden;
+    backdrop-filter: none;
+  }
+  .mars-date-picker-head, .mars-date-picker-weekdays, .mars-date-picker-foot { margin: 0; }
+  .mars-date-picker-grid { min-height: 0; grid-auto-rows: 44px; align-content: space-between; overflow-y: auto; overscroll-behavior: contain; }
+  .mars-date-picker-day { min-width: 0; min-height: 44px; padding: .25rem; }
+  .mars-date-picker-head :is(button, input, select), .mars-date-picker-foot button { min-height: 44px; }
+  .mars-date-picker-head .select-button { min-height: 44px; }
+}
+
 @media (max-width: 560px) {
-  body.almanac-mode #workspaceActionsHome { min-height: 4rem; }
+  .almanac-globe-toolbar { position: relative; grid-template-columns: minmax(0, 1fr) auto; gap: .25rem; padding: .35rem; }
+  /* The canvas already identifies the globe; retain its heading for assistive technology. */
+  .almanac-globe-toolbar strong {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .almanac-globe-toolbar .workspace-history {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: .25rem;
+    min-width: 0;
+  }
+  .almanac-globe-options { grid-column: 2; grid-row: 1; }
+  .almanac-globe-options:not([open]) .almanac-globe-view-controls { display: none; }
+  .almanac-globe-options > summary {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: .2rem;
+    min-height: 36px;
+    padding: .2rem .35rem;
+    border: 2px solid var(--line);
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--accent-2) 12%, var(--panel));
+    color: var(--ink);
+    font: 700 .75rem/1.2 Arial, sans-serif;
+    cursor: pointer;
+    list-style: none;
+  }
+  .almanac-globe-options > summary::-webkit-details-marker { display: none; }
+  .almanac-globe-options > summary::after { content: '▾'; }
+  .almanac-globe-options[open] > summary::after { content: '▴'; }
+  .almanac-globe-options > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .almanac-globe-view-controls {
+    position: absolute;
+    z-index: 8;
+    top: 100%;
+    left: .35rem;
+    right: .35rem;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: .25rem;
+    padding: .4rem;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--panel);
+    box-shadow: 0 .4rem .8rem #0005;
+  }
+  .almanac-globe-zoom {
+    display: grid;
+    grid-column: 1 / -1;
+    grid-template-columns: 36px 36px minmax(0, 1fr);
+    gap: .25rem;
+  }
+  .almanac-globe-toolbar button {
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
+    min-height: 36px;
+    padding: .2rem .4rem;
+    font-size: .75rem;
+    line-height: 1.2;
+  }
+  .almanac-globe-zoom :is([data-globe-action="out"], [data-globe-action="in"]) { font-size: 1.1rem; }
   /* Preserve the native table and every value, but lay out each body as an
      individually labelled entry instead of a nine-column horizontal strip. */
   .almanac-body-table {
@@ -566,7 +677,9 @@
   .celtic-backdrop {
     display: none;
   }
+}
 
+@media (max-width: 560px), (orientation: landscape) and (max-height: 500px) {
   header {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
@@ -632,21 +745,63 @@
   main {
     padding: 0.45rem max(0.5rem, env(safe-area-inset-right)) max(1rem, env(safe-area-inset-bottom)) max(0.5rem, env(safe-area-inset-left));
   }
+}
 
+/* Phone navigation stays compact when the viewport rotates into landscape. */
+@media (max-width: 560px), (orientation: landscape) and (max-height: 500px) {
   .lab-topbar {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: minmax(0, 1fr) minmax(8.5rem, 42%);
     gap: 0.3rem;
     padding: 0;
   }
 
-  .lab-tabs {
-    grid-column: 1 / -1;
+  .lab-mode-menu {
+    position: static;
+    justify-self: stretch;
+    z-index: 30;
+    grid-column: 1;
     grid-row: 1;
+  }
+
+  .lab-mode-menu > summary {
+    display: flex;
+    align-items: center;
+    gap: .4rem;
+    min-height: 36px;
+    height: 100%;
+    padding: .35rem .65rem;
+    border: 2px solid var(--line);
+    border-radius: 12px;
+    background: color-mix(in srgb, var(--accent-2) 12%, var(--panel));
+    color: var(--ink);
+    font: 700 .85rem/1.3 system-ui, sans-serif;
+    list-style: none;
+    cursor: pointer;
+  }
+  .lab-mode-menu > summary::-webkit-details-marker { display: none; }
+  .lab-mode-menu > summary::after { content: '▾'; margin-left: auto; }
+  .lab-mode-menu[open] > summary::after { content: '▴'; }
+  .lab-mode-menu > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .lab-mode-menu:not([open]) .lab-tabs { display: none; }
+
+  .lab-tabs {
+    position: absolute;
+    z-index: 30;
+    top: 100%;
+    left: 0;
+    right: 0;
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 0.3rem;
     align-items: stretch;
+    max-height: 60vh;
+    overflow: auto;
+    padding: .5rem;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--panel);
+    box-shadow: 0 .4rem .8rem #0005;
   }
 
   .mode-tab {
@@ -660,36 +815,30 @@
   }
 
   .precision-toolbar {
-    grid-column: 1 / 3;
+    grid-column: 2;
     grid-row: 1;
     align-self: start;
     justify-self: stretch;
     height: 3.25rem;
     min-height: 0;
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr) auto;
+    grid-template-columns: minmax(0, 1fr) auto;
     gap: 0.1rem 0.3rem;
     padding: 0;
   }
 
-  .mode-tab:first-child {
-    grid-column: 3;
-    min-height: 3.25rem;
-  }
-
   .precision-label {
-    font-size: 0.62rem;
-    letter-spacing: 0.03em;
+    display: none;
   }
 
   .precision-value {
-    grid-column: 2;
+    grid-column: 1;
     grid-row: 1;
     font-size: 0.62rem;
   }
 
   #precisionCustomToggle {
-    grid-column: 3;
+    grid-column: 2;
     grid-row: 1;
     min-width: 1.75rem;
     min-height: 27px;
@@ -702,6 +851,19 @@
     height: 1.25rem;
   }
 
+  .precision-custom-panel {
+    left: auto;
+    right: 0;
+  }
+}
+
+@media (orientation: landscape) and (max-height: 500px) {
+  .lab-tabs {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 560px) {
   section {
     background: rgba(8, 29, 22, 0.94);
     --workspace-panel-border: 1px;
@@ -766,7 +928,8 @@
     grid-row: 1;
   }
 
-  #marsDatePickerMonth {
+  #marsDatePickerMonth,
+  .mars-date-picker-title > .select-shell {
     grid-column: 2;
     grid-row: 1;
     min-width: 0;
@@ -797,6 +960,7 @@
   }
 
   .mars-date-picker-title select {
+    padding-left: 1rem;
     padding-right: 1.8rem;
   }
 
@@ -837,15 +1001,13 @@
     padding: 0 0.6rem 0.5rem;
   }
 
+  /* Compact actions retain the shared theme's rounded, raised button styling. */
   .controls button {
     flex: 0 0 auto;
     width: auto;
     max-width: 100%;
     min-height: 2rem;
     padding: 0.25rem 0.45rem;
-    border-width: 1px;
-    border-radius: 7px;
-    box-shadow: none;
     font: 600 0.75rem/1.2 system-ui, sans-serif;
   }
 
@@ -919,5 +1081,88 @@
 
   .help-card {
     padding: 0.8rem;
+  }
+}
+
+/* Landscape uses one compact header above the full-width, six-week calendar. */
+@media (orientation: landscape) and (max-height: 500px) {
+  .mars-date-picker:not(.hidden) {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: 36px auto minmax(0, 1fr) 36px;
+    gap: .25rem;
+    padding: max(.5rem, env(safe-area-inset-top)) max(.5rem, env(safe-area-inset-right))
+      max(.5rem, env(safe-area-inset-bottom)) max(.5rem, env(safe-area-inset-left));
+  }
+
+  .mars-date-picker-head {
+    grid-column: 1;
+    grid-row: 1;
+    align-self: start;
+    grid-template-columns: 36px minmax(0, 1fr) 36px minmax(7.5rem, 8.5rem);
+    gap: .25rem;
+  }
+
+  .mars-date-picker-title { display: contents; }
+  #marsDatePickerPrev { grid-column: 1; grid-row: 1; }
+  #marsDatePickerMonth,
+  .mars-date-picker-title > .select-shell { grid-column: 2; grid-row: 1; min-width: 0; }
+  #marsDatePickerNext { grid-column: 3; grid-row: 1; }
+  .mars-date-picker-year-group {
+    grid-column: 4;
+    grid-row: 1;
+    grid-template-columns: 32px minmax(0, 1fr) 32px;
+    gap: .2rem;
+  }
+
+  .mars-date-picker-head :is(button, input, select) {
+    min-width: 0;
+    min-height: 36px;
+    height: 36px;
+    padding: .25rem .2rem;
+    box-shadow: none;
+  }
+
+  .mars-date-picker-title select { font-size: .75rem; padding-left: 1rem; padding-right: 1.4rem; }
+  .mars-date-picker-title .select-button { min-height: 36px; font-size: .75rem; }
+  .mars-date-picker-title .select-option { min-height: 36px; }
+  .mars-date-picker-title input { font-size: 1rem; }
+  .mars-date-picker-weekdays { grid-column: 1 / -1; grid-row: 2; gap: .25rem; }
+  .mars-date-picker-grid {
+    grid-column: 1 / -1;
+    grid-row: 3;
+    grid-template-rows: repeat(6, minmax(0, 1fr));
+    grid-auto-rows: auto;
+    max-height: none;
+    gap: .2rem;
+    overflow: hidden;
+  }
+
+  .mars-date-picker-day {
+    min-height: 0;
+    height: min(100%, 44px);
+    align-self: center;
+    padding: .1rem;
+    border-radius: .6rem;
+    font-size: .8rem;
+    box-shadow: none;
+  }
+
+  .mars-date-picker-foot {
+    grid-column: 1;
+    grid-row: 4;
+    align-self: end;
+    display: flex;
+    justify-content: space-between;
+    gap: .25rem;
+  }
+
+  .mars-date-picker-foot button {
+    flex: 0 0 auto;
+    min-width: 5rem;
+    min-height: 36px;
+    height: 36px;
+    padding: .15rem .65rem;
+    border-radius: .6rem;
+    box-shadow: none;
   }
 }

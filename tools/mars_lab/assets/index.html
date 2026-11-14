@@ -35,24 +35,33 @@
       <h1>__LAB_NAME__</h1>
       <p class="subtitle" id="subtitle">__LAB_SUBTITLE__</p>
     </div>
-    <div class="skin-picker">
-      <label id="skinSelectLabel" for="skinSelect">Skin</label>
-      <select id="skinSelect" aria-label="Appearance skin">
-        <option value="0" selected>0. Earth (Default)</option>
-        <option value="1">1. Mars</option>
-        <option value="2">2. Mercury</option>
-        <option value="3">3. Jupiter</option>
-        <option value="4">4. Venus</option>
-        <option value="5">5. Saturn</option>
-        <option value="6">6. Neptune</option>
-        <option value="7">7. Moon</option>
-        <option value="8">8. Galaxy</option>
-        <option value="9">9. Andromeda</option>
-        <option value="10">10. Nebula</option>
-        <option value="11">11. Quasar</option>
-        <option value="12">12. Asteroids</option>
-        <option value="13">13. Exoplanet</option>
-      </select>
+    <button class="settings-toggle" id="settings_toggle" type="button" popovertarget="settings_panel" aria-haspopup="dialog" aria-label="Settings" title="Settings">
+      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m9.7 3-.5 2.1-1.5.9-2.1-.6-2.3 4 1.6 1.5v1.8l-1.6 1.5 2.3 4 2.1-.6 1.5.9.5 2.1h4.6l.5-2.1 1.5-.9 2.1.6 2.3-4-1.6-1.5v-1.8l1.6-1.5-2.3-4-2.1.6-1.5-.9-.5-2.1Z"/><circle cx="12" cy="11.8" r="3"/></svg>
+    </button>
+    <div class="settings-panel" id="settings_panel" popover="auto" role="dialog" aria-labelledby="settings_title">
+      <div class="settings-heading">
+        <h2 id="settings_title">Settings</h2>
+        <button class="settings-close" id="settings_close" type="button" popovertarget="settings_panel" popovertargetaction="hide" aria-label="Close settings">×</button>
+      </div>
+      <div class="skin-picker">
+        <label id="skinSelectLabel" for="skinSelect">Theme</label>
+        <select id="skinSelect" aria-label="Theme">
+          <option value="0" selected>0. Earth (Default)</option>
+          <option value="1">1. Mars</option>
+          <option value="2">2. Mercury</option>
+          <option value="3">3. Jupiter</option>
+          <option value="4">4. Venus</option>
+          <option value="5">5. Saturn</option>
+          <option value="6">6. Neptune</option>
+          <option value="7">7. Moon</option>
+          <option value="8">8. Galaxy</option>
+          <option value="9">9. Andromeda</option>
+          <option value="10">10. Nebula</option>
+          <option value="11">11. Quasar</option>
+          <option value="12">12. Asteroids</option>
+          <option value="13">13. Exoplanet</option>
+        </select>
+      </div>
     </div>
     <div class="header-side">
       <div class="status" id="status" role="status">Restoring your worksheet…</div>
@@ -74,15 +83,18 @@
   </header>
   <main id="labWorkspace">
     <div class="lab-topbar">
-      <div class="lab-tabs" role="tablist" aria-label="__LAB_NAME__ mode selector">
-        <button class="mode-tab active" id="modeTabExpression" type="button" role="tab" aria-selected="true" aria-controls="workspacePanel" data-mode="expression">Expression</button>
-        <button class="mode-tab" id="modeTabEquation" type="button" role="tab" aria-selected="false" aria-controls="workspacePanel" data-mode="equation">Equation</button>
-        <button class="mode-tab" id="modeTabDiffequation" type="button" role="tab" aria-selected="false" aria-controls="workspacePanel" data-mode="diffequation">Differential Equation</button>
-        <button class="mode-tab" id="modeTabMatrix" type="button" role="tab" aria-selected="false" aria-controls="workspacePanel" data-mode="matrix">Matrix</button>
-        <button class="mode-tab" id="modeTabIntegrator" type="button" role="tab" aria-selected="false" aria-controls="workspacePanel" data-mode="integrator">Integrator</button>
-        <button class="mode-tab" id="modeTabDatetime" type="button" role="tab" aria-selected="false" aria-controls="workspacePanel" data-mode="datetime">Datetime</button>
-        <button class="mode-tab" id="modeTabAlmanac" type="button" role="tab" aria-selected="false" aria-controls="workspacePanel" data-mode="almanac">Almanac</button>
-      </div>
+      <details class="lab-mode-menu" id="modeMenu" open>
+        <summary id="modeMenuToggle">Mode: <span id="modeMenuCurrent">Expression</span></summary>
+        <div class="lab-tabs" role="tablist" aria-label="__LAB_NAME__ mode selector">
+          <button class="mode-tab active" id="modeTabExpression" type="button" role="tab" aria-selected="true" aria-controls="workspacePanel" data-mode="expression">Expression</button>
+          <button class="mode-tab" id="modeTabEquation" type="button" role="tab" aria-selected="false" aria-controls="workspacePanel" data-mode="equation">Equation</button>
+          <button class="mode-tab" id="modeTabDiffequation" type="button" role="tab" aria-selected="false" aria-controls="workspacePanel" data-mode="diffequation">Differential Equation</button>
+          <button class="mode-tab" id="modeTabMatrix" type="button" role="tab" aria-selected="false" aria-controls="workspacePanel" data-mode="matrix">Matrix</button>
+          <button class="mode-tab" id="modeTabIntegrator" type="button" role="tab" aria-selected="false" aria-controls="workspacePanel" data-mode="integrator">Integrator</button>
+          <button class="mode-tab" id="modeTabDatetime" type="button" role="tab" aria-selected="false" aria-controls="workspacePanel" data-mode="datetime">Datetime</button>
+          <button class="mode-tab" id="modeTabAlmanac" type="button" role="tab" aria-selected="false" aria-controls="workspacePanel" data-mode="almanac">Almanac</button>
+        </div>
+      </details>
       <div class="precision-toolbar" aria-label="Precision controls">
         <label class="precision-label" for="precisionSlider">Precision</label>
         <input id="precisionSlider" type="range" min="0" max="103" step="1" value="3" aria-describedby="precisionValue">
@@ -254,13 +266,18 @@ __HOLIDAY_JURISDICTION_OPTIONS__
           <div class="almanac-globe-toolbar">
             <strong>Observer globe</strong>
             <span class="workspace-history" id="almanacGlobeHistory"></span>
-            <div class="almanac-globe-view-controls">
-              <button type="button" class="secondary" data-globe-action="grid" aria-label="Latitude and longitude lines" aria-pressed="false">Lat/long: off</button>
-              <button type="button" class="secondary" data-globe-action="borders" aria-label="Indicative country land borders" aria-pressed="false">Borders: off</button>
-              <button type="button" class="secondary" data-globe-action="out" aria-label="Zoom globe out">−</button>
-              <button type="button" class="secondary" data-globe-action="in" aria-label="Zoom globe in">+</button>
-              <button type="button" class="secondary" data-globe-action="centre">Centre on observer</button>
-            </div>
+            <details class="almanac-globe-options" open>
+              <summary aria-label="Map controls">Map</summary>
+              <div class="almanac-globe-view-controls">
+                <button type="button" class="secondary" data-globe-action="grid" aria-label="Latitude and longitude lines" aria-pressed="false">Lat/long: off</button>
+                <button type="button" class="secondary" data-globe-action="borders" aria-label="Indicative country land borders" aria-pressed="false">Borders: off</button>
+                <div class="almanac-globe-zoom">
+                  <button type="button" class="secondary" data-globe-action="out" aria-label="Zoom globe out">−</button>
+                  <button type="button" class="secondary" data-globe-action="in" aria-label="Zoom globe in">+</button>
+                  <button type="button" class="secondary" data-globe-action="centre">Centre on observer</button>
+                </div>
+              </div>
+            </details>
           </div>
           <div class="almanac-globe-view">
             <canvas id="almanacGlobeCanvas" tabindex="0" aria-label="Globe: drag or use arrow keys to rotate; plus and minus to zoom; click or press Enter to select"></canvas>
@@ -326,26 +343,6 @@ __HOLIDAY_JURISDICTION_OPTIONS__
           </div>
         </div>
         <p class="mode-hint almanac-accuracy-note">__ALMANAC_ACCURACY_NOTE__</p>
-      </div>
-      <div class="mars-date-picker hidden" id="marsDatePicker" role="dialog" aria-label="Date picker">
-        <div class="mars-date-picker-head">
-          <button class="mars-date-picker-nav" id="marsDatePickerPrev" type="button" aria-label="Previous month">‹</button>
-          <div class="mars-date-picker-title" id="marsDatePickerTitle">
-            <select id="marsDatePickerMonth" aria-label="Calendar month"></select>
-            <div class="mars-date-picker-year-group" aria-label="Calendar year controls">
-              <button class="mars-date-picker-year-step" id="marsDatePickerYearDown" type="button" aria-label="Previous year" title="Previous year; Shift for 10 years; Ctrl for 100 years" data-symbol="−">−</button>
-              <input id="marsDatePickerYear" type="number" inputmode="numeric" min="1" max="9999" step="1" aria-label="Calendar year">
-              <button class="mars-date-picker-year-step" id="marsDatePickerYearUp" type="button" aria-label="Next year" title="Next year; Shift for 10 years; Ctrl for 100 years" data-symbol="+">+</button>
-            </div>
-          </div>
-          <button class="mars-date-picker-nav" id="marsDatePickerNext" type="button" aria-label="Next month">›</button>
-        </div>
-        <div class="mars-date-picker-weekdays" id="marsDatePickerWeekdays"></div>
-        <div class="mars-date-picker-grid" id="marsDatePickerGrid"></div>
-        <div class="mars-date-picker-foot">
-          <button id="marsDatePickerToday" type="button">Now</button>
-          <button id="marsDatePickerClose" type="button">Close</button>
-        </div>
       </div>
       <div class="target-row hidden" id="targetRow">
         <label for="goalTarget">Target</label>
@@ -1008,15 +1005,39 @@ __HOLIDAY_JURISDICTION_OPTIONS__
     </section>
   </main>
 
+  <div class="mars-date-picker hidden" id="marsDatePicker" role="dialog" aria-label="Date picker">
+    <div class="mars-date-picker-head">
+      <button class="mars-date-picker-nav" id="marsDatePickerPrev" type="button" aria-label="Previous month">‹</button>
+      <div class="mars-date-picker-title" id="marsDatePickerTitle">
+        <select id="marsDatePickerMonth" aria-label="Calendar month"></select>
+        <div class="mars-date-picker-year-group" aria-label="Calendar year controls">
+          <button class="mars-date-picker-year-step" id="marsDatePickerYearDown" type="button" aria-label="Previous year" title="Previous year; Shift for 10 years; Ctrl for 100 years" data-symbol="−">−</button>
+          <input id="marsDatePickerYear" type="number" inputmode="numeric" min="1" max="9999" step="1" aria-label="Calendar year">
+          <button class="mars-date-picker-year-step" id="marsDatePickerYearUp" type="button" aria-label="Next year" title="Next year; Shift for 10 years; Ctrl for 100 years" data-symbol="+">+</button>
+        </div>
+      </div>
+      <button class="mars-date-picker-nav" id="marsDatePickerNext" type="button" aria-label="Next month">›</button>
+    </div>
+    <div class="mars-date-picker-weekdays" id="marsDatePickerWeekdays"></div>
+    <div class="mars-date-picker-grid" id="marsDatePickerGrid"></div>
+    <div class="mars-date-picker-foot">
+      <button id="marsDatePickerToday" type="button">Now</button>
+      <button id="marsDatePickerClose" type="button">Close</button>
+    </div>
+  </div>
+
   <dialog class="history-editor" id="historyEditor" aria-labelledby="historyEditorTitle">
     <div class="history-editor-heading">
       <h2 id="historyEditorTitle">Worksheet history</h2>
       <button class="secondary" id="historyEditorClose" type="button">Close</button>
     </div>
-    <p>Select a worksheet to open it. “Current” marks the worksheet you are viewing.
-      Drag the grip beside an entry to reorder it, or use Earlier and Later. Remove deletes an entry.
-      Changes are saved automatically.
-      New evaluations are inserted after the current entry; later entries are kept.</p>
+    <p class="history-editor-intro">Select a worksheet to open it.</p>
+    <details class="history-editor-help">
+      <summary>Help with history</summary>
+      <p>“Current” marks the worksheet you are viewing. Drag the grip beside an entry to reorder it,
+        or use Earlier and Later. Remove deletes an entry. Changes are saved automatically.
+        New evaluations are inserted after the current entry; later entries are kept.</p>
+    </details>
     <p id="historyEditorStatus" role="status"></p>
     <ol id="historyEditorEntries"></ol>
   </dialog>

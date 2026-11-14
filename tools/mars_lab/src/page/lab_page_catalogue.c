@@ -25,10 +25,7 @@ static const char lab_page_expression_default[] =
     "61651328409245020367585027725712298019603598460371836314939684051731035234396186"
     "426975413794385305751, μ = 100 }";
 
-static const char lab_page_subtitle[] =
-    "Switch between expression, equation, differential-equation, matrix, integrator, "
-    "datetime, and almanac experiments. Each mode runs through a local MARS worker "
-    "binary and shows the result on the right.";
+static const char lab_page_subtitle[] = "Mathematics, calendars and astronomy.";
 
 static const lab_page_setting_t lab_page_constants[] = {
     {"ALMANAC_ACCURACY_NOTE", lab_page_accuracy_note, 0},

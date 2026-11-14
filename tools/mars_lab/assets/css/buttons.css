@@ -6,6 +6,7 @@ button {
   padding: 0.7rem 1rem;
   color: #061612;
   background: var(--accent);
+  font-size: 0.875rem;
   font-weight: 700;
   cursor: pointer;
   box-shadow: 0 0.38rem 0 rgba(0, 0, 0, 0.2), 0 10px 24px rgba(196, 131, 48, 0.16);

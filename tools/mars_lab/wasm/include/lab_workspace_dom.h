@@ -94,7 +94,10 @@ void lab_workspace_dom_labels(lab_mode_t mode);
  */
 void lab_workspace_dom_status(jsref text);
 
-/** @brief Project tab selection using an exact mode token.
+/** @brief Project tab selection and the compact Mode menu using an exact mode token.
+ * Copies the active tab's label into the menu summary, closes the phone menu and
+ * leaves desktop tabs expanded. Focus returns to the phone summary when needed.
+ * Absent optional menu nodes are ignored. The call retains no supplied handles.
  * @param tabs Scoped list of registered mode-tab nodes.
  * @param mode Scoped exact mode-name string to match against each tab's dataset.
  */

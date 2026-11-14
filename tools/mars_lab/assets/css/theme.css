@@ -1,5 +1,7 @@
 /* Colours, typography defaults and decorative landscape. */
 :root {
+  /* Keep rem-based controls and spacing on the same scale as the body text. */
+  font-size: 16px;
   color-scheme: light;
   --ink: #f3f8f2;
   --muted: #bed3c0;

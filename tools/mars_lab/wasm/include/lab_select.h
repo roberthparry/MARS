@@ -58,6 +58,7 @@ typedef enum {
  * @brief Create an accessible menu around a native select.
  * @param select Scoped native select-node handle; zero or an already enhanced select is ignored.
  * @param label Scoped associated label-node handle; its id supplies aria-labelledby when present.
+ * Without a labelled id, the button retains the select's aria-label, or uses "Select option" when absent.
  * @param searchable True adds a search input; false creates an unfiltered menu.
  * @param placeholder Scoped text string shown when no option is selected.
  * @param empty Scoped text string shown when search has no matching options.

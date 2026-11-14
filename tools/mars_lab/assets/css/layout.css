@@ -18,7 +18,7 @@ header > div:first-child {
   align-self: start;
 }
 
-header > .skin-picker {
+header > .settings-toggle {
   position: absolute;
   top: 1.5rem;
   right: clamp(1rem, 3vw, 2rem);
@@ -123,14 +123,19 @@ main {
 }
 
 .lab-topbar {
+  position: relative;
   grid-column: 1 / -1;
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   justify-content: space-between;
   gap: 0.8rem;
   padding: 0.35rem 0 0.2rem;
 }
+
+.lab-mode-menu { min-width: 0; justify-self: start; }
+.lab-topbar:has(> .precision-toolbar.hidden) { grid-template-columns: minmax(0, 1fr); }
+.lab-mode-menu > summary { display: none; }
 
 .lab-tabs {
   display: flex;
@@ -143,7 +148,7 @@ main {
   position: relative;
   z-index: 21;
   display: grid;
-  grid-template-columns: auto minmax(6rem, 9rem) 7.5rem auto;
+  grid-template-columns: auto minmax(4rem, 9rem) max-content auto;
   align-items: center;
   justify-content: flex-end;
   gap: 0.45rem;

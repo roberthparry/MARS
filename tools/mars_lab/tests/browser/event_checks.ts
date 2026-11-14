@@ -194,6 +194,9 @@ window.checkLabEvents = function checkLabEvents(): boolean {
     /** @brief Suppress unrelated browser presentation while inspecting event plans. */
     function ignorePresentation(): void {}
 
+    // Restoring mode-menu focus also emits document tooltip events outside this fixture's routing checks.
+    registry.showButtonTooltip = ignorePresentation;
+    registry.hideButtonTooltip = ignorePresentation;
     const savedRegistry = labDOM.bindEvents(Object.freeze(registry));
     try {
         window.requestAnimationFrame = ignoreFrame;
@@ -664,6 +667,23 @@ window.checkLabEvents = function checkLabEvents(): boolean {
         send(fixture.querySelector('textarea'), new Event('input'), 'scheduleEditorResizeGrip');
         send(fixture.querySelector('span'), new MouseEvent('click', {bubbles: true}), 'selectWorksheetMode');
         check(calls[0].args[0] === 'matrix', 'tab uses currentTarget rather than nested clicked element');
+        const modeMenu = document.getElementById('modeMenu') as HTMLDetailsElement;
+        const modeToggle = document.getElementById('modeMenuToggle')!;
+        const toggleStyle = modeToggle.getAttribute('style');
+        try {
+            modeToggle.style.setProperty('display', 'flex', 'important');
+            for (const mode of [WorksheetWorkspace.mode.currentMode(), 'matrix']) {
+                fixture.querySelector<HTMLElement>('.mode-tab')!.dataset.mode = mode;
+                modeMenu.open = true;
+                send(fixture.querySelector('span'), new MouseEvent('click', {bubbles: true}), 'selectWorksheetMode');
+                check(calls[0].args[0] === mode && !modeMenu.hasAttribute('open') && !modeMenu.open &&
+                    !Object.hasOwn(modeMenu, 'open') && document.activeElement === modeToggle,
+                    'selecting the current or another mode immediately closes the real mobile disclosure');
+            }
+        } finally {
+            if (toggleStyle === null) modeToggle.removeAttribute('style');
+            else modeToggle.setAttribute('style', toggleStyle);
+        }
         send(testWindow, new Event('pagehide'), 'flushWorksheetState');
         send(testWindow, new Event('resize'), 'scheduleWorkspacePanelFit');
         send(testWindow, new Event('scroll'), 'scheduleWorkspacePanelFit');

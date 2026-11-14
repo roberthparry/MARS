@@ -46,8 +46,10 @@ window.checkLabResultFlows = async function checkLabResultFlows() {
     check(scripts.indexOf('results') >= 0 && scripts.indexOf('results_services') > scripts.indexOf('results'),
           'result services follow their controllers in the startup catalogue');
     const widgets = labDOM.call<ResultFlowWidgetPlan>('lab_bootstrap_widgets');
-    check(widgets.calls.length === 6 && widgets.calls.every(call => call.args[0].tagName === 'SELECT'),
-          'only location dropdowns need native menu enhancement; plot settings are radio buttons');
+    check(widgets.calls.length === 7 && widgets.calls.every(call => call.args[0].tagName === 'SELECT'),
+          'location and month dropdowns use native menu enhancement; plot settings are radio buttons');
+    check(widgets.calls[6].args[0].id === 'marsDatePickerMonth' && !widgets.calls[6].args[1].searchable,
+          'the month picker uses a themed menu without a search field');
     check(
         widgets.calls[0].args[1].searchPlaceholder === 'Search countries' &&
             widgets.calls[2].args[1].placeholder === 'Custom location',

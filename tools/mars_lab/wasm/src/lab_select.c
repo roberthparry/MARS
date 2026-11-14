@@ -78,8 +78,10 @@ bool lab_select_create(node_jsref select, jsref label, bool searchable, jsref pl
     int label_id = lab_dom_read(label, LAB_DOM_ATTRIBUTE, "id");
     if (lab_dom_length(label_id))
         lab_dom_write(button, LAB_DOM_ATTRIBUTE, "aria-labelledby", label_id);
-    else
-        lab_select_text(button, LAB_DOM_ATTRIBUTE, "aria-label", "Select option");
+    else {
+        int name = lab_dom_read(select, LAB_DOM_ATTRIBUTE, "aria-label");
+        lab_dom_write(button, LAB_DOM_ATTRIBUTE, "aria-label", lab_dom_length(name) ? name : lab_dom_string("Select option"));
+    }
     int menu = lab_select_child(shell, "div", "select-menu");
     lab_dom_class(menu, "hidden", 1);
     lab_select_text(menu, LAB_DOM_ATTRIBUTE, "role", "listbox");

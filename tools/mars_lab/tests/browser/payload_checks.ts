@@ -62,7 +62,9 @@ window.checkLabPayload = async function checkLabPayload() {
 
     /** @brief Compare all wire keys, including the absence of additional fields. */
     function shape(record: object, keys: string[]): void {
-        equal(Object.keys(record).sort().join(), keys.sort().join(), 'exact wire fields');
+        const actual = Object.keys(record).sort().join();
+        const expected = keys.sort().join();
+        equal(actual, expected, `exact wire fields: expected ${expected}; got ${actual}`);
     }
 
     const controls = [
@@ -194,7 +196,12 @@ window.checkLabPayload = async function checkLabPayload() {
         }
         for (const [kind, field] of [[2, 'equation'], [3, 'diffequation']] as const) {
             const payload = build(kind, [text]);
-            shape(payload, [field, 'precision']);
+            shape(payload, kind === 2 ? [field, 'precision', 'solution_pages'] : [field, 'precision']);
+            if (kind === 2) {
+                equal(payload.solution_pages, true, 'equation requests enable incremental solution pages');
+                equal(decodeRecord(labWire.encode(payload)).solution_pages, true,
+                      'solution pagination retains its Boolean wire type');
+            }
             equal(payload[field], text, 'equation full source is opaque and untrimmed');
             equal(build(kind, [''])[field], '[x, y]', 'empty equation source uses trimmed editor');
         }

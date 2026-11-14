@@ -30,6 +30,7 @@ interface ResultFlowWidgetCall {
 
 /** Optional labels inspected by the widget bootstrap check. */
 interface ResultFlowWidgetOptions {
+    searchable?: boolean;
     searchPlaceholder?: string;
     placeholder?: string;
 }

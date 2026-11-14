@@ -408,6 +408,14 @@ class MarsAlmanacGlobe {
     }
 
     constructor(private readonly root: HTMLElement) {
+        const options = root.querySelector<HTMLDetailsElement>('.almanac-globe-options');
+        if (options) {
+            const phone = matchMedia('(max-width: 560px)');
+            // Keep the phone controls collapsed on entry; wider layouts show the existing toolbar.
+            const arrangeControls = (): void => { options.open = !phone.matches; };
+            arrangeControls();
+            phone.addEventListener('change', arrangeControls);
+        }
         this.canvas = root.querySelector('canvas')!;
         this.markers = root.querySelector('.almanac-globe-markers')!;
         this.status = root.querySelector('[role="status"]')!;

@@ -25,14 +25,15 @@ void lab_bootstrap_widgets(void)
         {"datetimeTown", "Custom location", "Search towns", "No towns for this country", true},
         {"almanacTown", "Custom location", "Search towns", "No towns for this country", true},
         {"datetimePlaceSearch", "Find a place anywhere…", "Town, country or region", "Type at least two characters", true},
-        {"almanacPlaceSearch", "Find a place anywhere…", "Town, country or region", "Type at least two characters", true}
+        {"almanacPlaceSearch", "Find a place anywhere…", "Town, country or region", "Type at least two characters", true},
+        {"marsDatePickerMonth", "Calendar month", "", "No months available", false}
     };
     int result = lab_dom_object(LAB_VALUE_OBJECT), calls = lab_dom_object(LAB_VALUE_ARRAY);
     lab_dom_set(result, "calls", calls);
     for (unsigned i = 0; i < sizeof controls / sizeof *controls; ++i) {
         int options = lab_dom_object(LAB_VALUE_OBJECT), args = lab_dom_object(LAB_VALUE_ARRAY),
             call = lab_dom_object(LAB_VALUE_OBJECT);
-        lab_dom_set(options, "searchable", lab_dom_scalar(LAB_VALUE_BOOLEAN, 1));
+        lab_dom_set(options, "searchable", lab_dom_scalar(LAB_VALUE_BOOLEAN, controls[i].search[0] != 0));
         lab_dom_set(options, "searchPlaceholder", lab_dom_string(controls[i].search));
         lab_dom_set(options, "emptyText", lab_dom_string(controls[i].empty));
         lab_dom_set(options, "placeholder", lab_dom_string(controls[i].placeholder));

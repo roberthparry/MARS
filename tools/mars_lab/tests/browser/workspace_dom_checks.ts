@@ -60,6 +60,25 @@ window.checkLabWorkspaceDom = function checkLabWorkspaceDom() {
         const classes = ['datetime', 'almanac', 'diffequation', 'matrix'];
         WorksheetContext.value.textContent = ' \n\t ';
         WorksheetContext.datetimeLocalBody.textContent = 'Local weather';
+        const modeMenu = document.getElementById('modeMenu') as HTMLDetailsElement;
+        const modeToggle = document.getElementById('modeMenuToggle')!;
+        const toggleStyle = modeToggle.getAttribute('style');
+        try {
+            modeToggle.style.setProperty('display', 'flex', 'important');
+            for (const mode of WorksheetWorkspace.WORKSPACE_MODE_NAMES) {
+                modeMenu.open = true;
+                labDOM.call('lab_workspace_dom_tabs', WorksheetContext.modeTabs, mode);
+                check(!modeMenu.open && !modeMenu.hasAttribute('open') && !Object.hasOwn(modeMenu, 'open'),
+                    'native mode projection closes the disclosure itself without shadowing its DOM property');
+            }
+            modeToggle.style.setProperty('display', 'none', 'important');
+            labDOM.call('lab_workspace_dom_tabs', WorksheetContext.modeTabs, WorksheetWorkspace.mode.currentMode());
+            check(modeMenu.open && modeMenu.hasAttribute('open') && !Object.hasOwn(modeMenu, 'open'),
+                'desktop mode projection expands the real disclosure');
+        } finally {
+            if (toggleStyle === null) modeToggle.removeAttribute('style');
+            else modeToggle.setAttribute('style', toggleStyle);
+        }
         for (let mode = 0; mode < 7; ++mode) {
             native.lab_workspace_select(mode);
             WorksheetWorkspace.presentation.syncModeTabs();
@@ -68,6 +87,9 @@ window.checkLabWorkspaceDom = function checkLabWorkspaceDom() {
                 check(tab.classList.contains('active') === selected, 'exact mode tab selection');
                 check(tab.getAttribute('aria-selected') === String(selected), 'tab accessibility selection');
                 check(tab.tabIndex === (selected ? 0 : -1), 'only selected tab is in the tab order');
+                if (selected)
+                    check(document.getElementById('modeMenuCurrent')!.textContent === tab.textContent,
+                        'Mode button names the selected worksheet');
             }
             WorksheetContext.rightPaneTitle.textContent = 'x plot RESULT';
             labDOM.call('lab_workspace_dom_mode', mode, 'fixture coverage');
@@ -93,6 +115,12 @@ window.checkLabWorkspaceDom = function checkLabWorkspaceDom() {
                 check(actionHome.previousElementSibling?.id === 'almanacGlobe' &&
                       actionHome.nextElementSibling?.classList.contains('datetime-field-groups'),
                       'Almanac Help sits between globe and worksheet controls');
+                const helpBounds = WorksheetContext.help.getBoundingClientRect();
+                const actionBounds = actionHome.getBoundingClientRect();
+                const globeBounds = document.getElementById('almanacGlobe')!.getBoundingClientRect();
+                check(Math.abs(actionBounds.height - helpBounds.height) < 1 &&
+                      actionBounds.top >= globeBounds.bottom && actionBounds.top - globeBounds.bottom < 16,
+                      'desktop Help row fits the button with a compact gap below the globe');
                 check(Boolean(historyHome.closest('.almanac-globe-toolbar')) &&
                       document.querySelectorAll('#back, #forward').length === 2,
                       'the toolbar reuses the two existing history controls without duplicate buttons');

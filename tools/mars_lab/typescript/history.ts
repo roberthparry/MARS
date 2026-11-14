@@ -474,11 +474,15 @@ class WorksheetHistoryEditor {
             worksheetHistoryPersistence.changed(this.mode);
             this.render();
             this.status(action === 'remove' ? 'Entry removed.' : 'Entry moved.');
-            const focus = Math.min(target ?? position,
+            const movedPosition = target ?? position + (action === 'earlier' ? -1 : action === 'later' ? 1 : 0);
+            const focus = Math.min(movedPosition,
                 native.lab_workspace_history_current(this.mode) + native.lab_workspace_history_count(this.mode, 1));
-            const selected = document.querySelector<HTMLElement>(`#historyEditorEntries [data-history-position="${focus}"] button`);
+            const row = document.querySelector<HTMLElement>(`#historyEditorEntries [data-history-position="${focus}"]`);
+            const control = action === 'earlier' || action === 'later' ? action : 'open';
+            const selected = row?.querySelector<HTMLButtonElement>(`[data-history-action="${control}"]:not(:disabled)`) ??
+                row?.querySelector<HTMLButtonElement>('[data-history-action="open"]');
             selected?.focus({preventScroll: true});
-            selected?.scrollIntoView({block: 'nearest'});
+            row?.scrollIntoView({block: 'nearest'});
         } catch (error) { this.status(String(error)); }
         finally {
             this.editing = false;
