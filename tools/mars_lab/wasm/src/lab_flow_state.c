@@ -11,6 +11,7 @@
 #include "lab_events.h"
 #include "lab_persist.h"
 #include "lab_workspace.h"
+#include "lab_workspace_dom.h"
 #include "lab_flow.h"
 #include "lab_flow_state.h"
 
@@ -1211,10 +1212,17 @@ static jsref lab_flow_state_selection_evaluation_guard(frame_jsref frame)
     return lab_flow_state_guard(frame, 41);
 }
 
-/* Every accepted mode change refreshes its restored input without adding or clearing navigation history. */
+/* Reuse restored results; an empty worksheet or interrupted Almanac calculation still needs evaluation. */
 static jsref lab_flow_state_selection_evaluate(frame_jsref frame)
 {
     if (!lab_dom_truth(lab_dom_get(frame, "current")))
+        return lab_flow_done(0);
+    lab_mode_t index = (lab_mode_t)(unsigned)lab_dom_number(lab_dom_get(frame, "index"));
+    bool completed = index == LAB_MODE_ALMANAC
+                         ? lab_dom_truth(lab_dom_get(frame, "calendarResult")) &&
+                               lab_dom_query(0, "#rendered .almanac-grid-table")
+                         : lab_workspace_dom_has_result();
+    if (completed)
         return lab_flow_done(0);
     jsref options = lab_dom_object(LAB_VALUE_OBJECT);
     lab_dom_set(options, "skipHistoryUpdate", lab_dom_scalar(LAB_VALUE_BOOLEAN, 1));

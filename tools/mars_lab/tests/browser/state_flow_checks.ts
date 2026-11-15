@@ -16,6 +16,98 @@ function labStateDeferred(): LabWorksheetTestDeferred {
     return {promise, resolve, reject};
 }
 
+/** @brief Count real mode-entry requests while checking first evaluation and completed-result reuse. */
+async function check_mode_entry_results(): Promise<void> {
+    const check = (ok: unknown, message: string) => {
+        if (!ok) throw new Error('Mode entry: ' + message);
+    };
+    const mode = WorksheetWorkspace.mode.currentMode();
+    const snapshot = WorksheetPersistence.history.snapshot();
+    WorksheetWorkspace.presentation.saveCurrentModeResultState();
+    const states = {...WorksheetWorkspace.presentation.resultStates};
+    const editors = {...WorksheetContext.modeEditorText};
+    const fetch = window.fetch;
+    let evaluations = 0;
+    let expression_evaluations = 0;
+    const settle = async () => {
+        const deadline = performance.now() + 30000;
+        const pending = () => WorksheetRequests.labRequests.busy() ||
+            document.getElementById('plotRendered')!.textContent?.includes('Generating plot');
+        while (pending() && performance.now() < deadline)
+            await LabTestBrowser.wait(25);
+        check(!pending(), 'calculation and automatic plotting complete');
+    };
+    try {
+        await WorksheetWorkspace.mode.selectWorksheetMode('expression');
+        await settle();
+        window.fetch = (url, options) => {
+            if (String(url) === '/equation-eval') ++evaluations;
+            if (String(url) === '/eval') {
+                const payload = options?.body instanceof Uint8Array ?
+                    labWire.decode(new Uint8Array(options.body)) as {action?: string} : null;
+                if (!payload?.action) ++expression_evaluations;
+            }
+            return fetch(url, options);
+        };
+        WorksheetContext.modeEditorText.equation = 'x=2*y+1';
+        WorksheetWorkspace.presentation.resultStates.equation = undefined;
+        await WorksheetWorkspace.mode.selectWorksheetMode('equation');
+        await settle();
+        check(evaluations === 1 && WorksheetContext.rendered.querySelector('svg'),
+              'entering an unevaluated mode starts one real calculation');
+        const rendered = WorksheetContext.rendered.innerHTML;
+        for (let attempt = 0; attempt < 2; ++attempt) {
+            await WorksheetWorkspace.mode.selectWorksheetMode('expression');
+            await WorksheetWorkspace.mode.selectWorksheetMode('equation');
+            await settle();
+            check(evaluations === 1 && WorksheetContext.rendered.innerHTML === rendered,
+                  'returning to a completed mode restores its result without another request');
+        }
+        await WorksheetWorkspace.mode.selectWorksheetMode('equation');
+        check(evaluations === 1, 'selecting the active mode does not calculate again');
+        await WorksheetWorkspace.mode.selectWorksheetMode('expression');
+        WorksheetWorkspace.presentation.resultStates.equation = undefined;
+        await WorksheetWorkspace.mode.selectWorksheetMode('equation');
+        await settle();
+        check(Number(evaluations) === 2, 'a mode whose result has been cleared is evaluated again');
+
+        await WorksheetWorkspace.mode.selectWorksheetMode('expression');
+        WorksheetBindings.controller.setExpressionEditor('x^2+y^2');
+        await WorksheetRequests.evaluation.evaluateExpression({skipHistoryUpdate: true});
+        await settle();
+        await LabTestBrowser.paint();
+        const chart = document.querySelector<SVGSVGElement>('#plotRendered [data-surface]')!;
+        check(chart, 'a completed surface is available for cached view restoration');
+        const angles: MarsSurfaceAngles = [75, 40, 10];
+        ['plotAzimuth', 'plotElevation', 'plotRoll'].forEach((id, index) => {
+            (document.getElementById(id)! as HTMLInputElement).value = String(angles[index]);
+        });
+        check(labSurfacePreview.draw(chart, angles), 'the surface can be rotated before leaving its mode');
+        const surface = labSurfacePreview.snapshot()!;
+        const key = surface.key, orientation = surface.orientation.slice();
+        const evaluations_before = expression_evaluations;
+        await WorksheetWorkspace.mode.selectWorksheetMode('equation');
+        await WorksheetWorkspace.mode.selectWorksheetMode('expression');
+        await settle();
+        await LabTestBrowser.paint();
+        const restored = labSurfacePreview.snapshot();
+        check(expression_evaluations === evaluations_before && restored?.key === key &&
+              restored.orientation.every((value, index) => Math.abs(value - orientation[index]) < 1e-10),
+              'a completed surface restores its exact view without reevaluating the worksheet: ' +
+              JSON.stringify({evaluations_before, after: expression_evaluations, same_key: restored?.key === key,
+                  orientation, restored: restored?.orientation}));
+    } finally {
+        window.fetch = fetch;
+        WorksheetRequests.labRequests.cancel('evaluate');
+        WorksheetWorkspace.mode.setMode(mode);
+        await WorksheetPersistence.navigation.restore(snapshot);
+        Object.assign(WorksheetContext.modeEditorText, editors);
+        Object.assign(WorksheetWorkspace.presentation.resultStates, states);
+        WorksheetWorkspace.presentation.syncModeUI();
+        WorksheetWorkspace.presentation.restoreModeResultState(mode);
+    }
+}
+
 /** @brief Enter Almanac with populated controls but no result, cancel it, and recover without creating history. */
 async function checkAlmanacFirstEntry(): Promise<void> {
     const check = (ok: unknown, message: string) => {
@@ -69,20 +161,18 @@ async function checkAlmanacFirstEntry(): Promise<void> {
 
         await WorksheetWorkspace.mode.selectWorksheetMode('expression');
         await WorksheetWorkspace.mode.selectWorksheetMode('almanac');
-        await waitFor(() => pending.length === 3);
-        check(WorksheetContext.rendered.querySelector('.almanac-summary'),
-              're-entering a completed worksheet starts a fresh calculation');
-        pending[2](reply());
-        await waitFor(() => !WorksheetRequests.labRequests.busy());
+        await new Promise(resolve => window.setTimeout(resolve, 50));
+        check(pending.length === 2 && WorksheetContext.rendered.querySelector('.almanac-grid-table'),
+              're-entering a completed worksheet restores it without another calculation');
         const refresh = WorksheetRequests.evaluation.evaluateAlmanac({skipHistoryUpdate: true});
-        await waitFor(() => pending.length === 4);
+        await waitFor(() => pending.length === 3);
         await WorksheetWorkspace.mode.selectWorksheetMode('expression');
         await WorksheetWorkspace.mode.selectWorksheetMode('almanac');
-        await waitFor(() => pending.length === 5);
+        await waitFor(() => pending.length === 4);
         check(WorksheetContext.rendered.textContent?.includes('Calculating for the selected observer'),
               'an interrupted refresh resumes even when an older completed response remains cached');
+        pending[2](reply());
         pending[3](reply());
-        pending[4](reply());
         await refresh;
         await waitFor(() => !WorksheetRequests.labRequests.busy());
         check(WorksheetContext.rendered.querySelector('.almanac-grid-table'),
@@ -295,12 +385,35 @@ window.checkLabStateFlow = async function checkLabStateFlow() {
     equal(failedRestoration.stage, 42,
           'restoration errors finish without evaluating a partially restored mode');
     equal(step(24, failedRestoration).done, true, 'failed restoration cannot start a destination calculation');
-    for (let index = 0; index < 7; ++index) {
-        const evaluation = step(24, {stage: 41, index, current: true, calendarResult: {ok: true}});
-        equal(evaluation.calls[0].service, 'stateEvaluate', 'every changed mode evaluates even with a cached result');
-        equal((evaluation.calls[0].args[0] as WorksheetEvaluationOptions).skipHistoryUpdate, true,
-              'automatic mode changes do not append or clear history');
-        equal(evaluation.wait, false, 'mode selection remains responsive while evaluation runs');
+    const result_nodes = [WorksheetContext.rendered, WorksheetContext.parsed, WorksheetContext.functionStyle,
+                         WorksheetContext.value];
+    const result_contents = result_nodes.map(node => [...node.childNodes]);
+    try {
+        result_nodes.forEach(node => node.replaceChildren());
+        for (let index = 0; index < 7; ++index) {
+            const evaluation = step(24, {stage: 41, index, current: true});
+            equal(evaluation.calls[0].service, 'stateEvaluate', 'an unevaluated mode starts its calculation');
+            equal((evaluation.calls[0].args[0] as WorksheetEvaluationOptions).skipHistoryUpdate, true,
+                  'automatic mode changes do not append or clear history');
+            equal(evaluation.wait, false, 'mode selection remains responsive while evaluation runs');
+        }
+        for (const node of result_nodes) {
+            node.textContent = 'completed result';
+            for (let index = 0; index < 6; ++index)
+                equal(step(24, {stage: 41, index, current: true}).done, true,
+                      'each ordinary result card prevents redundant mode-entry evaluation');
+            node.replaceChildren();
+        }
+        WorksheetContext.rendered.innerHTML = '<section class="almanac-summary"></section>';
+        equal(step(24, {stage: 41, index: 6, current: true, calendarResult: {ok: true}}).calls[0].service,
+              'stateEvaluate', 'an interrupted observer summary is not a completed Almanac');
+        WorksheetContext.rendered.innerHTML = '<table class="almanac-grid-table"></table>';
+        equal(step(24, {stage: 41, index: 6, current: true, calendarResult: {ok: true}}).done, true,
+              'a completed Almanac does not evaluate again');
+        equal(step(24, {stage: 41, index: 6, current: true, calendarResult: null}).calls[0].service,
+              'stateEvaluate', 'Almanac also requires its completed native response');
+    } finally {
+        result_nodes.forEach((node, index) => node.replaceChildren(...result_contents[index]));
     }
     for (const [action, service] of [
              [1, 'statePrecisionGoal'], [2, 'statePrecisionExpression'], [3, 'stateEvaluate']]) {

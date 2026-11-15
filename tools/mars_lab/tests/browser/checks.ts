@@ -3646,6 +3646,7 @@
             }
             initialiseLabTestAdapters();
             if (new URLSearchParams(location.search).get('appearance-check') === '1') {
+                await runBrowserGroup('mode-entry result reuse', check_mode_entry_results);
                 await runBrowserGroup('binding commit policy', window.checkLabBindingCommit);
                 await runBrowserGroup('appearance skins', window.checkLabAppearance);
                 await runBrowserGroup('plot palettes', check_plot_palettes, 120000);
@@ -3681,6 +3682,7 @@
                 return;
             }
             if (new URLSearchParams(location.search).get('evaluation-check') === '1') {
+                await runBrowserGroup('mode-entry result reuse', check_mode_entry_results);
                 await runBrowserGroup('complex equation root diagram', checkComplexEquationPlot);
                 await runBrowserGroup('first Almanac entry and interrupted re-entry', checkAlmanacFirstEntry);
                 await runBrowserGroup('checkLabWorkspaceDom', window.checkLabWorkspaceDom);
@@ -3794,6 +3796,7 @@
                 await report('PASS: PROFILE ' + JSON.stringify(await labProfile.run()));
                 return;
             }
+            await runBrowserGroup('mode-entry result reuse', check_mode_entry_results);
             await runBrowserGroup('equation parameter controls', check_equation_parameter_controls, 120000);
             await runBrowserGroup('wire', checkWire);
             await runBrowserGroup('workers', () => labCheckWorkers(check));
@@ -4517,10 +4520,8 @@
                   'Live plotting must work without leaving the expanded card');
             surfaceExpand.click();
             (document.getElementById('plotLower')! as HTMLInputElement).value = '-10';
-            const retainedCamera = ['plotAzimuth', 'plotElevation', 'plotRoll', 'plotZoom'].map(id =>
-                (document.getElementById(id)! as HTMLInputElement).value);
+            const retainedSurface = labSurfacePreview.snapshot()!;
             for (let cycle = 0; cycle < 2; ++cycle) {
-                const previousEvaluation = WorksheetRequests.labRequests.latestMain();
                 await WorksheetWorkspace.mode.selectWorksheetMode('matrix');
                 check(!document.querySelector<SVGSVGElement>('#plotRendered [data-surface-overlay]')!,
                       'Leaving a surface releases its transient renderer');
@@ -4534,15 +4535,10 @@
                       plotRendered.querySelectorAll<SVGSVGElement>('[data-surface-overlay]').length === 1 &&
                       chart.dataset.localRenderer && labSurfacePreview.prepare(chart)!.framePlan!.drawMesh,
                       'Returning to Expression recreates a visible surface renderer, not empty saved canvases');
-                check(WorksheetRequests.labRequests.latestMain() > 0 &&
-                      WorksheetRequests.labRequests.latestMain() !== previousEvaluation &&
-                      ['plotAzimuth', 'plotElevation', 'plotRoll', 'plotZoom'].every((id, index) => {
-                          const control = document.getElementById(id)! as HTMLInputElement;
-                          return control.value === retainedCamera[index];
-                      }), 'Mode round trips initiate a fresh calculation and retain the camera controls: ' +
-                      JSON.stringify({lower: chart.dataset.xMin, camera: retainedCamera,
-                          restored: ['plotAzimuth', 'plotElevation', 'plotRoll', 'plotZoom'].map(id =>
-                              (document.getElementById(id)! as HTMLInputElement).value)}));
+                check(restored.key === retainedSurface.key &&
+                      restored.orientation.every((value, index) => Math.abs(value - retainedSurface.orientation[index]) < 1e-10) &&
+                      restored.volume.exponent === retainedSurface.volume.exponent,
+                      'Mode round trips retain the completed surface and exact camera without recalculating');
                 check(!(WorksheetWorkspace.presentation.resultStates.expression as LabTestSavedPlotResult).plotRendered.innerHTML.includes('data-surface-overlay'),
                       'Saved plot HTML contains only reusable native geometry');
             }

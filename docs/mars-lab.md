@@ -1173,10 +1173,12 @@ size; non-editable calendar selector buttons use 14 pixels. Editable fields stay
 at 16 pixels to avoid focus-triggered zoom on iPhone.
 Almanac evaluates automatically when a control selection changes or a field edit is
 committed (for example, by pressing Tab). Its Evaluate button is hidden; other modes
-retain theirs. Selecting a different mode restores its saved inputs and immediately
-starts a fresh evaluation, including when it has a cached result. Mode-entry evaluations
-preserve Back and Forward history; selecting the already active mode does not evaluate
-again. Globe location selections also evaluate automatically.
+retain theirs. Selecting a different mode restores its saved inputs and result cards.
+It starts an evaluation only when that mode has no retained result; returning to a
+completed worksheet reuses its result and plot view. An interrupted Almanac calculation
+restarts when its completed worksheet is unavailable. Mode-entry evaluations preserve
+Back and Forward history; selecting the already active mode does not evaluate again.
+Globe location selections also evaluate automatically.
 
 The Almanac header's Copy button copies the visible globe as a PNG, including
 its vector overlays, place labels and observer marker, rather than the hidden
