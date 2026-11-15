@@ -102,3 +102,54 @@ INSERT OR IGNORE INTO mars_lab_cases(name, operation, input, expected) VALUES
        "status":{"BackendState":"Running","Self":{"Online":true,"DNSName":"machine.example.ts.net."}},
        "serve":{"TCP":{"443":{"HTTPS":true}},"Web":{"machine.example.ts.net:443":{"Handlers":{"/":{"Proxy":"http://127.0.0.1:8766"}}}}}}',
      'reject');
+
+INSERT INTO test_case_runner(module, source, parent, table_name, operation) VALUES (
+    'mars_lab.equation_parameters', 'tools/mars_lab/tests/test_lab_equation_parameters.c',
+    'tests.test_lab_equation_parameters', 'mars_lab_cases', 'equation_parameters')
+ON CONFLICT(module) DO UPDATE SET table_name=excluded.table_name, operation=excluded.operation;
+
+INSERT OR IGNORE INTO mars_lab_cases(name, operation, input, expected) VALUES
+    ('equation_inverse_curve_parameters', 'equation_parameters',
+     '{"expression":"{x=-(2*atanh(sqrt(C+2*exp(y))/sqrt(C)))/sqrt(C)+D | x=?, y=?; C=?, D=?}","wrt":"x","action":"plot","plot_source_mode":"equation","precision":32}',
+     '{"status":"200","parameters":{"C":"-1","D":"1"},"plot_marker":"data-series"}'),
+    ('equation_line_parameters', 'equation_parameters',
+     '{"expression":"{y=a*x+b | x=?, y=?; a=?, b=?}","wrt":"x","action":"plot","plot_source_mode":"equation","precision":32}',
+     '{"status":"200","parameters":{"a":"1","b":"1"},"plot_marker":"data-series"}'),
+    ('equation_named_coordinates_parameters', 'equation_parameters',
+     '{"expression":"{v=a*u+b | u=?, v=?; a=?, b=?}","wrt":"u","action":"plot","plot_source_mode":"equation","precision":32}',
+     '{"status":"200","parameters":{"a":"1","b":"1"},"plot_marker":"data-series"}'),
+    ('equation_fixed_constant_parameter', 'equation_parameters',
+     '{"expression":"{y=a*x+b | x=?, y=?; a=3, b=?}","wrt":"x","action":"plot","plot_source_mode":"equation","precision":32}',
+     '{"status":"200","parameters":{"b":"1"},"plot_marker":"data-series"}'),
+    ('equation_exact_constant_narrow_parameter', 'equation_parameters',
+     '{"expression":"{y=C+a*x | x=?, y=?; C=exp(1), a=?}","wrt":"x","action":"plot","plot_source_mode":"equation","precision":32,"plot_lower":"-1e-70","plot_upper":"1e-70","plot_scale":"manual","plot_y_lower":"exp(1)-2e-70","plot_y_upper":"exp(1)+2e-70"}',
+     '{"status":"200","parameters":{"a":"1"},"plot_marker":"data-series"}'),
+    ('equation_three_coordinate_parameter', 'equation_parameters',
+     '{"expression":"{x^2+y^2+z^2=r^2 | x=?, y=?, z=?; r=?}","wrt":"x","action":"plot","plot_source_mode":"equation","precision":32}',
+     '{"status":"200","parameters":{"r":"1"},"plot_marker":"data-surface"}'),
+    ('equation_parameter_slider_position', 'equation_parameters',
+     '{"expression":"{y=a*x+b | x=?, y=?; a=?, b=?}","wrt":"x","action":"plot","plot_source_mode":"equation","precision":32,"plot_slices":"a\t-2\t2\t1\t250\nb\t-2\t2\t1\t-1"}',
+     '{"status":"200","parameters":{"a":"-1","b":"1"},"plot_marker":"data-series"}'),
+    ('equation_parameter_invalid_limits', 'equation_parameters',
+     '{"expression":"{y=a*x | x=?, y=?; a=?}","wrt":"x","action":"plot","plot_source_mode":"equation","precision":32,"plot_slices":"a\t1\t0\t1\t500"}',
+     '{"status":"422","parameters":{},"error_contains":"Invalid slice"}'),
+    ('equation_four_coordinates_notice', 'equation_parameters',
+     '{"expression":"{x+y+z+w=a | x=?, y=?, z=?, w=?; a=?}","wrt":"x","action":"plot","plot_source_mode":"equation","precision":32}',
+     '{"status":"422","parameters":{},"error_contains":"mark them as constant parameters"}'),
+    ('equation_display_y_of_x', 'equation_parameters',
+     '{"equation":"x=2*y+1","precision":32}',
+     '{"route":"/equation-eval","status":"200","parameters":{},"display_contains":"y &=","display_excludes":"x &=","horizontal":"x"}'),
+    ('equation_display_x_of_t', 'equation_parameters',
+     '{"equation":"t=2*x+1","precision":32}',
+     '{"route":"/equation-eval","status":"200","parameters":{},"display_contains":"x &=","display_excludes":"t &=","horizontal":"t"}'),
+    ('equation_display_all_dependent_branches', 'equation_parameters',
+     '{"equation":"x=y^2","precision":32}',
+     '{"route":"/equation-eval","status":"200","parameters":{},"display_contains":"y &=","display_excludes":"x &=","horizontal":"x"}');
+
+INSERT OR IGNORE INTO mars_lab_cases(name, operation, input, expected) VALUES
+    ('equation_unwrapped_inverse_display', 'equation_parameters',
+     '{"equation":"x=-(2*atanh(sqrt(C+2*exp(y))/sqrt(C)))/sqrt(C)+D","precision":40}',
+     '{"route":"/equation-eval","status":"200","parameters":{},"display_contains":"y &=","display_excludes":"D &=","solutions_contains":"where","horizontal":"x","bindings":{"x":"variable","y":"variable","C":"constant","D":"constant"}}'),
+    ('equation_unwrapped_inverse_plot', 'equation_parameters',
+     '{"expression":"x=-(2*atanh(sqrt(C+2*exp(y))/sqrt(C)))/sqrt(C)+D","wrt":"x","action":"plot","plot_source_mode":"equation","precision":40}',
+     '{"status":"200","parameters":{"C":"-1","D":"1"},"plot_marker":"data-series","bindings":{"x":"variable","y":"variable","C":"constant","D":"constant"}}');

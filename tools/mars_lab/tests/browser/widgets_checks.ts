@@ -92,8 +92,9 @@ window.checkLabWidgets = function checkLabWidgets() {
         WorksheetResults.cards.setRenderedError('<b>not markup</b>');
         check(WorksheetContext.rendered.textContent === '<b>not markup</b>' && !WorksheetContext.rendered.querySelector<HTMLElement>('b')!, 'errors remain plain text');
         check(
-            WorksheetContext.rendered.classList.contains('error') && getComputedStyle(WorksheetContext.rendered).color === 'rgb(255, 217, 154)',
-            'CSS supplies unchanged error colour');
+            WorksheetContext.rendered.classList.contains('error') &&
+                getComputedStyle(WorksheetContext.rendered).color === getComputedStyle(WorksheetContext.rendered.parentElement!).color,
+            'CSS supplies the current theme ink for errors');
         WorksheetResults.cards.clearRenderedError();
         check(!WorksheetContext.rendered.classList.contains('error'), 'C clears error state');
         function callMissingExport() {

@@ -605,6 +605,7 @@ int tests_main(void)
     test_lab_render_job_cases();
     test_lab_diagnostic_cases();
     test_lab_evaluation_extra_cases();
+    test_lab_equation_parameter_cases();
     test_lab_function_cases();
     test_lab_calendar_extra_cases();
     test_lab_state_cases();

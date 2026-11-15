@@ -41,8 +41,18 @@ number_t lab_worker_sample_coordinate(number_t value, size_t bits);
 /** @brief Precise coordinate frame and guarded evaluator for an implicit equation. */
 typedef struct _lab_worker_implicit_t lab_worker_implicit_t;
 
-/** @brief Parse authored bounds before rounding and retain a private, guard-precision equation. */
-lab_worker_implicit_t *lab_worker_implicit_new(const char *source, const char *const *names,
+/**
+ * @brief Parse authored bounds and retain a private, guard-precision equation.
+ * @param source Borrowed original equation text, including its exact symbolic bindings.
+ * @param choices Borrowed equation supplying plot-local values for originally unset constants, or NULL.
+ * @param names Borrowed array of count coordinate names.
+ * @param limits Borrowed array of twice count lower and upper bound strings; empty strings request defaults.
+ * @param count Number of coordinates, from one to three.
+ * @param[out] bounds Array of twice count algorithm bounds, using unit coordinates when extra precision is needed.
+ * @return Owned sampling frame, released with lab_worker_implicit_free(), or NULL on invalid input or allocation failure.
+ * The inputs are not changed or retained. The caller's numerical precision is restored before returning.
+ */
+lab_worker_implicit_t *lab_worker_implicit_new(const char *source, const equation_t *choices, const char *const *names,
                                               const char *const *limits, size_t count, double *bounds);
 
 /** @brief Evaluate world coordinates, or local unit coordinates when the frame requires extra precision. */
@@ -182,13 +192,15 @@ char *lab_worker_surface_slice(const char *source, const char *first, const char
  * @param[in] source Borrowed expression and binding envelope; not retained or changed.
  * @param[in] first First plotting coordinate, or NULL for a parameter-domain predicate.
  * @param[in] second Second plotting coordinate, or NULL when absent.
+ * @param[in] third Third plotting coordinate, or NULL when absent.
+ * @param[in] initial Borrowed finite real starting value for automatic choices; not retained or changed.
  * @param[in] request Borrowed tab-separated slider records, or NULL for automatic choices.
  * @param[out] bindings_out Optional destination for owned selected bindings, released with expr_bindings_free().
  * @return Owned source released with free(), or NULL for invalid values, restrictions or allocation failure.
  * @note Run serially in the calculation worker. Worksheet bindings remain untouched.
  */
-char *lab_worker_parameter_slices(const char *source, const char *first, const char *second, const char *request,
-                                  expr_bindings_t **bindings_out);
+char *lab_worker_parameter_slices(const char *source, const char *first, const char *second, const char *third,
+                                  number_t initial, const char *request, expr_bindings_t **bindings_out);
 
 /**
  * @brief Assemble a differential problem's complete editable parameter envelope.
@@ -216,6 +228,22 @@ string_t *lab_worker_de_time_lower(const diffequ_t *de, const char *axis);
  * @note No worksheet source or supplied constant value is changed. Use before solving for the plotted curves.
  */
 bool lab_worker_de_plot_parameters(diffequ_t *de, const char *request);
+
+/**
+ * @brief Select the conventional horizontal coordinate for a two-variable equation.
+ * @param[in] bindings Borrowed equation bindings; constants are excluded and nothing is modified.
+ * @return Binding index for t, then x, then the first variable; the binding count when there are not two variables.
+ * @note The returned index is valid only while the binding catalogue remains unchanged. No ownership transfers.
+ */
+size_t lab_worker_equation_horizontal(const expr_bindings_t *bindings);
+
+/**
+ * @brief Emit an equation's original coordinate and constant bindings to the native response protocol.
+ * @param[in] equation Borrowed parsed worksheet; no binding is changed or retained.
+ * @return No value. Protocol rows are written to the calculation worker's standard output.
+ * @note Call before selecting plot-local parameters, so temporary values never replace worksheet bindings.
+ */
+void lab_worker_equation_bindings(const equation_t *equation);
 
 /**
  * @brief Draw representative real numerical trajectories when an ODE has no explicit symbolic coordinate function.

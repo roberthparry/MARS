@@ -162,10 +162,15 @@ model, rather than silently extrapolating an inconsistent pattern.
 
 ## Solving Model
 
-Principal square roots can be isolated recursively when the target has a known
-value in the principal square root's range. Squaring preserves nested exponentials
-and polynomial subexpressions; a negative real target is proved impossible instead
-of producing an extraneous root. An unknown target's branch restriction remains unresolved.
+Principal square roots can be isolated recursively. Squaring preserves nested
+exponentials and polynomial subexpressions; a negative real target is proved
+impossible instead of producing an extraneous root. An unknown target retains
+the principal-root restriction as a native expression domain on the result.
+Isolation also walks affine addition, subtraction, multiplication and division
+around roots, exponentials, logarithms and `atanh`. It retains non-zero
+denominators and principal-function ranges with the formula, so later parameter
+bindings cannot silently introduce an invalid branch. A chain with more than one
+dependent operand remains available to the other symbolic or numerical solvers.
 Positive real constant bases other than one use the principal logarithmic inverse.
 A proposed integer exponent is accepted only after exact exponentiation verifies
 it; otherwise the logarithmic quotient is retained. Other complex logarithmic

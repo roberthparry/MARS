@@ -1,74 +1,94 @@
+/* Earth keeps the native plot ramp; other skins grade the same geometry into their own palette. */
+:root {
+  --plot-low: #3f6ba3; --plot-mid: #47b5b1; --plot-high: #e7c569;
+  --plot-axis: #94b8b1; --plot-label: #b8ccc5; --plot-grid: #82aaa3;
+  --plot-wire: #193d46;
+}
+
 /* Numbered decorative palettes. Zero deliberately retains the original theme's complete cascade. */
 :root[data-skin="1"] {
   --paper: #21120f; --panel: #4d281e; --ink: #fff3e8; --muted: #e8bda5;
   --line: #b97350; --accent: #f18a56; --accent-2: #ce684b;
+  --plot-low: #a44332; --plot-mid: #ed8850; --plot-high: #ffdda3;
   --skin-art-opacity: .95;
   --skin-art: url("/skins/mars.svg");
 }
 :root[data-skin="2"] {
   --paper: #0b1b23; --panel: #1c3945; --ink: #edf5f3; --muted: #b7cdd0;
   --line: #648b91; --accent: #d8c591; --accent-2: #86bdc6;
+  --plot-low: #497f98; --plot-mid: #88c5c9; --plot-high: #e9d89b;
   --skin-art-opacity: .95;
   --skin-art: url("/skins/mercury.svg");
 }
 :root[data-skin="3"] {
   --paper: #211b17; --panel: #3b322c; --ink: #f7f0e4; --muted: #d7c6b5;
   --line: #a28571; --accent: #e6b48c; --accent-2: #c6d8dc;
+  --plot-low: #a66a49; --plot-mid: #bdcfd9; --plot-high: #f5e6cb;
   --skin-art-opacity: .95;
   --skin-art: url("/skins/jupiter.svg");
 }
 :root[data-skin="4"] {
   --paper: #241307; --panel: #4a2c12; --ink: #fff4d6; --muted: #e7c58c;
   --line: #b78437; --accent: #ffd05e; --accent-2: #ed9241;
+  --plot-low: #b85e28; --plot-mid: #f5aa37; --plot-high: #fff0ad;
   --skin-art-opacity: .95;
   --skin-art: url("/skins/venus.svg");
 }
 :root[data-skin="5"] {
   --paper: #15171a; --panel: #2a2d31; --ink: #f8f4e9; --muted: #d0cdc4;
   --line: #898e94; --accent: #e6ce9d; --accent-2: #c4d4dc;
+  --plot-low: #9b8665; --plot-mid: #d5c6a6; --plot-high: #f3f0e8;
   --skin-art-opacity: .95;
   --skin-art: url("/skins/saturn.svg");
 }
 :root[data-skin="6"] {
   --paper: #061321; --panel: #102e4b; --ink: #edf9ff; --muted: #adcce1;
   --line: #4b83ac; --accent: #bfeaff; --accent-2: #5e9ed8;
+  --plot-low: #2868ac; --plot-mid: #56b3e0; --plot-high: #d6f3ff;
   --skin-art-opacity: .95;
   --skin-art: url("/skins/neptune.svg");
 }
 :root[data-skin="7"] {
   --paper: #191712; --panel: #363229; --ink: #f6f0de; --muted: #d5cbb4;
   --line: #928870; --accent: #e0d2aa; --accent-2: #c4b697;
+  --plot-low: #92856a; --plot-mid: #c8bea4; --plot-high: #f5edcf;
   --skin-art-opacity: .95;
   --skin-art: url("/skins/moon.svg");
 }
 :root[data-skin="8"] {
   --paper: #110d23; --panel: #241c3b; --ink: #faf4ff; --muted: #cec0e4;
   --line: #806b9e; --accent: #d8b6f6; --accent-2: #8dd5eb;
+  --plot-low: #7962bb; --plot-mid: #bd8bd9; --plot-high: #c7f0f5;
   --skin-art: url("/skins/galaxy.svg");
 }
 :root[data-skin="9"] {
   --paper: #160e1c; --panel: #2e1f33; --ink: #fff4fa; --muted: #dfc2d3;
   --line: #976c91; --accent: #efbcca; --accent-2: #b6b6f2;
+  --plot-low: #9270ad; --plot-mid: #d69dbd; --plot-high: #ffe1bf;
   --skin-art: url("/skins/andromeda.svg");
 }
 :root[data-skin="10"] {
   --paper: #0e1622; --panel: #202839; --ink: #fff5fb; --muted: #d2c4e1;
   --line: #877697; --accent: #efafc9; --accent-2: #96d9d0;
+  --plot-low: #638fba; --plot-mid: #d49bc6; --plot-high: #bcebdc;
   --skin-art: url("/skins/nebula.svg");
 }
 :root[data-skin="11"] {
   --paper: #080f1d; --panel: #172436; --ink: #effcff; --muted: #b9d1e1;
   --line: #5d879d; --accent: #89e5f0; --accent-2: #cfabe7;
+  --plot-low: #626dbc; --plot-mid: #65c9da; --plot-high: #eed7fa;
   --skin-art: url("/skins/quasar.svg");
 }
 :root[data-skin="12"] {
   --paper: #15110e; --panel: #29231e; --ink: #fff6eb; --muted: #d5c8b8;
   --line: #8b7962; --accent: #dfbf88; --accent-2: #b2c4c8;
+  --plot-low: #97836c; --plot-mid: #c6ab85; --plot-high: #f3dfb5;
   --skin-art: url("/skins/asteroids.svg");
 }
 :root[data-skin="13"] {
   --paper: #101524; --panel: #24283e; --ink: #faf5ff; --muted: #d1c7e9;
   --line: #7b7ea9; --accent: #babcfb; --accent-2: #83d8c8;
+  --plot-low: #8279c4; --plot-mid: #80cabc; --plot-high: #e3dcff;
   --skin-art: url("/skins/exoplanet.svg");
 }
 
@@ -181,8 +201,10 @@
   font: inherit;
   color: var(--ink);
 }
-/* Shared skin surfaces replace the original green fills without changing charts, flags or photography. */
+/* Shared skin surfaces and plot presentation leave flags and photography unchanged. */
 :root[data-skin]:not([data-skin="0"]) {
+  --plot-axis: var(--muted); --plot-label: var(--ink); --plot-grid: var(--line);
+  --plot-wire: var(--line);
   color-scheme: dark;
   --code: var(--ink);
   --stone: var(--panel);

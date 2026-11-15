@@ -5,6 +5,7 @@
  * Extends a finite Dirichlet sum with the integral, endpoint and Bernoulli corrections. A scaled rising product
  * advances through a quadratic recurrence, avoiding separate factorial products and negative endpoint powers.
  * Analytic differentiation advances alongside the value without division by a possibly zero rising product.
+ * Absolute Bernoulli bounds size each correction's arithmetic without reducing the recurrence or sum precision.
  * The owning number module supplies guarded MPC accumulators and its existing correction and accuracy budgets.
  */
 #define MARS_NUMBER_INTERNAL_ACCESS
@@ -16,6 +17,34 @@ static bool zeta_tail_small(mpc_srcptr term, mpfr_prec_t target, unsigned guard)
     return mpfr_number_p(mpc_realref(term)) && mpfr_number_p(mpc_imagref(term)) &&
            (mpfr_zero_p(mpc_realref(term)) || mpfr_get_exp(mpc_realref(term)) <= bound) &&
            (mpfr_zero_p(mpc_imagref(term)) || mpfr_get_exp(mpc_imagref(term)) <= bound);
+}
+
+static mpfr_exp_t zeta_tail_exponent(mpc_srcptr value)
+{
+    bool real_zero = mpfr_zero_p(mpc_realref(value)), imaginary_zero = mpfr_zero_p(mpc_imagref(value));
+    if (real_zero && imaginary_zero) return 0;
+    mpfr_exp_t real = real_zero ? mpfr_get_exp(mpc_imagref(value)) : mpfr_get_exp(mpc_realref(value));
+    mpfr_exp_t imaginary = imaginary_zero ? real : mpfr_get_exp(mpc_imagref(value));
+    return (real > imaginary ? real : imaginary) + 1;
+}
+
+/* |B_(2k)/(2k)!| < 4/32^k, since zeta(2k)<2 and (2*pi)^2>32. Together with an upper exponent of
+ * each multiplier, this keeps coefficient and product roundoff below 2^(-work-28) per correction. Both
+ * derivative and value accumulators stay at full precision; no rising-product state is rounded down. */
+static mpfr_prec_t zeta_tail_precision(mpc_srcptr scaled, mpc_srcptr derivative, size_t index,
+                                     mpfr_prec_t work)
+{
+    if (work < 640 || work > 65536 || index > 65536 ||
+        !mpfr_number_p(mpc_realref(scaled)) || !mpfr_number_p(mpc_imagref(scaled))) return work;
+    mpfr_exp_t exponent = zeta_tail_exponent(scaled);
+    if (derivative) {
+        if (!mpfr_number_p(mpc_realref(derivative)) || !mpfr_number_p(mpc_imagref(derivative))) return work;
+        mpfr_exp_t other = zeta_tail_exponent(derivative);
+        if (other > exponent) exponent = other;
+    }
+    mpfr_exp_t adjustment = exponent - 5 * (mpfr_exp_t)index + 32;
+    if (adjustment >= 0) return work;
+    return adjustment < 128 - work ? 128 : work + adjustment;
 }
 
 /* Add one guarded tail, using each endpoint exponential only once. */
@@ -90,6 +119,9 @@ int number_zeta_tail(mpc_ptr sum, mpc_ptr derivative, mpc_srcptr argument, mpc_s
     mpc_mul_ui(second_difference, inverse_square, 8u, MPC_RNDNN);
 
     for (size_t k = 1u; k <= budget; ++k) {
+        mpfr_prec_t precision = zeta_tail_precision(scaled, derivative ? scaled_derivative : NULL, k, work);
+        if (mpfr_get_prec(bernoulli) != precision) mpfr_set_prec(bernoulli, precision);
+        if (mpc_get_prec(term) != precision) mpc_set_prec(term, precision);
         if (number_coefficient_normalised(bernoulli, k)) break;
         mpc_mul_fr(term, scaled, bernoulli, MPC_RNDNN);
         mpc_add(sum, sum, term, MPC_RNDNN);

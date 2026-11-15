@@ -88,7 +88,7 @@ static void periodic_phases(lab_worker_implicit_t *sample)
 }
 
 /* Keep parsing, numerical evaluation and coordinate precision in one worker-owned policy. */
-lab_worker_implicit_t *lab_worker_implicit_new(const char *source, const char *const *names,
+lab_worker_implicit_t *lab_worker_implicit_new(const char *source, const equation_t *choices, const char *const *names,
                                               const char *const *limits, size_t count, double *bounds)
 {
     if (!count || count > 3)
@@ -142,6 +142,22 @@ lab_worker_implicit_t *lab_worker_implicit_new(const char *source, const char *c
     if (ok)
         sample->equation = equ_from_string(source);
     ok = ok && sample->equation;
+    /* Re-evaluate authored constants at guard precision; copy only plot-local choices for unset constants. */
+    expr_bindings_t *bindings = ok ? equ_bindings(sample->equation) : NULL;
+    for (size_t i = 0; choices && i < expr_bindings_count(bindings); ++i) {
+        if (!expr_bindings_is_constant_at(bindings, i))
+            continue;
+        expr_t *parameter = expr_bindings_expr_at(bindings, i);
+        number_t original = expr_get_val(parameter);
+        if (num_is_nan(original)) {
+            expr_t *choice = equ_binding(choices, expr_bindings_name_at(bindings, i));
+            number_t value = choice ? expr_get_val(choice) : num_clone(NUM_NAN);
+            if (num_is_real(value) && num_is_finite(value))
+                expr_set_val(parameter, value);
+            num_destroy(&value);
+        }
+        num_destroy(&original);
+    }
     const expr_t *inputs[3];
     for (size_t axis = 0; ok && axis < count; ++axis) {
         number_t lower = lab_worker_sample_coordinate(sample->lower[axis], sample->bits);

@@ -512,6 +512,15 @@ expr_t *expr_substitute(const expr_t *expr, const expr_t *needle, const expr_t *
 expr_t *expr_with_domain_of(const expr_t *expr, const expr_t *domain);
 
 /**
+ * @brief Borrow an expression's algebraic body beneath outer domain wrappers.
+ * @param expr Borrowed expression, or NULL; neither modified nor retained.
+ * @return Borrowed body, the input itself when unrestricted, or NULL for NULL input. Do not free it.
+ * @note The body remains valid only while the source graph is alive and unchanged. This is a presentation query:
+ * callers must retain and communicate the original restrictions, and must evaluate the original guarded expression.
+ */
+const expr_t *expr_domain_body(const expr_t *expr);
+
+/**
  * @brief Return an owning display-oriented simplification of @p expr.
  *
  * This helper expands simple products over sums before simplification so UI

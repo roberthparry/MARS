@@ -65,6 +65,13 @@ void run_number_cache_tests(void);
 void run_number_appell_alias_tests(void);
 
 void run_number_backend_parity_tests(void);
+
+/**
+ * @brief Check real scalar conversions across complex numeric storage backends.
+ * @return No value; the sequential harness records SQL-backed assertions without changing default precision.
+ * @note Inputs and expected values are owned by the shared test database; no ownership transfers to the caller.
+ */
+void run_number_real_complex_conversion_tests(void);
 void run_number_readme_example_tests(void);
 void run_number_readme_mersenne_prime_search(void);
 

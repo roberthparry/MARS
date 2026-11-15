@@ -3,7 +3,8 @@
  * @brief Stateful checks of private logarithm and Dirichlet-power reuse and directed complex bounds.
  *
  * These number-module white-box fixtures compare cached logarithms with independent MPC evaluations across keys,
- * signed branch-cut zeros, precision changes and uncached indices. Integer logarithms also cover precision reuse,
+ * signed branch-cut zeros, precision changes and uncached indices. Bernoulli prefixes and their precision upgrades
+ * are checked against independent MPFR integer-zeta references. Integer logarithms also cover precision reuse,
  * direct calculation beyond the cache limits and invalid input. Concurrent callers exercise copied ownership
  * without running independent test cases or suites in parallel. Ordinary mathematical input cases remain in SQL.
  * Dirichlet powers are checked against higher-precision MPC evaluations across both keys, signed branch-cut zeros,
@@ -106,6 +107,60 @@ static bool cache_power_matches(mpc_srcptr offset, mpc_srcptr exponent, unsigned
     return ok;
 }
 
+/* Check both coefficient forms after prefix extension or precision reuse, without using their production recurrence. */
+static bool cache_coefficient_matches(unsigned long index, mpfr_prec_t precision)
+{
+    mpfr_t value, reference, scale, error, bound;
+    mpfr_init2(value, precision);
+    mpfr_inits2(precision + 128, reference, scale, error, bound, (mpfr_ptr)0);
+    mpfr_const_pi(scale, MPFR_RNDN); mpfr_mul_2ui(scale, scale, 1u, MPFR_RNDN);
+    mpfr_pow_ui(scale, scale, 2ul * index, MPFR_RNDN);
+    mpfr_zeta_ui(reference, 2ul * index, MPFR_RNDN);
+    mpfr_mul_2ui(reference, reference, 1u, MPFR_RNDN); mpfr_div(reference, reference, scale, MPFR_RNDN);
+    if (!(index & 1u)) mpfr_neg(reference, reference, MPFR_RNDN);
+    bool ok = number_coefficient_normalised(value, index) == 0;
+    mpfr_sub(error, value, reference, MPFR_RNDN); mpfr_abs(error, error, MPFR_RNDU);
+    mpfr_abs(bound, reference, MPFR_RNDD); mpfr_mul_2si(bound, bound, -precision + 4, MPFR_RNDD);
+    ok = ok && mpfr_number_p(error) && mpfr_lessequal_p(error, bound);
+    mpfr_fac_ui(scale, 2ul * index, MPFR_RNDN); mpfr_mul(reference, reference, scale, MPFR_RNDN);
+    ok = number_coefficient_bernoulli(value, index) == 0 && ok;
+    mpfr_sub(error, value, reference, MPFR_RNDN); mpfr_abs(error, error, MPFR_RNDU);
+    mpfr_abs(bound, reference, MPFR_RNDD); mpfr_mul_2si(bound, bound, -precision + 4, MPFR_RNDD);
+    ok = ok && mpfr_number_p(error) && mpfr_lessequal_p(error, bound);
+    mpfr_clears(reference, scale, error, bound, value, (mpfr_ptr)0);
+    return ok;
+}
+
+/* Dyadic thread-specific keys and a separate uniform MPC sum check copied result ownership under contention. */
+static bool cache_lerch_matches(mpc_srcptr offset, mpc_srcptr exponent)
+{
+    mpc_t argument, result, reference, base, negative, power, term;
+    mpc_init2(argument, 640); mpc_init2(result, 512); mpc_init2(reference, 640);
+    mpc_init2(base, 640); mpc_init2(negative, 640); mpc_init2(power, 640); mpc_init2(term, 640);
+    mpc_set_d_d(argument, 0.125, 0.0625, MPC_RNDNN);
+    mpc_neg(negative, exponent, MPC_RNDNN);
+    mpc_set_ui(power, 1u, MPC_RNDNN); mpc_set_ui(reference, 0u, MPC_RNDNN);
+    for (unsigned long k = 0; k < 256; ++k) {
+        mpc_add_ui(base, offset, k, MPC_RNDNN); mpc_pow(term, base, negative, MPC_RNDNN);
+        mpc_mul(term, term, power, MPC_RNDNN); mpc_add(reference, reference, term, MPC_RNDNN);
+        mpc_mul(power, power, argument, MPC_RNDNN);
+    }
+    bool ok = true;
+    mpfr_t error, bound;
+    mpfr_inits2(640, error, bound, (mpfr_ptr)0);
+    for (unsigned repeat = 0; repeat < 2; ++repeat) {
+        ok = number_lerch_blocks(result, argument, exponent, offset, 512) && ok;
+        mpc_sub(term, result, reference, MPC_RNDNN);
+        mpc_abs(error, term, MPFR_RNDU); mpc_abs(bound, reference, MPFR_RNDD);
+        mpfr_mul_2si(bound, bound, -504, MPFR_RNDD);
+        ok = mpfr_number_p(error) && mpfr_lessequal_p(error, bound) && ok;
+    }
+    mpfr_clears(error, bound, (mpfr_ptr)0);
+    mpc_clear(argument); mpc_clear(result); mpc_clear(reference); mpc_clear(base);
+    mpc_clear(negative); mpc_clear(power); mpc_clear(term);
+    return ok;
+}
+
 static void *cache_log_thread(void *data)
 {
     cache_job_t *job = data;
@@ -120,6 +175,7 @@ static void *cache_log_thread(void *data)
         job->ok = cache_log_matches(offset, i, i & 1u ? 128 : 256) &&
                   cache_integer_log_matches(i + 1u, i & 1u ? 128 : 256) &&
                   cache_power_matches(offset, exponent, i, i & 1u ? 128 : 256);
+    job->ok = cache_lerch_matches(offset, exponent) && job->ok;
     mpc_clear(offset);
     mpc_clear(exponent);
     mpfr_free_cache();
@@ -130,6 +186,11 @@ static void *cache_log_thread(void *data)
 void run_number_cache_tests(void)
 {
     ASSERT_TRUE(cloned_constant_precision_is_preserved());
+    /* Prefix extension, a lower request, a higher upgrade and the uncached index exercise stateful ownership. */
+    const unsigned long coefficient_indices[] = {1, 2, 64, 3, 6, 765, 2, 128, 1024, 4096, 766, 767, 768};
+    const mpfr_prec_t coefficient_bits[] = {128, 128, 256, 16320, 512, 4096, 128, 4096, 256, 128, 2048, 512, 4096};
+    for (size_t i = 0; i < sizeof coefficient_indices / sizeof *coefficient_indices; ++i)
+        ASSERT_TRUE(cache_coefficient_matches(coefficient_indices[i], coefficient_bits[i]));
     mpc_t offset;
     mpc_t exponent;
     mpc_init2(offset, 512);

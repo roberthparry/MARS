@@ -1,4 +1,25 @@
 -- Precision regressions for previously failing or timed-out benchmark functions.
+
+WITH precisions(digits) AS (VALUES(64),(300)),
+cases(name, input) AS (VALUES
+    ('lerch_reference_complex', '0.5+0.125i;1.25+0.125i;0.75+0.125i'),
+    ('lerch_reference_conjugate', '0.5-0.125i;1.25-0.125i;0.75-0.125i'),
+    ('lerch_reference_negative_order', '0.5+0.125i;-3.5+0.125i;0.75+0.125i'),
+    ('lerch_reference_alternating', '-0.5+0.125i;1.25+0.125i;0.75+0.125i'),
+    ('lerch_reference_lower_cut', '0.5+0.125i;1.25+0.125i;-0.75-0.125i'),
+    ('lerch_reference_precision_retry', '0.5+0.125i;-100.5+0.125i;0.75+0.125i'))
+INSERT OR IGNORE INTO number_cases(name, operation, input, expected, precision)
+SELECT name || '_' || digits, 'lerch_reference', input, '0', digits FROM cases CROSS JOIN precisions;
+
+INSERT OR IGNORE INTO number_cases(name, operation, input, expected, precision) VALUES
+    ('lerch_reference_complex_1234', 'lerch_reference', '0.5+0.125i;1.25+0.125i;0.75+0.125i', '0', 1234);
+
+WITH precisions(digits) AS (VALUES(64),(300),(1234)),
+cases(name, input) AS (VALUES
+    ('gamma_inverse_conjugate', '9.5-0.125i'),
+    ('gamma_inverse_shifted', '4+0.5i'))
+INSERT OR IGNORE INTO number_cases(name, operation, input, expected, precision)
+SELECT name || '_' || digits, 'gamma_inverse_complex', input, '0', digits FROM cases CROSS JOIN precisions;
 -- Each precision is decimal significant digits; reference calculations and checks remain in C.
 CREATE TABLE IF NOT EXISTS number_cases (
     name TEXT PRIMARY KEY, operation TEXT NOT NULL, input TEXT NOT NULL, expected TEXT NOT NULL,
@@ -121,6 +142,16 @@ INSERT OR IGNORE INTO number_cases(name, operation, input, expected, precision) 
     ('qc_lommel_complex', 'qc_lommel', '0.75+0.125i', '0', 34),
     ('qf_normal_tail', 'qf_normal_tail', '-12', '1', 34);
 
+WITH precisions(digits) AS (VALUES (64), (300), (1234)),
+cases(name, input) AS (VALUES
+    ('zetah_reference_unit', '2.25;1'),
+    ('zetah_reference_half', '0.75;0.5'),
+    ('zetah_reference_near_pole', '1.000000000931322574615478515625;0.5'),
+    ('zetah_reference_negative', '-2.25;0.5')
+)
+INSERT OR IGNORE INTO number_cases(name, operation, input, expected, precision)
+SELECT name || '_' || digits, 'zetah_reference', input, '0', digits FROM cases CROSS JOIN precisions;
+
 INSERT OR IGNORE INTO number_cases(name, operation, input, expected, precision) VALUES
     ('double_zeta_positive', 'double_zeta', '2.25', '0', 19),
     ('double_zeta_negative', 'double_zeta', '-2.25', '0', 19),
@@ -180,3 +211,35 @@ INSERT INTO test_case_runner(module, source, parent, table_name, operation) VALU
     'number.benchmark_regressions', 'tests/number/test_number_special_regressions.c',
     'tests.run_number_benchmark_regressions', 'number_cases', NULL)
 ON CONFLICT(module) DO UPDATE SET table_name=excluded.table_name, operation=excluded.operation;
+
+CREATE TABLE IF NOT EXISTS number_conversion_cases (
+    name TEXT PRIMARY KEY, operation TEXT NOT NULL, input TEXT NOT NULL, expected TEXT NOT NULL,
+    precision INTEGER NOT NULL DEFAULT 32 CHECK (precision BETWEEN 1 AND 10000),
+    enabled INTEGER NOT NULL DEFAULT 1 CHECK (enabled IN (0, 1))
+) WITHOUT ROWID;
+
+INSERT INTO test_case_runner(module, source, parent, table_name, operation) VALUES (
+    'number.real_complex_conversion', 'tests/number/test_number_backend_parity.c',
+    'tests.run_number_real_complex_conversion_tests', 'number_conversion_cases', 'real_complex_conversion')
+ON CONFLICT(module) DO UPDATE SET table_name=excluded.table_name, operation=excluded.operation;
+INSERT OR IGNORE INTO number_conversion_cases(name, operation, input, expected) VALUES
+    ('complex_real_conversion_zero', 'real_complex_conversion', '0', '0'),
+    ('complex_real_conversion_positive', 'real_complex_conversion', '0.125', '0.125'),
+    ('complex_real_conversion_negative', 'real_complex_conversion', '-3.5', '-3.5'),
+    ('complex_real_conversion_nonreal', 'real_complex_conversion', '0.125+0.25i', 'NAN'),
+    ('complex_real_conversion_imaginary', 'real_complex_conversion', 'i', 'NAN');
+
+INSERT OR IGNORE INTO number_cases(name, operation, input, expected, precision) VALUES
+    ('lerch_blocks_complex_300', 'lerch_blocks_reference', '0.3125+0.125i;2+0.125i;1.375+0.125i', '0', 300),
+    ('lerch_blocks_complex_1234', 'lerch_blocks_reference', '0.3125+0.125i;2+0.125i;1.375+0.125i', '0', 1234),
+    ('lerch_blocks_conjugate_300', 'lerch_blocks_reference', '0.3125-0.125i;2-0.125i;1.375-0.125i', '0', 300),
+    ('lerch_blocks_alternating_1234', 'lerch_blocks_reference', '-0.625+0.125i;0.75+0.125i;0.75-0.125i', '0', 1234),
+    ('lerch_blocks_negative_order_300', 'lerch_blocks_reference', '0.5+0.125i;-3.5+0.125i;0.75+0.125i', '0', 300),
+    ('lerch_blocks_imaginary_300', 'lerch_blocks_reference', '0.5i;1.25+0.125i;0.75-0.125i', '0', 300),
+    ('lerch_blocks_upper_offset_300', 'lerch_blocks_reference', '0.5+0.125i;1.5+0.125i;-15.75+0.125i', '0', 300),
+    ('lerch_blocks_lower_offset_300', 'lerch_blocks_reference', '0.5+0.125i;1.5+0.125i;-15.75-0.125i', '0', 300),
+    ('lerch_blocks_near_unit_300', 'lerch_blocks_reference', '0.875+0.03125i;2.25+0.125i;1.125+0.125i', '0', 300),
+    ('lerch_blocks_reject_precision', 'lerch_blocks_reject', '0.5;1.5;0.75', '0', 64),
+    ('lerch_blocks_reject_radius', 'lerch_blocks_reject', '0.9375;1.5;0.75', '0', 300),
+    ('lerch_blocks_reject_order', 'lerch_blocks_reject', '0.5;-100.5+0.125i;0.75', '0', 300),
+    ('lerch_blocks_reject_offset', 'lerch_blocks_reject', '0.5;1.5;32.25+0.125i', '0', 300);

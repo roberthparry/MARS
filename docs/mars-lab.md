@@ -561,10 +561,15 @@ the selected palette; the two binding roles retain distinct accent colours.
 Button, plot and globe tooltips also use the selected palette for their text,
 borders and backgrounds. Help cards, section labels, links and inline examples
 follow the same palette on phones and larger screens.
+Error and warning panels use the same skin's text, surface and accent colours.
 Almanac result tables and their phone-sized body cards use the skin's
 surface, border and label colours too.
-Calculations, plot colours, flags, globe imagery and worksheet history retain
-their existing behaviour when a skin changes.
+Mathematical plots use the selected palette for their surfaces, curves, axes and
+labels. Earth retains the original blue–teal–sand ramp; Mars uses rust, orange and
+pale sand. Other themes use matching colour ramps. Existing plots recolour
+immediately, retaining their camera, zoom and data. Canvas fallback rendering and
+SVG exports use the same palette. Calculations, flags, globe imagery and worksheet
+history retain their existing behaviour when a skin changes.
 
 The selection is saved independently for each browser and site address in
 `localStorage`, under `mars.lab.skin.v1`. It is restored before the stylesheet
@@ -597,7 +602,9 @@ Authored artwork lives in `tools/mars_lab/assets/skins/`, with the palettes and
 surface overrides in `assets/css/skins.css`. The small `appearance.ts` browser
 adapter handles only selection, optional preference storage and browser theme
 colour. It runs before worksheet restoration and does not enter calculation or
-WASM scheduling. The artwork has no animation or external image dependency.
+WASM scheduling. `plot_palette.ts` supplies the shared display-colour transform
+for SVG, Canvas and WebGL plots, independently of native calculation and camera
+state. The artwork has no animation or external image dependency.
 The Moon uses simplified vector contours from NASA's north-up full-Moon rendering,
 retaining the familiar lunar seas and crater patterns. Warm ivory highlands,
 taupe seas and pale cream rays accompany warm neutral panels and ivory accents.
@@ -1166,7 +1173,10 @@ size; non-editable calendar selector buttons use 14 pixels. Editable fields stay
 at 16 pixels to avoid focus-triggered zoom on iPhone.
 Almanac evaluates automatically when a control selection changes or a field edit is
 committed (for example, by pressing Tab). Its Evaluate button is hidden; other modes
-retain theirs. Globe location selections also evaluate automatically.
+retain theirs. Selecting a different mode restores its saved inputs and immediately
+starts a fresh evaluation, including when it has a cached result. Mode-entry evaluations
+preserve Back and Forward history; selecting the already active mode does not evaluate
+again. Globe location selections also evaluate automatically.
 
 The Almanac header's Copy button copies the visible globe as a PNG, including
 its vector overlays, place labels and observer marker, rather than the hidden
@@ -3290,6 +3300,14 @@ are already supplied. Constant bindings remain parameters, never automatic axes.
 
 #### Parameter slices
 
+In Equation mode, unset constant bindings use plot-local parameter controls too.
+They do not count towards the three-coordinate plotting limit. Supplied constants
+stay fixed, and slider choices change only the isolated plotting problem; the
+worksheet and its symbolic solution retain their original bindings. Both implicit
+curves and three-coordinate meshes use those selected parameter values. Exact
+supplied constants are re-evaluated from the original source at the precision
+needed by the viewport, including deep zooms.
+
 Up to eight additional unset parameters share a compact vertical slider panel
 to the right of the chart, keeping the curve or surface visible while adjusting a slice.
 For a 2-D expression curve, unset constant bindings receive these controls too:
@@ -4732,6 +4750,28 @@ The wider design remains in the
 [Ophelia design notes](design-notes/expression-language.md).
 
 ## Equation mode
+
+For a two-variable equation, the default horizontal coordinate is time `t`, then
+`x`, then the first variable in native binding order. The Rendered TeX card prefers
+solutions for the other coordinate, giving the usual orientation of `y(x)` or
+`x(t)`, and retains every branch the native solver supplies for it. The Solutions
+card keeps all derived forms. When isolation of the dependent coordinate is not
+available, the original relation is retained and its real contour is plotted;
+the client does not invent an inverse or discard principal-branch restrictions.
+Changing the horizontal plot coordinate remains available through the plot controls.
+
+Unwrapped equations infer `C` and `D`, including their indexed forms, as constant
+parameters. Native isolation can walk affine arithmetic around principal roots,
+exponentials, logarithms and `atanh`, retaining their domain restrictions with the
+dependent-coordinate formula. Constant parameters remain editable bindings and
+plot controls; they do not become plotted coordinates or independent solution rows.
+Leaving a constant value blank keeps its unset binding and control in every mode;
+an ordinary binding commit does not remove a named integration constant.
+The primary Rendered TeX formula stays compact and identifies conditional results;
+the Solutions card retains their complete native domain restrictions.
+
+Each binding's **→ Variable** or **→ Constant** button names the role it will become.
+Clicking it converts the binding; its tooltip and accessible label describe the change.
 
 Numerical solution rows normally use ordinary decimal notation at the selected
 significant-digit precision. Values below `0.0001` use `×10` with a superscript

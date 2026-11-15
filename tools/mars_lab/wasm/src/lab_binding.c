@@ -373,9 +373,15 @@ static void lab_binding_card(jsref root, jsref binding, jsref values, jsref kind
     lab_dom_write(clear, LAB_DOM_ATTRIBUTE, "aria-label", clear_label);
     int actions = lab_binding_child(box, "div", "variable-value-actions");
     if (lab_workspace_mode() != LAB_MODE_DIFFERENTIAL_EQUATION) {
-        int toggle = lab_binding_button(actions, "card-action variable-toggle", constant ? "Variable" : "Constant");
-        lab_dom_write(toggle, LAB_DOM_ATTRIBUTE, "title",
-                      lab_binding_caption("Treat ", label, constant ? " as a variable" : " as a constant"));
+        int toggle = lab_binding_button(actions, "card-action variable-toggle", "");
+        int arrow = lab_binding_child(toggle, "span", "binding-conversion-arrow");
+        lab_binding_text(arrow, LAB_DOM_TEXT, "", "→");
+        lab_binding_text(arrow, LAB_DOM_ATTRIBUTE, "aria-hidden", "true");
+        int destination = lab_binding_child(toggle, "span", "binding-conversion-label");
+        lab_binding_text(destination, LAB_DOM_TEXT, "", constant ? " Variable" : " Constant");
+        int conversion = lab_binding_caption("Convert ", label, constant ? " to a variable" : " to a constant");
+        lab_dom_write(toggle, LAB_DOM_ATTRIBUTE, "title", conversion);
+        lab_dom_write(toggle, LAB_DOM_ATTRIBUTE, "aria-label", conversion);
     }
     int copy = lab_binding_button(actions, "card-action variable-copy", "Copy");
     int card = lab_dom_object(LAB_VALUE_OBJECT);

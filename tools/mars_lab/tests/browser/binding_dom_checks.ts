@@ -262,10 +262,12 @@ window.checkLabBindingDom = async function checkLabBindingDom() {
         equal(inputs[1].value, '', 'NaN display is empty');
         equal(new Map(rendered.values).get('[μ]'), inputs[0].value, 'cache receives complete authored value');
         equal(new Map(rendered.kinds).get('z'), 'variable', 'missing kind defaults to variable');
-        equal(root.querySelector<HTMLButtonElement>('.variable-toggle')!.textContent, 'Constant', 'variable toggle caption');
+        equal(root.querySelector<HTMLButtonElement>('.variable-toggle')!.textContent, '→ Constant', 'variable conversion caption');
+        equal(root.querySelector<HTMLButtonElement>('.variable-toggle')!.getAttribute('aria-label'),
+            'Convert μ to a constant', 'variable conversion is accessible');
         equal(
-            root.querySelector<HTMLButtonElement>('.constant-value-box .variable-toggle')!.textContent, 'Variable',
-            'constant toggle caption');
+            root.querySelector<HTMLButtonElement>('.constant-value-box .variable-toggle')!.textContent, '→ Variable',
+            'constant conversion caption');
         equal(
             root.querySelector<HTMLButtonElement>('.binding-value-clear')!.getAttribute('aria-label'), 'Clear μ', 'clear accessible label');
         for (const left of ['c2', 'c10', 'É2', 'e2', '[μ]', '', 0, 12, {name: 'é10'}]) {

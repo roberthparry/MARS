@@ -3,6 +3,7 @@
  * @brief Precision-preserving defining series for pFq and the Lerch transcendent.
  *
  * Uses the widest participating number backend and guarded MPC arithmetic for real and complex series.
+ * Moderate high-precision Lerch parameters first use weighted binomial blocks, with the defining series as fallback.
  * Geometric remainder bounds and accumulated rounding checks prevent a finite but under-resolved sum from being
  * accepted. Fixed-precision callers retain their existing kernels. Boundary continuation is not guessed.
  */
@@ -36,7 +37,8 @@ static number_t series_result(mpc_srcptr value, size_t bits, bool real)
 
 /* A geometric tail bounds every future term; roundoff is checked against the absolute partial sum. */
 static bool series_complete(mpc_srcptr sum, mpfr_srcptr term, mpfr_srcptr absolute_sum,
-                            mpfr_srcptr ratio, mpfr_prec_t target, unsigned long operations)
+                            mpfr_srcptr ratio, mpfr_prec_t target, unsigned long operations,
+                            mpfr_srcptr power_error)
 {
     if (!mpfr_number_p(ratio) || mpfr_cmp_ui(ratio, 1u) >= 0) return false;
     mpfr_t tail, tolerance, temporary;
@@ -47,6 +49,7 @@ static bool series_complete(mpc_srcptr sum, mpfr_srcptr term, mpfr_srcptr absolu
     mpfr_mul_ui(temporary, absolute_sum, operations, MPFR_RNDU);
     mpfr_mul_2si(temporary, temporary, -mpc_get_prec(sum) + 8, MPFR_RNDU);
     mpfr_add(tail, tail, temporary, MPFR_RNDU);
+    if (power_error) mpfr_add(tail, tail, power_error, MPFR_RNDU);
     number_mpc_abs_lower(tolerance, sum);
     mpfr_mul_2si(tolerance, tolerance, -target - 8, MPFR_RNDD);
     bool ok = mpfr_lessequal_p(tail, tolerance);
@@ -127,7 +130,7 @@ number_t num_hypergeometric_pFq(const number_t *upper, size_t p, const number_t 
         if (mpfr_zero_p(magnitude)) {
             mpfr_set_zero(ratio, 1);
             converged = exact_arithmetic ||
-                series_complete(sum, magnitude, absolute_sum, ratio, bits, (n + 1) * (p + q + 8));
+                series_complete(sum, magnitude, absolute_sum, ratio, bits, (n + 1) * (p + q + 8), NULL);
             break;
         }
         if (terminating || n < 8 || n % 8) continue;
@@ -148,7 +151,7 @@ number_t num_hypergeometric_pFq(const number_t *upper, size_t p, const number_t 
                 mpfr_div(ratio, ratio, temporary, MPFR_RNDU);
             }
         }
-        if (bounded && series_complete(sum, magnitude, absolute_sum, ratio, bits, k * (p + q + 8))) {
+        if (bounded && series_complete(sum, magnitude, absolute_sum, ratio, bits, k * (p + q + 8), NULL)) {
             converged = true;
             break;
         }
@@ -184,52 +187,107 @@ number_t number_lerch_phi(const number_t z, const number_t s, const number_t a)
     if (bits < 106) bits = 106;
     if (bits > 65536 - 128) return NUM_NAN;
     mpfr_prec_t work = (mpfr_prec_t)bits + 128;
-    mpc_t argument, exponent, offset, base, power, term, sum;
+    enum { LERCH_BLOCK = 16 };
+    unsigned block = bits >= 512 ? LERCH_BLOCK : 1u;
+    mpc_t argument, exponent, offset, base, power, term, sum, step;
+    mpc_t coefficients[LERCH_BLOCK];
     mpc_init2(argument, work); mpc_init2(exponent, work); mpc_init2(offset, work); mpc_init2(base, work);
-    mpc_init2(power, work); mpc_init2(term, work); mpc_init2(sum, work);
+    mpc_init2(power, work); mpc_init2(term, work); mpc_init2(sum, work); mpc_init2(step, work);
+    for (unsigned j = 0; j < block; ++j) mpc_init2(coefficients[j], work);
     bool ok = series_input(argument, &z) && series_input(exponent, &s) && series_input(offset, &a);
     bool real = num_is_real(z) && num_is_real(s) && num_is_real(a), converged = false;
-    mpfr_t radius, order, offset_size, ratio, temporary, magnitude, absolute_sum;
-    mpfr_inits2(64, radius, order, offset_size, ratio, temporary, (mpfr_ptr)0);
-    mpfr_inits2(work, magnitude, absolute_sum, (mpfr_ptr)0);
+    mpfr_t radius, order, offset_size, ratio, temporary, magnitude, absolute_sum, power_error, rounding;
+    /* Directed error bounds need a reliable upper bound, not the result's full significand. */
+    mpfr_inits2(64, radius, order, offset_size, ratio, temporary, magnitude, absolute_sum, power_error, rounding,
+                 (mpfr_ptr)0);
     mpc_abs(radius, argument, MPFR_RNDU); mpc_abs(order, exponent, MPFR_RNDU);
     mpc_abs(offset_size, offset, MPFR_RNDU);
     ok = ok && mpfr_cmp_ui(radius, 1u) < 0;
     bool integer = mpfr_zero_p(mpc_imagref(exponent)) && mpfr_integer_p(mpc_realref(exponent)) &&
                    mpfr_fits_slong_p(mpc_realref(exponent), MPFR_RNDN);
     long integer_order = integer ? mpfr_get_si(mpc_realref(exponent), MPFR_RNDN) : 0;
-    mpc_set_ui(power, 1u, MPC_RNDNN); mpc_set_ui(sum, 0u, MPC_RNDNN);
-    mpfr_set_zero(absolute_sum, 1);
-    for (unsigned long k = 0; ok && k < 200000; ++k) {
-        mpc_add_ui(base, offset, k, MPC_RNDNN);
-        if (integer) mpc_pow_si(base, base, integer_order, MPC_RNDNN);
-        else number_dirichlet_power(base, offset, exponent, k);
-        if (integer) mpc_div(term, power, base, MPC_RNDNN);
-        else mpc_mul(term, power, base, MPC_RNDNN);
-        mpc_add(sum, sum, term, MPC_RNDNN);
-        if (!mpfr_number_p(mpc_realref(sum)) || !mpfr_number_p(mpc_imagref(sum))) break;
-        number_mpc_abs_upper(magnitude, term);
-        mpfr_add(absolute_sum, absolute_sum, magnitude, MPFR_RNDU);
-        if (k > 8 && k % 8 == 0) {
-            mpfr_ui_sub(temporary, k, offset_size, MPFR_RNDD);
-            if (mpfr_cmp_ui(temporary, 1u) > 0) {
-                mpfr_ui_div(temporary, 1u, temporary, MPFR_RNDU);
-                mpfr_ui_sub(temporary, 1u, temporary, MPFR_RNDD);
-                mpfr_neg(ratio, order, MPFR_RNDN);
-                mpfr_pow(ratio, temporary, ratio, MPFR_RNDU);
-                mpfr_mul(ratio, ratio, radius, MPFR_RNDU);
-                if (series_complete(sum, magnitude, absolute_sum, ratio, bits, (k + 1) * 32)) {
-                    converged = true;
-                    break;
+    mpc_pow_ui(step, argument, block, MPC_RNDNN);
+    if (ok && !integer) converged = number_lerch_blocks(sum, argument, exponent, offset, (mpfr_prec_t)bits);
+    for (unsigned attempt = 0; ok && !converged && attempt < 2; ++attempt) {
+        bool adaptive = !integer && attempt == 0, retry = false;
+        mpc_set_prec(base, work);
+        mpc_set_ui(power, 1u, MPC_RNDNN); mpc_set_ui(sum, 0u, MPC_RNDNN);
+        mpfr_set_zero(absolute_sum, 1); mpfr_set_zero(power_error, 1);
+        for (unsigned long k = 0; ok && k < 200000; k += block) {
+            if (integer && block == 1) {
+                /* Retain the direct quotient for short integer-order calculations. */
+                mpc_add_ui(base, offset, k, MPC_RNDNN);
+                mpc_pow_si(base, base, integer_order, MPC_RNDNN);
+                mpc_div(term, power, base, MPC_RNDNN);
+                number_mpc_abs_upper(rounding, term);
+                mpfr_add(absolute_sum, absolute_sum, rounding, MPFR_RNDU);
+            } else {
+                number_mpc_abs_upper(magnitude, power);
+                for (unsigned j = 0; j < block; ++j) {
+                    mpfr_exp_t exponent_bound = mpfr_zero_p(magnitude) ? 0 : mpfr_get_exp(magnitude);
+                    mpfr_prec_t precision = work;
+                    if (adaptive && exponent_bound < 0)
+                        precision = exponent_bound < 128 - work ? 128 : work + exponent_bound;
+                    if (mpc_get_prec(coefficients[j]) != precision) mpc_set_prec(coefficients[j], precision);
+                    if (integer) {
+                        mpc_add_ui(base, offset, k + j, MPC_RNDNN);
+                        mpc_pow_si(base, base, integer_order, MPC_RNDNN);
+                        mpc_ui_div(coefficients[j], 1u, base, MPC_RNDNN);
+                    } else number_dirichlet_power(coefficients[j], offset, exponent, k + j);
+                    number_mpc_abs_upper(rounding, coefficients[j]);
+                    mpfr_mul(rounding, rounding, magnitude, MPFR_RNDU);
+                    mpfr_add(absolute_sum, absolute_sum, rounding, MPFR_RNDU);
+                    /* Bounds use |z|^j times an upper bound for the block's initial power, rather than
+                     * separately multiplying every complex z^k. Low-precision coefficient errors stay explicit. */
+                    /* Also cover every rounded operation of the at-most-sixteen-term Horner block and
+                     * its final multiplication. The absolute coefficient sum bounds cancellation inside it. */
+                    mpfr_mul_2si(temporary, rounding, -precision + 10, MPFR_RNDU);
+                    mpfr_add(power_error, power_error, temporary, MPFR_RNDU);
+                    if (j + 1 < block) mpfr_mul(magnitude, magnitude, radius, MPFR_RNDU);
+                }
+                /* Rectangular splitting halves the full-width complex products: one Horner block, then one
+                 * multiplication by z^k. The geometric tail uses the last individual term's directed upper bound. */
+                mpfr_prec_t precision = mpc_get_prec(coefficients[0]);
+                if (mpc_get_prec(term) != precision) mpc_set_prec(term, precision);
+                if (mpc_get_prec(base) != precision) mpc_set_prec(base, precision);
+                mpc_set(base, argument, MPC_RNDNN);
+                mpc_set(term, coefficients[block - 1], MPC_RNDNN);
+                for (unsigned j = block - 1; j > 0; --j) {
+                    mpc_mul(term, term, base, MPC_RNDNN); mpc_add(term, term, coefficients[j - 1], MPC_RNDNN);
+                }
+                mpc_set(base, power, MPC_RNDNN);
+                mpc_mul(term, term, base, MPC_RNDNN);
+            }
+            mpc_add(sum, sum, term, MPC_RNDNN);
+            if (!mpfr_number_p(mpc_realref(sum)) || !mpfr_number_p(mpc_imagref(sum))) break;
+            if (k > 8 && (block > 1 || k % 8 == 0)) {
+                mpfr_ui_sub(temporary, k + block - 1, offset_size, MPFR_RNDD);
+                if (mpfr_cmp_ui(temporary, 1u) > 0) {
+                    mpfr_ui_div(temporary, 1u, temporary, MPFR_RNDU);
+                    mpfr_ui_sub(temporary, 1u, temporary, MPFR_RNDD);
+                    mpfr_neg(ratio, order, MPFR_RNDN);
+                    mpfr_pow(ratio, temporary, ratio, MPFR_RNDU);
+                    mpfr_mul(ratio, ratio, radius, MPFR_RNDU);
+                    if (series_complete(sum, rounding, absolute_sum, ratio, bits, (k + block) * 32, power_error)) {
+                        converged = true;
+                        break;
+                    }
+                    if (adaptive && series_complete(sum, rounding, absolute_sum, ratio, bits, (k + block) * 32, NULL)) {
+                        retry = true;
+                        break;
+                    }
                 }
             }
+            mpc_mul(power, power, step, MPC_RNDNN);
         }
-        mpc_mul(power, power, argument, MPC_RNDNN);
+        if (!retry) break;
     }
     number_t result = converged ? series_result(sum, bits, real) : NUM_NAN;
-    mpfr_clears(radius, order, offset_size, ratio, temporary, magnitude, absolute_sum, (mpfr_ptr)0);
+    mpfr_clears(radius, order, offset_size, ratio, temporary, magnitude, absolute_sum, power_error, rounding,
+                 (mpfr_ptr)0);
     mpc_clear(argument); mpc_clear(exponent); mpc_clear(offset); mpc_clear(base);
-    mpc_clear(power); mpc_clear(term); mpc_clear(sum);
+    mpc_clear(power); mpc_clear(term); mpc_clear(sum); mpc_clear(step);
+    for (unsigned j = 0; j < block; ++j) mpc_clear(coefficients[j]);
     return result;
 }
 

@@ -118,25 +118,30 @@ static bool domain_range(expr_t *expr, expr_t *parameter, number_t bounds[2])
     return ok;
 }
 
-static bool probe(expr_t *expr, expr_t *parameter, number_t value, expr_t *x, expr_t *y)
+static bool probe(expr_t *expr, expr_t *parameter, number_t value, expr_t *x, expr_t *y, expr_t *z)
 {
     NUM_SCOPE(numbers);
     number_t saved_x = x ? expr_get_val(x) : NUM_NAN, saved_y = y ? expr_get_val(y) : NUM_NAN;
+    number_t saved_z = z ? expr_get_val(z) : NUM_NAN;
     number_t saved = expr_get_val(parameter);
     expr_set_val(parameter, value);
     bool found = false;
-    /* Twenty-five fixed real-domain probes; no unbounded search is attempted. */
-    for (int r = -2; !found && r <= 2; ++r) {
-        if (y) expr_set_val(y, num_create_from_frac(r * 3, 2));
-        for (int c = -2; !found && c <= 2; ++c) {
-            if (x) expr_set_val(x, num_create_from_frac(c * 3, 2));
-            number_t height = expr_eval(expr);
-            found = real(height);
-            num_destroy(&height);
+    /* At most 125 fixed real-domain probes across three coordinates; absent axes need one sample. */
+    for (int d = z ? -2 : 0; !found && d <= (z ? 2 : 0); ++d) {
+        if (z) expr_set_val(z, num_create_from_frac(d * 3, 2));
+        for (int r = y ? -2 : 0; !found && r <= (y ? 2 : 0); ++r) {
+            if (y) expr_set_val(y, num_create_from_frac(r * 3, 2));
+            for (int c = x ? -2 : 0; !found && c <= (x ? 2 : 0); ++c) {
+                if (x) expr_set_val(x, num_create_from_frac(c * 3, 2));
+                number_t height = expr_eval(expr);
+                found = real(height);
+                num_destroy(&height);
+            }
         }
     }
     if (x) expr_set_val(x, saved_x);
     if (y) expr_set_val(y, saved_y);
+    if (z) expr_set_val(z, saved_z);
     expr_set_val(parameter, saved);
     return found;
 }
@@ -150,8 +155,8 @@ static number_t exact(const char *text)
 }
 
 /* The returned source owns its text; all mutations belong to this private graph. */
-char *lab_worker_parameter_slices(const char *source, const char *first, const char *second, const char *request,
-                                  expr_bindings_t **bindings_out)
+char *lab_worker_parameter_slices(const char *source, const char *first, const char *second, const char *third,
+                                  number_t initial, const char *request, expr_bindings_t **bindings_out)
 {
     if (bindings_out) *bindings_out = NULL;
     NUM_SCOPE(numbers);
@@ -159,20 +164,22 @@ char *lab_worker_parameter_slices(const char *source, const char *first, const c
     expr_t *expr = expr_from_string(source, &bindings);
     expr_t *x = bindings && first ? expr_bindings_get(bindings, first) : NULL;
     expr_t *y = bindings && second ? expr_bindings_get(bindings, second) : NULL;
+    expr_t *z = bindings && third ? expr_bindings_get(bindings, third) : NULL;
+    bool predicate = !first && !second && !third;
     expr_t *parameters[8];
     size_t count = 0;
-    bool ok = expr && (!first || x) && (!second || y);
+    bool ok = expr && real(initial) && (!first || x) && (!second || y) && (!third || z);
     for (size_t i = 0; ok && i < expr_bindings_count(bindings); ++i) {
         expr_t *binding = expr_bindings_expr_at(bindings, i);
         number_t value = expr_get_val(binding);
-        if (binding == x || binding == y || !num_is_nan(value))
+        if (binding == x || binding == y || binding == z || !num_is_nan(value))
             continue;
         if (count == sizeof parameters / sizeof *parameters) {
             ok = false;
             break;
         }
         parameters[count++] = binding;
-        expr_set_val(binding, !first && !second ? NUM_ONE : NUM_ZERO);
+        expr_set_val(binding, initial);
     }
     string_t *input = string_new_with(request ? request : "");
     size_t rows_count = 0;
@@ -200,7 +207,7 @@ char *lab_worker_parameter_slices(const char *source, const char *first, const c
                 string_split_free(parts, n);
             }
         }
-        number_t bounds[] = {NUM_NAN, NUM_NAN}, value = !first && !second ? NUM_ONE : NUM_ZERO;
+        number_t bounds[] = {NUM_NAN, NUM_NAN}, value = expr_get_val(parameters[i]);
         long position = -1;
         bool automatic = fields && !strcmp(string_c_str(fields[4]), "-2");
         if (ok && fields && !automatic) {
@@ -218,26 +225,29 @@ char *lab_worker_parameter_slices(const char *source, const char *first, const c
                 value = exact(string_c_str(fields[3]));
         } else if (ok) {
             number_t saved_x = x ? expr_get_val(x) : NUM_NAN, saved_y = y ? expr_get_val(y) : NUM_NAN;
+            number_t saved_z = z ? expr_get_val(z) : NUM_NAN;
             if (x) expr_set_val(x, NUM_NAN);
             if (y) expr_set_val(y, NUM_NAN);
+            if (z) expr_set_val(z, NUM_NAN);
             bool bounded = domain_range(expr, parameters[i], bounds);
             if (x) expr_set_val(x, saved_x);
             if (y) expr_set_val(y, saved_y);
+            if (z) expr_set_val(z, saved_z);
             if (!bounded) {
                 long radius = 1;
-                bool found = probe(expr, parameters[i], value, x, y);
+                bool found = probe(expr, parameters[i], value, x, y, z);
                 for (long step = 1; !found && step <= 64; step *= 2) {
                     for (int sign = -1; !found && sign <= 1; sign += 2) {
                         number_t candidate = num_create_from_long(sign * step);
-                        if (probe(expr, parameters[i], candidate, x, y)) {
+                        if (probe(expr, parameters[i], candidate, x, y, z)) {
                             value = candidate;
                             radius = step;
                             found = true;
                         }
                     }
                 }
-                if (num_is_zero(value) && (probe(expr, parameters[i], NUM_ONE, x, y) ||
-                                          probe(expr, parameters[i], num_neg(NUM_ONE), x, y)))
+                if (num_is_zero(value) && (probe(expr, parameters[i], NUM_ONE, x, y, z) ||
+                                          probe(expr, parameters[i], num_neg(NUM_ONE), x, y, z)))
                     radius = 2;
                 bounds[0] = num_sub(value, num_create_from_long(radius));
                 bounds[1] = num_add(value, num_create_from_long(radius));
@@ -250,16 +260,16 @@ char *lab_worker_parameter_slices(const char *source, const char *first, const c
                     value = previous;
             }
             /* Keep automatic ODE slider endpoints inside the authored parameter assumptions. */
-            if (!first && !second) {
+            if (predicate) {
                 for (unsigned edge = 0; edge < 2u; ++edge)
                     for (unsigned attempt = 0; attempt < 16u &&
-                         !probe(expr, parameters[i], bounds[edge], NULL, NULL); ++attempt)
+                         !probe(expr, parameters[i], bounds[edge], NULL, NULL, NULL); ++attempt)
                         bounds[edge] = num_mul(num_add(bounds[edge], value), NUM_HALF);
             }
         }
         ok = ok && real(value) && real(bounds[0]) && real(bounds[1]) && num_lt(bounds[0], bounds[1]) &&
              !num_lt(value, bounds[0]) && !num_gt(value, bounds[1]);
-        if (ok && !first && !second) ok = probe(expr, parameters[i], value, NULL, NULL);
+        if (ok && predicate) ok = probe(expr, parameters[i], value, NULL, NULL, NULL);
         if (ok) {
             number_t fraction = num_div(num_sub(value, bounds[0]), num_sub(bounds[1], bounds[0]));
             position = lround(1000 * num_to_double(fraction));
@@ -315,5 +325,5 @@ char *lab_worker_parameter_slices(const char *source, const char *first, const c
 /* Preserve the ordinary surface API while sharing exact slider interpolation with ODE parameter controls. */
 char *lab_worker_surface_slice(const char *source, const char *first, const char *second, const char *request)
 {
-    return lab_worker_parameter_slices(source, first, second, request, NULL);
+    return lab_worker_parameter_slices(source, first, second, NULL, NUM_ZERO, request, NULL);
 }

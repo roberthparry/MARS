@@ -148,6 +148,20 @@ equation_t *equ_new_with_inferred_bindings(const expr_t *lhs, const expr_t *rhs)
     return equation;
 }
 
+/* Keep removed coefficient names reserved when later inversion introduces fresh branch indices. */
+equation_t *equ_reduction_new(const equation_t *source, const expr_t *lhs, const expr_t *rhs)
+{
+    equation_t *reduced = equ_new_with_inferred_bindings(lhs, rhs);
+    if (!reduced || !equ_bindings(source))
+        return reduced;
+    expr_bindings_t *bindings = expr_bindings_merge_internal(equ_bindings(reduced), equ_bindings(source));
+    equation_t *reserved = bindings ? equ_new_with_owned_bindings(lhs, rhs, bindings) : NULL;
+    if (!reserved)
+        expr_bindings_free(bindings);
+    equ_free(reduced);
+    return reserved;
+}
+
 void equ_free(equation_t *equation)
 {
     if (!equation)
@@ -2423,7 +2437,7 @@ int equ_solve_for_into(const equation_t *equation, const expr_t *wrt, equation_s
     static const solver_t solvers[] = {
         equ_try_solve_unary_inverse, equ_try_solve_unary_periodic, equ_try_solve_atan_sum,
         equ_try_solve_self_power, equ_try_solve_repeated_power_polynomial, equ_try_solve_affine,
-        equ_try_solve_general_polynomial, equ_try_solve_zero_product, equ_try_solve_quadratic,
+        equ_try_solve_guarded_inverse, equ_try_solve_general_polynomial, equ_try_solve_zero_product, equ_try_solve_quadratic,
         equ_try_solve_cubic, equ_try_solve_quartic, equ_try_solve_quintic
     };
     if (!solutions)
@@ -2443,7 +2457,7 @@ int equ_solve_for_into(const equation_t *equation, const expr_t *wrt, equation_s
     int rc = 1;
     if (equ_is_solved_for(equation, wrt))
         rc = equ_append_existing_solution(equation, solutions);
-    /* Twelve ordered alternatives, not a key lookup. Whole-polynomial collection
+    /* Ordered alternatives, not a key lookup. Whole-polynomial collection
      * precedes factor solving so complex conjugate coefficients can cancel. */
     for (size_t i = 0; rc > 0 && i < sizeof(solvers) / sizeof(*solvers); ++i) {
         if (!equ_computation_step("equation.symbolic")) {

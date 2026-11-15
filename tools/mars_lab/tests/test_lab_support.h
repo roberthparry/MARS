@@ -141,4 +141,11 @@ void test_lab_math_cases(void);
 /** @brief Run mathematical README examples after ordinary tests. @return No value. */
 void test_lab_math_readme_cases(void);
 
+/**
+ * @brief Register database-backed native equation parameter and dependent-coordinate checks.
+ * @return No value; the sequential test harness owns execution and records failures.
+ * @note Called once by the native Lab suite before README examples. No ownership transfers.
+ */
+void test_lab_equation_parameter_cases(void);
+
 #endif

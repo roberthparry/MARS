@@ -61,6 +61,7 @@ int tests_main(void)
 
     TEST_SECTION("Backend Parity");
     TEST_RUN_IN_GROUP(run_number_backend_parity_tests, tests, "number,backend-parity");
+    TEST_RUN_IN_GROUP(run_number_real_complex_conversion_tests, tests, "number,conversion,complex");
 
     TEST_SECTION("Public API");
     TEST_RUN_IN_GROUP(run_number_public_api_tests, tests, "number,public-api");

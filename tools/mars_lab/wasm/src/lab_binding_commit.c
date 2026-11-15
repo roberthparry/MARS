@@ -51,8 +51,8 @@ void lab_binding_commit_request(lab_mode_t mode, jsref source, snapshot_jsref sn
     lab_dom_set(request, "bindings", bindings);
     if (mode == LAB_MODE_DIFFERENTIAL_EQUATION)
         lab_dom_set(request, "syntax", lab_dom_string("diffequation"));
-    lab_dom_set(request, "unset_constants", lab_dom_scalar(LAB_VALUE_BOOLEAN,
-        mode != LAB_MODE_EXPRESSION && mode != LAB_MODE_DIFFERENTIAL_EQUATION));
+    /* Empty ordinary bindings stay unset; removing an additive integration constant is a separate operation. */
+    lab_dom_set(request, "unset_constants", lab_dom_scalar(LAB_VALUE_BOOLEAN, 0));
     lab_dom_return(request);
 }
 

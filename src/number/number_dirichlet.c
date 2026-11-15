@@ -48,6 +48,41 @@ static void dirichlet_clear(void)
     dirichlet_count = dirichlet_bytes = 0;
 }
 
+/* Reuse the offset logarithms even when an exponent changes. Guard bits cover the log/product/exponential
+ * composition; integral orders and exceptional magnitudes retain MPC's direct power and signed-zero handling. */
+static void dirichlet_evaluate(mpc_ptr out, mpc_srcptr offset, mpc_srcptr exponent, unsigned long index)
+{
+    mpfr_exp_t extra = 0;
+    bool finite = mpfr_number_p(mpc_realref(exponent)) && mpfr_number_p(mpc_imagref(exponent));
+    if (finite) {
+        if (!mpfr_zero_p(mpc_realref(exponent))) extra = mpfr_get_exp(mpc_realref(exponent));
+        if (!mpfr_zero_p(mpc_imagref(exponent)) && mpfr_get_exp(mpc_imagref(exponent)) > extra)
+            extra = mpfr_get_exp(mpc_imagref(exponent));
+    }
+    bool integral = mpfr_zero_p(mpc_imagref(exponent)) && mpfr_integer_p(mpc_realref(exponent));
+    if (finite && !integral && extra <= 4096 &&
+        mpc_get_prec(out) <= 65536 - 128 - (extra > 0 ? extra : 0)) {
+        mpfr_prec_t work = mpc_get_prec(out) + 128 + (extra > 0 ? extra : 0);
+        mpc_t logarithm, value;
+        mpc_init2(logarithm, work); mpc_init2(value, work);
+        number_zeta_logarithm(logarithm, offset, index);
+        bool usable = mpfr_number_p(mpc_realref(logarithm)) && mpfr_number_p(mpc_imagref(logarithm));
+        if (usable) {
+            mpc_mul(value, exponent, logarithm, MPC_RNDNN); mpc_neg(value, value, MPC_RNDNN);
+            mpc_exp(value, value, MPC_RNDNN); mpc_set(out, value, MPC_RNDNN);
+        }
+        mpc_clear(value); mpc_clear(logarithm);
+        if (usable) return;
+    }
+    mpc_t base, negative;
+    mpfr_prec_t precision = mpc_get_prec(out), base_precision = mpc_get_prec(offset);
+    if (base_precision < precision) base_precision = precision;
+    mpc_init2(base, base_precision); mpc_init2(negative, mpc_get_prec(exponent));
+    mpc_add_ui(base, offset, index, MPC_RNDNN); mpc_neg(negative, exponent, MPC_RNDNN);
+    mpc_pow(out, base, negative, MPC_RNDNN);
+    mpc_clear(base); mpc_clear(negative);
+}
+
 /* Copy a retained inverse power, or calculate and optionally retain it without locking transcendental work. */
 void number_dirichlet_power(mpc_ptr out, mpc_srcptr offset, mpc_srcptr exponent, unsigned long index)
 {
@@ -63,12 +98,7 @@ void number_dirichlet_power(mpc_ptr out, mpc_srcptr offset, mpc_srcptr exponent,
         pthread_mutex_unlock(&dirichlet_lock);
         if (found) return;
     }
-    mpc_t base, negative;
-    mpc_init2(base, precision); mpc_init2(negative, mpc_get_prec(exponent));
-    mpc_add_ui(base, offset, index, MPC_RNDNN);
-    mpc_neg(negative, exponent, MPC_RNDNN);
-    mpc_pow(out, base, negative, MPC_RNDNN);
-    mpc_clear(base); mpc_clear(negative);
+    dirichlet_evaluate(out, offset, exponent, index);
     if (!eligible || !mpfr_number_p(mpc_realref(out)) || !mpfr_number_p(mpc_imagref(out)) ||
         pthread_mutex_lock(&dirichlet_lock)) return;
     if (!dirichlet_same(offset, exponent)) {

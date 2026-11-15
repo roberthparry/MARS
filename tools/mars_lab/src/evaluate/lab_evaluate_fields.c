@@ -433,9 +433,9 @@ static void lab_eval_matrix_fields(json_t *fields)
 static void lab_eval_equation_fields(json_t *fields)
 {
     lab_eval_alias(fields, "equation_TeX", "tex");
-    const char *const renderings[] = {"derivation_TeX", "solutions_TeX", "tex"};
+    const char *const renderings[] = {"display_TeX", "derivation_TeX", "solutions_TeX", "tex"};
     const char *const equations[] = {"unbound", "equation"};
-    lab_eval_display_pair(fields, "TeX", lab_eval_first_field(fields, renderings, 3u));
+    lab_eval_display_pair(fields, "TeX", lab_eval_first_field(fields, renderings, 4u));
     lab_eval_display_pair(fields, "equation", lab_eval_first_field(fields, equations, 2u));
     lab_eval_alias(fields, "tex", "display_TeX");
     json_t *solutions = lab_eval_line_array(fields, "solutions");

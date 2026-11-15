@@ -175,6 +175,50 @@ static void print_axis(const char *name)
     expr_free(axis);
 }
 
+/* Choose only unset constant bindings in the isolated plotting equation; coordinates and supplied values stay intact. */
+static bool equation_parameters(equation_t *equ, const char *first, const expr_t *second, const expr_t *third,
+                                 const char *request)
+{
+    expr_bindings_t *bindings = equ_bindings(equ);
+    bool needed = false;
+    for (size_t i = 0; i < expr_bindings_count(bindings); ++i) {
+        if (!expr_bindings_is_constant_at(bindings, i))
+            continue;
+        number_t value = expr_get_val(expr_bindings_expr_at(bindings, i));
+        needed |= num_is_nan(value);
+        num_destroy(&value);
+    }
+    if (!needed)
+        return true;
+    expr_t *residual = equ_residual(equ);
+    char *source = residual ? expr_to_string(residual, style_EXPRESSION) : NULL;
+    expr_bindings_t *selected = NULL;
+    char *sliced = source ? lab_worker_parameter_slices(source, first, second ? expr_symbol_name(second) : NULL,
+                                                        third ? expr_symbol_name(third) : NULL,
+                                                        NUM_ONE, request, &selected) : NULL;
+    bool ok = sliced != NULL;
+    for (size_t i = 0; ok && i < expr_bindings_count(bindings); ++i) {
+        if (!expr_bindings_is_constant_at(bindings, i))
+            continue;
+        expr_t *parameter = expr_bindings_expr_at(bindings, i);
+        number_t value = expr_get_val(parameter);
+        expr_t *choice = expr_bindings_get(selected, expr_bindings_name_at(bindings, i));
+        if (num_is_nan(value) && choice) {
+            number_t chosen = expr_get_val(choice);
+            ok = num_is_real(chosen) && num_is_finite(chosen);
+            if (ok)
+                expr_set_val(parameter, chosen);
+            num_destroy(&chosen);
+        }
+        num_destroy(&value);
+    }
+    free(sliced);
+    expr_bindings_free(selected);
+    free(source);
+    expr_free(residual);
+    return ok;
+}
+
 /* Select native equation sides or explicit differential-equation graphs, preserving the worksheet source. */
 int lab_worker_solver_plot(int argc, char **argv)
 {
@@ -199,22 +243,20 @@ int lab_worker_solver_plot(int argc, char **argv)
             return 1;
         }
         const expr_t *curves[] = {equ_lhs(equ), equ_rhs(equ)};
-        for (size_t i = 0; i < expr_bindings_count(bindings); ++i)
-            if (!expr_bindings_is_constant_at(bindings, i))
-                print_axis(expr_bindings_name_at(bindings, i));
+        lab_worker_equation_bindings(equ);
         expr_t *second = NULL, *third = NULL;
         bool unresolved = false;
         /* The parsed binding catalogue is bounded by the authored expression; inspect each parameter once. */
         for (size_t i = 0; i < expr_bindings_count(bindings); ++i) {
             expr_t *node = expr_bindings_get(bindings, expr_bindings_name_at(bindings, i));
-            if (node == variable)
+            if (node == variable || expr_bindings_is_constant_at(bindings, i))
                 continue;
             number_t value = expr_eval(node);
             bool fixed = num_is_real(value) && num_is_finite(value);
             num_destroy(&value);
             if (fixed)
                 continue;
-            if (expr_bindings_is_constant_at(bindings, i) || third)
+            if (third)
                 unresolved = true;
             else if (second)
                 third = node;
@@ -223,7 +265,13 @@ int lab_worker_solver_plot(int argc, char **argv)
         }
         if (unresolved) {
             equ_free(equ);
-            printf("error Bind remaining parameters; an equation plot supports at most three free coordinates.\n");
+            printf("error An equation plot supports at most three free coordinates; bind extra coordinates "
+                   "or mark them as constant parameters.\n");
+            return 1;
+        }
+        const char *request = argc > 19 && strcmp(argv[19], "--plot-cache") ? argv[19] : NULL;
+        if (!equation_parameters(equ, axis, second, third, request)) {
+            equ_free(equ);
             return 1;
         }
         if (third) {

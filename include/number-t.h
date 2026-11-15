@@ -543,10 +543,20 @@ int num_set_from_text(number_t *number, const string_t *text);
  */
 string_t *num_to_string(const number_t number);
 
-/** @brief Returns the numeric value converted to `double`. */
+/**
+ * @brief Convert a real numeric value to a machine double.
+ * @param number Borrowed value, including complex storage with an exactly zero imaginary component; not modified.
+ * @return Rounded double, or NAN for an invalid or non-real input. Values outside the double range may overflow.
+ * @note No ownership transfers. The caller retains its input; conversion does not change the default precision.
+ */
 double num_to_double(const number_t number);
 
-/** @brief Returns the numeric value converted to `qfloat_t`. */
+/**
+ * @brief Convert a real numeric value to a double-double scalar.
+ * @param number Borrowed value, including complex storage with an exactly zero imaginary component; not modified.
+ * @return Rounded qfloat_t, or QF_NAN for an invalid or non-real input. Values outside its range may overflow.
+ * @note No ownership transfers. The caller retains its input; conversion does not change the default precision.
+ */
 qfloat_t num_to_qfloat(const number_t number);
 /** @} */
 

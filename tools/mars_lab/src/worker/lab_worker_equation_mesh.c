@@ -290,7 +290,7 @@ int lab_worker_equation_mesh(equation_t *equation, expr_t *first, expr_t *second
     bool manual = !strcmp(argv[7], "manual");
     const char *supplied[] = {argv[5], argv[6], argv[12], argv[13], manual ? argv[8] : "", manual ? argv[9] : ""};
     const char *names[] = {expr_symbol_name(first), expr_symbol_name(second), expr_symbol_name(third)};
-    mesh.sampling = lab_worker_implicit_new(argv[1], names, supplied, 3, bounds);
+    mesh.sampling = lab_worker_implicit_new(argv[1], equation, names, supplied, 3, bounds);
     num_set_default_prec_bits(lab_worker_implicit_precision(mesh.sampling));
     bool ok = mesh.sampling && (manual || !strcmp(argv[7], "auto") || !strcmp(argv[7], "all"));
     for (unsigned axis = 0; axis < 3; ++axis) {

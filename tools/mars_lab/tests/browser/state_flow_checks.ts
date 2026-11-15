@@ -69,18 +69,20 @@ async function checkAlmanacFirstEntry(): Promise<void> {
 
         await WorksheetWorkspace.mode.selectWorksheetMode('expression');
         await WorksheetWorkspace.mode.selectWorksheetMode('almanac');
-        await new Promise(resolve => window.setTimeout(resolve, 50));
-        check(pending.length === 2 && WorksheetContext.rendered.querySelector('.almanac-grid-table'),
-              're-entering a completed worksheet restores it without another calculation');
-        const refresh = WorksheetRequests.evaluation.evaluateAlmanac({skipHistoryUpdate: true});
         await waitFor(() => pending.length === 3);
+        check(WorksheetContext.rendered.querySelector('.almanac-summary'),
+              're-entering a completed worksheet starts a fresh calculation');
+        pending[2](reply());
+        await waitFor(() => !WorksheetRequests.labRequests.busy());
+        const refresh = WorksheetRequests.evaluation.evaluateAlmanac({skipHistoryUpdate: true});
+        await waitFor(() => pending.length === 4);
         await WorksheetWorkspace.mode.selectWorksheetMode('expression');
         await WorksheetWorkspace.mode.selectWorksheetMode('almanac');
-        await waitFor(() => pending.length === 4);
+        await waitFor(() => pending.length === 5);
         check(WorksheetContext.rendered.textContent?.includes('Calculating for the selected observer'),
               'an interrupted refresh resumes even when an older completed response remains cached');
-        pending[2](reply());
         pending[3](reply());
+        pending[4](reply());
         await refresh;
         await waitFor(() => !WorksheetRequests.labRequests.busy());
         check(WorksheetContext.rendered.querySelector('.almanac-grid-table'),
@@ -282,23 +284,24 @@ window.checkLabStateFlow = async function checkLabStateFlow() {
     equal(step(21, obsolete).value, false, 'stale history cannot reach control projection');
     const obsoleteSelection = {stage: 11, current: false};
     equal(step(24, obsoleteSelection).done, true, 'stale selection stops before bounds/default projection');
-    const firstAlmanac = step(24, {stage: 40, index: 6, calendarResult: null});
-    equal(firstAlmanac.calls[0].service, 'stateEvaluate', 'an empty Almanac starts evaluation after defaults');
-    equal((firstAlmanac.calls[0].args[0] as WorksheetEvaluationOptions).skipHistoryUpdate, true,
-          'automatic first entry does not append or clear history');
-    equal(firstAlmanac.wait, false, 'mode selection does not wait for astronomy calculations');
-    const savedResultHTML = WorksheetContext.rendered.innerHTML;
-    try {
-        WorksheetContext.rendered.innerHTML = '<table class="almanac-grid-table"></table>';
-        equal(step(24, {stage: 40, index: 6, calendarResult: {ok: true}}).done, true,
-              'a completed Almanac remains reusable');
-        WorksheetContext.rendered.textContent = '';
-        equal(step(24, {stage: 40, index: 6, calendarResult: {ok: true}}).calls[0].service, 'stateEvaluate',
-              'a cached response cannot suppress evaluation of an empty or interrupted worksheet');
-    } finally { WorksheetContext.rendered.innerHTML = savedResultHTML; }
-    for (let index = 0; index < 6; ++index)
-        equal(step(24, {stage: 40, index, calendarResult: null}).done, true,
-              'manual evaluation modes retain their existing entry policy');
+    const selectionGuard = () => true;
+    const evaluationGuard = step(24, {stage: 40, isCurrent: selectionGuard});
+    equal(evaluationGuard.calls[0].service, 'stateGuard', 'mode defaults are followed by a fresh ownership check');
+    equal(evaluationGuard.calls[0].args[0], selectionGuard, 'evaluation keeps the selection ownership guard');
+    equal(step(24, {stage: 41, current: false}).done, true, 'a superseded mode change cannot start evaluation');
+    const failedRestoration = {stage: 31, current: true, error: 'failed restoration'};
+    equal(step(24, failedRestoration).calls[0].service, 'stateStatus',
+          'restoration errors report their status');
+    equal(failedRestoration.stage, 42,
+          'restoration errors finish without evaluating a partially restored mode');
+    equal(step(24, failedRestoration).done, true, 'failed restoration cannot start a destination calculation');
+    for (let index = 0; index < 7; ++index) {
+        const evaluation = step(24, {stage: 41, index, current: true, calendarResult: {ok: true}});
+        equal(evaluation.calls[0].service, 'stateEvaluate', 'every changed mode evaluates even with a cached result');
+        equal((evaluation.calls[0].args[0] as WorksheetEvaluationOptions).skipHistoryUpdate, true,
+              'automatic mode changes do not append or clear history');
+        equal(evaluation.wait, false, 'mode selection remains responsive while evaluation runs');
+    }
     for (const [action, service] of [
              [1, 'statePrecisionGoal'], [2, 'statePrecisionExpression'], [3, 'stateEvaluate']]) {
         const frame = {stage: 4, plan: {action, source: 'native source', target: '1/3'}};

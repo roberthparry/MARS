@@ -295,9 +295,13 @@ static jsref lab_flow_evaluation_weather_state(struct lab_flow_evaluation_contex
             lab_dom_delete(range, "marsZoomChart");
             lab_dom_delete(lab_dom_id("plotRendered"), "marsComplexPlaneBounds");
         }
-        if (!lab_dom_equal(previous, source))
+        if (!lab_dom_equal(previous, source)) {
+            int names = lab_dom_get(range, "marsPlotNames");
+            if (lab_dom_count(names))
+                lab_dom_write(lab_dom_id("plotFirst"), LAB_DOM_VALUE, "", lab_dom_item(names, 0));
+            lab_dom_write(lab_dom_id("plotSecond"), LAB_DOM_VALUE, "", lab_dom_string(""));
             lab_plot_slices_clear();
-        else
+        } else
             lab_plot_slices_auto();
         lab_dom_write(range, LAB_DOM_DATASET, "plotSource", source);
         /* Retain symbolic cards without scheduling plots for constants or unresolved native operations. */

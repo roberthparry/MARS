@@ -683,7 +683,8 @@ static bool bindings_have_name(const expr_bindings_t *bindings, const char *name
 }
 
 static const char *solutions_integer_branch_parameter(const equation_solutions_t *solutions,
-                                                      const expr_bindings_t *bindings, const size_t *order)
+                                                      expr_bindings_t *bindings, const size_t *order,
+                                                      const char *dependent)
 {
     static const char *const preferences[] = {"n", "m", "k", "l", "j", "r"};
     size_t count = equ_solutions_count(solutions);
@@ -694,6 +695,9 @@ static const char *solutions_integer_branch_parameter(const equation_solutions_t
     /* Build each expression's symbol dictionary once: compact forms such as 4n are still dependencies. */
     for (size_t i = 0; preferred && i < count; ++i) {
         const equation_t *solution = ordered_solution_at(solutions, order, i);
+        const char *name = dependent ? solution_binding_name(bindings, solution) : NULL;
+        if (dependent && (!name || strcmp(name, dependent)))
+            continue;
         expr_bindings_t *symbols = expr_bindings_from_expr_internal(equ_rhs(solution));
         for (size_t j = 0; j < preferred; ++j) {
             if (available[j] && expr_bindings_get(symbols, preferences[j])) {
@@ -769,13 +773,16 @@ static void print_solutions(const equation_solutions_t *solutions, expr_bindings
 }
 
 static void print_solution_TeX_rows(const equation_solutions_t *solutions, expr_bindings_t *bindings,
-                                    const size_t *order, const char *first_separator)
+                                    const size_t *order, const char *first_separator, const char *dependent)
 {
     size_t count = equ_solutions_count(solutions);
+    size_t printed = 0;
 
     for (size_t i = 0u; i < count; ++i) {
         const equation_t *solution = ordered_solution_at(solutions, order, i);
         const char *name = solution_binding_name(bindings, solution);
+        if (dependent && (!name || strcmp(name, dependent)))
+            continue;
         number_t pair = NUM_NAN;
         bool paired = name && solution_conjugate_pair(solutions, order, i, &pair);
         char *pair_TeX = paired ? solution_pair_rhs_text(pair, 0, true) : NULL;
@@ -787,7 +794,7 @@ static void print_solution_TeX_rows(const equation_solutions_t *solutions, expr_
         }
 
         if (pair_TeX) {
-            printf("%s%s &%s %s", i == 0u ? first_separator : " \\\\\n", name,
+            printf("%s%s &%s %s", printed++ == 0u ? first_separator : " \\\\\n", name,
                    symbolic_pair || solution_value_is_exact(pair) ? "=" : "\\approx", pair_TeX);
             free(pair_TeX);
             num_destroy(&pair);
@@ -797,14 +804,21 @@ static void print_solution_TeX_rows(const equation_solutions_t *solutions, expr_
         num_destroy(&pair);
         equation_t *display = solution_with_bound_constants(solution, bindings);
         const equation_t *shown = display ? display : solution;
+        const expr_t *body = dependent ? expr_domain_body(equ_rhs(shown)) : equ_rhs(shown);
+        equation_t *compact = body != equ_rhs(shown) ? equ_new(equ_lhs(shown), body) : NULL;
+        if (compact)
+            shown = compact;
         char *rhs_TeX = expr_TeX_body_dup(equ_rhs(shown));
         char *tex = equ_text_dup(shown, style_LATEX);
 
         if (name && rhs_TeX) {
-            printf("%s", i == 0u ? first_separator : " \\\\\n");
+            printf("%s", printed++ == 0u ? first_separator : " \\\\\n");
             print_aligned_equation_fragment(name, rhs_TeX);
         } else
-            printf("%s%s", i == 0u ? first_separator : " \\\\\n", tex ? tex : "\\text{null}");
+            printf("%s%s", printed++ == 0u ? first_separator : " \\\\\n", tex ? tex : "\\text{null}");
+        if (compact)
+            printf(" \\\\\n&\\text{Conditions in Solutions}");
+        equ_free(compact);
         equ_free(display);
         free(tex);
         free(rhs_TeX);
@@ -827,8 +841,8 @@ static void print_solutions_TeX(const equation_solutions_t *solutions, expr_bind
     printf("solutions_TeX \\begin{aligned}");
     if (equ_solutions_family_note(solutions))
         printf("&\\text{Non-trivial zeros found} \\\\\n");
-    print_solution_TeX_rows(solutions, bindings, order, " ");
-    branch_parameter = solutions_integer_branch_parameter(solutions, bindings, order);
+    print_solution_TeX_rows(solutions, bindings, order, " ", NULL);
+    branch_parameter = solutions_integer_branch_parameter(solutions, bindings, order, NULL);
     if (branch_parameter)
         printf(" \\\\\n& %s \\in \\mathbb{Z}", branch_parameter);
     printf(" \\end{aligned}\n");
@@ -847,7 +861,7 @@ static void print_derivation_TeX(const char *equation_TeX, const equation_soluti
     }
 
     printf("derivation_TeX \\begin{aligned}[t]\n%.*s \\\\\n", (int)equation_body_len, equation_body);
-    print_solution_TeX_rows(solutions, bindings, order, "");
+    print_solution_TeX_rows(solutions, bindings, order, "", NULL);
     printf("\n\\end{aligned}\n");
 }
 
@@ -991,7 +1005,7 @@ static string_t *solution_numerics(const equation_solutions_t *solutions, expr_b
                                     const size_t *order, int precision, const char *prefix)
 {
     size_t count = equ_solutions_count(solutions);
-    const char *branch_parameter = solutions_integer_branch_parameter(solutions, bindings, order);
+    const char *branch_parameter = solutions_integer_branch_parameter(solutions, bindings, order, NULL);
     string_t *text = string_new();
     if (!text)
         return NULL;
@@ -1052,7 +1066,7 @@ static number_t *solution_plot_roots(const equation_solutions_t *solutions, expr
 {
     *root_count = 0;
     size_t count = equ_solutions_count(solutions);
-    if (!count || count > 256 || solutions_integer_branch_parameter(solutions, bindings, order))
+    if (!count || count > 256 || solutions_integer_branch_parameter(solutions, bindings, order, NULL))
         return NULL;
     number_t *roots = calloc(count, sizeof(*roots));
     bool nonreal = false;
@@ -1083,7 +1097,7 @@ static size_t solution_plot_families(const equation_solutions_t *solutions, expr
                                      const size_t *order, expr_t **families, string_t **parameters)
 {
     size_t count = equ_solutions_count(solutions), filled = 0;
-    const char *branch = solutions_integer_branch_parameter(solutions, bindings, order);
+    const char *branch = solutions_integer_branch_parameter(solutions, bindings, order, NULL);
     if (!branch || !count || count > 16)
         return 0;
     for (size_t i = 0; i < count; ++i) {
@@ -1183,12 +1197,63 @@ string_t *lab_worker_equation_plot_solutions(const equation_t *equation, int pre
     return text;
 }
 
-static void print_equation_bindings(const equation_t *equation)
+/* Prefer time, then the conventional Cartesian abscissa, only for a two-variable relation. */
+size_t lab_worker_equation_horizontal(const expr_bindings_t *bindings)
+{
+    size_t count = expr_bindings_count(bindings), indices[2], variables = 0;
+    for (size_t i = 0; i < count; ++i) {
+        if (expr_bindings_is_constant_at(bindings, i))
+            continue;
+        if (variables == 2)
+            return count;
+        indices[variables++] = i;
+    }
+    if (variables != 2)
+        return count;
+    static const char *const preferred[] = {"t", "x"};
+    /* Two convention names and two coordinates, independent of the equation's spelling or operation. */
+    for (size_t i = 0; i < sizeof preferred / sizeof *preferred; ++i)
+        for (size_t j = 0; j < 2; ++j)
+            if (!strcmp(expr_bindings_name_at(bindings, indices[j]), preferred[i]))
+                return indices[j];
+    return indices[0];
+}
+
+/* Use explicit dependent-coordinate solutions when available; retain all branches in the Solutions card. */
+static void print_dependent_TeX(const equation_solutions_t *solutions, expr_bindings_t *bindings, const size_t *order)
+{
+    size_t horizontal = lab_worker_equation_horizontal(bindings), count = expr_bindings_count(bindings);
+    if (horizontal == count)
+        return;
+    const char *dependent = NULL;
+    for (size_t i = 0; i < count; ++i)
+        if (i != horizontal && !expr_bindings_is_constant_at(bindings, i))
+            dependent = expr_bindings_name_at(bindings, i);
+    bool found = false;
+    for (size_t i = 0; i < equ_solutions_count(solutions); ++i) {
+        const char *name = solution_binding_name(bindings, equ_solutions_at(solutions, i));
+        found |= name && dependent && !strcmp(name, dependent);
+    }
+    if (found) {
+        printf("display_TeX \\begin{aligned}");
+        print_solution_TeX_rows(solutions, bindings, order, " ", dependent);
+        const char *branch = solutions_integer_branch_parameter(solutions, bindings, order, dependent);
+        if (branch)
+            printf(" \\\\\n& %s \\in \\mathbb{Z}", branch);
+        printf(" \\end{aligned}\n");
+    }
+}
+
+/* Keep original worksheet bindings available even when the plot uses a temporary numerical member. */
+void lab_worker_equation_bindings(const equation_t *equation)
 {
     expr_bindings_t *bindings = equ_bindings(equation);
+    size_t horizontal = lab_worker_equation_horizontal(bindings);
 
-    /* Every binding is emitted once in its native order; no name lookup is needed. */
-    for (size_t i = 0u; i < expr_bindings_count(bindings); ++i) {
+    /* Emit the horizontal coordinate first, then each remaining binding in native order. */
+    for (size_t position = 0u; position < expr_bindings_count(bindings); ++position) {
+        size_t i = horizontal < expr_bindings_count(bindings)
+                       ? (position == 0 ? horizontal : position <= horizontal ? position - 1 : position) : position;
         const char *name = expr_bindings_name_at(bindings, i);
         expr_t *binding = expr_bindings_expr_at(bindings, i);
         if (!name || !binding)
@@ -1235,10 +1300,11 @@ static void print_equation_fields(const equation_t *equation, const equation_sol
     printf("search_note %s\n", equ_solutions_search_note(solutions) ? equ_solutions_search_note(solutions) : "");
     printf("family_note %s\n", equ_solutions_family_note(solutions) ? equ_solutions_family_note(solutions) : "");
     printf("interpretation_note %s\n", equ_interpretation_note(equation) ? equ_interpretation_note(equation) : "");
-    print_equation_bindings(equation);
+    lab_worker_equation_bindings(equation);
     print_solutions(solutions, bindings, solution_order, precision, false);
     print_solutions(solutions, bindings, solution_order, precision, true);
     print_solutions_TeX(solutions, bindings, solution_order);
+    print_dependent_TeX(solutions, bindings, solution_order);
     print_derivation_TeX(tex, solutions, bindings, solution_order);
     print_solution_numerics(solutions, bindings, solution_order, precision, "numeric     ");
 

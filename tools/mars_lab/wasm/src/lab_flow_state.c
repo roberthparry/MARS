@@ -1205,16 +1205,20 @@ static jsref lab_flow_state_selection_finish(frame_jsref frame)
                : lab_flow_done(0);
 }
 
-/* Almanac has no Evaluate button: first entry and interrupted calculations must start without adding history. */
-static jsref lab_flow_state_selection_calendar(frame_jsref frame)
+/* Recheck ownership after mode-specific defaults and focus before starting a destination calculation. */
+static jsref lab_flow_state_selection_evaluation_guard(frame_jsref frame)
 {
-    if (lab_dom_number(lab_dom_get(frame, "index")) != LAB_MODE_ALMANAC ||
-        (lab_dom_truth(lab_dom_get(frame, "calendarResult")) &&
-         lab_dom_query(0, "#rendered .almanac-grid-table")))
+    return lab_flow_state_guard(frame, 41);
+}
+
+/* Every accepted mode change refreshes its restored input without adding or clearing navigation history. */
+static jsref lab_flow_state_selection_evaluate(frame_jsref frame)
+{
+    if (!lab_dom_truth(lab_dom_get(frame, "current")))
         return lab_flow_done(0);
     jsref options = lab_dom_object(LAB_VALUE_OBJECT);
     lab_dom_set(options, "skipHistoryUpdate", lab_dom_scalar(LAB_VALUE_BOOLEAN, 1));
-    return lab_flow_call(frame, 41, "stateEvaluate", 0, 0, 1, options);
+    return lab_flow_call(frame, 42, "stateEvaluate", 0, 0, 1, options);
 }
 
 static jsref lab_flow_state_selection_error_guard(frame_jsref frame)
@@ -1225,7 +1229,7 @@ static jsref lab_flow_state_selection_error_guard(frame_jsref frame)
 static jsref lab_flow_state_selection_state_status(frame_jsref frame)
 {
     if (lab_dom_truth(lab_dom_get(frame, "current")))
-        return lab_flow_call(frame, 40, "stateStatus", 0, 0, 1, lab_dom_get(frame, "error"));
+        return lab_flow_call(frame, 42, "stateStatus", 0, 0, 1, lab_dom_get(frame, "error"));
     /* Continue: stale failures cannot change the visible status. */
     return lab_flow_state_selection_otherwise(frame);
 }
@@ -1259,7 +1263,8 @@ static jsref lab_flow_state_selection(frame_jsref frame, view_jsref view)
         [16] = lab_flow_state_selection_finish,
         [30] = lab_flow_state_selection_error_guard,
         [31] = lab_flow_state_selection_state_status,
-        [40] = lab_flow_state_selection_calendar,
+        [40] = lab_flow_state_selection_evaluation_guard,
+        [41] = lab_flow_state_selection_evaluate,
     };
     unsigned selected = lab_flow_state_stage(frame);
     return selected < sizeof handlers / sizeof *handlers && handlers[selected]

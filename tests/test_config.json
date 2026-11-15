@@ -930,6 +930,7 @@
         "complex_power_affine_exponent": true,
         "complex_power_cartesian_base": true,
         "complex_power_complex_target": true,
+        "complex_power_guarded_parameter_collision": true,
         "complex_power_i": true,
         "complex_power_negative_base": true,
         "complex_power_negative_i": true,
@@ -944,6 +945,7 @@
       },
       "test_equation_database_cases": {
         "enabled": true,
+        "guarded_root_polynomial_branches": true,
         "linear_root": true,
         "quadratic_roots": true
       },
@@ -959,6 +961,20 @@
         "test_equation_future_simplifies_schoolbook_periodic_tan_families": true,
         "test_equation_future_solves_sin_family": true
       },
+      "test_equation_guarded_inverse": {
+        "enabled": true,
+        "guarded_inverse_atanh": true,
+        "guarded_inverse_denominator": true,
+        "guarded_inverse_euler_power": true,
+        "guarded_inverse_exp_affine": true,
+        "guarded_inverse_indexed_constants": true,
+        "guarded_inverse_integral_constants": true,
+        "guarded_inverse_log_affine": true,
+        "guarded_inverse_renamed_scaled": true,
+        "guarded_inverse_root": true,
+        "guarded_inverse_upper_boundary": true,
+        "guarded_inverse_upper_negative_boundary": true
+      },
       "test_equation_inverts_roots_and_constant_powers": true,
       "test_equation_preserves_principal_root_domain": {
         "case_389115d6296ae31f": true,
@@ -967,6 +983,8 @@
         "case_dd97cd0d916f9da1": true,
         "complex_power_zero_target": true,
         "enabled": true,
+        "inverse_atanh_lower_cut": true,
+        "inverse_atanh_pole": true,
         "negative_power_zero_target": true
       },
       "test_equation_relation_separators": {
@@ -2958,6 +2976,7 @@
       "run_number_physical_constant_tests": true,
       "run_number_promotion_tests": true,
       "run_number_public_api_tests": true,
+      "run_number_real_complex_conversion_tests": true,
       "run_number_special_function_tests": true
     }
   },
@@ -2973,6 +2992,14 @@
         "test_number_real_elementary_parity": true,
         "test_number_real_special_identities": true,
         "test_number_real_special_parity": true
+      },
+      "run_number_real_complex_conversion_tests": {
+        "complex_real_conversion_imaginary": true,
+        "complex_real_conversion_negative": true,
+        "complex_real_conversion_nonreal": true,
+        "complex_real_conversion_positive": true,
+        "complex_real_conversion_zero": true,
+        "enabled": true
       }
     }
   },
@@ -3140,6 +3167,11 @@
         "clausen_odd_300": true,
         "clausen_odd_34": true,
         "clausen_odd_80": true,
+        "complex_real_conversion_imaginary": true,
+        "complex_real_conversion_negative": true,
+        "complex_real_conversion_nonreal": true,
+        "complex_real_conversion_positive": true,
+        "complex_real_conversion_zero": true,
         "digamma_shift_1234": true,
         "digamma_shift_300": true,
         "digamma_shift_34": true,
@@ -3520,7 +3552,51 @@
         "zetap_zero_1234": true,
         "zetap_zero_300": true,
         "zetap_zero_34": true,
-        "zetap_zero_80": true
+        "zetap_zero_80": true,
+        "gamma_inverse_conjugate_1234": true,
+        "gamma_inverse_conjugate_300": true,
+        "gamma_inverse_conjugate_64": true,
+        "gamma_inverse_shifted_1234": true,
+        "gamma_inverse_shifted_300": true,
+        "gamma_inverse_shifted_64": true,
+        "lerch_reference_alternating_300": true,
+        "lerch_reference_alternating_64": true,
+        "lerch_reference_complex_1234": true,
+        "lerch_reference_complex_300": true,
+        "lerch_reference_complex_64": true,
+        "lerch_reference_conjugate_300": true,
+        "lerch_reference_conjugate_64": true,
+        "lerch_reference_lower_cut_300": true,
+        "lerch_reference_lower_cut_64": true,
+        "lerch_reference_negative_order_300": true,
+        "lerch_reference_negative_order_64": true,
+        "lerch_reference_precision_retry_300": true,
+        "lerch_reference_precision_retry_64": true,
+        "zetah_reference_half_1234": true,
+        "zetah_reference_half_300": true,
+        "zetah_reference_half_64": true,
+        "zetah_reference_near_pole_1234": true,
+        "zetah_reference_near_pole_300": true,
+        "zetah_reference_near_pole_64": true,
+        "zetah_reference_negative_1234": true,
+        "zetah_reference_negative_300": true,
+        "zetah_reference_negative_64": true,
+        "zetah_reference_unit_1234": true,
+        "zetah_reference_unit_300": true,
+        "zetah_reference_unit_64": true,
+        "lerch_blocks_alternating_1234": true,
+        "lerch_blocks_complex_1234": true,
+        "lerch_blocks_complex_300": true,
+        "lerch_blocks_conjugate_300": true,
+        "lerch_blocks_imaginary_300": true,
+        "lerch_blocks_lower_offset_300": true,
+        "lerch_blocks_near_unit_300": true,
+        "lerch_blocks_negative_order_300": true,
+        "lerch_blocks_reject_offset": true,
+        "lerch_blocks_reject_order": true,
+        "lerch_blocks_reject_precision": true,
+        "lerch_blocks_reject_radius": true,
+        "lerch_blocks_upper_offset_300": true
       }
     }
   },
@@ -4848,6 +4924,28 @@
       "enabled": true,
       "test_lab_eclipse_worker_geometry": true,
       "test_lab_totality_large_catalogue": true
+    }
+  },
+  "tools/mars_lab/tests/test_lab_equation_parameters.c": {
+    "tests": {
+      "enabled": true,
+      "test_lab_equation_parameters": {
+        "enabled": true,
+        "equation_display_all_dependent_branches": true,
+        "equation_display_x_of_t": true,
+        "equation_display_y_of_x": true,
+        "equation_exact_constant_narrow_parameter": true,
+        "equation_fixed_constant_parameter": true,
+        "equation_four_coordinates_notice": true,
+        "equation_inverse_curve_parameters": true,
+        "equation_line_parameters": true,
+        "equation_named_coordinates_parameters": true,
+        "equation_parameter_invalid_limits": true,
+        "equation_parameter_slider_position": true,
+        "equation_three_coordinate_parameter": true,
+        "equation_unwrapped_inverse_display": true,
+        "equation_unwrapped_inverse_plot": true
+      }
     }
   },
   "tools/mars_lab/tests/test_lab_evaluation.c": {

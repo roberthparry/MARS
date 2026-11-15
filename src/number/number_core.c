@@ -3848,6 +3848,7 @@ int num_set_from_text(number_t *number, const string_t *text)
     return number_is_valid_value(number) ? 0 : -1;
 }
 
+/* Convert mathematically real complex storage through its real component, without discarding an imaginary value. */
 double num_to_double(const number_t number)
 {
     const number_vtable_t *vt = number_vt(&number);
@@ -3855,6 +3856,12 @@ double num_to_double(const number_t number)
 
     if (!number_is_valid_value(&number) || !num_is_real(number))
         return NAN;
+    if (vt && vt->is_complex) {
+        number_t real = num_real_part(number);
+        double value = num_to_double(real);
+        num_destroy(&real);
+        return value;
+    }
     if (vt && vt->to_double)
         return vt->to_double(&number);
     tmp = number_coerce(&number, NUMBER_MPFR);
@@ -3866,6 +3873,7 @@ double num_to_double(const number_t number)
     return value;
 }
 
+/* Preserve double-double conversion for real values held by a complex backend. */
 qfloat_t num_to_qfloat(const number_t number)
 {
     const number_vtable_t *vt = number_vt(&number);
@@ -3873,6 +3881,12 @@ qfloat_t num_to_qfloat(const number_t number)
 
     if (!number_is_valid_value(&number) || !num_is_real(number))
         return QF_NAN;
+    if (vt && vt->is_complex) {
+        number_t real = num_real_part(number);
+        qfloat_t value = num_to_qfloat(real);
+        num_destroy(&real);
+        return value;
+    }
     if (vt && vt->to_qfloat)
         return vt->to_qfloat(&number);
     tmp = number_coerce(&number, NUMBER_MPFR);

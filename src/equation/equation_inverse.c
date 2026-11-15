@@ -165,7 +165,8 @@ static expr_t *inverse_complex_power_target(const expr_t *base, const expr_t *ta
     return result;
 }
 
-static int inverse_side(const expr_t *left, const expr_t *right, const expr_t *variable, const char *branch,
+static int inverse_side(const equation_t *source, const expr_t *left, const expr_t *right,
+                         const expr_t *variable, const char *branch,
                          equation_solutions_t *solutions)
 {
     if (!inverse_uses_variable(left, variable) || inverse_uses_variable(right, variable))
@@ -200,7 +201,7 @@ static int inverse_side(const expr_t *left, const expr_t *right, const expr_t *v
     } else
         return 1;
     /* Nested inversions must reserve any branch parameters introduced by the outer inverse. */
-    equation_t *reduced = target ? equ_new_with_inferred_bindings(inner, target) : NULL;
+    equation_t *reduced = target ? equ_reduction_new(source, inner, target) : NULL;
     int status = reduced ? equ_solve_for_into(reduced, variable, solutions) : -1;
     equ_free(reduced);
     expr_free(target);
@@ -212,6 +213,6 @@ int equ_try_solve_unary_inverse(const equation_t *equation, const expr_t *variab
 {
     if (!equation || !variable || !solutions) return -1;
     const char *branch = equ_branch_parameter_name(equation);
-    int status = inverse_side(equ_lhs(equation), equ_rhs(equation), variable, branch, solutions);
-    return status == 1 ? inverse_side(equ_rhs(equation), equ_lhs(equation), variable, branch, solutions) : status;
+    int status = inverse_side(equation, equ_lhs(equation), equ_rhs(equation), variable, branch, solutions);
+    return status == 1 ? inverse_side(equation, equ_rhs(equation), equ_lhs(equation), variable, branch, solutions) : status;
 }

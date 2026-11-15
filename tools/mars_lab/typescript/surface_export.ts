@@ -69,6 +69,7 @@ class MarsSurfaceExporter {
         const drawing = document.createElementNS(MarsSurfaceSVGWriter.namespace, 'g');
         this.appendSeries(drawing, plan.series, segments);
         this.appendAxes(drawing, plan.axes, view.framePlan.texts);
+        WorksheetPlotPalette.apply(drawing);
         return drawing;
     }
 
@@ -140,6 +141,7 @@ class MarsSurfaceExporter {
         }
         chart.replaceChildren(drawing);
         chart.style.overflow = 'hidden';
+        WorksheetPlotPalette.apply(copy);
         this.removeMetadata(copy);
         return new XMLSerializer().serializeToString(copy);
     }

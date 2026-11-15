@@ -940,7 +940,7 @@ int expr_is_default_constant_name_text(const string_t *name)
     rune = string_cursor_peek(cursor);
     if (!rune_to_ascii(rune, &ch))
         goto done;
-    uppercase_integral_constant = ch == 'C';
+    uppercase_integral_constant = ch == 'C' || ch == 'D';
     if (ch != 'a' && ch != 'b' && ch != 'c' && ch != 'd' && ch != 'j' && ch != 'k' && ch != 'l' && ch != 'm' &&
         ch != 'n' && !uppercase_integral_constant)
         goto done;

@@ -74,3 +74,51 @@ INSERT OR IGNORE INTO equation_cases(name, operation, input, expected) VALUES ('
 INSERT OR IGNORE INTO equation_cases(name, operation, input, expected) VALUES ('case_438037ee7a232475', 'test_equation_relation_separators_rejected', 'x~==1', '');
 INSERT OR IGNORE INTO equation_cases(name, operation, input, expected) VALUES ('case_5f204a246a9b38b4', 'test_equation_relation_separators_rejected', '0<x<=1', '');
 INSERT OR IGNORE INTO equation_cases(name, operation, input, expected) VALUES ('case_70c9008f08338f89', 'test_equation_relation_separators_rejected', 'x==y==z', '');
+
+INSERT INTO test_case_runner(module, source, parent, table_name, operation) VALUES (
+    'equation.guarded_inverse', 'tests/equation/test_equation.c',
+    'tests.test_equation_guarded_inverse', 'equation_cases', 'guarded_inverse')
+ON CONFLICT(module) DO UPDATE SET table_name=excluded.table_name, operation=excluded.operation;
+
+INSERT OR IGNORE INTO equation_cases(name, operation, input, expected, precision) VALUES
+    ('guarded_inverse_integral_constants', 'guarded_inverse',
+     'x=-(2*atanh(sqrt(C+2*exp(y))/sqrt(C)))/sqrt(C)+D',
+     '{"coordinate":"y","constants":["C","D"],"formula":"ln(-C/(2*cosh(sqrt(C)*(x-D)/2)^2))","samples":[{"bindings":{"C":"-1","D":"1","x":"1"},"valid":true},{"bindings":{"C":"-1","D":"1","x":"2"},"valid":true},{"bindings":{"C":"-1","D":"1","x":"0"},"valid":false},{"bindings":{"C":"-1","D":"1","x":"5"},"valid":false},{"bindings":{"C":"0","D":"1","x":"2"},"valid":false}]}', 64),
+    ('guarded_inverse_renamed_scaled', 'guarded_inverse',
+     'p=-(3*atanh(sqrt(a+5*exp(q))/sqrt(a)))/sqrt(a)+b',
+     '{"coordinate":"q","constants":["a","b"],"formula":"ln(a*(tanh(sqrt(a)*(p-b)/3)^2-1)/5)","samples":[{"bindings":{"a":"-4","b":"2","p":"2"},"valid":true},{"bindings":{"a":"-4","b":"2","p":"3"},"valid":true},{"bindings":{"a":"-4","b":"2","p":"1"},"valid":false},{"bindings":{"a":"-4","b":"2","p":"8"},"valid":false}]}', 64),
+    ('guarded_inverse_atanh', 'guarded_inverse', 'atanh(y)=x',
+     '{"coordinate":"y","formula":"tanh(x)","samples":[{"bindings":{"x":"-2"},"valid":true},{"bindings":{"x":"2"},"valid":true},{"bindings":{"x":"1+i/2"},"valid":true},{"bindings":{"x":"3*i"},"valid":false}]}', 64),
+    ('guarded_inverse_root', 'guarded_inverse', 'sqrt(y)=x',
+     '{"coordinate":"y","formula":"x^2","samples":[{"bindings":{"x":"3"},"valid":true},{"bindings":{"x":"0"},"valid":true},{"bindings":{"x":"i"},"valid":true},{"bindings":{"x":"-3"},"valid":false},{"bindings":{"x":"-i"},"valid":false}]}', 64),
+    ('guarded_inverse_log_affine', 'guarded_inverse', 'a+2*ln(y)=x',
+     '{"coordinate":"y","constants":["a"],"formula":"exp((x-a)/2)","samples":[{"bindings":{"a":"1","x":"3"},"valid":true},{"bindings":{"a":"1","x":"-1"},"valid":true},{"bindings":{"a":"1","x":"-8*i"},"valid":false}]}', 64),
+    ('guarded_inverse_exp_affine', 'guarded_inverse', 'a+2*exp(y)=x',
+     '{"coordinate":"y","constants":["a"],"formula":"ln((x-a)/2)","samples":[{"bindings":{"a":"1","x":"3"},"valid":true},{"bindings":{"a":"1","x":"-1"},"valid":true},{"bindings":{"a":"1","x":"1"},"valid":false}]}', 64),
+    ('guarded_inverse_denominator', 'guarded_inverse', 'x=atanh(y)/a',
+     '{"coordinate":"y","constants":["a"],"formula":"tanh(a*x)","samples":[{"bindings":{"a":"2","x":"1"},"valid":true},{"bindings":{"a":"-2","x":"1"},"valid":true},{"bindings":{"a":"0","x":"1"},"valid":false}]}', 64);
+
+INSERT OR IGNORE INTO equation_cases(name, operation, input, expected) VALUES
+    ('inverse_atanh_pole', 'test_equation_preserves_principal_root_domain_sources', 'atanh(y)=i*pi/2', '');
+
+INSERT OR IGNORE INTO equation_cases(name, operation, input, expected, precision) VALUES
+    ('guarded_inverse_upper_boundary', 'guarded_inverse', 'atanh(y)=1+i*pi/2',
+     '{"coordinate":"y","formula":"coth(1)","samples":[{"bindings":{},"valid":true}]}', 64),
+    ('guarded_inverse_upper_negative_boundary', 'guarded_inverse', 'atanh(y)=-1+i*pi/2',
+     '{"coordinate":"y","formula":"-coth(1)","samples":[{"bindings":{},"valid":true}]}', 64),
+    ('guarded_inverse_indexed_constants', 'guarded_inverse',
+     'x=-(2*atanh(sqrt(C1+2*exp(y))/sqrt(C1)))/sqrt(C1)+D1',
+     '{"coordinate":"y","constants":["C₁","D₁"],"formula":"ln(-C1/(2*cosh(sqrt(C1)*(x-D1)/2)^2))","samples":[{"bindings":{"C₁":"-4","D₁":"2","x":"3"},"valid":true}]}', 64);
+
+INSERT OR IGNORE INTO equation_cases(name, operation, input, expected) VALUES
+    ('inverse_atanh_lower_cut', 'test_equation_preserves_principal_root_domain_sources', 'atanh(y)=1-i*pi/2', '');
+
+INSERT OR IGNORE INTO equation_cases(name, operation, input, expected, precision) VALUES
+    ('guarded_inverse_euler_power', 'guarded_inverse',
+     'x=-(2*atanh(sqrt(C+2*e^y)/sqrt(C)))/sqrt(C)+D',
+     '{"coordinate":"y","constants":["C","D"],"formula":"ln(-C/(2*cosh(sqrt(C)*(x-D)/2)^2))","samples":[{"bindings":{"C":"-1","D":"1","x":"1"},"valid":true},{"bindings":{"C":"-1","D":"1","x":"2"},"valid":true},{"bindings":{"C":"-1","D":"1","x":"0"},"valid":false}]}', 64),
+    ('guarded_root_polynomial_branches', 'solve_count', '{sqrt(y^2)=a | y=?; a=?}', '2', 64);
+
+INSERT OR IGNORE INTO equation_cases(name, operation, input, expected, precision) VALUES
+    ('complex_power_guarded_parameter_collision', 'complex_power_family',
+     '{n*sqrt(i^x)/n=2 | x=?; n=3}', 'x=4*m-2*i*ln(4)/pi', 78);

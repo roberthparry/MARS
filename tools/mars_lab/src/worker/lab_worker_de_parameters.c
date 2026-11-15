@@ -117,7 +117,8 @@ bool lab_worker_de_plot_parameters(diffequ_t *de, const char *request)
     }
     ok = ok && string_append_cstr(source, " }") == 0;
     expr_bindings_t *selected = NULL;
-    char *sliced = ok ? lab_worker_parameter_slices(string_c_str(source), NULL, NULL, request, &selected) : NULL;
+    char *sliced = ok ? lab_worker_parameter_slices(string_c_str(source), NULL, NULL, NULL,
+                                                    NUM_ONE, request, &selected) : NULL;
     ok = sliced != NULL;
     for (size_t i = 0; ok && i < expr_bindings_count(constants); ++i) {
         expr_t *parameter = expr_bindings_expr_at(constants, i);

@@ -711,22 +711,65 @@ Exact parameters and arguments contribute the current default working precision.
 
 `number_lerch_phi` and `num_lerch_phi` use native arithmetic for real and complex
 arguments in `abs(z) < 1`, with the existing zero-argument, zero-order and Hurwitz
-zeta reductions. Integer orders use integer powers. General orders reuse shifted
+zeta reductions. Integer orders use integer powers. At 512–8,192 bits, moderate
+non-integral orders and offsets (both of modulus at most 16) and
+`0.01 <= abs(z) <= 0.9` use finite weighted binomial blocks. Each block sums 64
+consecutive terms around one inverse-power anchor, using the
+[binomial expansion](https://dlmf.nist.gov/4.6.E7) and shared geometric moments.
+The first 64 terms retain their principal powers; later blocks stay in the right
+half-plane. The moments are computed within the call and released afterwards. Explicit bounds
+cover the binomial remainder, defining-series tail and accumulated absolute
+roundoff, including shortened moment arithmetic. Unresolved cases fall back to
+the ordinary series. One checked result, keyed by exact arguments, signed zeros
+and verified precision, retains at most 16 KiB of significands under a mutex;
+this avoids repeating unchanged calculations. Cold and changing-input timings
+must be measured separately from that reuse.
+
+The ordinary series for general orders reuses shifted
 inverse powers across calls: the additional power cache retains
 one exact offset/order pair, at most 4,096 entries, 16,384 bits per entry and eight
 MiB of significands. Entries are copied under a mutex, higher precision can serve
 lower requests with the same exact key, and changing either key releases the old
 entries. This bounds memory use in a persistent server. First use still calculates
-the required powers; subsequent calls can reuse them. Convergence and accumulated
-rounding checks apply to both cached and uncached evaluations.
+the required powers; subsequent calls can reuse them. Guarded logarithms are shared
+when the order changes. As `z^k` decreases, non-integral powers use fewer significant
+bits; a separate absolute error bound for every weighted power remains part of the
+convergence check. At larger precisions, sixteen-term Horner blocks reduce full-width complex products,
+with directed magnitude bounds controlling the same geometric remainder. Each
+block also uses its required coefficient precision for Horner evaluation, including
+rounded copies of the argument and power; their rounding errors remain in the bound. If
+cancellation exhausts that allowance, the calculation retries
+at uniform precision. Convergence and accumulated rounding checks apply to both
+cached and uncached evaluations. The native benchmark
+`build/release/bench/number/bench_number_lerch` measures separate fresh-process
+calls and calls changing all three arguments, rather than timing repeated cache
+hits as evidence of algorithmic speed.
 
 Complex `num_gamma`, `num_lgamma` and `num_gammainv` retain MPC precision instead
 of converting to qcomplex. Gamma uses recurrence and a guarded Stirling expansion;
 log gamma tracks the logarithm's branch through that recurrence. Inverse gamma
 refines the established logarithmic branch with increasing precision and checks
-the final defining residual. Working storage is local apart from the bounded,
-synchronised coefficient cache. A rejected input or unresolved calculation
+the final defining residual. Both real and complex inverse gamma plan their precision
+stages backwards from the target, avoiding a redundant almost-full-precision stage.
+Their Newton slopes use half-stage precision plus guard bits, while the final
+correction and residual retain the full accuracy checks. Intermediate stages apply
+a correction once half-stage accuracy is established. When a final iterate already passes both the correction and
+logarithmic-residual checks, it is retained without a redundant final gamma evaluation.
+Working storage is local apart from the bounded, synchronised coefficient cache.
+A rejected input or unresolved calculation
 returns an invalid number rather than a lower-precision answer.
+
+The shared Bernoulli cache builds even coefficient prefixes from the
+[Bernoulli generating function](https://dlmf.nist.gov/24.2.E1), retaining 96 arithmetic
+guard bits and bounding the omitted convolution tail. Normalised coefficients,
+ordinary coefficients and the recurrence's inverse factorials share the existing
+eight-MiB limit. Oversized requests keep the direct integer-zeta formula. Hurwitz
+zeta and its order derivative share Lerch's guarded inverse powers for their finite
+sums; their Euler–Maclaurin tails and branch conventions are unchanged.
+Small convolution products and Euler–Maclaurin corrections use fewer significant
+bits, with absolute roundoff bounds derived from the accumulator scale and the
+normalised Bernoulli-coefficient bound. Rising products and final sums retain their
+full working precision.
 
 Double-backed inverse erf and erfc use cheap starting estimates followed by libc
 Halley refinement; very small complementary probabilities use MPFR. Complex inverse
@@ -2097,7 +2140,10 @@ string_t *num_sprintf_text(const char *fmt, ...);
 
 ### `num_to_double()`
 
-Returns the public result described by to double.
+Converts a real value to a machine double, including a value stored in any complex
+backend whose imaginary component is exactly zero. A nonzero imaginary component
+or invalid value returns `NAN`. Conversion rounds to double precision and may
+overflow outside its range; it preserves the input and default precision.
 
 ```c
 double num_to_double(const number_t number);
@@ -2105,7 +2151,9 @@ double num_to_double(const number_t number);
 
 ### `num_to_qfloat()`
 
-Returns the public result described by to qfloat.
+Converts a real value to a double-double scalar, including real-valued complex
+storage. Non-real or invalid values return `QF_NAN`. The input and default precision
+are preserved; values outside the scalar's range may overflow.
 
 ```c
 qfloat_t num_to_qfloat(const number_t number);

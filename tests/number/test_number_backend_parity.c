@@ -15,6 +15,7 @@
 #include <stdlib.h>
 
 #include "string-t.h"
+#include "test_database.h"
 #include "test_number.h"
 
 #define NUMBER_PARITY_PRECISION 512u
@@ -726,6 +727,37 @@ static void test_number_complex_special_parity(void)
     num_destroy(&erf_one);
     num_destroy(&gamma_one);
     num_destroy(&real_one);
+}
+
+static void real_complex_conversion_row(const void *data)
+{
+    const test_database_case_t *row = data;
+    NUM_SCOPE(scope);
+    number_t input = num_create_from_text(row->input), expected = num_create_from_text(row->expected);
+    number_t real = num_real_part(input), imaginary = num_imag_part(input);
+    double re = num_to_double(real), im = num_to_double(imaginary);
+    number_t values[] = {
+        num_create_from_cdouble(CMPLX(re, im)),
+        num_create_from_qcomplex(qc_make(qf_from_double(re), qf_from_double(im))),
+        num_mul(input, num_mul(NUM_I, num_neg(NUM_I))),
+    };
+    double want = num_to_double(expected);
+    for (size_t i = 0; i < sizeof values / sizeof *values; ++i) {
+        double converted = num_to_double(values[i]);
+        qfloat_t wide = num_to_qfloat(values[i]);
+        bool ok = isnan(want) ? isnan(converted) && qf_isnan(wide) :
+                                converted == want && qf_eq(wide, qf_from_double(want));
+        if (!ok)
+            printf("%s backend %zu: double %.17g, expected %.17g\n", string_c_str(row->name), i, converted, want);
+        ASSERT_TRUE(ok);
+        ASSERT_TRUE(num_eq(num_real_part(values[i]), real) && num_eq(num_imag_part(values[i]), imaginary));
+    }
+}
+
+/* Register independently selectable conversion cases, leaving the backend-parity precision scope untouched. */
+void run_number_real_complex_conversion_tests(void)
+{
+    test_run_database_cases(__FILE__, __LINE__, "number.real_complex_conversion", NULL, real_complex_conversion_row);
 }
 
 void run_number_backend_parity_tests(void)

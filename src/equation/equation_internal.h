@@ -41,6 +41,16 @@ bool equ_input_parts(const string_t *text, string_view_t *body, string_view_t *b
 
 equation_t *equ_new_with_owned_bindings(const expr_t *lhs, const expr_t *rhs, expr_bindings_t *bindings);
 
+/**
+ * @brief Construct a reduced problem while reserving every original binding name.
+ * @param source Borrowed original problem, or NULL; no side or binding is changed.
+ * @param lhs Borrowed reduced left side, retained on success.
+ * @param rhs Borrowed reduced right side, retained on success.
+ * @return Owned reduced equation released with equ_free(), or NULL on invalid sides or allocation failure.
+ * @note Inferred live symbols take precedence; original names remain reserved even when algebra removes them.
+ */
+equation_t *equ_reduction_new(const equation_t *source, const expr_t *lhs, const expr_t *rhs);
+
 struct _expr_function_temporaries_t;
 
 /** @brief Reserve and report one solver attempt, search seed or numerical iteration in the current scope. */
@@ -117,6 +127,16 @@ number_t equ_polynomial_rational_candidate(number_t value);
  * principal inverse. Finite non-zero negative or complex bases produce the complete integer logarithmic family.
  */
 int equ_try_solve_unary_inverse(const equation_t *equation, const expr_t *wrt, equation_solutions_t *solutions);
+
+/**
+ * @brief Isolate a coordinate through affine arithmetic and principal unary operations with retained domains.
+ * @param equation Borrowed source equation; sides, bindings and values remain unchanged.
+ * @param wrt Borrowed coordinate to isolate, occurring on exactly one side of the equation.
+ * @param solutions Borrowed output receiving a guarded solution or a proved-empty status.
+ * @return Zero when handled, one for an unsupported chain, or minus one on allocation or computation failure.
+ * @note Principal-root and inverse-hyperbolic restrictions remain native expression conditions. No ownership transfers.
+ */
+int equ_try_solve_guarded_inverse(const equation_t *equation, const expr_t *wrt, equation_solutions_t *solutions);
 
 /**
  * @brief Choose the name of a fresh integer parameter for a symbolic solution family.

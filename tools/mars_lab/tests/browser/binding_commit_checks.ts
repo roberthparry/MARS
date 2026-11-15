@@ -40,7 +40,7 @@ window.checkLabBindingCommit = async function checkLabBindingCommit() {
         equal(payload.operation, 'bindings', 'binding payload operation');
         equal(payload.mode, 'merge', 'binding payload merge policy');
         equal(payload.text, source, 'source is copied without mathematical interpretation or trimming');
-        equal(payload.unset_constants, mode !== 0 && mode !== 2, 'Expression and ODE edits preserve symbolic constants');
+        equal(payload.unset_constants, false, 'ordinary binding edits preserve unset constants in every mode');
         equal(payload.syntax, mode === 2 ? 'diffequation' : undefined, 'ODE edits retain the differential-envelope syntax');
         equal(payload.bindings.length, 3, 'duplicate bindings are not removed');
         check(

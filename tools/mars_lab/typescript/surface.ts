@@ -27,6 +27,7 @@ class MarsSurfaceGPU {
         private readonly camera: WebGLUniformLocation | null,
         private readonly domainScale: WebGLUniformLocation | null,
         private readonly domainOffset: WebGLUniformLocation | null,
+        private readonly palette: WebGLUniformLocation | null,
         readonly maxSize: number
     ) {}
 
@@ -55,11 +56,13 @@ class MarsSurfaceGPU {
                 }
             `], [gl.FRAGMENT_SHADER, `
                 precision ${precision} float;
+                uniform mat3 palette;
                 varying mediump vec3 shade; varying mediump vec3 edge; varying ${precision} vec3 coordinate;
                 void main() {
                     if (any(greaterThan(abs(coordinate), vec3(0.5000001)))) discard;
                     float wire = smoothstep(0.0, 0.025, min(edge.x, min(edge.y, edge.z)));
-                    gl_FragColor = vec4(mix(shade * 0.65, shade, wire), 1.0);
+                    vec3 themed = clamp(palette * shade, 0.0, 1.0);
+                    gl_FragColor = vec4(mix(themed * 0.65, themed, wire), 1.0);
                 }
             `]];
             for (const [type, source] of sources) {
@@ -88,12 +91,13 @@ class MarsSurfaceGPU {
             const camera = gl.getUniformLocation(program, 'camera');
             const domainScale = gl.getUniformLocation(program, 'domainScale');
             const domainOffset = gl.getUniformLocation(program, 'domainOffset');
+            const palette = gl.getUniformLocation(program, 'palette');
             gl.enable(gl.DEPTH_TEST);
             gl.disable(gl.CULL_FACE);
             const viewport = gl.getParameter(gl.MAX_VIEWPORT_DIMS) as Int32Array;
             const maximum = gl.getParameter(gl.MAX_RENDERBUFFER_SIZE) as number;
             return new MarsSurfaceGPU(gl, canvas, vertices.length / 9, segments, program, buffer,
-                shaders, camera, domainScale, domainOffset, Math.min(4096, maximum, ...viewport));
+                shaders, camera, domainScale, domainOffset, palette, Math.min(4096, maximum, ...viewport));
         } catch (_) {
             if (buffer) gl.deleteBuffer(buffer);
             if (program) gl.deleteProgram(program);
@@ -117,6 +121,7 @@ class MarsSurfaceGPU {
         gl.uniformMatrix4fv(this.camera, false, matrix);
         gl.uniform3fv(this.domainScale, scaling);
         gl.uniform3fv(this.domainOffset, offset);
+        gl.uniformMatrix3fv(this.palette, false, WorksheetPlotPalette.matrix());
         gl.drawArrays(this.segments ? gl.LINES : gl.TRIANGLES, 0, visible ? this.vertexCount : 0);
         return true;
     }
@@ -186,6 +191,7 @@ class MarsSurfacePreview {
         this.onHover = this.onHover.bind(this);
         this.events.addEventListener('pagehide', this.onPageHide);
         this.events.addEventListener('resize', this.onResize);
+        this.events.addEventListener('mars-plot-palette-change', this.onResize);
         this.events.addEventListener('pointermove', this.onHover);
         // Replaced SVG paths can enter a stationary pointer without a pointermove.
         this.events.addEventListener('pointerover', this.onHover);
@@ -594,7 +600,7 @@ class MarsSurfacePreview {
         if (!ctx || !view.polygons) return false;
         ctx.clearRect(0, 0, view.width, view.height);
         const triangles = view.polygons();
-        ctx.strokeStyle = '#193d4659';
+        ctx.strokeStyle = WorksheetPlotPalette.colour('#193d4659');
         ctx.lineWidth = 0.45;
         for (const triangle of triangles) {
             ctx.beginPath();
@@ -604,13 +610,13 @@ class MarsSurfacePreview {
                 else ctx.moveTo(...point);
             }
             if (view.chart.dataset.segments === 'true') {
-                ctx.strokeStyle = triangle.colour;
+                ctx.strokeStyle = WorksheetPlotPalette.colour(triangle.colour);
                 ctx.lineWidth = 2;
                 ctx.stroke();
                 continue;
             }
             ctx.closePath();
-            ctx.fillStyle = triangle.colour;
+            ctx.fillStyle = WorksheetPlotPalette.colour(triangle.colour);
             ctx.fill(); ctx.stroke();
         }
         return true;
@@ -618,7 +624,8 @@ class MarsSurfacePreview {
 
     private paintAxes(frame: MarsSurfaceFrame, ctx: MarsSurfaceAxisContext): void {
         ctx.clearRect(0, 0, frame.width, frame.height);
-        ctx.strokeStyle = '#94b8b1'; ctx.fillStyle = '#b8ccc5'; ctx.lineWidth = 1.2;
+        ctx.strokeStyle = WorksheetPlotPalette.colour('#94b8b1');
+        ctx.fillStyle = WorksheetPlotPalette.colour('#b8ccc5'); ctx.lineWidth = 1.2;
         ctx.font = '11px sans-serif'; ctx.textAlign = 'center';
         for (const path of frame.paths) {
             ctx.beginPath();
@@ -715,6 +722,7 @@ class MarsSurfacePreview {
         this.hover?.dispose();
         this.events.removeEventListener('pagehide', this.onPageHide);
         this.events.removeEventListener('resize', this.onResize);
+        this.events.removeEventListener('mars-plot-palette-change', this.onResize);
         cancelAnimationFrame(this.resizeFrame);
         this.resizeFrame = 0;
         cancelAnimationFrame(this.restorationFrame);

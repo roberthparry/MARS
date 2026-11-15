@@ -20,10 +20,11 @@
 #include "computation-t.h"
 #include "equation-t.h"
 #include "expression-t.h"
-#include "test_harness.h"
-#include "test_database.h"
+#include "json-t.h"
 #define MARS_SHARED_EQUATION_INTERNAL_ACCESS
 #include "internal/equation_internal.h"
+#include "test_harness.h"
+#include "test_database.h"
 
 TEST_SUITE_CONFIG(TEST_CONFIG_GLOBAL);
 
@@ -2704,10 +2705,111 @@ static void test_equation_preserves_principal_root_domain(void)
         test_equation_preserves_principal_root_domain_sources_row);
     equation_t *equation = equ_from_string("{sqrt(x) = a | x=?; a=?}");
     equation_solutions_t *solutions = equ_derive_solutions(equation);
-    bool ok = solutions && !equ_solutions_count(solutions) && !equ_solutions_proven_empty(solutions);
+    bool ok = solutions && equ_solutions_count(solutions) == 1 && !equ_solutions_proven_empty(solutions);
     equ_solutions_free(solutions);
     equ_free(equation);
     ASSERT_TRUE(ok);
+}
+
+static const json_t *equation_case_member(const json_t *object, const char *name)
+{
+    string_t *key = string_new_with(name);
+    const json_t *value = key ? json_object_get(object, key) : NULL;
+    string_free(key);
+    return value;
+}
+
+static const char *equation_case_text(const json_t *object, const char *name)
+{
+    const string_t *value = json_string_value(equation_case_member(object, name));
+    return value ? string_c_str(value) : "";
+}
+
+static void test_equation_guarded_inverse_row(const void *data)
+{
+    const test_database_case_t *row = data;
+    NUM_SCOPE(numbers);
+    size_t saved_precision = num_get_default_prec_bits();
+    num_set_default_prec_digits(row->precision);
+    json_t *expected = json_from_text(row->expected);
+    const char *coordinate_name = equation_case_text(expected, "coordinate");
+    equation_t *problem = equ_from_string(string_c_str(row->input));
+    string_t *before = problem ? equ_to_text(problem, style_EXPRESSION) : NULL;
+    equation_solutions_t *solutions = equ_derive_solutions(problem);
+    string_t *after = problem ? equ_to_text(problem, style_EXPRESSION) : NULL;
+    expr_t *coordinate = equ_binding(problem, coordinate_name);
+    const equation_t *solution = NULL;
+    for (size_t i = 0; i < equ_solutions_count(solutions); ++i)
+        if (equ_is_solved_for(equ_solutions_at(solutions, i), coordinate))
+            solution = equ_solutions_at(solutions, i);
+    equation_t *family = solution ? equ_new_with_inferred_bindings(equ_lhs(solution), equ_rhs(solution)) : NULL;
+    expr_bindings_t *reference_bindings = NULL;
+    expr_t *reference = expr_from_string(equation_case_text(expected, "formula"), &reference_bindings);
+    bool ok = family && reference && before && after && !string_compare(before, after);
+    const json_t *constants = equation_case_member(expected, "constants");
+    expr_bindings_t *bindings = equ_bindings(problem);
+    for (size_t i = 0; i < json_array_size(constants); ++i) {
+        const string_t *name = json_string_value(json_array_get(constants, i));
+        bool found = false;
+        for (size_t j = 0; name && j < expr_bindings_count(bindings); ++j)
+            if (!strcmp(expr_bindings_name_at(bindings, j), string_c_str(name)))
+                found = expr_bindings_is_constant_at(bindings, j);
+        ok = ok && found;
+    }
+    number_t tolerance = num_create_from_string("1e-24");
+    const json_t *samples = equation_case_member(expected, "samples");
+    for (size_t i = 0; ok && i < json_array_size(samples); ++i) {
+        const json_t *sample = json_array_get(samples, i), *values = equation_case_member(sample, "bindings");
+        bool valid = false;
+        ok = json_bool_value(equation_case_member(sample, "valid"), &valid);
+        expr_set_val(coordinate, NUM_NAN);
+        for (size_t j = 0; ok && j < json_object_size(values); ++j) {
+            const string_t *key = json_object_key_at(values, j);
+            const char *name = string_c_str(key);
+            expr_t *literal = expr_from_string(equation_case_text(values, name), NULL);
+            number_t value = literal ? expr_eval(literal) : num_clone(NUM_NAN);
+            expr_t *nodes[] = {equ_binding(problem, name), equ_binding(family, name),
+                               expr_bindings_get(reference_bindings, name)};
+            for (size_t k = 0; k < sizeof nodes / sizeof *nodes; ++k)
+                if (nodes[k])
+                    expr_set_val(nodes[k], value);
+            expr_free(literal);
+            num_destroy(&value);
+        }
+        number_t actual = expr_eval(equ_rhs(family));
+        if (valid) {
+            number_t want = expr_eval(reference), difference = num_abs(num_sub(actual, want));
+            ok = ok && num_is_finite(actual) && num_is_finite(want) && num_le(difference, tolerance);
+            expr_set_val(coordinate, actual);
+            number_t left = expr_eval(equ_lhs(problem)), right = expr_eval(equ_rhs(problem));
+            number_t residual = num_abs(num_sub(left, right));
+            ok = ok && num_is_finite(residual) && num_le(residual, tolerance);
+        } else
+            ok = ok && num_is_nan(actual);
+        if (!ok) {
+            string_t *formula = family ? equ_to_text(family, style_EXPRESSION) : NULL;
+            string_t *value = num_to_string(actual);
+            printf("%s sample %zu: %s; value %s\n", string_c_str(row->name), i,
+                   formula ? string_c_str(formula) : "no solution", value ? string_c_str(value) : "NAN");
+            string_free(value);
+            string_free(formula);
+        }
+    }
+    expr_free(reference);
+    expr_bindings_free(reference_bindings);
+    equ_free(family);
+    equ_solutions_free(solutions);
+    string_free(after);
+    string_free(before);
+    equ_free(problem);
+    json_free(expected);
+    num_set_default_prec_bits(saved_precision);
+    ASSERT_TRUE(ok);
+}
+
+static void test_equation_guarded_inverse(void)
+{
+    test_run_database_cases(__FILE__, __LINE__, "equation.guarded_inverse", NULL, test_equation_guarded_inverse_row);
 }
 
 /* README example: solve the nested principal-root equation without a numerical starting value. */
@@ -2885,6 +2987,7 @@ int tests_main(void)
     TEST_RUN_IN_GROUP(test_equation_complex_power_families, tests, NULL);
     TEST_RUN_IN_GROUP(test_equation_inverts_roots_and_constant_powers, tests, NULL);
     TEST_RUN_IN_GROUP(test_equation_preserves_principal_root_domain, tests, NULL);
+    TEST_RUN_IN_GROUP(test_equation_guarded_inverse, tests, NULL);
     TEST_RUN_IN_GROUP(test_equation_relation_separators, tests, NULL);
     TEST_RUN_IN_GROUP(test_equation_basics, tests, NULL);
 

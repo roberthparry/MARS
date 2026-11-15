@@ -87,6 +87,11 @@ window.checkLabAppearance = async function checkLabAppearance(): Promise<void> {
     const paletteProbe = document.createElement('span');
     paletteProbe.hidden = true;
     document.body.append(paletteProbe);
+    const error_probe = document.createElement('div');
+    error_probe.hidden = true;
+    error_probe.innerHTML = '<div class="error">Parameter warning</div>' +
+        '<div class="rendered error">Plot warning</div><div class="rendered error" id="rendered_error_probe">Result warning</div>';
+    document.body.append(error_probe);
     const almanacFrame = document.createElement('iframe');
     almanacFrame.style.cssText = 'position:fixed;left:-10000px;top:0;width:390px;height:844px;border:0';
     try {
@@ -159,6 +164,16 @@ window.checkLabAppearance = async function checkLabAppearance(): Promise<void> {
                 'the rendered selected row uses the current skin accent: ' + names[index]);
             check(document.querySelector<HTMLMetaElement>('meta[name="theme-color"]')?.content ===
                 style.getPropertyValue('--paper').trim(), 'browser chrome follows the palette');
+            paletteProbe.style.color = 'var(--ink)';
+            const error_ink = getComputedStyle(paletteProbe).color;
+            paletteProbe.style.color = 'var(--panel)';
+            const error_panel = getComputedStyle(paletteProbe).color;
+            for (const warning of error_probe.children) {
+                const warning_style = getComputedStyle(warning);
+                check(warning_style.color === error_ink && warning_style.backgroundImage.includes(error_panel),
+                    'error panels use the current skin text and surface: ' + names[index]);
+            }
+            paletteProbe.style.color = style.getPropertyValue('--accent');
             almanacDoc.documentElement.dataset.skin = String(index);
             for (const width of [390, 560, 900, 1280]) {
                 almanacFrame.style.width = width + 'px';
@@ -370,6 +385,7 @@ window.checkLabAppearance = async function checkLabAppearance(): Promise<void> {
         if (settings_panel.matches(':popover-open')) settings_close.click();
         almanacFrame.remove();
         paletteProbe.remove();
+        error_probe.remove();
         WorksheetAppearance.controller.select(original, false);
         if (stored === null) localStorage.removeItem(WorksheetAppearance.storageKey);
         else localStorage.setItem(WorksheetAppearance.storageKey, stored);

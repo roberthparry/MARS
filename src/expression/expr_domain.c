@@ -1,9 +1,10 @@
 /**
  * @file expr_domain.c
- * @brief Transform domain conditions and constant specialisation.
+ * @brief Native domain conditions, live coordinate projections and constant specialisation.
  *
- * Tracks and presents restrictions on transform results and specialises supplied constants when they settle those
- * restrictions. It supports consistent native results across expression, function and TeX output.
+ * Tracks and presents restrictions on transform and equation results and specialises supplied constants when they
+ * settle those restrictions. Live real and imaginary projections preserve later parameter values. A borrowed body
+ * query supports compact formula presentation while the guarded source retains every restriction for evaluation.
  *
  * This is part of the expr_t implementation. Preserve expression ownership, symbol identity and mathematical
  * domain restrictions when extending these operations.
@@ -46,7 +47,7 @@ static number_t real_bound_eval(expr_t *expr)
 static expr_t *real_bound_new(const expr_t *value)
 {
     if (value->ops == &ops_real_bound || value->ops == &ops_imag_coordinate)
-        return expr_clone(value);
+        return expr_retain_expr(value);
     if (domain_numeric(value)) {
         number_t number = expr_eval(value);
         number_t real = num_is_finite(number) ? num_real_part(number) : num_clone(NUM_NAN);
@@ -55,7 +56,7 @@ static expr_t *real_bound_new(const expr_t *value)
         num_destroy(&number);
         return result;
     }
-    return expr_new_unary_internal(&ops_real_bound, expr_clone(value));
+    return expr_new_unary_internal(&ops_real_bound, expr_retain_expr(value));
 }
 
 static expr_t *real_bound_simplify(const expr_t *expr, expr_t *a, expr_t *b)
@@ -99,7 +100,7 @@ expr_t *expr_imag_coordinate(const expr_t *value)
         num_destroy(&number);
         return result;
     }
-    return expr_new_unary_internal(&ops_imag_coordinate, expr_clone(value));
+    return expr_new_unary_internal(&ops_imag_coordinate, expr_retain_expr(value));
 }
 
 static expr_t *imag_coordinate_simplify(const expr_t *expr, expr_t *a, expr_t *b)
@@ -397,6 +398,14 @@ expr_t *expr_real_domain_from_args(size_t count, expr_t *const *args)
         tail = &(*tail)->b;
     }
     return out;
+}
+
+/* Borrow the displayed algebra without changing or forgetting the source's evaluable restrictions. */
+const expr_t *expr_domain_body(const expr_t *expr)
+{
+    while (expr && expr->ops == &ops_real_domain)
+        expr = expr->a;
+    return expr;
 }
 
 /* Carry outer domain conditions onto a new body without detaching its live binding nodes. */

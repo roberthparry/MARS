@@ -3403,8 +3403,15 @@ bindings.
   In the no-binding form, the default inference rule is:
   - constants with built-in values: `e`, `i`, `pi`, `π`, `@pi`, `phi`, `@phi`, `gamma`, `@gamma`, and `@eulermascheroni`.
     Function output uses `@eulermascheroni` for the immortal Euler–Mascheroni constant; the older gamma aliases remain accepted.
-  - constant placeholders: `a`, `b`, `c`, `d`, and their indexed forms such as `a₀`, `b_1`, `c₂`, and `d_3`
-  - variables: everything else that is a valid symbolic `expr` name, including `x`, `τ`, `@tau`, and bracketed names like `[radius]`
+  - constant placeholders: `a`, `b`, `c`, `d`, `j`, `k`, `l`, `m`, `n`, `C`, `D`, and their indexed forms such as `a₀`, `C₁`, and `D_2`
+  - variables: other valid symbolic `expr` names, including `x`, `y`, `z`, and bracketed names like `[radius]`
+
+  Explicit variable and constant declarations override this inference. In particular,
+  `C` and `D` remain constant parameters when an unwrapped equation is pasted into the Lab.
+  Real and imaginary coordinate projections retain live bindings when used in native domain restrictions.
+  `expr_domain_body()` borrows the algebra beneath outer domain wrappers for
+  presentation. Keep the source alive, communicate its restrictions separately,
+  and evaluate the guarded source rather than the borrowed body.
 
   The built-in-value inference is exact-name only. For example, `@pi` becomes
   the built-in constant `π`, but `@pi1`, `@pi2`, and `@pi_3` normalise to

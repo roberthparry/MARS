@@ -333,6 +333,87 @@
         }
     }
 
+    /** @brief Exercise native equation parameter sliders and conventional dependent-coordinate presentation. */
+    async function check_equation_parameter_controls() {
+        const original_mode = WorksheetWorkspace.mode.currentMode();
+        const original_source = WorksheetBindings.editor.currentExpressionText();
+        try {
+            await WorksheetWorkspace.mode.selectWorksheetMode('equation');
+            const source = 'x=-(2*atanh(sqrt(C+2*e^y)/sqrt(C)))/sqrt(C)+D';
+            await WorksheetRequests.presentation.prepareLabEditor(source);
+            WorksheetBindings.controller.setExpressionEditor(source);
+            await WorksheetWorkspace.mode.evaluateCurrentMode();
+            await waitForAutomaticPlot();
+            const root = document.getElementById('plotSlices')!;
+            check(root.querySelectorAll('.plot-slice').length === 2 &&
+                document.querySelector('#plotRendered [data-series]') &&
+                !document.querySelector('#plotRendered [data-surface]') &&
+                WorksheetContext.rendered.dataset.displayTex?.includes('y &=') &&
+                !WorksheetContext.rendered.dataset.displayTex?.includes('D &=') &&
+                root.querySelector('legend')!.textContent === 'Parameter',
+                'the unwrapped inverse equation displays y(x), with a real contour and two constant parameters');
+            const symbolic_source = WorksheetBindings.editor.currentExpressionText();
+            const coefficient = root.querySelector<HTMLElement>('.plot-slice[data-name="C"]')!;
+            root.querySelector<HTMLInputElement>('.slice-choice[value="C"]')!.click();
+            const value = coefficient.querySelector<HTMLInputElement>('.slice-value')!;
+            const before = document.querySelector('#plotRendered svg')!;
+            value.value = '-2';
+            value.dispatchEvent(new Event('change', {bubbles: true}));
+            for (let i = 0; i < 1200 && (before.isConnected || value.value !== '-2'); ++i)
+                await LabTestBrowser.wait(25);
+            check(!before.isConnected && value.value === '-2' &&
+                WorksheetBindings.editor.currentExpressionText() === symbolic_source,
+                'changing a constant parameter redraws the curve without changing symbolic worksheet bindings');
+            for (const name of ['C', 'D']) {
+                const input = document.querySelector<HTMLInputElement>(`.binding-value-input[data-binding-name="${name}"]`)!;
+                check(input, 'the equation retains its constant binding input: ' + name + '; found ' +
+                    JSON.stringify([...document.querySelectorAll<HTMLInputElement>('.binding-value-input')].map(node =>
+                        ({name: node.dataset.bindingName, kind: node.dataset.bindingKind, value: node.value}))) +
+                    '; source: ' + WorksheetBindings.editor.currentExpressionText());
+                check(input.dataset.bindingKind === 'constant' && input.value === '' &&
+                    input.closest('.variable-value-box')!.querySelector('.variable-toggle')!.textContent === '→ Variable',
+                    'the worksheet keeps an unset constant and offers conversion to a variable');
+            }
+            for (const [equation, horizontal, dependent] of [['x=2*y+1', 'x', 'y'], ['x=2*t+1', 't', 'x']]) {
+                WorksheetBindings.controller.setExpressionEditor(equation);
+                await WorksheetWorkspace.mode.evaluateCurrentMode();
+                await waitForAutomaticPlot();
+                check((document.getElementById('plotFirst') as HTMLInputElement).value === horizontal &&
+                    WorksheetContext.rendered.dataset.displayTex?.includes(dependent + ' &=') &&
+                    !WorksheetContext.rendered.dataset.displayTex?.includes(horizontal + ' &='),
+                    'native results prefer the dependent coordinate with the conventional horizontal axis');
+            }
+        } finally {
+            await WorksheetWorkspace.mode.selectWorksheetMode(original_mode);
+            await WorksheetRequests.presentation.prepareLabEditor(original_source);
+            WorksheetBindings.controller.setExpressionEditor(original_source);
+            await WorksheetWorkspace.mode.evaluateCurrentMode();
+            await waitForAutomaticPlot();
+        }
+    }
+
+    async function check_plot_palettes() {
+        const original_mode = WorksheetWorkspace.mode.currentMode();
+        const original_source = WorksheetBindings.editor.currentExpressionText();
+        try {
+            await WorksheetWorkspace.mode.selectWorksheetMode('expression');
+            const source = 'acos(sin(2-x*y))';
+            await WorksheetRequests.presentation.prepareLabEditor(source);
+            WorksheetBindings.controller.setExpressionEditor(source);
+            await WorksheetWorkspace.mode.evaluateCurrentMode();
+            await waitForAutomaticPlot();
+            const chart = document.querySelector<SVGSVGElement>('#plotRendered [data-surface]');
+            check(chart, 'a native surface is available for palette checks');
+            await window.checkLabPlotPalette(chart!);
+        } finally {
+            await WorksheetWorkspace.mode.selectWorksheetMode(original_mode);
+            await WorksheetRequests.presentation.prepareLabEditor(original_source);
+            WorksheetBindings.controller.setExpressionEditor(original_source);
+            await WorksheetWorkspace.mode.evaluateCurrentMode();
+            await waitForAutomaticPlot();
+        }
+    }
+
     async function checkComplexEquationPlot() {
         const originalMode = WorksheetWorkspace.mode.currentMode();
         try {
@@ -766,6 +847,7 @@
         }
         await WorksheetWorkspace.mode.selectWorksheetMode('matrix');
         await WorksheetWorkspace.mode.selectWorksheetMode('expression');
+        await wait_for_mode_evaluation();
         const restored = host.querySelector<HTMLElement>('.complex-panel')!;
         check(document.getElementById('plotCamera')! === cameraControls && cameraControls.parentElement === restored &&
               document.querySelectorAll<HTMLElement>('#plotCamera').length === 1,
@@ -1512,6 +1594,16 @@
             WorksheetWorkspace.presentation.syncModeUI();
         }
     }
+    /** @brief Wait for a mode's asynchronous calculation before inspecting its replacement plot. */
+    async function wait_for_mode_evaluation() {
+        await LabTestBrowser.paint();
+        const deadline = performance.now() + 30000;
+        while (WorksheetRequests.labRequests.busy() && performance.now() < deadline)
+            await LabTestBrowser.wait(25);
+        check(!WorksheetRequests.labRequests.busy(), 'Mode evaluation must finish');
+        await waitForAutomaticPlot();
+    }
+
     async function waitForAutomaticPlot() {
         if (document.getElementById('plotCard')!.classList.contains('hidden')) return;
         const node = (document.getElementById('plotRendered')! as LabTestPlotHost);
@@ -2540,7 +2632,8 @@
         await LabTestBrowser.paint();
         const svg = WorksheetContext.rendered.querySelector('svg')!;
         check(svg, `Native TeX SVG missing: mode=${WorksheetWorkspace.mode.currentMode()}, ` +
-            `status=${WorksheetContext.statusEl.textContent}, result=${WorksheetContext.rendered.textContent}`);
+            `status=${WorksheetContext.statusEl.textContent}, result=${WorksheetContext.rendered.textContent}, ` +
+            `source=${WorksheetBindings.editor.currentExpressionText()}`);
         const bounds = svg.getBoundingClientRect();
         check(bounds.width > 0 && bounds.height > 0, 'TeX SVG has no visible dimensions');
         const glyphs = Array.from(svg.querySelectorAll('use'));
@@ -3078,6 +3171,7 @@
     /** Exercise calendar edits and navigation through the real native history and control adapters. */
     async function checkCalendarHistoryNavigation(): Promise<void> {
         const savedFetch = window.fetch;
+        const savedEditor = {text: WorksheetContext.expr.value, source: {...WorksheetContext.labEditorState}};
         const savedGlobeFetch = labHttp.fetch;
         labHttp.fetch = (url, options) => url === '/almanac-globe' || url === '/almanac-rivers' ?
             Promise.reject(new Error('History camera fixture: no regional imagery')) : savedGlobeFetch.call(labHttp, url, options);
@@ -3250,6 +3344,8 @@
             modes.forEach((mode, index) => WorksheetWorkspace.presentation.resultStates[mode] = savedResults[index]);
             WorksheetWorkspace.presentation.restoreModeResultState(savedMode);
             WorksheetWorkspace.presentation.updateHistoryButtons();
+            WorksheetContext.expr.value = savedEditor.text;
+            Object.assign(WorksheetContext.labEditorState, savedEditor.source);
         }
     }
 
@@ -3550,7 +3646,9 @@
             }
             initialiseLabTestAdapters();
             if (new URLSearchParams(location.search).get('appearance-check') === '1') {
+                await runBrowserGroup('binding commit policy', window.checkLabBindingCommit);
                 await runBrowserGroup('appearance skins', window.checkLabAppearance);
+                await runBrowserGroup('plot palettes', check_plot_palettes, 120000);
                 await runBrowserGroup('responsive worksheet controls', async () => {
                     const originalMode = WorksheetWorkspace.mode.currentMode();
                     try {
@@ -3565,6 +3663,7 @@
                         WorksheetWorkspace.presentation.syncModeUI();
                     }
                 }, 120000);
+                await runBrowserGroup('equation parameter controls', check_equation_parameter_controls, 120000);
                 await report('PASS: local skins and responsive controls preserve worksheets and survive unavailable storage');
                 return;
             }
@@ -3695,6 +3794,7 @@
                 await report('PASS: PROFILE ' + JSON.stringify(await labProfile.run()));
                 return;
             }
+            await runBrowserGroup('equation parameter controls', check_equation_parameter_controls, 120000);
             await runBrowserGroup('wire', checkWire);
             await runBrowserGroup('workers', () => labCheckWorkers(check));
             check(
@@ -3731,6 +3831,7 @@
             await runBrowserGroup('checkLabStorage', window.checkLabStorage);
             window.checkLabWidgets();
             await runBrowserGroup('appearance skins', window.checkLabAppearance);
+            await runBrowserGroup('plot palettes', check_plot_palettes, 120000);
             await runBrowserGroup('checkLabSelects', window.checkLabSelects);
             await runBrowserGroup('checkLabSelectEvents', window.checkLabSelectEvents);
             await runBrowserGroup('checkLabLayout', window.checkLabLayout);
@@ -3864,6 +3965,7 @@
                 await WorksheetWorkspace.mode.selectWorksheetMode('expression');
                 check(document.querySelector<HTMLInputElement>('#plotSlices .slice-value')?.value === acceptedSlice,
                       'Returning to the worksheet restores its accepted native slice text');
+                await wait_for_mode_evaluation();
                 WorksheetBindings.controller.setExpressionEditor('x+y+z+w');
                 await WorksheetRequests.evaluation.evaluateExpression();
                 await waitForAutomaticPlot();
@@ -3903,6 +4005,7 @@
                       slicePanel.querySelectorAll<HTMLElement>('.slice-choice:checked').length === 1 &&
                       slicePanel.querySelectorAll<HTMLElement>('.plot-slice:not(.hidden)').length === 1,
                       'Worksheet restoration preserves the selected parameter');
+                await wait_for_mode_evaluation();
                 let selectedRow = slicePanel.querySelector<HTMLElement>('.plot-slice:not(.hidden)')!;
                 selectedRow.querySelector<HTMLElement>('.slice-manual')!.click();
                 await WorksheetWorkspace.mode.selectWorksheetMode('matrix');
@@ -3910,6 +4013,7 @@
                 selectedRow = slicePanel.querySelector<HTMLElement>('.plot-slice:not(.hidden)')!;
                 check(selectedRow.querySelector<HTMLElement>('.slice-manual')!.matches(':checked'),
                       'Mode switching retains the parameter range choice');
+                await wait_for_mode_evaluation();
                 await WorksheetRequests.evaluation.evaluateExpression();
                 await waitForAutomaticPlot();
                 check([...slicePanel.querySelectorAll<HTMLElement>('.plot-slice')].every(row =>
@@ -3929,6 +4033,7 @@
             await WorksheetWorkspace.mode.selectWorksheetMode('expression');
             check(document.getElementById('plotCard')!.classList.contains('hidden'),
                   'Returning to a symbolic-only result does not restore an obsolete plot');
+            await wait_for_mode_evaluation();
             WorksheetBindings.controller.setExpressionEditor('Laplace(exp(-x),x,s)');
             await WorksheetRequests.evaluation.evaluateExpression();
             await waitForAutomaticPlot();
@@ -4412,12 +4517,15 @@
                   'Live plotting must work without leaving the expanded card');
             surfaceExpand.click();
             (document.getElementById('plotLower')! as HTMLInputElement).value = '-10';
-            const retainedSurface = labSurfacePreview.snapshot()!;
+            const retainedCamera = ['plotAzimuth', 'plotElevation', 'plotRoll', 'plotZoom'].map(id =>
+                (document.getElementById(id)! as HTMLInputElement).value);
             for (let cycle = 0; cycle < 2; ++cycle) {
+                const previousEvaluation = WorksheetRequests.labRequests.latestMain();
                 await WorksheetWorkspace.mode.selectWorksheetMode('matrix');
                 check(!document.querySelector<SVGSVGElement>('#plotRendered [data-surface-overlay]')!,
                       'Leaving a surface releases its transient renderer');
                 await WorksheetWorkspace.mode.selectWorksheetMode('expression');
+                await wait_for_mode_evaluation();
                 await nextLayout();
                 const restored = labSurfacePreview.snapshot()!;
                 const chart = plotRendered.querySelector<SVGSVGElement>('[data-surface]')!;
@@ -4426,10 +4534,15 @@
                       plotRendered.querySelectorAll<SVGSVGElement>('[data-surface-overlay]').length === 1 &&
                       chart.dataset.localRenderer && labSurfacePreview.prepare(chart)!.framePlan!.drawMesh,
                       'Returning to Expression recreates a visible surface renderer, not empty saved canvases');
-                check(restored.key === retainedSurface.key &&
-                      restored.orientation.every((v, i) => Math.abs(v - retainedSurface.orientation[i]) < 1e-10) &&
-                      restored.volume.exponent === retainedSurface.volume.exponent,
-                      'Mode round trips retain the exact volume and quaternion camera');
+                check(WorksheetRequests.labRequests.latestMain() > 0 &&
+                      WorksheetRequests.labRequests.latestMain() !== previousEvaluation &&
+                      ['plotAzimuth', 'plotElevation', 'plotRoll', 'plotZoom'].every((id, index) => {
+                          const control = document.getElementById(id)! as HTMLInputElement;
+                          return control.value === retainedCamera[index];
+                      }), 'Mode round trips initiate a fresh calculation and retain the camera controls: ' +
+                      JSON.stringify({lower: chart.dataset.xMin, camera: retainedCamera,
+                          restored: ['plotAzimuth', 'plotElevation', 'plotRoll', 'plotZoom'].map(id =>
+                              (document.getElementById(id)! as HTMLInputElement).value)}));
                 check(!(WorksheetWorkspace.presentation.resultStates.expression as LabTestSavedPlotResult).plotRendered.innerHTML.includes('data-surface-overlay'),
                       'Saved plot HTML contains only reusable native geometry');
             }

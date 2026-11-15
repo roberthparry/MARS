@@ -170,7 +170,7 @@ int lab_worker_equation_contour(equation_t *equation, expr_t *first, expr_t *sec
     bool fixed_x = *argv[5] || *argv[6];
     const char *names[] = {expr_symbol_name(first), expr_symbol_name(second)};
     const char *supplied[] = {argv[5], argv[6], manual ? argv[8] : "", manual ? argv[9] : ""};
-    contour.sampling = lab_worker_implicit_new(argv[1], names, supplied, 2, bounds);
+    contour.sampling = lab_worker_implicit_new(argv[1], equation, names, supplied, 2, bounds);
     num_set_default_prec_bits(lab_worker_implicit_precision(contour.sampling));
     bool ok = contour.sampling && contour.points &&
               (!strcmp(argv[7], "auto") || !strcmp(argv[7], "all") || manual) &&

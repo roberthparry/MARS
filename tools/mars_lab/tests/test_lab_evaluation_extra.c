@@ -1355,7 +1355,7 @@ static void test_lab_extra_solver_plots(void)
     TEST_ASSERT_TRUE(ok, "a conditioned ODE plot identifies the authored problem without a redundant single-series legend");
     expect_response("/eval", "{\"expression\":\"{x=a | x=?; a=?}\",\"action\":\"plot\","
                              "\"plot_source_mode\":\"equation\",\"plot_lower\":\"-2\",\"plot_upper\":\"2\"}",
-                    422u, "error", "parameters");
+                    200u, "plot_slices", "a\t");
     expect_response("/eval", "{\"expression\":\"x^2=1\",\"action\":\"plot\",\"plot_source_mode\":\"equation\","
                              "\"plot_lower\":\"2\",\"plot_upper\":\"-2\"}", 422u, "error", "bounds");
     expect_response("/eval", "{\"expression\":\"Dx(y)=y\",\"action\":\"plot\",\"plot_source_mode\":\"diffequation\","
@@ -1726,7 +1726,7 @@ static void test_lab_extra_plot_precision(void)
     const char *names[] = {"x", "y", "z"};
     const char *limits[] = {"1e30-2", "1e30+2", "-2", "2", "-2", "2"};
     double box[6], point[] = {0.75, 0.5, 0.5};
-    lab_worker_implicit_t *implicit = lab_worker_implicit_new("(x-1e30)^2+y^2+z^2=1", names, limits, 3, box);
+    lab_worker_implicit_t *implicit = lab_worker_implicit_new("(x-1e30)^2+y^2+z^2=1", NULL, names, limits, 3, box);
     number_t left = lab_worker_implicit_coordinate(implicit, 0, 0.5);
     number_t right = lab_worker_implicit_coordinate(implicit, 0, 0.75);
     bool precise_mesh = implicit && box[0] == 0 && box[1] == 1 && num_lt(left, right) &&
@@ -1742,14 +1742,14 @@ static void test_lab_extra_plot_precision(void)
     TEST_ASSERT_TRUE(precise_mesh, "implicit local frames preserve distinct vertices beyond double coordinate resolution");
 
     const char *ordinary_limits[] = {"-2", "2", "-2", "2"};
-    implicit = lab_worker_implicit_new("exp(x)-1=y", names, ordinary_limits, 2, box);
+    implicit = lab_worker_implicit_new("exp(x)-1=y", NULL, names, ordinary_limits, 2, box);
     double small[] = {1e-20, 0};
     double residual = lab_worker_implicit_eval(implicit, small);
     TEST_ASSERT_TRUE(implicit && residual > 0.999999e-20 && residual < 1.000001e-20,
                      "uncertain implicit double residuals fall back to a freshly parsed guard-precision graph");
     lab_worker_implicit_free(implicit);
     const char *tiny_limits[] = {"1e-100", "2e-100", "0", "1e-99"};
-    implicit = lab_worker_implicit_new("exp(x)-1=y", names, tiny_limits, 2, box);
+    implicit = lab_worker_implicit_new("exp(x)-1=y", NULL, names, tiny_limits, 2, box);
     small[0] = 1e-100;
     residual = lab_worker_implicit_eval(implicit, small);
     TEST_ASSERT_TRUE(implicit && residual > 0.999999e-100 && residual < 1.000001e-100,

@@ -36,6 +36,21 @@
 unsigned long number_series_integer_power(unsigned long base, unsigned long exponent);
 
 /**
+ * @brief Attempt the high-precision Lerch defining sum with finite weighted binomial blocks.
+ * @param[out] out Caller-owned initialised MPC destination, unchanged if the attempt fails.
+ * @param[in] argument Borrowed complex z, with modulus strictly below one.
+ * @param[in] order Borrowed finite complex exponent s.
+ * @param[in] offset Borrowed finite complex offset a, away from defining-series poles.
+ * @param bits Required result precision in bits; supported attempts use 512 through 8192 bits.
+ * @return True only when explicit series-tail and absolute roundoff bounds meet the requested accuracy;
+ * false selects the ordinary defining series for unsupported parameters, allocation failure or exhausted bounds.
+ * No input is modified. Bounded local moments are released within the call; no ownership transfers or new
+ * persistent moment storage is introduced. A mutex protects one checked result (at most 16 KiB of significands),
+ * keyed by exact arguments, signed branch-cut zeros and verified precision. Independent calls receive copies.
+ */
+bool number_lerch_blocks(mpc_ptr out, mpc_srcptr argument, mpc_srcptr order, mpc_srcptr offset, mpfr_prec_t bits);
+
+/**
  * @brief Copy zeta(n) from the bounded numeric coefficient cache at the output's precision.
  * @param[out] out Caller-owned initialised MPFR destination; its precision is preserved.
  * @param[in] order Integer n, at least two.
@@ -61,7 +76,8 @@ int number_coefficient_bernoulli(mpfr_ptr out, size_t index);
  * @param[in] index Positive k, no larger than ULONG_MAX/2.
  * @return Zero on success; minus one on invalid input or cache-lock failure. Invalid values become NaN.
  * @note Uses the same thread-safe bounded retention policy as the ordinary coefficients. The caller clears
- * out with mpfr_clear(); no cache entry or borrowed pointer escapes the call.
+ * out with mpfr_clear(); no cache entry or borrowed pointer escapes the call. Guarded even-prefix recurrence
+ * shares inverse-factorial coefficients within that memory budget; larger requests retain direct evaluation.
  */
 int number_coefficient_normalised(mpfr_ptr out, size_t index);
 
@@ -126,6 +142,8 @@ void number_zeta_logarithm(mpc_ptr out, mpc_srcptr offset, unsigned long index);
  * @param[in] exponent Borrowed finite complex exponent.
  * @param index Non-negative integer shift, used as a direct cache index when eligible.
  * @return Nothing; out receives the value or propagated non-finite arithmetic. Cache failures use direct evaluation.
+ * Non-integral powers use guarded logarithm/exponential composition, sharing offset logarithms when orders change.
+ * Integral orders and exceptional magnitudes retain direct MPC power evaluation and its signed-zero conventions.
  * The eight-MiB cache copies values under a mutex, retains at most one exact key pair and never exposes ownership.
  * Both keys remain valid throughout this call; the caller clears out normally. Independent calls are thread-safe.
  */

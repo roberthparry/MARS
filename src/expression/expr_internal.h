@@ -516,10 +516,20 @@ extern const expr_ops_t ops_real_at_least;
 extern const expr_ops_t ops_real_bound;
 extern const expr_ops_t ops_imag_coordinate;
 
-/** Construct the real coordinate retained when integrating along a vertical line. */
+/**
+ * @brief Construct a real-coordinate projection with live source bindings.
+ * @param value Borrowed source expression; its graph is retained, not consumed or detached.
+ * @return Owned projection released with expr_free(), or NULL on failure. Later source-binding values remain visible.
+ * @note Used by vertical integration and native domain predicates; mutable graph access requires synchronisation.
+ */
 expr_t *expr_real_coordinate(const expr_t *value);
 
-/** Construct the imaginary coordinate used to parameterise a vertical integration line. */
+/**
+ * @brief Construct an imaginary-coordinate projection with live source bindings.
+ * @param value Borrowed source expression; its graph is retained, not consumed or detached.
+ * @return Owned projection released with expr_free(), or NULL on failure. Later source-binding values remain visible.
+ * @note Used by vertical integration and native domain predicates; mutable graph access requires synchronisation.
+ */
 expr_t *expr_imag_coordinate(const expr_t *value);
 
 /** Whether every occurrence of a symbol is confined to a fixed real-coordinate projection. */

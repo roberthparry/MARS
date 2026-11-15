@@ -1845,13 +1845,18 @@ static int number_mpc_zetah_euler_maclaurin(mpc_ptr out, mpc_srcptr s, mpc_srcpt
     mpc_init2(term, work); mpc_init2(temporary, work); mpc_init2(endpoint, work);
     mpc_set_ui(sum, 0u, MPC_RNDNN);
     mpc_set_ui(derivative, 0u, MPC_RNDNN);
+    /* At small precisions and integral orders, direct terms avoid the guarded cache's extra setup cost. */
+    bool reuse = target >= 1024 && !(mpfr_zero_p(mpc_imagref(s)) && mpfr_integer_p(mpc_realref(s)));
     for (unsigned long n = 0ul; n < count; ++n) {
-        number_zeta_logarithm(logarithm, a, n);
-        mpc_mul(term, s, logarithm, MPC_RNDNN);
-        mpc_neg(term, term, MPC_RNDNN);
-        mpc_exp(term, term, MPC_RNDNN);
+        if (reuse) number_dirichlet_power(term, a, s, n);
+        else {
+            number_zeta_logarithm(logarithm, a, n);
+            mpc_mul(term, s, logarithm, MPC_RNDNN);
+            mpc_neg(term, term, MPC_RNDNN); mpc_exp(term, term, MPC_RNDNN);
+        }
         mpc_add(sum, sum, term, MPC_RNDNN);
         if (want_derivative) {
+            if (reuse) number_zeta_logarithm(logarithm, a, n);
             mpc_mul(temporary, term, logarithm, MPC_RNDNN);
             mpc_sub(derivative, derivative, temporary, MPC_RNDNN);
         }

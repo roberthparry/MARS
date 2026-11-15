@@ -171,6 +171,9 @@ void equ_solutions_free(equation_solutions_t *solutions);
  * Any current values already stored on those variable bindings are used as the
  * numeric starting point.
  * Independent additive terms are moved across the equality before isolation.
+ * Nested affine arithmetic, principal roots and inverse hyperbolic tangents also
+ * retain their branch and non-zero-coefficient restrictions as native expression
+ * domains on the isolated formula. Unsupported dependency chains remain unsolved.
  * For multiple variable bindings, automatic numerical fallback requires a finite
  * starting value for every variable; an unseeded implicit family is not replaced
  * by an arbitrary sampled point. An empty unproved result remains undetermined.
