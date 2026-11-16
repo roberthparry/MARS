@@ -19,6 +19,8 @@
 
 #define MARS_DIFFEQUATION_SOLVE_INTERNAL_ACCESS
 #include "diffequ_solve_internal.h"
+#define MARS_DIFFEQUATION_INTERNAL_ACCESS
+#include "diffequ_notation_internal.h"
 #define MARS_DIFFEQUATION_PDE_INTERNAL_ACCESS
 #include "diffequ_pde_internal.h"
 #define MARS_SHARED_EQUATION_INTERNAL_ACCESS
@@ -533,6 +535,8 @@ static diffequ_solve_result_t *de_solve_with_options_impl(const diffequ_t *de, u
             result = de_solve_result_new(DE_SOLVE_STATUS_SOLVED, second_order_solver,
                                          second_order_solver == DE_SOLVER_POWER_LAW_BESSEL
                                              ? "solved by a power-law reduction to Bessel's equation"
+                                         : second_order_solver == DE_SOLVER_BESSEL
+                                             ? "solved as a scaled Bessel equation on real intervals excluding the singular origin"
                                              : "solved as a second-order linear Sturm-Liouville equation");
             goto append;
         }
@@ -778,6 +782,10 @@ diffequ_solve_result_t *de_solve_with_options(const diffequ_t *de, unsigned int 
         return NULL;
     diffequ_solve_result_t *result = de_solve_with_options_impl(de, options);
     if (de && result && !de_result_apply_restrictions(de, result)) {
+        de_solve_result_free(result);
+        result = NULL;
+    }
+    if (de && result && !de_notation_solution_functions(de, result)) {
         de_solve_result_free(result);
         result = NULL;
     }

@@ -1,6 +1,6 @@
 /**
  * @file test_diffequ_format.c
- * @brief Differential-equation power-formatting regressions.
+ * @brief Differential-equation power and explicit-solution formatting regressions.
  *
  * Checks integer and Unicode power notation in expression and differential-equation output. The associated example
  * verifies that documented notation remains parseable and consistent.
@@ -9,13 +9,39 @@
  * run suites sequentially; this source is not part of the installed library.
  */
 
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
+#include "string-t.h"
 #include "diffequation-t.h"
 #include "test_harness.h"
+#include "test_database.h"
 #include "test_diffequ_format.h"
+
+static void solution_notation_row(const void *data)
+{
+    const test_database_case_t *row = data;
+    diffequ_t *problem = de_from_text(row->input);
+    diffequ_solve_result_t *result = problem ? de_solve(problem) : NULL;
+    const equation_t *solution = result ? de_solve_result_at(result, 0u) : NULL;
+    char *TeX = solution ? equ_to_TeX_body_wrapped(solution, SIZE_MAX) : NULL;
+    bool ok = TeX && strstr(TeX, string_c_str(row->expected)) &&
+              expr_is_variable(equ_lhs(solution));
+    if (!ok)
+        string_printf("Solution notation: %S\nExpected notation: %S\nActual: %s\n", row->input, row->expected,
+                        TeX ? TeX : "(none)");
+    free(TeX); de_solve_result_free(result); de_free(problem);
+    TEST_ASSERT_TRUE(ok, "explicit ODE notation labels the native solution by its declared coordinate");
+}
+
+/* Check presentation while retaining the variable left side required by numerical callers. */
+void test_diffequ_solution_notation(void)
+{
+    test_run_database_cases(__FILE__, __LINE__, "diffequation.solution_notation", "test_diffequ_solution_notation",
+                              solution_notation_row);
+}
 
 static void check_power_display(const char *source, const char *expected)
 {

@@ -187,6 +187,19 @@ number_t number_lerch_phi(const number_t z, const number_t s, const number_t a)
     if (bits < 106) bits = 106;
     if (bits > 65536 - 128) return NUM_NAN;
     mpfr_prec_t work = (mpfr_prec_t)bits + 128;
+    if (num_is_real(s)) {
+        number_t real_order = num_real_part(s);
+        double degree = num_is_integer(real_order) ? -num_to_double(real_order) : 0;
+        num_destroy(&real_order);
+        if (degree >= 1 && degree <= 64) {
+            mpc_t value;
+            mpc_init2(value, work);
+            bool complete = number_lerch_integer(value, z, a, (unsigned)degree, (mpfr_prec_t)bits);
+            number_t result = complete ? series_result(value, bits, num_is_real(z) && num_is_real(a)) : NUM_NAN;
+            mpc_clear(value);
+            if (complete) return result;
+        }
+    }
     enum { LERCH_BLOCK = 16 };
     unsigned block = bits >= 512 ? LERCH_BLOCK : 1u;
     mpc_t argument, exponent, offset, base, power, term, sum, step;
@@ -206,8 +219,13 @@ number_t number_lerch_phi(const number_t z, const number_t s, const number_t a)
     bool integer = mpfr_zero_p(mpc_imagref(exponent)) && mpfr_integer_p(mpc_realref(exponent)) &&
                    mpfr_fits_slong_p(mpc_realref(exponent), MPFR_RNDN);
     long integer_order = integer ? mpfr_get_si(mpc_realref(exponent), MPFR_RNDN) : 0;
-    mpc_pow_ui(step, argument, block, MPC_RNDNN);
-    if (ok && !integer) converged = number_lerch_blocks(sum, argument, exponent, offset, (mpfr_prec_t)bits);
+    if (ok && !integer && !converged)
+        converged = number_lerch_blocks(sum, argument, exponent, offset, (mpfr_prec_t)bits);
+    if (ok && real && !converged) {
+        converged = number_lerch_real(mpc_realref(sum), argument, exponent, offset, (mpfr_prec_t)bits);
+        if (converged) mpfr_set_zero(mpc_imagref(sum), 1);
+    }
+    if (ok && !converged) mpc_pow_ui(step, argument, block, MPC_RNDNN);
     for (unsigned attempt = 0; ok && !converged && attempt < 2; ++attempt) {
         bool adaptive = !integer && attempt == 0, retry = false;
         mpc_set_prec(base, work);
@@ -215,10 +233,15 @@ number_t number_lerch_phi(const number_t z, const number_t s, const number_t a)
         mpfr_set_zero(absolute_sum, 1); mpfr_set_zero(power_error, 1);
         for (unsigned long k = 0; ok && k < 200000; k += block) {
             if (integer && block == 1) {
-                /* Retain the direct quotient for short integer-order calculations. */
+                /* Negative orders are positive powers; avoid inverting a power and then dividing by it. */
                 mpc_add_ui(base, offset, k, MPC_RNDNN);
-                mpc_pow_si(base, base, integer_order, MPC_RNDNN);
-                mpc_div(term, power, base, MPC_RNDNN);
+                if (integer_order < 0) {
+                    mpc_pow_ui(base, base, 0ul - (unsigned long)integer_order, MPC_RNDNN);
+                    mpc_mul(term, power, base, MPC_RNDNN);
+                } else {
+                    mpc_pow_si(base, base, integer_order, MPC_RNDNN);
+                    mpc_div(term, power, base, MPC_RNDNN);
+                }
                 number_mpc_abs_upper(rounding, term);
                 mpfr_add(absolute_sum, absolute_sum, rounding, MPFR_RNDU);
             } else {
@@ -231,8 +254,12 @@ number_t number_lerch_phi(const number_t z, const number_t s, const number_t a)
                     if (mpc_get_prec(coefficients[j]) != precision) mpc_set_prec(coefficients[j], precision);
                     if (integer) {
                         mpc_add_ui(base, offset, k + j, MPC_RNDNN);
-                        mpc_pow_si(base, base, integer_order, MPC_RNDNN);
-                        mpc_ui_div(coefficients[j], 1u, base, MPC_RNDNN);
+                        if (integer_order < 0)
+                            mpc_pow_ui(coefficients[j], base, 0ul - (unsigned long)integer_order, MPC_RNDNN);
+                        else {
+                            mpc_pow_si(base, base, integer_order, MPC_RNDNN);
+                            mpc_ui_div(coefficients[j], 1u, base, MPC_RNDNN);
+                        }
                     } else number_dirichlet_power(coefficients[j], offset, exponent, k + j);
                     number_mpc_abs_upper(rounding, coefficients[j]);
                     mpfr_mul(rounding, rounding, magnitude, MPFR_RNDU);

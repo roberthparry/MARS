@@ -16,6 +16,15 @@
 #include "internal/expr_internal.h"
 
 /**
+ * @brief Show explicit ordinary solutions as functions of their declared independent coordinate.
+ * @param[in] problem Borrowed original differential problem; not modified or retained.
+ * @param[in,out] result Borrowed result receiving independent left-side mathematical display strings.
+ * @return True for inapplicable results or successful presentation; false for invalid input or allocation/rendering
+ * failure. Preserves solution graphs and custom right-side notation. Call serially; ownership is unchanged.
+ */
+bool de_notation_solution_functions(const diffequ_t *problem, diffequ_solve_result_t *result);
+
+/**
  * @brief Label the two coordinates of a quadrature family as functions of their shared parameter.
  * @param[in,out] result Borrowed result receiving independent display strings on its first two equations.
  * @return True for a non-quadrature result or after successful formatting; false for missing coordinates,

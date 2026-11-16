@@ -959,6 +959,18 @@ number_t num_polygamma(unsigned int order, const number_t number);
 number_t num_zeta(const number_t number);
 
 /**
+ * @brief Evaluate Riemann zeta and its first derivative together.
+ * @param number Borrowed real or complex exponent; its backend and precision are preserved.
+ * @param[out] derivative Pointer receiving an independently owning derivative; its previous contents
+ * are not released. Must not point to the caller's input handle.
+ * @return Owning zeta value. Both outputs become NaN for invalid input or exhausted convergence guards.
+ * A NULL derivative pointer requests only the value. MPFR and MPC evaluations share their finite sum and
+ * Euler–Maclaurin recurrence; other backends retain their ordinary kernels. Release both outputs with
+ * num_destroy(), or use NUM_SCOPE. Shared bounded coefficient caches are thread-safe.
+ */
+number_t num_zeta_pair(const number_t number, number_t *derivative);
+
+/**
  * @brief Evaluate the analytically continued Hurwitz zeta function.
  *
  * @param s Real or complex exponent argument; 1 is the simple pole.

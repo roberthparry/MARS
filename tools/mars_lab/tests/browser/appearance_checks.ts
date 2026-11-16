@@ -162,6 +162,9 @@ window.checkLabAppearance = async function checkLabAppearance(): Promise<void> {
                 option.getAttribute('aria-selected') === 'true', 'visible menu selection follows the current skin');
             check(getComputedStyle(option).backgroundColor === getComputedStyle(paletteProbe).color,
                 'the rendered selected row uses the current skin accent: ' + names[index]);
+            paletteProbe.style.color = 'color-mix(in srgb, var(--accent-2) 65%, var(--ink))';
+            check(getComputedStyle(document.getElementById('calculationTime')!).color ===
+                getComputedStyle(paletteProbe).color, 'calculation time follows the current theme: ' + names[index]);
             check(document.querySelector<HTMLMetaElement>('meta[name="theme-color"]')?.content ===
                 style.getPropertyValue('--paper').trim(), 'browser chrome follows the palette');
             paletteProbe.style.color = 'var(--ink)';

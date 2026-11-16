@@ -68,8 +68,15 @@ static void dirichlet_evaluate(mpc_ptr out, mpc_srcptr offset, mpc_srcptr expone
         number_zeta_logarithm(logarithm, offset, index);
         bool usable = mpfr_number_p(mpc_realref(logarithm)) && mpfr_number_p(mpc_imagref(logarithm));
         if (usable) {
-            mpc_mul(value, exponent, logarithm, MPC_RNDNN); mpc_neg(value, value, MPC_RNDNN);
-            mpc_exp(value, value, MPC_RNDNN); mpc_set(out, value, MPC_RNDNN);
+            if (mpfr_zero_p(mpc_imagref(exponent)) && mpfr_zero_p(mpc_imagref(logarithm))) {
+                /* Preserve MPC's signed-zero product convention for complex callers sharing this cache. */
+                mpc_mul(value, exponent, logarithm, MPC_RNDNN); mpc_neg(value, value, MPC_RNDNN);
+                mpfr_exp(mpc_realref(out), mpc_realref(value), MPFR_RNDN);
+                mpfr_set_zero(mpc_imagref(out), mpfr_signbit(mpc_imagref(value)) ? -1 : 1);
+            } else {
+                mpc_mul(value, exponent, logarithm, MPC_RNDNN); mpc_neg(value, value, MPC_RNDNN);
+                mpc_exp(value, value, MPC_RNDNN); mpc_set(out, value, MPC_RNDNN);
+            }
         }
         mpc_clear(value); mpc_clear(logarithm);
         if (usable) return;

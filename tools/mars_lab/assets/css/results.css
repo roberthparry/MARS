@@ -157,6 +157,23 @@
   align-items: center;
 }
 
+.value-heading {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  min-width: 0;
+}
+
+.calculation-time {
+  color: color-mix(in srgb, var(--accent-2) 65%, var(--ink));
+  font-size: 0.95em;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: normal;
+  text-transform: none;
+  white-space: nowrap;
+}
+
 .precision-actions {
   justify-content: center;
   grid-column: 2;

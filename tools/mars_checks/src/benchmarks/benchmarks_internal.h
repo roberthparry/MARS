@@ -136,6 +136,14 @@ const char *benchmark_backend_title(const char *backend);
 extern const char benchmark_protocol[];
 
 /**
+ * @brief Look up an immutable timing protocol by its command-line mode.
+ * @param[in] mode Borrowed name: warm, cold or changing; must be non-null.
+ * @return Borrowed process-lifetime description, or NULL for an unknown mode. Do not release it.
+ * Descriptions distinguish comparison histories, including argument perturbations and process isolation.
+ */
+const char *benchmark_protocol_for(const char *mode);
+
+/**
  * @brief Imaginary component added to permitted complex operands, shared by workers and reports.
  * @details Immutable real literal with process lifetime; never modify or release its storage.
  */
@@ -212,8 +220,10 @@ bool benchmark_operation_supported(const benchmark_operation_t *operation, bool 
 /**
  * @brief Measure one catalogue case in an isolated worker and print machine-readable samples.
  * @param[in] root Borrowed repository root; storage is not created or changed.
- * @param[in] argc Four arguments, or five when saved operand literals are supplied.
- * @param[in] argv Borrowed arguments: operation, backend, bits, sample count and optional comma-separated operands.
+ * @param[in] argc Four through six arguments, including optional saved operands and measurement mode.
+ * @param[in] argv Borrowed arguments: operation, backend, bits, sample count, optional comma-separated operands,
+ * then optional warm/cold/changing mode. Cold samples fork independently from an unevaluated parent;
+ * changing samples perturb permitted real parts outside timing and support only MPFR/MPC profiles.
  * Saved operands are parsed before timing and remain caller-owned. Exact fractions use a 16,384-bit rational
  * size budget; both exact profiles reject inexact results rather than timing an unnoticed floating conversion.
  * @return Zero after finite results and all timings were written; one on invalid mathematics or clock failure;

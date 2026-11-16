@@ -13,6 +13,7 @@
 #include "expression-t.h"
 #include "lab_presentation.h"
 #include "test_harness.h"
+#include "test_database.h"
 #include "test_lab_support.h"
 
 static json_t *lab_pres_test_request(const char *literal, unsigned *status)
@@ -34,6 +35,24 @@ static json_t *lab_pres_test_analyse_text(const string_t *text, unsigned *status
     string_free(key);
     json_free(payload);
     return result;
+}
+
+static void calculation_time_row(const void *data)
+{
+    const test_database_case_t *row = data;
+    json_t *fields = test_lab_json(string_c_str(row->input));
+    bool ok = lab_presentation_adapt(fields);
+    const char *display = test_lab_text(test_lab_member(fields, "presentation"), "calculation_time");
+    ok = ok && !strcmp(display, string_c_str(row->expected));
+    if (!ok)
+        printf("%s: duration '%s'; expected '%s'\n", string_c_str(row->name), display, string_c_str(row->expected));
+    json_free(fields);
+    TEST_ASSERT_TRUE(ok, "native timing metadata selects readable units and rejects missing or invalid durations");
+}
+
+static void test_lab_presentation_calculation_time(void)
+{
+    test_run_database_cases(__FILE__, __LINE__, "mars_lab.calculation_times", NULL, calculation_time_row);
 }
 
 static void test_lab_presentation_matrix(void)
@@ -478,6 +497,7 @@ static void test_lab_presentation_integrator_text(void)
 /* Register ordinary presentation checks before the suite's README examples. */
 void test_lab_presentation_cases(void)
 {
+    TEST_RUN_IN_GROUP(test_lab_presentation_calculation_time, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_presentation_matrix, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_presentation_metadata, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_presentation_calculus_cards, tests, NULL);

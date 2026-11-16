@@ -249,6 +249,29 @@ static const TeX_model_node_t *rule_bessel(notation_build_t *b)
     return statements(b, nodes, sizeof nodes / sizeof *nodes);
 }
 
+static const TeX_model_node_t *rule_scaled_bessel(notation_build_t *b)
+{
+    const TeX_model_node_t *x = symbol(b, "x"), *y = symbol(b, "y"), *z = symbol(b, "z");
+    const TeX_model_node_t *alpha = symbol(b, "α"), *nu = symbol(b, "ν");
+    const TeX_model_node_t *two = notation_build_literal(b, TeX_NODE_NUMBER, "2");
+    const TeX_model_node_t *zero = notation_build_literal(b, TeX_NODE_NUMBER, "0");
+    const TeX_model_node_t *governing = pair(b, TeX_NODE_SUM,
+        pair(b, TeX_NODE_SUM, pair(b, TeX_NODE_PRODUCT, pair(b, TeX_NODE_POWER, x, two), prime(b, y, 2u)),
+            pair(b, TeX_NODE_PRODUCT, math(b, "p*x"), prime(b, y, 1u))),
+        pair(b, TeX_NODE_PRODUCT, math(b, "a*x^2+q"), y));
+    const TeX_model_node_t *nodes[] = {
+        pair(b, TeX_NODE_EQUATION, governing, zero),
+        pair(b, TeX_NODE_EQUATION, alpha, math(b, "(1-p)/2")),
+        pair(b, TeX_NODE_EQUATION, pair(b, TeX_NODE_POWER, nu, two), math(b, "α^2-q")),
+        pair(b, TeX_NODE_EQUATION, z, math(b, "sqrt(abs(a))*abs(x)")),
+        pair(b, TeX_NODE_EQUATION, y,
+            pair(b, TeX_NODE_PRODUCT, pair(b, TeX_NODE_POWER, math(b, "abs(x)"), alpha),
+                pair(b, TeX_NODE_APPLY, symbol(b, "u"), z))),
+        neq(b, x, zero)
+    };
+    return statements(b, nodes, sizeof nodes / sizeof *nodes);
+}
+
 static const TeX_model_node_t *rule_separable(notation_build_t *b)
 {
     const TeX_model_node_t *x = symbol(b, "x"), *y = symbol(b, "y"), *one = notation_build_literal(b, TeX_NODE_NUMBER, "1");
@@ -339,6 +362,13 @@ static const char title_stationary[] = "stationary-eigenfunction evolution rule"
 static const char title_exact_first[] = "exact first-order differential rule";
 static const char title_laplace[] = "Laplace harmonic-function rule";
 static const char title_bessel[] = "power-law Bessel reduction rule";
+static const char title_scaled_bessel[] = "scaled Bessel reduction rule";
+static const char plain_scaled_bessel[] =
+    "Normalise to x^2*y″ + p*x*y′ + (a*x^2+q)*y = 0. Set α=(1-p)/2 and ν^2=α^2-q. "
+    "For a>0 use |x|^α times J_ν(sqrt(a)*|x|) and Y_ν(sqrt(a)*|x|); for a<0 use I_ν and K_ν. "
+    "At exact half order, simplify to |x|^(-p/2) times sine/cosine or hyperbolic sine/cosine. "
+    "The a=0 limit uses Euler powers or a repeated-root logarithm. Each real branch excludes the origin "
+    "and any zero of the original leading coefficient. Impose supplied point conditions within one such interval.";
 
 static const rule_description_t rules[] = {
     [DE_SOLVER_NONE]                           = {title_none,             plain_none,             rule_none},
@@ -359,6 +389,7 @@ static const rule_description_t rules[] = {
     [DE_SOLVER_EXACT_FIRST_ORDER]              = {title_exact_first,      plain_exact_first,      rule_exact_first},
     [DE_SOLVER_LAPLACE]                        = {title_laplace,          plain_laplace,          rule_laplace},
     [DE_SOLVER_POWER_LAW_BESSEL]               = {title_bessel,           plain_bessel,           rule_bessel},
+    [DE_SOLVER_BESSEL]                         = {title_scaled_bessel,    plain_scaled_bessel,    rule_scaled_bessel},
 };
 
 static const rule_description_t *description(de_solver_t solver)

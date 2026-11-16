@@ -2892,6 +2892,27 @@ static void test_lab_extra_ode_interval(void)
 static void test_lab_extra_diffequation(void)
 {
     unsigned status = 0;
+    json_t *bessel = request("/diffequation-eval",
+        "{\"diffequation\":\"x^2y''+xy'+(x^2-1/4)y=0\"}", &status);
+    bool bessel_ok = status == 200u && contains(bessel, "status", "solved") &&
+        contains(bessel, "solver", "Bessel") && contains(bessel, "solutions", "cos(x)") &&
+        contains(bessel, "solutions", "sin(x)") && contains(bessel, "solutions", "x ≠ 0") &&
+        contains(bessel, "solutions_TeX", "y\\left(x\\right)") &&
+        contains(bessel, "solutions_TeX", "\\frac{C_{1}") &&
+        contains(bessel, "solutions_TeX", "\\sqrt{\\left| x \\right|}") &&
+        lab_presentation_adapt(bessel);
+    if (!bessel_ok) show_failure(bessel);
+    json_free(bessel);
+    TEST_ASSERT_TRUE(bessel_ok, "the Bessel screenshot equation exposes native elementary solutions and real restrictions");
+    bessel = request("/eval", "{\"expression\":\"x^2y''+xy'+(x^2-1/4)y=0\",\"action\":\"plot\","
+                     "\"plot_source_mode\":\"diffequation\",\"plot_lower\":\"-5\",\"plot_upper\":\"5\"}", &status);
+    bessel_ok = status == 200u && contains(bessel, "plot_svg", "data-series=") &&
+        contains(bessel, "plot_title_TeX", "y\\left(x\\right)") &&
+        contains(bessel, "plot_title_TeX", "\\frac{C_{1}") &&
+        !contains(bessel, "plot_svg", "NaN") && !contains(bessel, "plot_svg", "Infinity");
+    if (!bessel_ok) show_failure(bessel);
+    json_free(bessel);
+    TEST_ASSERT_TRUE(bessel_ok, "the elementary Bessel family plots across both real half-axes without invalid SVG coordinates");
     json_t *response = request("/diffequation-eval", "{\"diffequation\":\"Dx(y)=x*y; y(0)=1\"}", &status);
     const json_t *bindings = test_lab_member(response, "binding_values");
     bool ok = status == 200 && contains(response, "solutions", "y") && json_array_size(bindings) == 1 &&

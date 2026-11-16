@@ -49,7 +49,7 @@ static number_t regression_erf_reference(number_t input)
     int digits = (int)(precision * 0.302) + 4;
     mpfr_asprintf(&text, "%.*Rg%+.*Rgi", digits, mpc_realref(sum), digits, mpc_imagref(sum));
     number_t result = text ? num_create_from_string(text) : num_clone(NUM_NAN);
-    mpfr_free_str(text);
+    if (text) mpfr_free_str(text);
     mpfr_clears(pi, size, (mpfr_ptr)0);
     mpc_clear(z); mpc_clear(square); mpc_clear(term); mpc_clear(sum); mpc_clear(addend);
     return result;
@@ -138,6 +138,15 @@ static number_t regression_gamma_inverse_complex(const number_t *a)
     return num_sub(num_gamma(value), a[0]);
 }
 
+static number_t regression_lgamma_turns(const number_t *a)
+{
+    number_t value = regression_resolved(num_lgamma(a[0]));
+    number_t difference = num_sub(num_lgamma(num_add(a[0], num_create_from_long(128))), value);
+    for (unsigned j = 0; j < 128; ++j)
+        difference = num_sub(difference, num_log(num_add(a[0], num_create_from_long(j))));
+    return difference;
+}
+
 static number_t regression_gamma_upper_one(const number_t *a)
 {
     number_t one = num_new_with_prec_bits(num_get_default_prec_bits());
@@ -221,21 +230,36 @@ static number_t regression_lerch_shift(const number_t *a)
 /* SQL supplies small dyadic arguments. This independent full-precision MPC sum neither adapts term precision
  * nor uses the production logarithm/power caches. The two fixture ranges have term ratios below 0.9 after
  * k=100 or k=2000 respectively, including the large negative order which forces uniform-precision retry. */
-static number_t regression_lerch_reference_value(const number_t *a, bool checked_blocks)
+typedef enum {
+    LERCH_REFERENCE_PUBLIC,
+    LERCH_REFERENCE_BLOCKS,
+    LERCH_REFERENCE_INTEGER
+} lerch_reference_kind_t;
+
+/* Retain exact rational inputs when constructing the independently summed high-precision reference. */
+static bool regression_mpc_input(mpc_ptr out, number_t input)
+{
+    number_t *converted = number_coerce(&input, NUMBER_COMPLEX);
+    bool ok = converted && !number_complex_get_mpc(out, number_impl_const(converted)->value.cx, mpc_get_prec(out));
+    number_box_free(converted);
+    return ok;
+}
+
+static number_t regression_lerch_reference_value(const number_t *a, lerch_reference_kind_t kind)
 {
     mpfr_prec_t precision = (mpfr_prec_t)num_get_default_prec_bits() + 256;
     mpc_t z, negative, offset, base, power, term, sum;
     mpc_init2(z, precision); mpc_init2(negative, precision); mpc_init2(offset, precision);
     mpc_init2(base, precision); mpc_init2(power, precision); mpc_init2(term, precision); mpc_init2(sum, precision);
-    mpc_set_d_d(z, num_to_double(num_real_part(a[0])), num_to_double(num_imag_part(a[0])), MPC_RNDNN);
-    mpc_set_d_d(negative, -num_to_double(num_real_part(a[1])), -num_to_double(num_imag_part(a[1])), MPC_RNDNN);
-    mpc_set_d_d(offset, num_to_double(num_real_part(a[2])), num_to_double(num_imag_part(a[2])), MPC_RNDNN);
+    bool inputs = regression_mpc_input(z, a[0]) && regression_mpc_input(negative, a[1]) &&
+                  regression_mpc_input(offset, a[2]);
+    mpc_neg(negative, negative, MPC_RNDNN);
     mpc_set_ui(power, 1u, MPC_RNDNN); mpc_set_ui(sum, 0u, MPC_RNDNN);
     mpfr_t magnitude, bound;
     mpfr_inits2(precision, magnitude, bound, (mpfr_ptr)0);
     unsigned long reference_start = num_gt(num_abs(a[1]), num_create_from_long(10)) ? 2000u : 100u;
     bool converged = false;
-    for (unsigned long k = 0; k < 20000; ++k) {
+    for (unsigned long k = 0; inputs && k < 20000; ++k) {
         mpc_add_ui(base, offset, k, MPC_RNDNN); mpc_pow(base, base, negative, MPC_RNDNN);
         mpc_mul(term, power, base, MPC_RNDNN); mpc_add(sum, sum, term, MPC_RNDNN);
         if (k > reference_start && k % 8 == 0) {
@@ -250,29 +274,61 @@ static number_t regression_lerch_reference_value(const number_t *a, bool checked
     if (converged) mpfr_asprintf(&text, "%.*Rg%+.*Rgi", digits, mpc_realref(sum), digits, mpc_imagref(sum));
     number_t reference = text ? num_create_from_string(text) : NUM_NAN;
     number_t result;
-    if (checked_blocks) {
+    if (kind != LERCH_REFERENCE_PUBLIC) {
         mpc_neg(negative, negative, MPC_RNDNN);
-        bool complete = number_lerch_blocks(term, z, negative, offset, (mpfr_prec_t)num_get_default_prec_bits());
+        mpfr_prec_t bits = (mpfr_prec_t)num_get_default_prec_bits();
+        bool complete = kind == LERCH_REFERENCE_BLOCKS ? number_lerch_blocks(term, z, negative, offset, bits) :
+            number_lerch_integer(term, a[0], a[2], (unsigned)-num_to_double(a[1]), bits);
         char *rendering = NULL;
         if (complete)
             mpfr_asprintf(&rendering, "%.*Rg%+.*Rgi", digits, mpc_realref(term), digits, mpc_imagref(term));
         result = rendering ? num_create_from_string(rendering) : NUM_NAN;
-        mpfr_free_str(rendering);
+        if (rendering) mpfr_free_str(rendering);
     } else result = regression_resolved(num_lerch_phi(a[0], a[1], a[2]));
     number_t scale = num_abs(reference);
     if (num_lt(scale, NUM_ONE)) scale = NUM_ONE;
     number_t error = num_div(num_sub(result, reference), scale);
-    mpfr_free_str(text);
+    if (kind == LERCH_REFERENCE_INTEGER) {
+        number_t public_value = regression_resolved(num_lerch_phi(a[0], a[1], a[2]));
+        number_t public_error = num_div(num_sub(public_value, reference), scale);
+        error = num_add(num_abs(error), num_abs(public_error));
+    }
+    if (text) mpfr_free_str(text);
     mpfr_clears(magnitude, bound, (mpfr_ptr)0);
     mpc_clear(z); mpc_clear(negative); mpc_clear(offset); mpc_clear(base);
     mpc_clear(power); mpc_clear(term); mpc_clear(sum);
     return error;
 }
 
-static number_t regression_lerch_reference(const number_t *a) { return regression_lerch_reference_value(a, false); }
+static number_t regression_lerch_reference(const number_t *a)
+{
+    return regression_lerch_reference_value(a, LERCH_REFERENCE_PUBLIC);
+}
 static number_t regression_lerch_blocks_reference(const number_t *a)
 {
-    return regression_lerch_reference_value(a, true);
+    return regression_lerch_reference_value(a, LERCH_REFERENCE_BLOCKS);
+}
+
+static number_t regression_lerch_integer_reference(const number_t *a)
+{
+    return regression_lerch_reference_value(a, LERCH_REFERENCE_INTEGER);
+}
+
+static number_t regression_lerch_integer_exact(const number_t *a)
+{
+    number_t inputs[] = {num_create_from_frac(1, 5), num_neg(a[0]), num_create_from_frac(1, 3)};
+    return regression_lerch_reference_value(inputs, LERCH_REFERENCE_INTEGER);
+}
+
+static number_t regression_lerch_integer_reject(const number_t *a)
+{
+    mpfr_prec_t bits = (mpfr_prec_t)num_get_default_prec_bits();
+    mpc_t value;
+    mpc_init2(value, bits); mpc_set_d_d(value, 7.25, 0.5, MPC_RNDNN);
+    bool ok = !number_lerch_integer(value, a[0], a[1], (unsigned)num_to_double(a[2]), bits) &&
+        !mpfr_cmp_d(mpc_realref(value), 7.25) && !mpfr_cmp_d(mpc_imagref(value), 0.5);
+    mpc_clear(value);
+    return ok ? NUM_ZERO : NUM_ONE;
 }
 
 static number_t regression_lerch_blocks_reject(const number_t *a)
@@ -292,6 +348,116 @@ static number_t regression_lerch_blocks_reject(const number_t *a)
 static number_t regression_qc_erfcinv(const number_t *a)
 {
     return num_create_from_qcomplex(qc_erfc(qc_erfcinv(regression_qcomplex(a[0]))));
+}
+
+static bool regression_mpc_close(mpc_srcptr value, mpc_srcptr reference, mpfr_prec_t bits)
+{
+    mpfr_prec_t work = bits + 256;
+    mpc_t difference;
+    mpc_init2(difference, work);
+    mpfr_t error, bound;
+    mpfr_inits2(work, error, bound, (mpfr_ptr)0);
+    mpc_sub(difference, value, reference, MPC_RNDNN); mpc_abs(error, difference, MPFR_RNDU);
+    mpc_abs(bound, reference, MPFR_RNDD); mpfr_add_ui(bound, bound, 1u, MPFR_RNDD);
+    mpfr_mul_2si(bound, bound, -bits + 8, MPFR_RNDD);
+    bool ok = mpfr_number_p(error) && mpfr_lessequal_p(error, bound);
+    mpfr_clears(error, bound, (mpfr_ptr)0); mpc_clear(difference);
+    return ok;
+}
+
+/* SQL uses dyadic components. Independent full-width powers and logarithms check both finite sums.
+ * A value-only request precedes the paired request, exercising the finite cache's derivative upgrade. */
+static number_t regression_zeta_blocks(const number_t *a)
+{
+    mpfr_prec_t bits = (mpfr_prec_t)num_get_default_prec_bits(), work = bits + 256;
+    unsigned long count = (unsigned long)num_to_double(a[2]);
+    mpc_t s, offset, value, slope, reference, reference_slope, base, negative, power, term, logarithm;
+    mpc_init2(s, work); mpc_init2(offset, work); mpc_init2(value, bits); mpc_init2(slope, bits);
+    mpc_init2(reference, work); mpc_init2(reference_slope, work); mpc_init2(base, work);
+    mpc_init2(negative, work); mpc_init2(power, work); mpc_init2(term, work); mpc_init2(logarithm, work);
+    mpc_set_d_d(s, num_to_double(num_real_part(a[0])), num_to_double(num_imag_part(a[0])), MPC_RNDNN);
+    mpc_set_d_d(offset, num_to_double(num_real_part(a[1])), num_to_double(num_imag_part(a[1])), MPC_RNDNN);
+    mpc_neg(negative, s, MPC_RNDNN);
+    mpc_set_ui(reference, 0u, MPC_RNDNN); mpc_set_ui(reference_slope, 0u, MPC_RNDNN);
+    for (unsigned long n = 0; n < count; ++n) {
+        mpc_add_ui(base, offset, n, MPC_RNDNN); mpc_pow(power, base, negative, MPC_RNDNN);
+        mpc_add(reference, reference, power, MPC_RNDNN);
+        mpc_log(logarithm, base, MPC_RNDNN); mpc_mul(term, power, logarithm, MPC_RNDNN);
+        mpc_sub(reference_slope, reference_slope, term, MPC_RNDNN);
+    }
+    bool ok = number_zeta_shifted_sum(value, NULL, s, offset, count) && regression_mpc_close(value, reference, bits);
+    ok = number_zeta_shifted_sum(value, slope, s, offset, count) && ok;
+    ok = regression_mpc_close(value, reference, bits) && regression_mpc_close(slope, reference_slope, bits) && ok;
+    ok = number_zeta_shifted_sum(value, slope, s, offset, count) && ok;
+    ok = regression_mpc_close(value, reference, bits) && regression_mpc_close(slope, reference_slope, bits) && ok;
+    mpc_clear(logarithm); mpc_clear(term); mpc_clear(power); mpc_clear(negative); mpc_clear(base);
+    mpc_clear(reference_slope); mpc_clear(reference); mpc_clear(slope); mpc_clear(value); mpc_clear(offset); mpc_clear(s);
+    return ok ? NUM_ZERO : NUM_ONE;
+}
+
+static number_t regression_zeta_blocks_reject(const number_t *a)
+{
+    mpfr_prec_t bits = (mpfr_prec_t)num_get_default_prec_bits();
+    mpc_t s, offset, value, slope;
+    mpc_init2(s, bits); mpc_init2(offset, bits); mpc_init2(value, bits); mpc_init2(slope, bits);
+    mpc_set_d_d(s, num_to_double(num_real_part(a[0])), num_to_double(num_imag_part(a[0])), MPC_RNDNN);
+    mpc_set_d_d(offset, num_to_double(num_real_part(a[1])), num_to_double(num_imag_part(a[1])), MPC_RNDNN);
+    mpc_set_d_d(value, 7.25, 0.5, MPC_RNDNN); mpc_set_d_d(slope, 8.25, 0.75, MPC_RNDNN);
+    bool ok = !number_zeta_shifted_sum(value, slope, s, offset, (unsigned long)num_to_double(a[2])) &&
+        !mpfr_cmp_d(mpc_realref(value), 7.25) && !mpfr_cmp_d(mpc_imagref(value), 0.5) &&
+        !mpfr_cmp_d(mpc_realref(slope), 8.25) && !mpfr_cmp_d(mpc_imagref(slope), 0.75);
+    mpc_clear(slope); mpc_clear(value); mpc_clear(offset); mpc_clear(s);
+    return ok ? NUM_ZERO : NUM_ONE;
+}
+
+/* A deliberately unsupported short-path budget selects the original full-state recurrence for the reference.
+ * Inputs are dyadic; the reference retains 256 extra target bits and independent full-width state. */
+static number_t regression_zeta_tail_reference(const number_t *a)
+{
+    mpfr_prec_t bits = (mpfr_prec_t)num_get_default_prec_bits(), work = bits + 384;
+    mpc_t s, endpoint, value, slope, reference, reference_slope;
+    mpc_init2(s, work); mpc_init2(endpoint, work);
+    mpc_init2(value, bits + 128); mpc_init2(slope, bits + 128);
+    mpc_init2(reference, work); mpc_init2(reference_slope, work);
+    mpc_set_d_d(s, num_to_double(num_real_part(a[0])), num_to_double(num_imag_part(a[0])), MPC_RNDNN);
+    mpc_set_d_d(endpoint, num_to_double(num_real_part(a[1])), num_to_double(num_imag_part(a[1])), MPC_RNDNN);
+    mpc_set_ui(value, 0u, MPC_RNDNN); mpc_set_ui(slope, 0u, MPC_RNDNN);
+    mpc_set_ui(reference, 0u, MPC_RNDNN); mpc_set_ui(reference_slope, 0u, MPC_RNDNN);
+    bool ok = !number_zeta_tail(reference, reference_slope, s, endpoint, bits + 256, 8193, 32);
+    ok = number_zeta_tail_short(value, slope, s, endpoint, bits, 8192, 32) && ok;
+    ok = regression_mpc_close(value, reference, bits) && regression_mpc_close(slope, reference_slope, bits) && ok;
+    mpc_set_ui(value, 0u, MPC_RNDNN);
+    ok = number_zeta_tail_short(value, NULL, s, endpoint, bits, 8192, 32) && ok;
+    ok = regression_mpc_close(value, reference, bits) && ok;
+    mpc_clear(reference_slope); mpc_clear(reference); mpc_clear(slope); mpc_clear(value);
+    mpc_clear(endpoint); mpc_clear(s);
+    return ok ? NUM_ZERO : NUM_ONE;
+}
+
+static number_t regression_zeta_tail_rejected(const number_t *a, size_t budget)
+{
+    mpfr_prec_t bits = (mpfr_prec_t)num_get_default_prec_bits();
+    mpc_t s, endpoint, value, slope;
+    mpc_init2(s, bits + 128); mpc_init2(endpoint, bits + 128);
+    mpc_init2(value, bits + 128); mpc_init2(slope, bits + 128);
+    mpc_set_d_d(s, num_to_double(num_real_part(a[0])), num_to_double(num_imag_part(a[0])), MPC_RNDNN);
+    mpc_set_d_d(endpoint, num_to_double(num_real_part(a[1])), num_to_double(num_imag_part(a[1])), MPC_RNDNN);
+    mpc_set_d_d(value, 7.25, 0.5, MPC_RNDNN); mpc_set_d_d(slope, 8.25, 0.75, MPC_RNDNN);
+    bool ok = !number_zeta_tail_short(value, slope, s, endpoint, bits, budget, 32) &&
+        !mpfr_cmp_d(mpc_realref(value), 7.25) && !mpfr_cmp_d(mpc_imagref(value), 0.5) &&
+        !mpfr_cmp_d(mpc_realref(slope), 8.25) && !mpfr_cmp_d(mpc_imagref(slope), 0.75);
+    mpc_clear(slope); mpc_clear(value); mpc_clear(endpoint); mpc_clear(s);
+    return ok ? NUM_ZERO : NUM_ONE;
+}
+
+static number_t regression_zeta_tail_reject(const number_t *a)
+{
+    return regression_zeta_tail_rejected(a, 8192);
+}
+
+static number_t regression_zeta_tail_budget(const number_t *a)
+{
+    return regression_zeta_tail_rejected(a, 4);
 }
 
 static number_t regression_bessel_half(const number_t *a)
@@ -421,6 +587,21 @@ static number_t regression_tetragamma(const number_t *a)
                     num_div(NUM_TWO, num_pow(a[0], num_create_from_long(3))));
 }
 
+static number_t regression_trigamma_reflection(const number_t *a)
+{
+    number_t pi = num_const(NUM_PI), sine = num_sin(num_mul(pi, a[0]));
+    number_t reference = num_div(num_sqr(pi), num_sqr(sine));
+    return num_sub(num_add(num_trigamma(a[0]), num_trigamma(num_sub(NUM_ONE, a[0]))), reference);
+}
+
+static number_t regression_tetragamma_reflection(const number_t *a)
+{
+    number_t pi = num_const(NUM_PI), angle = num_mul(pi, a[0]);
+    number_t reference = num_div(num_mul(NUM_TWO, num_mul(num_pow(pi, num_create_from_long(3)), num_cos(angle))),
+                                 num_pow(num_sin(angle), num_create_from_long(3)));
+    return num_sub(num_sub(num_tetragamma(num_sub(NUM_ONE, a[0])), num_tetragamma(a[0])), reference);
+}
+
 static number_t regression_zeta(const number_t *a)
 {
     return num_sub(num_zeta(a[0]), num_div(num_sqr(num_const(NUM_PI)), num_create_from_long(6)));
@@ -445,7 +626,7 @@ static number_t regression_zeta_reference_value(const number_t *a, bool hurwitz)
     if (num_lt(scale, NUM_ONE)) scale = NUM_ONE;
     number_t value = hurwitz ? num_zetah(a[0], a[1]) : num_zeta(a[0]);
     number_t error = num_div(num_sub(value, expected), scale);
-    mpfr_free_str(text);
+    if (text) mpfr_free_str(text);
     mpfr_clears(reference, order, factor, (mpfr_ptr)0);
     return error;
 }
@@ -479,6 +660,16 @@ static number_t regression_zetap(const number_t *a)
     return num_add(num_zetap(a[0]), num_mul(NUM_HALF, num_ln(num_mul(NUM_TWO, num_const(NUM_PI)))));
 }
 
+static number_t regression_zeta_pair(const number_t *a)
+{
+    number_t derivative;
+    number_t value = regression_resolved(num_zeta_pair(a[0], &derivative));
+    derivative = regression_resolved(derivative);
+    number_t value_error = num_abs(num_sub(value, num_zetah(a[0], NUM_ONE)));
+    number_t derivative_error = num_abs(num_sub(derivative, num_zatahp(a[0], NUM_ONE)));
+    return num_add(value_error, derivative_error);
+}
+
 static number_t regression_zetah(const number_t *a)
 {
     number_t delta = num_sub(num_zetah(a[0], a[1]), num_zetah(a[0], num_add(a[1], NUM_ONE)));
@@ -489,6 +680,34 @@ static number_t regression_zatahp(const number_t *a)
 {
     number_t delta = num_sub(num_zatahp(a[0], a[1]), num_zatahp(a[0], num_add(a[1], NUM_ONE)));
     return num_add(delta, num_mul(num_ln(a[1]), num_pow(a[1], num_neg(a[0]))));
+}
+
+/* Check public integer-order derivatives against individually evaluated finite powers and logarithms.
+ * The reference tail keeps extra precision and uses the original full-state recurrence. */
+static number_t regression_zatahp_reference(const number_t *a)
+{
+    mpfr_prec_t bits = (mpfr_prec_t)num_get_default_prec_bits(), work = bits + 384;
+    unsigned long count = 128ul + (bits > 512 ? (unsigned long)(bits - 512) / 8ul : 0ul);
+    mpc_t s, offset, negative, base, logarithm, power, term, sum, slope, endpoint, value;
+    mpc_init2(s, work); mpc_init2(offset, work); mpc_init2(negative, work); mpc_init2(base, work);
+    mpc_init2(logarithm, work); mpc_init2(power, work); mpc_init2(term, work); mpc_init2(sum, work);
+    mpc_init2(slope, work); mpc_init2(endpoint, work); mpc_init2(value, work);
+    bool ok = regression_mpc_input(s, a[0]) && regression_mpc_input(offset, a[1]);
+    mpc_neg(negative, s, MPC_RNDNN); mpc_set_ui(sum, 0u, MPC_RNDNN); mpc_set_ui(slope, 0u, MPC_RNDNN);
+    for (unsigned long n = 0; ok && n < count; ++n) {
+        mpc_add_ui(base, offset, n, MPC_RNDNN); mpc_pow(power, base, negative, MPC_RNDNN);
+        mpc_add(sum, sum, power, MPC_RNDNN);
+        mpc_log(logarithm, base, MPC_RNDNN); mpc_mul(term, power, logarithm, MPC_RNDNN);
+        mpc_sub(slope, slope, term, MPC_RNDNN);
+    }
+    mpc_add_ui(endpoint, offset, count, MPC_RNDNN);
+    ok = ok && !number_zeta_tail(sum, slope, s, endpoint, bits + 256, 8193, 32);
+    number_t result = regression_resolved(num_zatahp(a[0], a[1]));
+    ok = regression_mpc_input(value, result) && ok;
+    ok = regression_mpc_close(value, slope, bits) && ok;
+    mpc_clear(s); mpc_clear(offset); mpc_clear(negative); mpc_clear(base); mpc_clear(logarithm);
+    mpc_clear(power); mpc_clear(term); mpc_clear(sum); mpc_clear(slope); mpc_clear(endpoint); mpc_clear(value);
+    return ok ? NUM_ZERO : NUM_ONE;
 }
 
 static number_t regression_zatahp_zero(const number_t *a)
@@ -515,7 +734,7 @@ static number_t regression_clausen_catalan(const number_t *a)
     mpfr_asprintf(&text, "%.*Rg", digits, reference);
     number_t expected = text ? num_create_from_string(text) : NUM_NAN;
     number_t result = num_sub(num_clausen2(num_mul(a[0], num_const(NUM_PI))), expected);
-    mpfr_free_str(text);
+    if (text) mpfr_free_str(text);
     mpfr_clear(reference);
     return result;
 }
@@ -650,9 +869,13 @@ static const regression_operation_t regression_operations[] = {
     {"lerch_blocks_reference", 3, regression_lerch_blocks_reference},
     {"lerch_blocks_reject", 3, regression_lerch_blocks_reject},
     {"lerch_exact", 1, regression_lerch_exact},
+    {"lerch_integer_exact", 1, regression_lerch_integer_exact},
+    {"lerch_integer_reference", 3, regression_lerch_integer_reference},
+    {"lerch_integer_reject", 3, regression_lerch_integer_reject},
     {"lerch_log", 1, regression_lerch_log},
     {"lerch_reference", 3, regression_lerch_reference},
     {"lerch_shift", 3, regression_lerch_shift},
+    {"lgamma_turns", 1, regression_lgamma_turns},
     {"lommel", 1, regression_lommel},
     {"lommel_recurrence", 3, regression_lommel_recurrence},
     {"normal_cdf", 1, regression_normal_cdf},
@@ -670,12 +893,21 @@ static const regression_operation_t regression_operations[] = {
     {"qc_lommel", 1, regression_qc_lommel},
     {"qf_normal_tail", 1, regression_qf_normal_tail},
     {"tetragamma", 1, regression_tetragamma},
+    {"tetragamma_reflection", 1, regression_tetragamma_reflection},
     {"trigamma", 1, regression_trigamma},
+    {"trigamma_reflection", 1, regression_trigamma_reflection},
     {"zatahp", 2, regression_zatahp},
+    {"zatahp_reference", 2, regression_zatahp_reference},
     {"zatahp_zero", 1, regression_zatahp_zero},
     {"zeta", 1, regression_zeta},
+    {"zeta_blocks", 3, regression_zeta_blocks},
+    {"zeta_blocks_reject", 3, regression_zeta_blocks_reject},
+    {"zeta_pair", 1, regression_zeta_pair},
     {"zeta_reference", 1, regression_zeta_reference},
     {"zeta_reflection", 1, regression_zeta_reflection},
+    {"zeta_tail_budget", 2, regression_zeta_tail_budget},
+    {"zeta_tail_reference", 2, regression_zeta_tail_reference},
+    {"zeta_tail_reject", 2, regression_zeta_tail_reject},
     {"zetah", 2, regression_zetah},
     {"zetah_negative_one", 1, regression_zetah_negative_one},
     {"zetah_reference", 2, regression_zetah_reference},

@@ -349,6 +349,15 @@ window.checkLabMobileLayout = async function checkLabMobileLayout(state: string,
                 if (visible(card))
                     inside(card, `card ${i}`);
             }
+            const calculationTime = doc.getElementById('calculationTime')!;
+            calculationTime.textContent = '999.9 ms';
+            calculationTime.classList.remove('hidden');
+            if (visible(calculationTime)) {
+                inside(calculationTime, 'calculation duration');
+                const heading = calculationTime.closest<HTMLElement>('.value-heading')!;
+                check(heading.scrollWidth <= heading.clientWidth + 1,
+                    `${width}px: calculation duration fits beside the Value title`);
+            }
             for (const node of doc.querySelectorAll<HTMLElement>('.datetime-row, .datetime-row-value')) {
                 if (visible(node))
                     inside(node, node.className);

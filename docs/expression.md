@@ -3812,7 +3812,11 @@ const char *expr_symbol_name(const expr_t *expr);
 
 ### `expr_to_TeX_body()`
 
-Returns the public result described by to TeX body.
+Returns the native mathematical rendering. An algebraic product containing a
+reciprocal power uses a single fraction, with the remaining factors in its
+numerator. Unit fractional powers use root notation in the denominator.
+This structural rule preserves signs, principal branches and domain restrictions;
+derivatives and integrals stay outside enclosing algebraic fractions.
 
 ```c
 char *expr_to_TeX_body(const expr_t *expr);

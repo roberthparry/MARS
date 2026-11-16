@@ -288,7 +288,9 @@
                  ["x'' + alpha xx' + beta x³ = 0", 'Equation and quadratures'],
                  ["{d²x/dt² + alpha*x*dx/dt + beta*x³ = 0 | t=?}", 'Equation and quadratures'],
                  ["d²x/dt² + alpha x*dx/dt + alpha^2/9 x³ = 0", 'Equation and solutions'],
-                 ["y''+6y*y'+4y^3=0; y'(0)=0", 'Equation and solutions']]) {
+                 ["y''+6y*y'+4y^3=0; y'(0)=0", 'Equation and solutions'],
+                 ["x^2y''+xy'+(x^2-1/4)y=0", 'Equation and solutions'],
+                 ["x^2y''+xy'+(x^2-1/4)y=0; y(1)=2; y'(1)=-1", 'Equation and solutions']]) {
             WorksheetContext.expr.value = source;
             WorksheetContext.expr.dispatchEvent(new Event('input', {bubbles: true}));
             check(!document.querySelector('#variableValues .binding-value-input'),
@@ -303,6 +305,16 @@
                       !WorksheetContext.rendered.textContent?.includes('error [lab.render:'),
                       'The ODE card contains successfully rendered mathematics: ' + source + '; ' +
                       WorksheetContext.rendered.textContent?.slice(0, 350));
+                if (source.startsWith('x^2y')) {
+                    const notation = WorksheetContext.rendered.dataset.displayTex || '';
+                    check(notation.includes('y\\left(x\\right)') &&
+                          notation.includes('\\sqrt{\\left| x \\right|}'),
+                          `Bessel solutions show y(x) with a root denominator: ${source}; ` +
+                          `evaluation ${repeat + 1}; notation: ${notation}`);
+                    if (!source.includes(';'))
+                        check(notation.includes('\\frac{C_{1}'),
+                              'The complete sine/cosine sum belongs in the fraction numerator');
+                }
                 check(!document.querySelector('#variableValues .binding-value-input[data-binding-kind="variable"]'),
                       'Independent ODE coordinates are not editable coefficient values');
                 check(!document.querySelector('#variableValues .variable-toggle'),

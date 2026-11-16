@@ -68,10 +68,12 @@ static void test_lab_math_modes(void)
     for (size_t i = 0; i < sizeof(cases) / sizeof(*cases); ++i) {
         unsigned status = 0;
         json_t *response = evaluate(cases[i].route, cases[i].payload, &status);
-        bool ok = status == 200 && test_lab_ok(response, true) &&
+        bool ok = status == 200 && test_lab_ok(response, true) && lab_presentation_adapt(response) &&
                   !strcmp(test_lab_text(response, "mode"), cases[i].mode) && *test_lab_text(response, "input") &&
                   *test_lab_text(response, cases[i].field) &&
-                  json_type(test_lab_member(response, "binding_values")) == JSON_ARRAY;
+                  json_type(test_lab_member(response, "binding_values")) == JSON_ARRAY &&
+                  *test_lab_text(response, "calculation_time_ns") &&
+                  *test_lab_text(test_lab_member(response, "presentation"), "calculation_time");
         if (!ok)
             string_printf("native Lab route %s returned status %u: %s\n", cases[i].route, status,
                           test_lab_text(response, "error"));

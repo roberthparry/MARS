@@ -1,10 +1,12 @@
 /**
  * @file expr_notation_calculus.c
- * @brief Separate scalar coefficients from calculus factors before presentation.
+ * @brief Present scalar quotients and separate calculus factors from enclosing fractions.
  *
  * Native expressions determine which factors contain derivatives or integrals.
  * The resulting semantic quotient keeps those factors outside algebraic fractions
  * without changing their order, signs or denominator restrictions.
+ * Reciprocal powers in algebraic products use one fraction with a positive-power
+ * denominator; the same rule applies independently of function and variable names.
  */
 #include <stdbool.h>
 
@@ -53,6 +55,54 @@ static bool contains_calculus(const expr_t *expression, unsigned depth)
     return expr_is_formal_derivative(expression) || expr_is_integral_transform(expression) ||
            expr_is_op(expression, &ops_integral) || contains_calculus(expression->a, depth + 1u) ||
            contains_calculus(expression->b, depth + 1u);
+}
+
+static bool negative_power(const expr_t *factor, number_t *exponent)
+{
+    if (expr_is_op(factor, &ops_pow_d))
+        *exponent = factor->c;
+    else if (expr_is_op(factor, &ops_pow) && expr_is_unnamed_const(factor->b))
+        *exponent = factor->b->c;
+    else
+        return false;
+    return num_is_finite(*exponent) && num_is_real(*exponent) && num_get_sign(*exponent) < 0;
+}
+
+/* Inspect the existing bounded factor list once before constructing either side of a scalar fraction. */
+static const TeX_model_node_t *reciprocal_product(notation_build_t *build, expr_t *const *factors, size_t count)
+{
+    bool reciprocal = false;
+    for (size_t i = 0u; i < count; ++i) {
+        number_t exponent;
+        if (contains_calculus(factors[i], 0u))
+            return NULL;
+        reciprocal |= negative_power(factors[i], &exponent);
+    }
+    if (!reciprocal)
+        return NULL;
+    const TeX_model_node_t *numerator = NULL, *denominator = NULL;
+    for (size_t i = 0u; i < count; ++i) {
+        number_t exponent;
+        bool inverse = negative_power(factors[i], &exponent);
+        const TeX_model_node_t *part;
+        if (inverse) {
+            number_t positive = num_neg(exponent);
+            expr_t *power = num_is_one(positive) ? expr_clone(factors[i]->a) : expr_pow(factors[i]->a, &positive);
+            part = notation_build_expr(build, power);
+            expr_free(power);
+            num_destroy(&positive);
+        } else {
+            part = notation_build_expr(build, factors[i]);
+        }
+        const TeX_model_node_t **side = inverse ? &denominator : &numerator;
+        const TeX_model_node_t *parts[] = {*side, part};
+        *side = *side ? notation_build_node(build,
+            (TeX_node_view_t){.kind = TeX_NODE_PRODUCT, .child_count = 2u}, parts) : part;
+    }
+    const TeX_model_node_t *parts[] = {
+        numerator ? numerator : notation_build_literal(build, TeX_NODE_NUMBER, "1"), denominator
+    };
+    return notation_build_node(build, (TeX_node_view_t){.kind = TeX_NODE_FRACTION, .child_count = 2u}, parts);
 }
 
 /* Preserve exact reciprocal-sum structure without enclosing calculus in a fraction. */
@@ -209,6 +259,9 @@ const TeX_model_node_t *expr_notation_product(notation_build_t *build, const exp
     if (!product_factors(expression, factors, &count, 0u))
         return NULL;
     sort_factors(factors, (int)count);
+    const TeX_model_node_t *fraction = reciprocal_product(build, factors, count);
+    if (fraction)
+        return fraction;
     bool calculus[256];
     for (size_t i = 0u; i < count; ++i)
         calculus[i] = contains_calculus(factors[i], 0u);

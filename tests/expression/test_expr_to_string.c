@@ -2856,6 +2856,29 @@ static void test_to_string_integrals_outside_fractions_TeX(void)
         test_to_string_integrals_outside_fractions_TeX_cases_row);
 }
 
+static void test_reciprocal_product_TeX_row(const void *data)
+{
+    const test_database_case_t *row = data;
+    expr_t *parsed = expr_from_text(row->input, NULL);
+    expr_t *expression = parsed ? expr_simplify(parsed) : NULL;
+    string_t *before = expression ? expr_to_text(expression, style_UNBOUND) : NULL;
+    string_t *TeX = expression ? expr_to_text(expression, style_LATEX) : NULL;
+    string_t *after = expression ? expr_to_text(expression, style_UNBOUND) : NULL;
+    bool ok = TeX && string_find(TeX, string_c_str(row->expected)) >= 0 && before && after &&
+              !strcmp(string_c_str(before), string_c_str(after));
+    if (!ok)
+        string_printf("Reciprocal product: %S\nExpected: %S\nActual: %S\n", row->input, row->expected, TeX);
+    string_free(after); string_free(TeX); string_free(before);
+    expr_free(expression); expr_free(parsed);
+    TEST_ASSERT_TRUE(ok, "algebraic reciprocal factors use one fraction without changing their native expression");
+}
+
+static void test_to_string_reciprocal_products_TeX(void)
+{
+    test_run_database_cases(__FILE__, __LINE__, "expression.reciprocal_product_TeX", NULL,
+                              test_reciprocal_product_TeX_row);
+}
+
 void test_to_string_all(void)
 {
     TEST_RUN_SUBTEST(test_to_string_indexed_principal_roots, NULL);
@@ -2868,6 +2891,7 @@ void test_to_string_all(void)
     TEST_RUN_SUBTEST(test_to_string_equal_conjugate_sums, NULL);
     TEST_RUN_SUBTEST(test_to_string_symmetric_shifts_TeX, NULL);
     TEST_RUN_SUBTEST(test_to_string_integrals_outside_fractions_TeX, NULL);
+    TEST_RUN_SUBTEST(test_to_string_reciprocal_products_TeX, NULL);
     TEST_RUN_SUBTEST(test_to_string_clausen, NULL);
     TEST_RUN_SUBTEST(test_to_string_basic_const, NULL);
     TEST_RUN_SUBTEST(test_to_string_basic_var, NULL);

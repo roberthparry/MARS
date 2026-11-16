@@ -2159,6 +2159,7 @@ diffequ_solve_homogeneous.c
 diffequ_solve_linear_subst.c
 diffequ_solve_linear_transform.c
 diffequ_solve_sturm_liouville.c
+diffequ_solve_bessel.c
 diffequ_solve_constant_linear.c
 diffequ_pde_solve.c
 diffequ_pde_laplace.c
@@ -2190,6 +2191,55 @@ $\quad\begin{array}{l}\displaystyle \displaystyle\quad \frac{d}{dx}\left(p(x)\fr
 This Sturm–Liouville normalisation is valid on intervals where $A(x)\ne0$.
 It is a canonical representation, not a promise that arbitrary coefficient
 functions possess an elementary closed-form basis.
+
+The native `DE_SOLVER_BESSEL` strategy recognises homogeneous scaled Bessel equations
+
+$\quad\begin{array}{l}\displaystyle x^2y''+p x y'+(a x^2+q)y=0,\qquad \alpha=\frac{1-p}{2},\quad \nu^2=\alpha^2-q.\end{array}$
+
+For finite known real coefficients and real order, the basis is
+$|x|^\alpha J_\nu(\sqrt a\,|x|)$,
+$|x|^\alpha Y_\nu(\sqrt a\,|x|)$ when $a>0$.
+For $a<0$, it uses the modified functions $I_\nu$ and $K_\nu$ with
+argument $\sqrt{-a}\,|x|$. Integer orders use independent first- and second-kind
+functions. The $a=0$ Euler limit uses powers, a repeated-root logarithm, or
+real sine/cosine functions of $\log|x|$, according to the discriminant.
+Unknown coefficients and imaginary Bessel orders are outside this strategy's scope.
+
+Exact half order reduces directly to elementary sine/cosine or hyperbolic
+sine/cosine functions, retaining exact rational coefficients. For example:
+
+```c
+diffequ_t *problem = de_from_string("x^2y'' + xy' + (x^2 - 1/4)y = 0");
+diffequ_solve_result_t *result = problem ? de_solve(problem) : NULL;
+string_t *text = result ? equ_to_text(de_solve_result_at(result, 0u), style_UNBOUND) : NULL;
+if (text)
+    puts(string_c_str(text));
+string_free(text);
+de_solve_result_free(result);
+de_free(problem);
+```
+
+Output:
+
+```text
+y = (C₁·cos(x) + C₂·sin(x))·1/√(|x|) where (x ∈ ℝ; x ≠ 0)
+```
+
+The mathematical rendering presents the complete numerator over the square root:
+
+$\quad\begin{array}{l}\displaystyle y(x)=\frac{C_1\cos x+C_2\sin x}{\sqrt{|x|}},\qquad x\ne0.\end{array}$
+
+Explicit ordinary solutions include their declared independent coordinate in
+mathematical notation, such as $y(x)$ or $x(t)$. The native equation retains
+its calculable variable left side, and plain expression output remains parseable.
+
+Each real solution applies on a connected interval excluding the singular origin
+and any zero of the original leading coefficient; the constants may differ between
+intervals. One or two regular point conditions determine the corresponding constants,
+with incomplete data retaining a free constant. Conditions at the origin or across
+the two half-axes are declined. Supplied point data restrict the returned real branch
+to their half-axis. Native solutions, their mathematical renderings and Lab plots
+all use the same expression; the Lab performs no algebraic rewriting.
 
 For a homogeneous equation in normal form, the solver recognises the affine
 Riccati factorisation

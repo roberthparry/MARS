@@ -6,11 +6,31 @@
  * These avoid repeated square roots where a conservative convergence or roundoff bound is sufficient. Mathematical
  * values and actual polar conversions still use their ordinary modulus. Only number-module implementations use
  * these helpers; callers retain their initialised MPFR destinations and all input ownership.
+ * Guarded complex multiplication supplies an explicit absolute error allowance for finite series polynomials,
+ * allowing three rounded real products without MPC's correctly rounded component contract.
  */
 #include <limits.h>
 
 #define MARS_NUMBER_INTERNAL_ACCESS
 #include "number_internal.h"
+
+/* Use three rounded real products where the owning series provides an absolute error budget. */
+void number_mpc_mul_guarded(mpc_ptr out, mpc_srcptr left, mpc_srcptr right, mpfr_t *scratch)
+{
+    if (mpfr_zero_p(mpc_imagref(left)) && mpfr_zero_p(mpc_imagref(right))) {
+        mpfr_mul(mpc_realref(out), mpc_realref(left), mpc_realref(right), MPFR_RNDN);
+        mpfr_set_zero(mpc_imagref(out), 1);
+        return;
+    }
+    mpfr_mul(scratch[0], mpc_realref(left), mpc_realref(right), MPFR_RNDN);
+    mpfr_mul(scratch[1], mpc_imagref(left), mpc_imagref(right), MPFR_RNDN);
+    mpfr_add(scratch[2], mpc_realref(left), mpc_imagref(left), MPFR_RNDN);
+    mpfr_add(scratch[3], mpc_realref(right), mpc_imagref(right), MPFR_RNDN);
+    mpfr_mul(scratch[2], scratch[2], scratch[3], MPFR_RNDN);
+    mpfr_sub(scratch[2], scratch[2], scratch[0], MPFR_RNDN);
+    mpfr_sub(mpc_imagref(out), scratch[2], scratch[1], MPFR_RNDN);
+    mpfr_sub(mpc_realref(out), scratch[0], scratch[1], MPFR_RNDN);
+}
 
 /* Bound the modulus from above without a square root. */
 void number_mpc_abs_upper(mpfr_ptr out, mpc_srcptr value)

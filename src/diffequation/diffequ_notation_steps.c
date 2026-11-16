@@ -18,6 +18,35 @@
 #define MARS_DIFFEQUATION_INTERNAL_ACCESS
 #include "diffequ_internal.h"
 
+/* Explicit ODE functions keep their calculable variable left side and gain native mathematical notation only. */
+bool de_notation_solution_functions(const diffequ_t *problem, diffequ_solve_result_t *result)
+{
+    if (!problem || !result)
+        return false;
+    if (de_independent_count(problem) != 1u || de_solve_result_status(result) != DE_SOLVE_STATUS_SOLVED)
+        return true;
+    const expr_t *coordinate = de_independent_at(problem, 0u);
+    for (size_t i = 0u; i < result->solution_count; ++i) {
+        equation_t *solution = result->solutions[i];
+        const expr_t *left = equ_lhs(solution);
+        if (!expr_is_variable(left) || expr_struct_eq(left, coordinate))
+            continue;
+        notation_build_t *build = notation_build_new();
+        const TeX_model_node_t *parts[] = {
+            notation_build_expr(build, left), notation_build_expr(build, coordinate)
+        };
+        const TeX_model_node_t *function = notation_build_node(build,
+            (TeX_node_view_t){.kind = TeX_NODE_APPLY, .child_count = 2u}, parts);
+        string_t *notation = notation_build_render(build, function);
+        bool ok = notation && equ_set_display_TeX(solution, notation, equ_rhs_display_TeX(solution)) == 0;
+        string_free(notation);
+        notation_build_free(build);
+        if (!ok)
+            return false;
+    }
+    return true;
+}
+
 /* A bare symbolic coefficient keeps its name even when its numerical binding is unset. */
 string_t *de_notation_symbol_text(const expr_t *expression)
 {

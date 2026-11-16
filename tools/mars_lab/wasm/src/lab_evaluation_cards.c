@@ -262,6 +262,7 @@ static void lab_evaluation_cards_present_calendar(jsref data)
 /* Project mode-specific notes, controls and visibility after the text-card services have run. */
 void lab_evaluation_cards_present(lab_mode_t mode, jsref data)
 {
+    lab_result_calculation_time(data);
     /** @brief Optional presentation effects indexed by the worksheet ABI mode. */
     static void (*const handlers[LAB_MODE_COUNT])(jsref) = {
         [LAB_MODE_EXPRESSION]            = lab_evaluation_cards_present_expression,

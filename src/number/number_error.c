@@ -6,6 +6,9 @@
  * Real forward values use MPFR directly. Inverses use a seed followed by checked Halley iteration at increasing
  * working precision; approximate starting values never determine multiprecision accuracy. Binary64 inverses use
  * libc refinement directly; multiprecision answers never accept a fixed-precision approximation as their result.
+ * Inverse stages are planned backwards from the final precision to avoid nearly full-sized intermediate stages.
+ * A final iterate that already passes both correction and residual checks needs no further forward evaluation.
+ * Near erf endpoints, complementary residuals retain the small probability; reflection does the same near erfc(−∞).
  */
 #include <math.h>
 
@@ -274,6 +277,15 @@ static void error_inverse_coefficient(mpfr_ptr coefficient, bool complement)
     if (complement) mpfr_neg(coefficient, coefficient, MPFR_RNDN);
 }
 
+static bool error_inverse_residual_small(mpc_srcptr residual, mpc_srcptr input, mpfr_prec_t target,
+                                         mpfr_ptr magnitude, mpfr_ptr scale)
+{
+    number_mpc_abs_upper(magnitude, residual);
+    number_mpc_abs_lower(scale, input);
+    mpfr_mul_2si(scale, scale, -target - 16, MPFR_RNDD);
+    return mpfr_lessequal_p(magnitude, scale);
+}
+
 static int error_inverse(mpc_ptr out, mpc_srcptr input, mpc_rnd_t rounding, bool complement)
 {
     if (!error_finite(input)) { mpc_set_nan(out); return -1; }
@@ -291,14 +303,28 @@ static int error_inverse(mpc_ptr out, mpc_srcptr input, mpc_rnd_t rounding, bool
     }
     mpfr_prec_t target = mpc_get_prec(out), work = target + 96;
     if (work > ERROR_MAX_WORK_BITS) { mpc_set_nan(out); return -1; }
-    mpfr_prec_t stage = work < 128 ? work : 128;
+    mpc_t canonical;
+    mpc_init2(canonical, work);
+    bool reflect = false;
+    if (!complement && mpfr_cmp_d(mpc_realref(input), 0.75) > 0) {
+        mpc_ui_sub(canonical, 1u, input, MPC_RNDNN);
+        input = canonical; complement = true;
+    } else if (!complement && mpfr_cmp_d(mpc_realref(input), -0.75) < 0) {
+        mpc_add_ui(canonical, input, 1u, MPC_RNDNN);
+        input = canonical; complement = true; reflect = true;
+    } else if (complement && mpfr_cmp_ui(mpc_realref(input), 1u) > 0) {
+        mpc_ui_sub(canonical, 2u, input, MPC_RNDNN);
+        input = canonical; reflect = true;
+    }
+    mpfr_prec_t stage = work;
+    while (stage > 128) stage = (stage + 1) / 2;
     mpc_t value, residual, derivative, denominator, delta, scratch;
     mpc_init2(value, stage); mpc_init2(residual, stage); mpc_init2(derivative, stage);
     mpc_init2(denominator, stage); mpc_init2(delta, stage); mpc_init2(scratch, stage);
     mpfr_t scale, tolerance, magnitude, coefficient;
     mpfr_inits2(stage, scale, tolerance, magnitude, coefficient, (mpfr_ptr)0);
     error_inverse_coefficient(coefficient, complement);
-    bool ok = error_inverse_seed(value, input, complement), converged = false;
+    bool ok = error_inverse_seed(value, input, complement), converged = false, verified = false;
     if (!ok && stage < work) {
         /* A seed arbitrarily close to a branch endpoint can need the full input precision. */
         mpc_set_prec(value, work);
@@ -321,13 +347,21 @@ static int error_inverse(mpc_ptr out, mpc_srcptr input, mpc_rnd_t rounding, bool
         mpc_add(denominator, denominator, derivative, MPC_RNDNN);
         if (error_zero(denominator)) break;
         mpc_div(delta, residual, denominator, MPC_RNDNN);
-        mpc_sub(value, value, delta, MPC_RNDNN);
-        if (!error_finite(value) || !error_finite(delta)) break;
-        number_mpc_abs_lower(scale, value);
+        mpc_sub(denominator, value, delta, MPC_RNDNN);
+        if (!error_finite(denominator) || !error_finite(delta)) break;
+        number_mpc_abs_lower(scale, denominator);
         if (mpfr_cmp_ui(scale, 1u) < 0) mpfr_set_ui(scale, 1u, MPFR_RNDN);
         mpfr_mul(scale, scale, tolerance, MPFR_RNDD);
         number_mpc_abs_upper(magnitude, delta);
-        if (mpfr_lessequal_p(magnitude, scale)) {
+        bool small = mpfr_lessequal_p(magnitude, scale);
+        if (small && stage == work && error_inverse_residual_small(residual, input, target, magnitude, scale)) {
+            /* The current value has already passed the original final residual check at full precision.
+             * Keep that verified value instead of changing it by an immaterial correction and checking again. */
+            converged = verified = true;
+            break;
+        }
+        mpc_set(value, denominator, MPC_RNDNN);
+        if (small) {
             if (stage == work) { converged = true; break; }
             stage = stage > work / 2 ? work : stage * 2;
             mpfr_prec_round(mpc_realref(value), stage, MPFR_RNDN);
@@ -339,17 +373,19 @@ static int error_inverse(mpc_ptr out, mpc_srcptr input, mpc_rnd_t rounding, bool
             error_inverse_coefficient(coefficient, complement);
         }
     }
-    if (converged && !error_forward(residual, value, MPC_RNDNN, complement)) {
-        mpc_sub(residual, residual, input, MPC_RNDNN);
-        number_mpc_abs_upper(magnitude, residual);
-        number_mpc_abs_lower(scale, input);
-        mpfr_mul_2si(scale, scale, -target - 16, MPFR_RNDD);
-        converged = mpfr_lessequal_p(magnitude, scale);
-    } else converged = false;
-    if (converged) mpc_set(out, value, rounding);
+    if (converged && !verified) {
+        converged = !error_forward(residual, value, MPC_RNDNN, complement);
+        if (converged) {
+            mpc_sub(residual, residual, input, MPC_RNDNN);
+            converged = error_inverse_residual_small(residual, input, target, magnitude, scale);
+        }
+    }
+    if (converged && reflect) mpc_neg(out, value, rounding);
+    else if (converged) mpc_set(out, value, rounding);
     else mpc_set_nan(out);
     mpfr_clears(scale, tolerance, magnitude, coefficient, (mpfr_ptr)0);
     mpc_clear(value); mpc_clear(residual); mpc_clear(derivative); mpc_clear(denominator); mpc_clear(delta); mpc_clear(scratch);
+    mpc_clear(canonical);
     return converged ? 0 : -1;
 }
 

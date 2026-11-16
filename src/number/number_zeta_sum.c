@@ -87,3 +87,61 @@ void number_zeta_finite_sum(mpc_ptr sum, mpc_ptr derivative, mpc_srcptr argument
     mpc_clear(correction);
     mpc_clear(term);
 }
+/* Sum integer Dirichlet terms and, when requested, their analytic derivatives. */
+void number_zeta_finite_sum_real(mpfr_ptr sum, mpfr_ptr derivative, mpfr_srcptr argument, unsigned long endpoint)
+{
+    mpfr_prec_t precision = mpfr_get_prec(sum);
+    size_t bytes = sizeof(mpfr_t) + mpfr_custom_get_size(precision);
+    if (derivative) bytes += sizeof(mpfr_t) + mpfr_custom_get_size(precision);
+    bool factorised = endpoint <= ZETA_FACTOR_SLOTS && endpoint <= ZETA_POWER_BYTES / bytes &&
+                      pthread_once(&zeta_factors_once, zeta_factor_sieve) == 0;
+    mpfr_t *powers = factorised ? calloc(endpoint, sizeof(*powers)) : NULL;
+    mpfr_t *logs = powers && derivative ? calloc(endpoint, sizeof(*logs)) : NULL;
+    if (derivative && powers && !logs) { free(powers); powers = NULL; }
+    mpfr_t term, correction;
+    mpfr_t logarithm;
+    mpfr_init2(term, precision);
+    mpfr_init2(correction, precision);
+    mpfr_init2(logarithm, precision);
+    mpfr_set_ui(sum, 0u, MPFR_RNDN);
+    if (derivative) mpfr_set_ui(derivative, 0u, MPFR_RNDN);
+    for (unsigned long n = 1; n < endpoint; ++n) {
+        unsigned int prime = powers ? zeta_factors[n] : 0;
+        if (powers) mpfr_init2(powers[n], precision);
+        if (logs) {
+            mpfr_init2(logs[n], precision);
+            if (n == 1) mpfr_set_zero(logs[n], 1);
+            else if (prime != n) mpfr_add(logs[n], logs[prime], logs[n / prime], MPFR_RNDN);
+            else number_integer_logarithm(logs[n], n);
+        }
+        mpfr_ptr value = powers ? powers[n] : term;
+        if (powers && n == 1) mpfr_set_ui(value, 1u, MPFR_RNDN);
+        else if (powers && prime != n) mpfr_mul(value, powers[prime], powers[n / prime], MPFR_RNDN);
+        else {
+            if (logs) mpfr_set(logarithm, logs[n], MPFR_RNDN);
+            else number_integer_logarithm(logarithm, n);
+            mpfr_mul(value, argument, logarithm, MPFR_RNDN);
+            mpfr_neg(value, value, MPFR_RNDN);
+            mpfr_exp(value, value, MPFR_RNDN);
+        }
+        mpfr_add(sum, sum, value, MPFR_RNDN);
+        if (derivative) {
+            if (logs) mpfr_set(logarithm, logs[n], MPFR_RNDN);
+            else number_integer_logarithm(logarithm, n);
+            mpfr_mul(correction, value, logarithm, MPFR_RNDN);
+            mpfr_sub(derivative, derivative, correction, MPFR_RNDN);
+        }
+    }
+    /* Each per-call MPFR value owns one allocation and must be cleared exactly once. */
+    if (powers) {
+        for (unsigned long n = 1; n < endpoint; ++n) mpfr_clear(powers[n]);
+        free(powers);
+    }
+    if (logs) {
+        for (unsigned long n = 1; n < endpoint; ++n) mpfr_clear(logs[n]);
+        free(logs);
+    }
+    mpfr_clear(logarithm);
+    mpfr_clear(correction);
+    mpfr_clear(term);
+}

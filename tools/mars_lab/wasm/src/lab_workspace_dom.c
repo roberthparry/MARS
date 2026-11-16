@@ -763,6 +763,7 @@ static const struct {
 } lab_workspace_dom_result_fields[] = {{"plotRendered", "#plotRendered", 0},
                                        {"rendered", "#rendered", 0},           {"parsed", "#parsed", 0},
                                        {"functionStyle", "#functionStyle", 0}, {"value", "#value", 0},
+                                       {"calculationTime", "#calculationTime", 0},
                                        {"renderedMore", "#renderedMore", 1},   {"parsedMore", "#parsedMore", 1},
                                        {"functionMore", "#functionMore", 1},   {"valueMore", "#valueMore", 1}};
 
@@ -838,6 +839,7 @@ void lab_workspace_dom_result_save(jsref metadata)
 /* Restore cards and reusable input before returning fresh globals for calculus controls and fitting. */
 void lab_workspace_dom_result_restore(jsref state)
 {
+    lab_result_calculation_time(0);
     lab_layout_plot_camera(1);
     lab_plot_slices_clear();
     lab_dom_set(lab_dom_id("plotSlices"), "marsSliceSelected", lab_dom_get(state, "plotSliceSelected"));

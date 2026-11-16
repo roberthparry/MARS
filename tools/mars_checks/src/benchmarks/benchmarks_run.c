@@ -29,6 +29,7 @@
 typedef struct {
     const char *backend;
     const char *operation;
+    const char *mode;
     unsigned bits;
     unsigned samples;
     unsigned timeout;
@@ -38,13 +39,14 @@ typedef struct {
 
 static bool benchmark_options(int argc, char **argv, benchmark_options_t *options)
 {
-    *options = (benchmark_options_t){.backend = "", .operation = "", .samples = 7, .timeout = 15};
+    *options = (benchmark_options_t){.backend = "", .operation = "", .mode = "warm", .samples = 7, .timeout = 15};
     for (int i = 0; i < argc; ++i) {
         if (!strcmp(argv[i], "--verbose")) { options->verbose = true; continue; }
         if (i + 1 >= argc) return false;
         const char *key = argv[i], *value = argv[++i];
         if (!strcmp(key, "--backend")) options->backend = value;
         else if (!strcmp(key, "--operation")) options->operation = value;
+        else if (!strcmp(key, "--mode") && benchmark_protocol_for(value)) options->mode = value;
         else {
             char *end = NULL;
             errno = 0;
@@ -58,6 +60,32 @@ static bool benchmark_options(int argc, char **argv, benchmark_options_t *option
         }
     }
     return true;
+}
+
+static bool benchmark_select_operations(sqlite_t *db, const char *names)
+{
+    if (!sqlite_exec_cstr(db, "CREATE TEMP TABLE benchmark_selected_operation(name TEXT PRIMARY KEY) WITHOUT ROWID"))
+        return false;
+    if (!*names) return true;
+    string_t *text = string_new_with(names);
+    size_t count = 0;
+    string_t **parts = text ? string_split(text, ",", &count) : NULL;
+    sqlite_stmt_t *insert = sqlite_stmt_prepare(db, "INSERT OR IGNORE INTO temp.benchmark_selected_operation VALUES (?1)");
+    sqlite_stmt_t *find = sqlite_stmt_prepare(db, "SELECT name FROM benchmark_operation WHERE name = ?1");
+    bool ok = parts && count && insert && find;
+    for (size_t i = 0; ok && i < count; ++i) {
+        string_trim(parts[i]);
+        ok = sqlite_stmt_bind_text(find, 1, string_c_str(parts[i])) &&
+             sqlite_stmt_step(find) == SQLITE_STEP_ROW &&
+             sqlite_stmt_bind_text(insert, 1, string_c_str(parts[i])) && sqlite_stmt_step(insert) == SQLITE_STEP_DONE;
+        sqlite_stmt_reset(find);
+        sqlite_stmt_reset(insert);
+    }
+    sqlite_stmt_finalize(insert);
+    sqlite_stmt_finalize(find);
+    string_split_free(parts, count);
+    string_free(text);
+    return ok;
 }
 
 static string_t *benchmark_digest(const string_t *path)
@@ -120,7 +148,7 @@ static long benchmark_start(sqlite_t *db, const benchmark_options_t *options,
         sqlite_stmt_bind_int(insert, 8, (int)options->samples) &&
         sqlite_stmt_bind_int(insert, 9, (int)options->timeout) &&
         sqlite_stmt_bind_text(insert, 10, options->operation) &&
-        sqlite_stmt_bind_text(insert, 11, benchmark_protocol) && sqlite_stmt_step(insert) == SQLITE_STEP_DONE;
+        sqlite_stmt_bind_text(insert, 11, benchmark_protocol_for(options->mode)) && sqlite_stmt_step(insert) == SQLITE_STEP_DONE;
     sqlite_stmt_finalize(insert);
     string_free(cpu);
     string_free(system);
@@ -135,7 +163,8 @@ static long benchmark_start(sqlite_t *db, const benchmark_options_t *options,
         "WHEN 'qcomplex' THEN 2 WHEN 'mpfr' THEN 3 ELSE 4 END, p.bits, o.name) "
         "FROM benchmark_operation AS o CROSS JOIN benchmark_profile AS p\n"
         "LEFT JOIN benchmark_workload AS w ON w.operation = o.name AND w.backend = p.backend\n"
-        "WHERE (?2 = '' OR o.name = ?2) AND (?3 = '' OR p.backend = ?3) AND (?4 = 0 OR p.bits = ?4)") : NULL;
+        "WHERE (?2 = '' OR o.name IN (SELECT name FROM temp.benchmark_selected_operation)) "
+        "AND (?3 = '' OR p.backend = ?3) AND (?4 = 0 OR p.bits = ?4)") : NULL;
     ok = ok && run && insert && sqlite_stmt_bind_int64(insert, 1, run) &&
         sqlite_stmt_bind_text(insert, 2, options->operation) && sqlite_stmt_bind_text(insert, 3, options->backend) &&
         sqlite_stmt_bind_int(insert, 4, (int)options->bits) && sqlite_stmt_step(insert) == SQLITE_STEP_DONE;
@@ -270,6 +299,7 @@ int benchmark_run(const string_t *root, sqlite_t *db, int argc, char **argv)
 {
     benchmark_options_t options;
     if (!benchmark_options(argc, argv, &options)) return 2;
+    if (!benchmark_select_operations(db, options.operation)) return 2;
     string_t *db_path = checks_path(root, "bench/benchmarks.db");
     file_t *lock = file_new(db_path);
     string_free(db_path);
@@ -291,7 +321,7 @@ int benchmark_run(const string_t *root, sqlite_t *db, int argc, char **argv)
     sqlite_stmt_t *metadata = sqlite_stmt_prepare(db,
         "SELECT b.requested_samples, b.case_timeout_seconds, count(r.operation),\n"
         "       sum(r.outcome = 'pass'), sum(r.outcome = 'fail'),\n"
-        "       sum(r.outcome = 'timeout'), sum(r.outcome = 'unsupported')\n"
+        "       sum(r.outcome = 'timeout'), sum(r.outcome = 'unsupported'), b.clock\n"
         "FROM benchmark_run AS b LEFT JOIN benchmark_result AS r ON r.run_id = b.id\n"
         "WHERE b.id = ?1 GROUP BY b.id");
     bool ok = metadata && sqlite_stmt_bind_int64(metadata, 1, run) && sqlite_stmt_step(metadata) == SQLITE_STEP_ROW;
@@ -307,6 +337,10 @@ int benchmark_run(const string_t *root, sqlite_t *db, int argc, char **argv)
         .skipped = (size_t)sqlite_stmt_column_int64(metadata, 6)
     };
     int total = (int)counts.total, completed = (int)(counts.passed + counts.failed + counts.timed_out + counts.skipped);
+    const char *stored_protocol = ok ? sqlite_stmt_column_text(metadata, 7) : NULL;
+    if (stored_protocol && !strcmp(stored_protocol, benchmark_protocol_for("cold"))) options.mode = "cold";
+    else if (stored_protocol && !strcmp(stored_protocol, benchmark_protocol_for("changing"))) options.mode = "changing";
+    else if (!stored_protocol || strcmp(stored_protocol, benchmark_protocol)) ok = false;
     sqlite_stmt_finalize(metadata);
     benchmark_progress_t *progress = ok ? benchmark_progress_new(&counts, timeout, options.verbose) : NULL;
     if (ok && !progress) fputs("Cannot initialise benchmark progress; pending cases are retained.\n", stderr);
@@ -349,6 +383,7 @@ int benchmark_run(const string_t *root, sqlite_t *db, int argc, char **argv)
         checks_strings_add(arguments, string_sprintf("%d", bits));
         checks_strings_add(arguments, string_sprintf("%u", samples));
         checks_strings_add(arguments, operands);
+        checks_strings_add(arguments, checks_text(options.mode));
         benchmark_progress_case(progress, string_c_str(operation), string_c_str(backend), bits);
         string_t *output = NULL, *errors = NULL;
         int status = supported ? -1 : 3;

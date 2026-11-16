@@ -876,6 +876,42 @@ static void test_benchmarks_measurements(void)
     TEST_ASSERT_TRUE(ok, "all numeric profiles yield finite timed samples and interrupted runs resume without duplicate data");
 }
 
+static void test_benchmarks_protocols(void)
+{
+    string_t *root = test_checks_root();
+    const char *cold[] = {"run", "--operation", "sin,cos,sin", "--backend", "mpfr", "--bits", "256",
+                          "--samples", "3", "--mode", "cold"};
+    bool ok = benchmark_test_fixture(root) && benchmark_test_command(root, cold, 11, 0, NULL);
+    sqlite_t *db = benchmark_test_open(root);
+    ok = db && benchmark_test_integer(db, "SELECT count(*) FROM benchmark_result WHERE outcome='pass' "
+        "AND iterations=1 AND sample_count=3 AND baseline_median_ns IS NULL") == 2 &&
+        benchmark_test_integer(db, "SELECT count(*) FROM benchmark_sample") == 6 && ok;
+    ok = ok && benchmark_test_integer(db, "SELECT count(*) FROM benchmark_run "
+        "WHERE clock LIKE '%cold=fork_from_unevaluated_worker%'") == 1;
+    ok = ok && sqlite_exec_cstr(db, "DELETE FROM benchmark_sample WHERE operation='cos'; "
+        "UPDATE benchmark_result SET outcome='pending' WHERE operation='cos'; "
+        "UPDATE benchmark_run SET status='interrupted'");
+    sqlite_close(db);
+    const char *resume[] = {"run", "--resume", "1"};
+    ok = ok && benchmark_test_command(root, resume, 3, 0, NULL);
+    const char *changing[] = {"run", "--operation", "sin,cos", "--backend", "mpfr", "--bits", "256",
+                              "--samples", "3", "--mode", "changing"};
+    ok = ok && benchmark_test_command(root, changing, 11, 0, NULL);
+    db = benchmark_test_open(root);
+    ok = db && benchmark_test_integer(db, "SELECT count(*) FROM benchmark_result WHERE outcome='pass' "
+        "AND iterations=1 AND sample_count=3 AND baseline_median_ns IS NULL") == 4 &&
+        benchmark_test_integer(db, "SELECT count(*) FROM benchmark_sample") == 12 && ok;
+    ok = ok && benchmark_test_integer(db, "SELECT count(*) FROM benchmark_run "
+        "WHERE clock LIKE '%changing=eligible_real_parts+(sample+1)/128%'") == 1;
+    sqlite_close(db);
+    const char *invalid[] = {"run", "--operation", "sin,missing", "--backend", "mpfr"};
+    ok = ok && benchmark_test_command(root, invalid, 5, 2, NULL);
+    const char *invalid_mode[] = {"run", "--operation", "sin", "--mode", "missing"};
+    ok = ok && benchmark_test_command(root, invalid_mode, 5, 2, NULL);
+    ok = test_checks_finish(root) && ok;
+    TEST_ASSERT_TRUE(ok, "cold and changing protocols preserve samples, select unique cases and resume their own mode");
+}
+
 static void test_benchmarks_progress_capture(void)
 {
     string_t *root = test_checks_root(), *errors = NULL;
@@ -1031,9 +1067,13 @@ static void test_benchmarks_expression_coverage(void)
     sqlite_step_result_t step = SQLITE_STEP_ERROR;
     while (rows && (step = sqlite_stmt_step(rows)) == SQLITE_STEP_ROW) {
         const char *name = sqlite_stmt_column_text(rows, 0);
+        /* This workload requests a public API's two outputs, rather than introducing an expression operator. */
+        if (!strcmp(name, "zeta_pair")) continue;
         bool component = !strcmp(name, "divmod") || !strcmp(name, "gcdext") ||
                          !strcmp(name, "sincos") || !strcmp(name, "sinhcosh");
-        string_t *source = string_sprintf("%s(%s%s)", name, sqlite_stmt_column_text(rows, 1),
+        const char *callable = !strcmp(name, "zatahp_integral") ? "zatahp" : name;
+        if (!strncmp(name, "lerch_phi_", 10)) callable = "lerch_phi";
+        string_t *source = string_sprintf("%s(%s%s)", callable, sqlite_stmt_column_text(rows, 1),
                                            component ? ",0" : "");
         if (!strcmp(name, "hypergeometric_pFq")) {
             string_free(source);
@@ -1095,7 +1135,12 @@ static void test_benchmarks_documentation(void)
     ok = db && sqlite_exec_cstr(db,
         "INSERT INTO benchmark_result(run_id, operation, backend, bits, arguments, complex_mask, sequence,\n"
         "                             outcome, median_ns)\n"
-        "VALUES (1, 'gcd', 'exact-integer', 0, '17, 5', 0, 17, 'pass', 1000);") && ok;
+        "VALUES (1, 'gcd', 'exact-integer', 0, '17, 5', 0, 17, 'pass', 1000),\n"
+        "       (1, 'lerch_phi_integer_order', 'mpfr', 256, '0.3125, -15, 0.375', 0, 18, 'pass', 2000),\n"
+        "       (1, 'lerch_phi_negative_order', 'mpfr', 256, '0.3125, -15, 0.375', 0, 19, 'pass', 3000),\n"
+        "       (1, 'zatahp_integral', 'mpfr', 256, '-4, 0.75', 0, 20, 'pass', 4000);\n"
+        "UPDATE benchmark_result SET median_ns=1234567000000 WHERE run_id=1 AND operation='sin'\n"
+        "  AND backend='mpfr' AND bits=4096;") && ok;
     sqlite_close(db);
     /* Preflight every document before publication; a broken final marker preserves all originals. */
     ok = ok && test_checks_write(root, paths[3], "missing markers\n") &&
@@ -1107,7 +1152,14 @@ static void test_benchmarks_documentation(void)
     for (unsigned i = 0; ok && i < 4; ++i) {
         path = checks_path(root, paths[i]); source = checks_read(path);
         ok = source && string_find(source, "Benchmark run **1**") >= 0 &&
-             string_find(source, "unchanged prefix") == 0 && string_find(source, "unchanged suffix") >= 0;
+             string_find(source, "unchanged prefix") == 0 && string_find(source, "unchanged suffix") >= 0 &&
+             string_find(source, "lerch_phi_integer_order") < 0 &&
+             string_find(source, "lerch_phi_negative_order") < 0 && string_find(source, "zatahp_integral") < 0;
+        if (ok && i < 2) {
+            ok = string_find(source, "| lerch_phi (integer order) | 0.3125, -15, 0.375 | 2.0 µs |") >= 0 &&
+                 string_find(source, "| lerch_phi (negative order) | 0.3125, -15, 0.375 | 3.0 µs |") >= 0 &&
+                 string_find(source, "| zatahp (integer order) | -4, 0.75 | 4.0 µs |") >= 0;
+        }
         if (ok && i == 1) {
             ok = string_find(source, "### number / double precision\n") >= 0 &&
                 string_find(source, "### number / multi-precision floating point\n") >= 0 &&
@@ -1115,7 +1167,9 @@ static void test_benchmarks_documentation(void)
                 string_find(source, "### number / unrestricted integer\n") >= 0 &&
                 string_find(source, "### number / unrestricted fraction\n") >= 0 &&
                 string_find(source, "GMP rational arithmetic (MPQ)") >= 0 &&
-                string_find(source, "16,384-bit") >= 0 &&
+                string_find(source, "16384-bit") >= 0 && string_find(source, "1 234.567 s") >= 0 &&
+                string_find(source, "1,234.567 s") < 0 && string_find(source, "4096 bits") >= 0 &&
+                string_find(source, "4 096 bits") < 0 && string_find(source, "16 384-bit") < 0 &&
                 string_find(source, "### `number-double`") < 0 && string_find(source, "### `mpfr`") < 0 &&
                 string_find(source, "### `mpc`") < 0 && string_find(source, "### `exact-integer`") < 0 &&
                 string_find(source, "17, <br/>5</span> | 1.0 µs |") >= 0 &&
@@ -1509,6 +1563,7 @@ void test_checks_benchmark_cases(void)
     TEST_RUN_IN_GROUP(test_benchmarks_api_coverage, tests, "benchmark,coverage");
     TEST_RUN_IN_GROUP(test_benchmarks_expression_coverage, tests, "benchmark,expression,coverage");
     TEST_RUN_IN_GROUP(test_benchmarks_measurements, tests, "benchmark,timing");
+    TEST_RUN_IN_GROUP(test_benchmarks_protocols, tests, "benchmark,timing,protocol");
     TEST_RUN_IN_GROUP(test_benchmarks_integer_inputs, tests, "benchmark,integer,timing");
     TEST_RUN_IN_GROUP(test_benchmarks_fraction_inputs, tests, "benchmark,fraction,timing");
     TEST_RUN_IN_GROUP(test_benchmarks_display_migration, tests, "benchmark,fraction,storage");

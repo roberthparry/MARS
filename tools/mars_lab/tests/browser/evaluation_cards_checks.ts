@@ -24,7 +24,7 @@ window.checkLabEvaluationCards = async function checkLabEvaluationCards() {
     }
     const selectors = [
         '#rendered', '#renderedMore', '#parsed', '#parsedMore', '#functionStyle', '#functionMore', '#value',
-        '#valueMore', '#valueCard', '#valueTitle', '#valueNote', '#valueNoteCard', '#resultUseInput', '#targetRow',
+        '#valueMore', '#valueCard', '#valueTitle', '#calculationTime', '#valueNote', '#valueNoteCard', '#resultUseInput', '#targetRow',
         '#goalTarget', '#goalSeek', '#resultPane', '#helpPane', '#rightPaneTitle', '#help', '#status'
     ];
     const snapshots: EvaluationCardsSnapshot[] = [];
@@ -54,7 +54,7 @@ window.checkLabEvaluationCards = async function checkLabEvaluationCards() {
         const data = {
             expression: 'native full', editor_expression: 'native editor', function: 'native function', value: '1',
             full_display_function: 'native full function', differentiable: ' NO ', value_note: 'native note',
-            presentation: {calculus: {derivative: {expression: 'native derivative'}}}
+            presentation: {calculation_time: '12.3 µs', calculus: {derivative: {expression: 'native derivative'}}}
         };
         let cards = plan(0, data);
         equal(cards.expression, 'native compact', 'native editor metadata supplies compact display');
@@ -62,6 +62,21 @@ window.checkLabEvaluationCards = async function checkLabEvaluationCards() {
         equal(cards.input, 'native editor', 'explicit editor source has reuse precedence');
         equal(cards.derivative, 'native derivative', 'native derivative metadata retained');
         equal(cards.differentiable, false, 'native differentiability flag normalised');
+        WorksheetResults.cards.installEvaluationTextCards(cards);
+        labDOM.call('lab_evaluation_cards_present', 0, data);
+        const calculationTime = document.getElementById('calculationTime')!;
+        equal(calculationTime.textContent, '12.3 µs', 'native calculation duration appears beside Value');
+        check(!calculationTime.classList.contains('hidden'), 'timed results expose the duration');
+        const snapshot = labDOM.call('lab_workspace_dom_result_save', {});
+        labDOM.call('lab_evaluation_cards_present', 0, {});
+        equal(calculationTime.textContent, '', 'replacement without metadata clears the previous duration');
+        check(calculationTime.classList.contains('hidden'), 'missing duration is hidden');
+        labDOM.call('lab_workspace_dom_result_restore', snapshot);
+        equal(calculationTime.textContent, '12.3 µs', 'cached mode result restores its original duration');
+        check(!calculationTime.classList.contains('hidden'), 'restored timing retains its visibility');
+        labDOM.call('lab_result_details_clear', caches, 'expression');
+        equal(calculationTime.textContent, '', 'clearing a result clears its duration');
+        check(calculationTime.classList.contains('hidden'), 'cleared timing is hidden');
         WorksheetResults.cards.installEvaluationTextCards(cards);
         labDOM.call('lab_evaluation_cards_present', 0, data);
         equal(WorksheetContext.parsed.textContent, 'native compact', 'selected display reaches real expression card');

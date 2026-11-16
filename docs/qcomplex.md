@@ -607,7 +607,7 @@ for separate investigations. See [the benchmark guide](benchmarks.md#persistent-
 for selection, interruption recovery and raw sample storage.
 
 <!-- MARS-BENCHMARKS:BEGIN -->
-Benchmark run **31**, 2026-11-12T01:25:53.508Z (UTC).
+Benchmark run **140**, 2026-11-15T22:41:00.137Z (UTC).
 
 Machine: Intel(R) N95.
 
@@ -620,7 +620,9 @@ Median per call from 7 timed batches.
 Timing method: CLOCK_MONOTONIC; warmup=100ms; target_batch=5ms; max_batch=1048576; storage_chunk=512.
 
 Argument parsing, output validation, disposal and database writes are outside timing.
+Timings use spaces for thousands grouping and a decimal point; bit counts are ungrouped.
 Inputs show the actual operands, including +0.125i for permitted complex arguments; integer orders remain real.
+Parenthesised qualifiers describe parameter-specific workloads of the same public function.
 `number-double` includes generic number dispatch; the other fixed profiles call qfloat/qcomplex directly.
 Requested multiprecision bits do not guarantee that every algorithm achieves that accuracy.
 Operations and precision columns with only unsupported results are omitted; — denotes an unsupported cell.
@@ -630,136 +632,139 @@ Failures and timeouts remain visible. † marks a retained slowdown outlier.
 
 | Operation | Inputs | 106 bits |
 |---|---|---:|
-| E1 | 2.345678+0.125i | 67.1 µs |
-| Ei | 2.345678+0.125i | 80.8 µs † |
-| Li | 2.345+0.125i | 56.6 µs |
-| abs | 0.7+0.125i | 597.8 ns |
-| acos | 0.7+0.125i | 11.4 µs |
-| acosec | 2.345+0.125i | 11.3 µs |
-| acosech | 0.7+0.125i | 10.5 µs |
-| acosh | 2.345+0.125i | 13.7 µs |
-| acot | 0.7+0.125i | 13.4 µs |
-| acoth | 2.345+0.125i | 5.6 µs |
-| add | 0.7+0.125i, 0.7+0.125i | 18.3 ns |
-| appell_F1 | <span style="display:inline-block;width:40ch;max-width:100%;white-space:normal;overflow-wrap:anywhere">0.5+0.125i, 0.7+0.125i, 0.8+0.125i, 2.5+<br/>0.125i, 0.2+0.125i, 0.3+0.125i</span> | 693.3 µs |
-| arccovercos | 0.5+0.125i | 9.7 µs |
-| arccoversin | 0.5+0.125i | 9.5 µs |
-| archacovercos | 0.5+0.125i | 6.6 µs |
-| archacoversin | 0.5+0.125i | 6.7 µs |
-| archavercos | 0.5+0.125i | 5.9 µs |
-| archaversin | 0.5+0.125i | 9.5 µs † |
-| arcvercos | 0.5+0.125i | 13.7 µs † |
-| arcversin | 0.5+0.125i | 11.1 µs |
-| arg | 0.7+0.125i | 1.5 µs |
-| asec | 2.345+0.125i | 11.0 µs |
-| asech | 0.7+0.125i | 14.4 µs |
-| asin | 0.7+0.125i | 10.8 µs |
-| asinh | 0.7+0.125i | 10.9 µs |
-| atan | 0.7+0.125i | 12.7 µs |
-| atan2 | 0.5+0.125i, -0.75+0.125i | 12.6 µs |
-| atanh | 0.7+0.125i | 6.7 µs |
-| bessel_I | 2, 0.7+0.125i | 112.2 µs |
-| bessel_J | 2, 0.7+0.125i | 130.7 µs |
-| bessel_K | 2, 0.7+0.125i | 86.3 µs |
-| bessel_Y | 2, 0.7+0.125i | 107.1 µs |
-| beta | 2.3+0.125i, 4.5+0.125i | 41.2 µs |
-| beta_pdf | 0.5+0.125i, 2.5+0.125i, 3.5+0.125i | 60.9 µs |
-| binomial | 5+0.125i, 2+0.125i | 33.6 µs |
-| chebyshev_Tn | 2, 0.7+0.125i | 194.3 ns |
-| chebyshev_Un | 2, 0.7+0.125i | 188.5 ns |
-| circ | 0.7 | 20.3 ns |
-| clausen | 3, 0.7+0.125i | 410.1 µs |
-| clausen2 | 0.7+0.125i | 28.8 µs |
-| conj | 0.7+0.125i | 4.0 ns |
-| cos | 0.7+0.125i | 11.1 µs |
-| cosec | 0.7+0.125i | 9.6 µs |
-| cosech | 0.7+0.125i | 9.8 µs |
-| cosh | 0.7+0.125i | 9.3 µs |
-| cot | 0.7+0.125i | 21.3 µs |
-| coth | 0.7+0.125i | 19.4 µs |
-| covercos | 0.7+0.125i | 9.5 µs |
-| coversin | 0.7+0.125i | 11.6 µs |
-| cubrt | 0.7+0.125i | 8.8 µs |
-| digamma | 2.345+0.125i | 16.0 µs |
-| dilog | 0.7+0.125i | 114.1 µs |
-| div | 0.7+0.125i, 0.7+0.125i | 174.9 ns |
-| erf | 0.7+0.125i | 61.6 µs |
-| erfc | 0.7+0.125i | 59.1 µs |
-| erfcinv | 0.5+0.125i | 378.9 µs |
-| erfinv | 0.5+0.125i | 411.9 µs |
-| exp | 1.23456789+0.125i | 3.9 µs |
-| floor | 0.7+0.125i | 60.1 ns |
-| gamma | 2.345+0.125i | 16.1 µs |
-| gammainc_P | 2.3+0.125i, 1.4+0.125i | 81.0 µs |
-| gammainc_Q | 2.3+0.125i, 1.4+0.125i | 79.9 µs |
-| gammainc_lower | 2.3+0.125i, 1.4+0.125i | 54.2 µs |
-| gammainc_upper | 2.3+0.125i, 1.4+0.125i | 73.7 µs |
-| gammainv | 9.5+0.125i | 142.3 µs |
-| hacovercos | 0.7+0.125i | 9.5 µs |
-| hacoversin | 0.7+0.125i | 10.6 µs |
-| harmonic_poly | 2, 0.7+0.125i | 665.6 ns |
-| havercos | 0.7+0.125i | 10.7 µs |
-| haversin | 0.7+0.125i | 12.5 µs † |
-| hermite_Hn | 2, 0.7+0.125i | 224.0 ns |
-| hypergeometric_pFq | 0.7+0.125i, 2.5+0.125i, 0.3+0.125i | 37.8 µs |
-| hypot | 0.7+0.125i, 1.2+0.125i | 1.8 µs |
+| E1 | 2.345678+0.125i | 59.8 µs |
+| Ei | 2.345678+0.125i | 92.1 µs † |
+| Li | 2.345+0.125i | 64.9 µs |
+| abs | 0.7+0.125i | 588.1 ns |
+| acos | 0.7+0.125i | 12.8 µs |
+| acosec | 2.345+0.125i | 13.1 µs |
+| acosech | 0.7+0.125i | 11.1 µs |
+| acosh | 2.345+0.125i | 19.8 µs |
+| acot | 0.7+0.125i | 13.0 µs |
+| acoth | 2.345+0.125i | 7.5 µs |
+| add | 0.7+0.125i, 0.7+0.125i | 25.1 ns |
+| appell_F1 | <span style="display:inline-block;width:40ch;max-width:100%;white-space:normal;overflow-wrap:anywhere">0.5+0.125i, 0.7+0.125i, 0.8+0.125i, 2.5+<br/>0.125i, 0.2+0.125i, 0.3+0.125i</span> | 914.3 µs |
+| arccovercos | 0.5+0.125i | 15.3 µs † |
+| arccoversin | 0.5+0.125i | 13.8 µs |
+| archacovercos | 0.5+0.125i | 7.6 µs |
+| archacoversin | 0.5+0.125i | 7.9 µs |
+| archavercos | 0.5+0.125i | 8.3 µs |
+| archaversin | 0.5+0.125i | 6.7 µs |
+| arcvercos | 0.5+0.125i | 13.4 µs |
+| arcversin | 0.5+0.125i | 12.7 µs |
+| arg | 0.7+0.125i | 1.3 µs |
+| asec | 2.345+0.125i | 10.1 µs |
+| asech | 0.7+0.125i | 19.4 µs |
+| asin | 0.7+0.125i | 11.9 µs |
+| asinh | 0.7+0.125i | 14.1 µs |
+| atan | 0.7+0.125i | 13.3 µs |
+| atan2 | 0.5+0.125i, -0.75+0.125i | 13.3 µs |
+| atanh | 0.7+0.125i | 7.5 µs |
+| bessel_I | 2, 0.7+0.125i | 166.0 µs |
+| bessel_J | 2, 0.7+0.125i | 201.7 µs † |
+| bessel_K | 2, 0.7+0.125i | 108.9 µs |
+| bessel_Y | 2, 0.7+0.125i | 119.6 µs |
+| beta | 2.3+0.125i, 4.5+0.125i | 45.6 µs |
+| beta_pdf | 0.5+0.125i, 2.5+0.125i, 3.5+0.125i | 79.6 µs |
+| binomial | 5+0.125i, 2+0.125i | 37.9 µs |
+| chebyshev_Tn | 2, 0.7+0.125i | 218.3 ns |
+| chebyshev_Un | 2, 0.7+0.125i | 208.0 ns |
+| circ | 0.7 | 25.9 ns |
+| clausen | 3, 0.7+0.125i | 434.9 µs |
+| clausen2 | 0.7+0.125i | 35.8 µs |
+| conj | 0.7+0.125i | 5.6 ns |
+| cos | 0.7+0.125i | 12.3 µs |
+| cosec | 0.7+0.125i | 13.6 µs |
+| cosech | 0.7+0.125i | 11.4 µs |
+| cosh | 0.7+0.125i | 10.8 µs |
+| cot | 0.7+0.125i | 27.1 µs |
+| coth | 0.7+0.125i | 25.9 µs |
+| covercos | 0.7+0.125i | 13.4 µs |
+| coversin | 0.7+0.125i | 12.5 µs |
+| cubrt | 0.7+0.125i | 10.5 µs |
+| digamma | 2.345+0.125i | 17.9 µs |
+| dilog | 0.7+0.125i | 239.0 µs † |
+| div | 0.7+0.125i, 0.7+0.125i | 321.6 ns |
+| erf | 0.7+0.125i | 74.1 µs |
+| erfc | 0.7+0.125i | 68.3 µs |
+| erfcinv | 0.5+0.125i | 406.9 µs |
+| erfinv | 0.5+0.125i | 416.8 µs |
+| exp | 1.23456789+0.125i | 5.1 µs |
+| floor | 0.7+0.125i | 58.0 ns |
+| gamma | 2.345+0.125i | 21.6 µs |
+| gammainc_P | 2.3+0.125i, 1.4+0.125i | 77.7 µs |
+| gammainc_Q | 2.3+0.125i, 1.4+0.125i | 91.0 µs |
+| gammainc_lower | 2.3+0.125i, 1.4+0.125i | 73.0 µs |
+| gammainc_upper | 2.3+0.125i, 1.4+0.125i | 73.8 µs |
+| gammainv | 9.5+0.125i | 198.3 µs |
+| hacovercos | 0.7+0.125i | 13.2 µs |
+| hacoversin | 0.7+0.125i | 10.8 µs |
+| harmonic_poly | 2, 0.7+0.125i | 564.4 ns |
+| havercos | 0.7+0.125i | 11.9 µs |
+| haversin | 0.7+0.125i | 12.9 µs |
+| hermite_Hn | 2, 0.7+0.125i | 265.2 ns |
+| hypergeometric_pFq | 0.7+0.125i, 2.5+0.125i, 0.3+0.125i | 48.9 µs |
+| hypot | 0.7+0.125i, 1.2+0.125i | 2.0 µs |
 | imag_part | 0.7+0.125i | 3.3 ns |
-| inv | 0.7+0.125i | 199.8 ns |
-| lambert_W0 | 0.7+0.125i | 36.0 µs |
-| lambert_Wm1 | -0.2+0.125i | 47.6 µs † |
-| lambert_Wn | 1, 0.7+0.125i | 36.4 µs |
-| lauricella_F | 0.5+0.125i, 0.3+0.125i, 2.5+0.125i | 205.6 µs |
-| ldexp | 1.23456789+0.125i, 3 | 32.8 ns |
-| legendre_chi | 2, 0.7+0.125i | 401.6 µs |
-| lerch_phi | 0.3+0.125i, 2+0.125i, 1.4+0.125i | 814.5 µs |
-| lg | 2.345678+0.125i | 4.7 µs |
-| lgamma | 2.345+0.125i | 12.4 µs |
-| ln | 2.345678+0.125i | 5.1 µs |
-| log | 2.345678+0.125i | 5.5 µs |
-| log10 | 2.345678+0.125i | 5.8 µs |
-| logbeta | 2.3+0.125i, 4.5+0.125i | 34.4 µs |
-| logbeta_pdf | 0.5+0.125i, 2.5+0.125i, 3.5+0.125i | 48.2 µs |
-| lommel_S | 0.5+0.125i, 0.7+0.125i, 1.2+0.125i | 143.7 µs |
-| mul | 0.7+0.125i, 0.7+0.125i | 61.3 ns |
-| neg | 0.7+0.125i | 7.5 ns |
-| normal_cdf | 0.7+0.125i | 46.6 µs |
-| normal_logpdf | 0.7+0.125i | 175.0 ns |
-| normal_pdf | 0.7+0.125i | 4.0 µs |
-| polygamma | 3, 2.345+0.125i | 14.7 µs |
-| polylog | 2, 0.7+0.125i | 112.4 µs |
-| polylog1 | 0.7+0.125i | 8.4 µs † |
-| pow | 1.23456789+0.125i, 3.5+0.125i | 12.1 µs † |
-| productlog | 0.7+0.125i | 36.7 µs |
-| qdigamma | 0.5+0.125i, 2.3+0.125i | 178.6 µs |
-| real_part | 0.7+0.125i | 2.9 ns |
+| inv | 0.7+0.125i | 255.4 ns |
+| lambert_W0 | 0.7+0.125i | 42.4 µs |
+| lambert_Wm1 | -0.2+0.125i | 42.7 µs |
+| lambert_Wn | 1, 0.7+0.125i | 35.3 µs |
+| lauricella_F | 0.5+0.125i, 0.3+0.125i, 2.5+0.125i | 236.8 µs |
+| ldexp | 1.23456789+0.125i, 3 | 40.1 ns |
+| legendre_chi | 2, 0.7+0.125i | 687.2 µs |
+| lerch_phi | 0.3+0.125i, 2+0.125i, 1.4+0.125i | 1.011 ms † |
+| lerch_phi (integer order) | 0.3125+0.125i, -15, 0.375+0.125i | 318.3 µs |
+| lerch_phi (negative order) | 0.3125+0.125i, -15+0.125i, 0.375+0.125i | 4.462 ms † |
+| lg | 2.345678+0.125i | 7.8 µs |
+| lgamma | 2.345+0.125i | 21.6 µs † |
+| ln | 2.345678+0.125i | 5.7 µs |
+| log | 2.345678+0.125i | 6.1 µs |
+| log10 | 2.345678+0.125i | 6.3 µs |
+| logbeta | 2.3+0.125i, 4.5+0.125i | 42.8 µs |
+| logbeta_pdf | 0.5+0.125i, 2.5+0.125i, 3.5+0.125i | 57.2 µs |
+| lommel_S | 0.5+0.125i, 0.7+0.125i, 1.2+0.125i | 176.6 µs |
+| mul | 0.7+0.125i, 0.7+0.125i | 66.7 ns |
+| neg | 0.7+0.125i | 8.6 ns |
+| normal_cdf | 0.7+0.125i | 59.8 µs |
+| normal_logpdf | 0.7+0.125i | 194.6 ns |
+| normal_pdf | 0.7+0.125i | 5.9 µs † |
+| polygamma | 3, 2.345+0.125i | 19.2 µs |
+| polylog | 2, 0.7+0.125i | 141.7 µs |
+| polylog1 | 0.7+0.125i | 6.9 µs |
+| pow | 1.23456789+0.125i, 3.5+0.125i | 13.1 µs |
+| productlog | 0.7+0.125i | 50.6 µs |
+| qdigamma | 0.5+0.125i, 2.3+0.125i | 239.1 µs |
+| real_part | 0.7+0.125i | 3.3 ns |
 | rect | 0.7 | 26.3 ns |
-| root | 1.2345+0.125i, 3 | 9.2 µs |
-| round | 0.7+0.125i | 79.5 ns |
-| roundn | 1.23456789+0.125i, 3 | 11.3 µs |
-| rounds | 1.23456789+0.125i, 3 | 36.5 µs |
-| sec | 0.7+0.125i | 10.2 µs |
-| sech | 0.7+0.125i | 10.2 µs |
-| sgn | 0.7 | 11.8 ns |
-| sin | 0.567+0.125i | 9.2 µs |
-| sinc | 0.7+0.125i | 9.5 µs |
-| sinh | 0.7+0.125i | 11.8 µs † |
-| sqr | 0.7+0.125i | 57.5 ns |
-| sqrt | 1.23456789+0.125i | 4.1 µs |
-| step | 0.7 | 14.8 ns |
-| struve_H | 2, 0.7+0.125i | 175.6 µs |
-| struve_L | 2, 0.7+0.125i | 123.2 µs |
-| sub | 0.7+0.125i, 0.7+0.125i | 18.1 ns |
-| tan | 0.7+0.125i | 22.4 µs |
-| tanh | 0.7+0.125i | 18.7 µs |
-| tetragamma | 2.345+0.125i | 4.6 µs |
-| tri | 0.7 | 19.1 ns |
-| trigamma | 2.345+0.125i | 3.5 µs |
-| vercos | 0.7+0.125i | 9.0 µs |
-| versin | 0.7+0.125i | 10.3 µs |
-| zatahp | 2.3+0.125i, 1.4+0.125i | 571.8 µs |
-| zeta | 2.345+0.125i | 411.7 µs |
-| zetah | 2.3+0.125i, 1.4+0.125i | 683.5 µs |
-| zetap | 2.345+0.125i | 478.0 µs |
+| root | 1.2345+0.125i, 3 | 11.9 µs |
+| round | 0.7+0.125i | 139.6 ns |
+| roundn | 1.23456789+0.125i, 3 | 16.0 µs |
+| rounds | 1.23456789+0.125i, 3 | 45.8 µs |
+| sec | 0.7+0.125i | 11.4 µs |
+| sech | 0.7+0.125i | 14.4 µs |
+| sgn | 0.7 | 18.0 ns |
+| sin | 0.567+0.125i | 12.7 µs |
+| sinc | 0.7+0.125i | 10.1 µs |
+| sinh | 0.7+0.125i | 9.9 µs |
+| sqr | 0.7+0.125i | 66.0 ns |
+| sqrt | 1.23456789+0.125i | 6.5 µs † |
+| step | 0.7 | 17.2 ns |
+| struve_H | 2, 0.7+0.125i | 207.7 µs |
+| struve_L | 2, 0.7+0.125i | 184.8 µs |
+| sub | 0.7+0.125i, 0.7+0.125i | 25.0 ns |
+| tan | 0.7+0.125i | 23.8 µs |
+| tanh | 0.7+0.125i | 19.4 µs |
+| tetragamma | 2.345+0.125i | 7.9 µs |
+| tri | 0.7 | 27.5 ns |
+| trigamma | 2.345+0.125i | 5.1 µs |
+| vercos | 0.7+0.125i | 10.9 µs |
+| versin | 0.7+0.125i | 13.0 µs |
+| zatahp | 2.3+0.125i, 1.4+0.125i | 795.3 µs |
+| zatahp (integer order) | -4, 0.75+0.125i | 935.9 µs |
+| zeta | 2.345+0.125i | 605.2 µs |
+| zetah | 2.3+0.125i, 1.4+0.125i | 695.2 µs |
+| zetap | 2.345+0.125i | 522.2 µs |
 
 <!-- MARS-BENCHMARKS:END -->
 

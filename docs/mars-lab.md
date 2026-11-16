@@ -467,6 +467,19 @@ the updater does not stop running applications automatically.
 
 ## Native calculation control
 
+Mathematical results show a small duration beside the **Value** card title, using
+the current theme's secondary accent colour on desktop and mobile. Expression,
+equation, differential-equation, matrix, integration and goal-seeking calculations
+share this timer. It measures one native worker invocation with a monotonic clock,
+including parsing, symbolic work and result preparation, and excludes process
+communication, TeX rendering and browser drawing. It is an interactive calculation
+duration rather than an isolated function benchmark. Measuring it requires only
+two clock readings; the calculation is never repeated. Cached mode results retain
+their original duration, and clearing or replacing a result clears obsolete timing.
+Failed calculations and diagnostic worker overrides without timing metadata show
+no duration. Nanoseconds, microseconds, milliseconds or seconds are selected by
+the native presentation adapter.
+
 Each HTTP request process owns a resident calculation process. Built-in mathematical
 entry points are called directly; a successful request retains that process and its
 module caches, including high-precision coefficients. The library remains linked
@@ -3836,6 +3849,12 @@ title shows the solved equation or equations; a single solution has no redundant
 legend, while multiple branches retain numbered legends. With no or incomplete
 initial conditions, up to two free integration constants per branch produce representative
 family curves: one selects five values; two select a nine-member Cartesian grid.
+Scaled Bessel equations use the native ordinary or modified Bessel basis, with elementary
+half-order reductions. Mathematical solutions include their independent coordinate, such as
+**y(x)**, and reciprocal factors use fraction notation. Their plots retain the native real-domain
+restrictions, exclude the
+singular origin and avoid evaluating derivatives where the solution value is unavailable.
+See [second-order linear equations](diffequation.md#second-order-linear-equations) for the supported family.
 Independent-coefficient modified-Emden equations instead show **Equation and quadratures**,
 with the simultaneous parametric pair and its separate exceptional branches identified in the native result.
 The first two equations are labelled as functions of their common parameter, and must be read together.

@@ -5,7 +5,8 @@
  * Extends a finite Dirichlet sum with the integral, endpoint and Bernoulli corrections. A scaled rising product
  * advances through a quadratic recurrence, avoiding separate factorial products and negative endpoint powers.
  * Analytic differentiation advances alongside the value without division by a possibly zero rising product.
- * Absolute Bernoulli bounds size each correction's arithmetic without reducing the recurrence or sum precision.
+ * Absolute Bernoulli bounds size each correction's arithmetic. A checked high-precision path also shortens
+ * rising-product state, propagating absolute errors after scaling by 32^(-k); accumulators retain full precision.
  * The owning number module supplies guarded MPC accumulators and its existing correction and accuracy budgets.
  */
 #define MARS_NUMBER_INTERNAL_ACCESS
@@ -48,13 +49,25 @@ static mpfr_prec_t zeta_tail_precision(mpc_srcptr scaled, mpc_srcptr derivative,
 }
 
 /* Add one guarded tail, using each endpoint exponential only once. */
-int number_zeta_tail(mpc_ptr sum, mpc_ptr derivative, mpc_srcptr argument, mpc_srcptr endpoint,
-                     mpfr_prec_t target, size_t budget, unsigned guard)
+static int zeta_tail_evaluate(mpc_ptr sum, mpc_ptr derivative, mpc_srcptr argument, mpc_srcptr endpoint,
+                              mpfr_prec_t target, size_t budget, unsigned guard, bool shortened)
 {
     mpfr_prec_t work = mpc_get_prec(sum);
     mpc_t logarithm, base, inverse, inverse_square, pole, term, scaled, scaled_derivative;
     mpc_t factor, increment, second_difference, factor_derivative, derivative_increment, temporary;
-    mpfr_t bernoulli;
+    mpc_t rounded_factor, rounded_derivative;
+    mpfr_t bernoulli, scratch[4], state_error, total_error, unit_error, norm, multiplier, bound;
+    if (shortened) {
+        for (unsigned i = 0; i < 4; ++i) mpfr_init2(scratch[i], work);
+        mpfr_inits2(64, state_error, total_error, unit_error, norm, multiplier, bound, (mpfr_ptr)0);
+        /* With at most 8192 steps, full-state factor differences accumulate O(k^2) errors. The checked
+         * state, multiplier and accumulator magnitudes are at most 1, 512 and 65536 respectively.
+         * At least 128 working guard bits leave more than 80 bits for an absolute per-step allowance
+         * in the 32^(-k) scale. Shortened state/coefficient errors have a further 32-bit allowance. */
+        mpfr_set_ui_2exp(unit_error, 1u, -target - 80, MPFR_RNDU);
+        mpfr_set(state_error, unit_error, MPFR_RNDU); mpfr_set(total_error, unit_error, MPFR_RNDU);
+        mpc_init2(rounded_factor, work); mpc_init2(rounded_derivative, work);
+    }
     mpc_init2(logarithm, work); mpc_init2(base, work); mpc_init2(inverse, work);
     mpc_init2(inverse_square, work); mpc_init2(pole, work); mpc_init2(term, work);
     mpc_init2(scaled, work); mpc_init2(scaled_derivative, work); mpc_init2(factor, work);
@@ -122,33 +135,149 @@ int number_zeta_tail(mpc_ptr sum, mpc_ptr derivative, mpc_srcptr argument, mpc_s
         mpfr_prec_t precision = zeta_tail_precision(scaled, derivative ? scaled_derivative : NULL, k, work);
         if (mpfr_get_prec(bernoulli) != precision) mpfr_set_prec(bernoulli, precision);
         if (mpc_get_prec(term) != precision) mpc_set_prec(term, precision);
+        if (shortened) {
+            number_mpc_abs_upper(norm, sum);
+            if (!mpfr_number_p(norm) || mpfr_cmp_ui(norm, 65536u) > 0) break;
+            if (derivative) {
+                number_mpc_abs_upper(norm, derivative);
+                if (!mpfr_number_p(norm) || mpfr_cmp_ui(norm, 65536u) > 0) break;
+            }
+            number_mpc_abs_upper(norm, scaled);
+            if (derivative) {
+                number_mpc_abs_upper(bound, scaled_derivative);
+                if (mpfr_greater_p(bound, norm)) mpfr_set(norm, bound, MPFR_RNDU);
+            }
+            mpfr_div_2ui(norm, norm, 5u * k, MPFR_RNDU);
+            if (!mpfr_number_p(norm) || mpfr_cmp_ui(norm, 1u) > 0) break;
+            /* After scaling U_k by 32^(-k), |B_(2k)/(2k)!|*32^k < 4. State roundoff is
+             * absolute in this scale, so it remains meaningful at zeros and under cancellation. */
+            mpfr_mul_ui(bound, state_error, 4u, MPFR_RNDU);
+            mpfr_add(total_error, total_error, bound, MPFR_RNDU);
+            mpfr_add(total_error, total_error, unit_error, MPFR_RNDU);
+            mpfr_prec_round(mpc_realref(scaled), precision, MPFR_RNDN);
+            mpfr_prec_round(mpc_imagref(scaled), precision, MPFR_RNDN);
+            if (derivative) {
+                mpfr_prec_round(mpc_realref(scaled_derivative), precision, MPFR_RNDN);
+                mpfr_prec_round(mpc_imagref(scaled_derivative), precision, MPFR_RNDN);
+            }
+            if (mpc_get_prec(temporary) != precision) mpc_set_prec(temporary, precision);
+            if (mpc_get_prec(rounded_factor) != precision) {
+                mpc_set_prec(rounded_factor, precision); mpc_set_prec(rounded_derivative, precision);
+            }
+            mpc_set(rounded_factor, factor, MPC_RNDNN);
+            if (derivative) mpc_set(rounded_derivative, factor_derivative, MPC_RNDNN);
+            for (unsigned i = 0; i < 4; ++i)
+                if (mpfr_get_prec(scratch[i]) != precision) mpfr_set_prec(scratch[i], precision);
+        }
         if (number_coefficient_normalised(bernoulli, k)) break;
         mpc_mul_fr(term, scaled, bernoulli, MPC_RNDNN);
         mpc_add(sum, sum, term, MPC_RNDNN);
+        bool small = zeta_tail_small(term, target, guard);
         if (derivative) {
             mpc_mul_fr(term, scaled_derivative, bernoulli, MPC_RNDNN);
             mpc_add(derivative, derivative, term, MPC_RNDNN);
+            small = small && zeta_tail_small(term, target, guard);
         }
-        if (k >= 4u && zeta_tail_small(term, target, guard)) {
-            status = 0;
+        if (k >= 4u && small) {
+            if (!shortened) status = 0;
+            else {
+                mpfr_set_ui_2exp(bound, 1u, -target - 32, MPFR_RNDD);
+                if (mpfr_number_p(total_error) && mpfr_lessequal_p(total_error, bound)) status = 0;
+            }
             break;
         }
+        if (shortened) {
+            number_mpc_abs_upper(multiplier, factor);
+            if (derivative) {
+                number_mpc_abs_upper(norm, factor_derivative);
+                mpfr_add(multiplier, multiplier, norm, MPFR_RNDU);
+            }
+            mpfr_div_2ui(multiplier, multiplier, 5u, MPFR_RNDU);
+            if (!mpfr_number_p(multiplier) || mpfr_cmp_ui(multiplier, 16u) > 0) break;
+            mpfr_mul(state_error, state_error, multiplier, MPFR_RNDU);
+            mpfr_add(state_error, state_error, unit_error, MPFR_RNDU);
+        }
         if (derivative) {
-            mpc_mul(temporary, scaled, factor_derivative, MPC_RNDNN);
-            mpc_mul(scaled_derivative, scaled_derivative, factor, MPC_RNDNN);
+            if (shortened) {
+                number_mpc_mul_guarded(temporary, scaled, rounded_derivative, scratch);
+                number_mpc_mul_guarded(scaled_derivative, scaled_derivative, rounded_factor, scratch);
+            } else {
+                mpc_mul(temporary, scaled, factor_derivative, MPC_RNDNN);
+                mpc_mul(scaled_derivative, scaled_derivative, factor, MPC_RNDNN);
+            }
             mpc_add(scaled_derivative, scaled_derivative, temporary, MPC_RNDNN);
             mpc_add(factor_derivative, factor_derivative, derivative_increment, MPC_RNDNN);
         }
-        mpc_mul(scaled, scaled, factor, MPC_RNDNN);
+        if (shortened) number_mpc_mul_guarded(scaled, scaled, rounded_factor, scratch);
+        else mpc_mul(scaled, scaled, factor, MPC_RNDNN);
         mpc_add(factor, factor, increment, MPC_RNDNN);
         mpc_add(increment, increment, second_difference, MPC_RNDNN);
     }
 
 done:
+    if (shortened && !status) {
+        number_mpc_abs_upper(norm, sum);
+        bool bounded = mpfr_number_p(norm) && mpfr_cmp_ui(norm, 65536u) <= 0;
+        if (derivative) {
+            number_mpc_abs_upper(norm, derivative);
+            bounded = bounded && mpfr_number_p(norm) && mpfr_cmp_ui(norm, 65536u) <= 0;
+        }
+        if (!bounded) status = -1;
+    }
+    if (shortened) {
+        mpfr_clears(state_error, total_error, unit_error, norm, multiplier, bound, (mpfr_ptr)0);
+        for (unsigned i = 0; i < 4; ++i) mpfr_clear(scratch[i]);
+        mpc_clear(rounded_derivative); mpc_clear(rounded_factor);
+    }
     mpfr_clear(bernoulli);
     mpc_clear(temporary); mpc_clear(derivative_increment); mpc_clear(factor_derivative);
     mpc_clear(second_difference); mpc_clear(increment); mpc_clear(factor);
     mpc_clear(scaled_derivative); mpc_clear(scaled); mpc_clear(term); mpc_clear(pole);
     mpc_clear(inverse_square); mpc_clear(inverse); mpc_clear(base); mpc_clear(logarithm);
     return status;
+}
+
+/* Commit shortened state only after its propagated arithmetic error fits the guarded absolute budget. */
+bool number_zeta_tail_short(mpc_ptr sum, mpc_ptr derivative, mpc_srcptr argument, mpc_srcptr endpoint,
+                            mpfr_prec_t target, size_t budget, unsigned guard)
+{
+    mpfr_prec_t work = mpc_get_prec(sum);
+    if (target < 1024 || target > 8192 || work < target + 128 || work > target + 512 ||
+        budget > 8192 || mpfr_cmp_ui(mpc_realref(endpoint), 64u) < 0) return false;
+    mpfr_t norm, bound;
+    mpfr_inits2(64, norm, bound, (mpfr_ptr)0);
+    number_mpc_abs_upper(norm, argument);
+    bool ok = mpfr_number_p(norm) && mpfr_cmp_ui(norm, 16u) <= 0;
+    number_mpc_abs_upper(norm, sum);
+    ok = ok && mpfr_number_p(norm) && mpfr_cmp_ui(norm, 65536u) <= 0;
+    if (derivative) {
+        number_mpc_abs_upper(norm, derivative);
+        ok = ok && mpfr_number_p(norm) && mpfr_cmp_ui(norm, 65536u) <= 0;
+    }
+    number_mpc_abs_upper(norm, endpoint);
+    ok = ok && mpfr_number_p(norm) && mpfr_cmp_ui(norm, 65536u) <= 0;
+    mpfr_abs(norm, mpc_imagref(endpoint), MPFR_RNDU);
+    mpfr_div_2ui(bound, mpc_realref(endpoint), 2u, MPFR_RNDD);
+    ok = ok && mpfr_lessequal_p(norm, bound);
+    mpfr_clears(norm, bound, (mpfr_ptr)0);
+    if (!ok) return false;
+    mpc_t value, slope;
+    mpc_init2(value, work); mpc_init2(slope, work);
+    mpc_set(value, sum, MPC_RNDNN);
+    if (derivative) mpc_set(slope, derivative, MPC_RNDNN);
+    ok = !zeta_tail_evaluate(value, derivative ? slope : NULL, argument, endpoint, target, budget, guard, true);
+    if (ok) {
+        mpc_set(sum, value, MPC_RNDNN);
+        if (derivative) mpc_set(derivative, slope, MPC_RNDNN);
+    }
+    mpc_clear(slope); mpc_clear(value);
+    return ok;
+}
+
+/* Add the checked tail when supported, retaining the full-state recurrence as the general fallback. */
+int number_zeta_tail(mpc_ptr sum, mpc_ptr derivative, mpc_srcptr argument, mpc_srcptr endpoint,
+                     mpfr_prec_t target, size_t budget, unsigned guard)
+{
+    if (derivative && number_zeta_tail_short(sum, derivative, argument, endpoint, target, budget, guard)) return 0;
+    return zeta_tail_evaluate(sum, derivative, argument, endpoint, target, budget, guard, false);
 }

@@ -43,6 +43,7 @@ static const char *solver_name(de_solver_t solver)
         [DE_SOLVER_LINEAR_TRANSFORMATION]          = "linear transformation",
         [DE_SOLVER_STURM_LIOUVILLE]                = "Sturm-Liouville",
         [DE_SOLVER_POWER_LAW_BESSEL]               = "power-law Bessel",
+        [DE_SOLVER_BESSEL]                         = "Bessel",
         [DE_SOLVER_CONSTANT_COEFFICIENT_LINEAR]    = "constant-coefficient linear",
         [DE_SOLVER_DERIVATIVE_QUADRATIC]           = "derivative-quadratic",
         [DE_SOLVER_EXACT_DERIVATIVE_LINEARIZATION] = "exact-derivative linearization",

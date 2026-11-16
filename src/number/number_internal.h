@@ -51,6 +51,34 @@ unsigned long number_series_integer_power(unsigned long base, unsigned long expo
 bool number_lerch_blocks(mpc_ptr out, mpc_srcptr argument, mpc_srcptr order, mpc_srcptr offset, mpfr_prec_t bits);
 
 /**
+ * @brief Attempt a real Lerch defining sum using guarded MPFR arithmetic.
+ * @param[out] out Initialised caller-owned MPFR destination, unchanged on failure.
+ * @param[in] argument Borrowed finite real z represented as MPC, with |z| < 1.
+ * @param[in] order Borrowed finite real s represented as MPC.
+ * @param[in] offset Borrowed positive real a represented as MPC.
+ * @param target Required result precision in bits, at most 65408.
+ * @return True only after explicit geometric-tail and roundoff bounds pass; false for unsupported inputs
+ * or exhausted bounds. Inputs must not alias out. All temporary storage is released within the call and shared
+ * exact-key cache copies are thread-safe; the caller retains out and clears it with mpfr_clear().
+ */
+bool number_lerch_real(mpfr_ptr out, mpc_srcptr argument, mpc_srcptr order, mpc_srcptr offset, mpfr_prec_t target);
+
+/**
+ * @brief Attempt a finite rational Lerch evaluation at order minus degree.
+ * @param[out] out Caller-owned initialised MPC destination, unchanged on rejection or exhausted error bounds.
+ * @param[in] argument Borrowed finite number representing z, with modulus at most fifteen sixteenths.
+ * @param[in] offset Borrowed finite number representing a, with modulus at most sixteen.
+ * @param degree Non-negative integer m, supported from zero through sixty-four.
+ * @param target Required result precision in bits; guarded working precision must not exceed 65536 bits.
+ * @return True after checking the polynomial's absolute arithmetic error against the final relative target;
+ * false selects the ordinary series. Inputs are converted again at the guarded precision so exact rational
+ * operands retain their accuracy. No ownership transfers; the caller clears out with mpc_clear(). All scratch
+ * storage is local and released before return, with no retained state or additional synchronisation requirement.
+ */
+bool number_lerch_integer(mpc_ptr out, const number_t argument, const number_t offset,
+                          unsigned degree, mpfr_prec_t target);
+
+/**
  * @brief Copy zeta(n) from the bounded numeric coefficient cache at the output's precision.
  * @param[out] out Caller-owned initialised MPFR destination; its precision is preserved.
  * @param[in] order Integer n, at least two.
@@ -107,6 +135,46 @@ int number_integer_logarithm(mpfr_ptr out, unsigned long value);
 void number_zeta_finite_sum(mpc_ptr sum, mpc_ptr derivative, mpc_srcptr argument, unsigned long endpoint);
 
 /**
+ * @brief Sum real integer Dirichlet terms and their optional order derivatives using MPFR.
+ * @param[out] sum Initialised caller-owned MPFR destination.
+ * @param[out] derivative Optional distinct MPFR destination at the same precision.
+ * @param[in] argument Borrowed exponent, distinct from both outputs.
+ * @param endpoint Exclusive positive integer endpoint.
+ * @return Nothing; non-finite arithmetic propagates. Temporary powers are bounded to eight MiB and released
+ * within the call. Allocation failure selects direct summation. Independent calls are thread-safe.
+ */
+void number_zeta_finite_sum_real(mpfr_ptr sum, mpfr_ptr derivative, mpfr_srcptr argument, unsigned long endpoint);
+
+/**
+ * @brief Attempt a finite shifted Dirichlet sum through bounded binomial blocks.
+ * @param[out] sum Caller-owned initialised MPC destination selecting the finite sum's precision.
+ * @param[out] derivative Optional distinct MPC destination at the same precision, receiving its order derivative.
+ * @param[in] argument Borrowed finite complex exponent, of modulus at most sixteen.
+ * @param[in] offset Borrowed shift with real part at least one quarter and modulus at most sixteen.
+ * @param count Number of consecutive terms starting at offset, between 64 and 4096.
+ * @return True after the finite expansion's absolute truncation and roundoff bounds pass; false selects the
+ * caller's ordinary summation. Failed destinations are unchanged. Supported output precisions are 1024–8320 bits.
+ * Inputs must not alias outputs. Temporary coefficients remain local; a mutex protects one bounded checked
+ * finite sum keyed by exact arguments, signed zeros, term count and verified precision. No ownership transfers.
+ */
+bool number_zeta_shifted_sum(mpc_ptr sum, mpc_ptr derivative, mpc_srcptr argument, mpc_srcptr offset,
+                             unsigned long count);
+
+/**
+ * @brief Evaluate real Riemann or Hurwitz zeta, optionally sharing its analytic order derivative.
+ * @param[out] out Initialised caller-owned MPFR destination selecting the target precision.
+ * @param[out] derivative Optional distinct MPFR destination at matching precision.
+ * @param[in] argument Borrowed finite exponent; may alias out because rounding occurs after evaluation.
+ * @param[in] offset Borrowed positive finite Hurwitz offset, or NULL for Riemann zeta.
+ * @param budget Maximum Bernoulli corrections, at least four.
+ * @param guard Additional absolute stopping-check bits.
+ * @return Zero on convergence, minus one for unsupported inputs or exhausted bounds. Failed outputs must
+ * be discarded. All outputs remain caller-owned; clear with mpfr_clear(). Shared cache copies are thread-safe.
+ */
+int number_zeta_real(mpfr_ptr out, mpfr_ptr derivative, mpfr_srcptr argument, mpfr_srcptr offset,
+                     size_t budget, unsigned guard);
+
+/**
  * @brief Add the Euler–Maclaurin integral, endpoint and Bernoulli tail to a finite zeta sum.
  * @param[in,out] sum Caller-owned initialised MPC accumulator containing the finite value sum.
  * @param[in,out] derivative Optional matching MPC accumulator containing the finite derivative in s.
@@ -122,6 +190,22 @@ void number_zeta_finite_sum(mpc_ptr sum, mpc_ptr derivative, mpc_srcptr argument
  */
 int number_zeta_tail(mpc_ptr sum, mpc_ptr derivative, mpc_srcptr argument, mpc_srcptr endpoint,
                      mpfr_prec_t target, size_t budget, unsigned guard);
+
+/**
+ * @brief Attempt a zeta tail with checked, adaptively shortened rising-product state.
+ * @param[in,out] sum Caller-owned initialised MPC finite-sum accumulator, unchanged on failure.
+ * @param[in,out] derivative Optional distinct matching MPC derivative accumulator, unchanged on failure.
+ * @param[in] argument Borrowed exponent; must not alias either accumulator.
+ * @param[in] endpoint Borrowed first omitted base; must not alias either accumulator.
+ * @param target Requested precision, supported from 1024 through 8192 bits.
+ * @param budget Maximum Bernoulli corrections, supported up to 8192.
+ * @param guard Additional absolute correction stopping-check bits.
+ * @return True only after convergence and a successful propagated absolute-error check. False leaves both
+ * outputs unchanged and requests the ordinary full-state tail. Accumulators require 128 through 512 guard bits
+ * and remain caller-owned; release with mpc_clear(). All scratch storage is local; coefficient copies are thread-safe.
+ */
+bool number_zeta_tail_short(mpc_ptr sum, mpc_ptr derivative, mpc_srcptr argument, mpc_srcptr endpoint,
+                            mpfr_prec_t target, size_t budget, unsigned guard);
 
 /**
  * @brief Copy log(offset + index), reusing bounded logarithms for the most recently used exact offset.
@@ -168,6 +252,36 @@ void number_mpc_abs_upper(mpfr_ptr out, mpc_srcptr value);
  * thread-safe; clear out using mpfr_clear() when finished. Use this only where a conservative bound is sufficient.
  */
 void number_mpc_abs_lower(mpfr_ptr out, mpc_srcptr value);
+
+/**
+ * @brief Multiply finite complex values using three rounded real products within an absolute error budget.
+ * @param[out] out Caller-owned initialised MPC destination; may alias either input.
+ * @param[in] left Borrowed finite complex multiplicand.
+ * @param[in] right Borrowed finite complex multiplier.
+ * @param[in,out] scratch Four distinct initialised MPFR temporaries at out's precision, disjoint from all operands.
+ * @return Nothing. Each component's absolute error is at most 16*2^(-p)*|left|_1*|right|_1 for precision p,
+ * away from exponent underflow/overflow. This is guarded series arithmetic, not correctly rounded MPC
+ * multiplication, and does not promise signed-zero conventions. Only use inside an explicit absolute
+ * roundoff allowance. No allocation or ownership transfer occurs; independent scratch storage is thread-safe.
+ */
+void number_mpc_mul_guarded(mpc_ptr out, mpc_srcptr left, mpc_srcptr right, mpfr_t *scratch);
+
+/**
+ * @brief Select a coefficient precision from an absolute bound on a polygamma asymptotic term.
+ * @param[in,out] factorial Caller-owned MPFR state, with at least 64 bits; for supported budgets, index one
+ * initialises it and successive contiguous indices advance (2*index+order-1)! using upward rounding.
+ * @param[out] bound Caller-owned MPFR scratch, with at least 64 bits and distinct from the other operands.
+ * @param[in] power_upper Borrowed finite positive upper bound on the current full-precision power's modulus.
+ * @param[in] index One-based Bernoulli index, supplied in increasing contiguous order during an evaluation.
+ * @param[in] order Polygamma order; zero denotes the digamma coefficient B_(2n)/(2n).
+ * @param[in] work Original working precision in bits, retained for unsupported or non-finite budgets.
+ * @return A precision between 128 and work for work in 640..65536 and orders up to 64; otherwise work.
+ * Shortened coefficients retain an absolute weighted error below 2^(-work-32), including rounded integer
+ * coefficient factors. Powers, terms and accumulators must retain work precision. No state or ownership is
+ * retained. Independent caller-owned state is thread-safe; clear the state and scratch with mpfr_clear().
+ */
+mpfr_prec_t number_polygamma_coefficient_precision(mpfr_ptr factorial, mpfr_ptr bound, mpfr_srcptr power_upper,
+                                                   size_t index, unsigned order, mpfr_prec_t work);
 
 /**
  * @brief Conservatively test a scaled series term against a relative precision target using binary exponents.

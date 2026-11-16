@@ -205,6 +205,24 @@ de_attempt_t de_attempt_linear_substitution(const diffequ_t *de, const expr_t *i
                                             const expr_t *derivative_right, equation_t **solution_out);
 de_attempt_t de_attempt_linear_transformation(const diffequ_t *de, const expr_t *independent, const expr_t *dependent,
                                               const expr_t *derivative_right, equation_t **solution_out);
+/**
+ * @brief Construct a real scaled Bessel or Euler basis for homogeneous second-order coefficients.
+ * @param[in] de Borrowed problem; point conditions must lie in one regular half-line excluding zero.
+ * @param[in] coordinate Borrowed independent coordinate, not changed or consumed.
+ * @param[in] dependent Borrowed dependent field identifying initial and boundary conditions.
+ * @param[in] leading Borrowed non-zero coefficient of the second derivative.
+ * @param[in] first Borrowed coefficient of the first derivative.
+ * @param[in] potential Borrowed coefficient of the dependent field.
+ * @param[in] forcing Borrowed right-hand forcing, which must be identically zero.
+ * @return Owned explicit right side, released with expr_free(), or NULL for unsupported coefficients,
+ * singular/incompatible conditions or allocation failure. Finite real normalised coefficients are required;
+ * non-zero wave coefficients require a real Bessel order. No input is retained except through ordinary
+ * expression ownership in the returned graph. Call serially within the current numeric precision scope.
+ */
+expr_t *de_bessel_solution(const diffequ_t *de, const expr_t *coordinate, const expr_t *dependent,
+                            const expr_t *leading, const expr_t *first, const expr_t *potential,
+                            const expr_t *forcing);
+
 de_attempt_t de_attempt_sturm_liouville(const diffequ_t *de, const expr_t *independent, const expr_t *dependent,
                                         const expr_t *second_derivative, const expr_t *first_derivative,
                                         const expr_t *residual, equation_t **solution_out, de_solver_t *solver_out);

@@ -28,6 +28,16 @@ static jsref lab_result_field(jsref object, const char *key)
     return lab_result_or(lab_dom_get(object, key), lab_dom_string(""));
 }
 
+/* Display only native duration metadata, clearing older timings when none is supplied. */
+void lab_result_calculation_time(jsref data)
+{
+    int metadata = lab_dom_get(data, "presentation");
+    int text = lab_result_field(lab_dom_truth(metadata) ? metadata : data, "calculation_time");
+    int node = lab_dom_query(0, "#calculationTime");
+    lab_dom_write(node, LAB_DOM_TEXT, "", text);
+    lab_dom_class(node, "hidden", !lab_dom_length(text));
+}
+
 static jsref lab_result_data(node_jsref node, const char *key)
 {
     return lab_dom_read(node, LAB_DOM_DATASET, key);
@@ -430,6 +440,7 @@ void lab_result_display(jsref caches, jsref data, lab_result_kind_t kind)
         lab_dom_return(0);
         return;
     }
+    lab_result_calculation_time(data);
     int expression = lab_result_field(data, fields[kind].expression);
     if (kind == LAB_RESULT_MATRIX) {
         lab_result_matrix_expression(caches, data);
@@ -638,6 +649,7 @@ void lab_result_pane_clear(void)
 /* Clear card metadata and pending identities together; no stale copy source survives. */
 void lab_result_details_clear(jsref caches, jsref mode)
 {
+    lab_result_calculation_time(0);
     lab_layout_plot_camera(1);
     lab_dom_write(lab_dom_id("plotRendered"), LAB_DOM_TEXT, "", lab_dom_string(""));
     lab_dom_remove(lab_dom_id("plotRendered"), "data-plot-pending");

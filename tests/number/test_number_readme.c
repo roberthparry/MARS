@@ -214,6 +214,25 @@ static void number_readme_physical_example(void)
     num_set_default_prec_bits(saved);
 }
 
+/* README example: shared Riemann zeta value and derivative (docs/number.md). */
+static void number_readme_zeta_pair(void)
+{
+    size_t saved = num_get_default_prec_bits();
+    num_set_default_prec_bits(256);
+    number_t s = num_create_from_string("2.25"), derivative;
+    number_t value = num_zeta_pair(s, &derivative);
+    printf("zeta(2.25) = %.6f; derivative = %.6f\n",
+           num_to_double(value), num_to_double(derivative));
+    char output[128];
+    snprintf(output, sizeof output, "zeta(2.25) = %.6f; derivative = %.6f",
+             num_to_double(value), num_to_double(derivative));
+    ASSERT_TRUE(!strcmp(output, "zeta(2.25) = 1.460212; derivative = -0.580229"));
+    num_destroy(&value);
+    num_destroy(&derivative);
+    num_destroy(&s);
+    num_set_default_prec_bits(saved);
+}
+
 void run_number_readme_example_tests(void)
 {
     number_readme_rational_basic();
@@ -226,4 +245,5 @@ void run_number_readme_example_tests(void)
     run_number_bessel_y_readme_tests();
     number_readme_sgn_example();
     number_readme_physical_example();
+    number_readme_zeta_pair();
 }

@@ -2,8 +2,9 @@
  * @file benchmarks_measure.c
  * @brief Isolated, checked monotonic measurements of typed mathematical operations.
  *
- * Arguments and output storage are prepared outside timed intervals. A warm-up and bounded adaptive calibration
- * amortise clock and dispatch costs. Result checks and number destruction happen after each timed batch.
+ * Arguments and output storage are prepared outside timed intervals. Warm measurements amortise clock costs
+ * through calibration; cold measurements fork from an unevaluated worker, and changing measurements perturb
+ * eligible inputs before each single timed call. Result checks and destruction happen after each timed batch.
  * The parent process supplies a hard deadline, so a non-cooperative algorithm cannot stall the complete run.
  */
 #include <math.h>
@@ -12,7 +13,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/wait.h>
 #include <time.h>
+#include <unistd.h>
 
 #include "number-t.h"
 #include "qfloat-t.h"
@@ -22,6 +25,17 @@
 
 const char benchmark_protocol[] =
     "CLOCK_MONOTONIC; warmup=100ms; target_batch=5ms; max_batch=1048576; storage_chunk=512";
+
+/* Return stable identities so cold, varying and warmed observations never share a baseline. */
+const char *benchmark_protocol_for(const char *mode)
+{
+    if (!strcmp(mode, "warm")) return benchmark_protocol;
+    if (!strcmp(mode, "cold"))
+        return "CLOCK_MONOTONIC; cold=fork_from_unevaluated_worker; warmup=0; iterations=1; setup=untimed";
+    if (!strcmp(mode, "changing"))
+        return "CLOCK_MONOTONIC; changing=eligible_real_parts+(sample+1)/128; warmup=0; iterations=1; setup=untimed";
+    return NULL;
+}
 
 typedef struct {
     const benchmark_operation_t *operation;
@@ -167,6 +181,57 @@ static bool benchmark_batch(benchmark_state_t *state, unsigned iterations, uint6
     return true;
 }
 
+/* Fork every sample from a parent that has prepared operands but has never evaluated the operation. */
+static bool benchmark_cold(benchmark_state_t *state, uint64_t *duration,
+                            bool (*chunk)(benchmark_state_t *, unsigned, uint64_t *))
+{
+    int channel[2];
+    if (pipe(channel)) return false;
+    pid_t child = fork();
+    if (child < 0) { close(channel[0]); close(channel[1]); return false; }
+    struct { uint64_t duration; unsigned ok, limited; } result = {0};
+    if (!child) {
+        close(channel[0]);
+        result.ok = chunk(state, 1, &result.duration);
+        result.limited = state->precision_limited;
+        ssize_t sent;
+        do sent = write(channel[1], &result, sizeof result); while (sent < 0 && errno == EINTR);
+        close(channel[1]);
+        _exit(sent == sizeof result ? 0 : 1);
+    }
+    close(channel[1]);
+    size_t received = 0;
+    while (received < sizeof result) {
+        ssize_t count = read(channel[0], (char *)&result + received, sizeof result - received);
+        if (count < 0 && errno == EINTR) continue;
+        if (count <= 0) break;
+        received += (size_t)count;
+    }
+    close(channel[0]);
+    int status = 0;
+    pid_t waited;
+    do waited = waitpid(child, &status, 0); while (waited < 0 && errno == EINTR);
+    state->precision_limited = result.limited != 0;
+    *duration = result.duration;
+    return received == sizeof result && waited == child && WIFEXITED(status) && !WEXITSTATUS(status) && result.ok;
+}
+
+/* Move permitted real parts by one exact binary fraction before timing the next independent input. */
+static bool benchmark_change(benchmark_state_t *state)
+{
+    number_t step = num_create_from_frac(1, 128);
+    bool ok = true;
+    for (unsigned i = 0; i < state->operation->arity; ++i) {
+        if (state->operation->complex_mask && !(state->operation->complex_mask & (1u << i))) continue;
+        number_t next = num_add(state->number[i], step);
+        num_destroy(state->number + i);
+        state->number[i] = next;
+        ok = num_is_finite(next) && ok;
+    }
+    num_destroy(&step);
+    return ok;
+}
+
 static bool benchmark_prepare(benchmark_state_t *state, const char *backend, unsigned bits, const char *operands)
 {
     const benchmark_operation_t *op = state->operation;
@@ -211,7 +276,10 @@ static bool benchmark_prepare(benchmark_state_t *state, const char *backend, uns
 int benchmark_measure(const string_t *root, int argc, char **argv)
 {
     (void)root;
-    if (argc != 4 && argc != 5) return 2;
+    if (argc < 4 || argc > 6) return 2;
+    const char *mode = argc == 6 ? argv[5] : "warm";
+    if (!benchmark_protocol_for(mode)) return 2;
+    bool cold = !strcmp(mode, "cold"), changing = !strcmp(mode, "changing");
     const benchmark_operation_t *op = benchmark_operation(argv[0]);
     char *end = NULL;
     unsigned bits = (unsigned)strtoul(argv[2], &end, 10);
@@ -222,8 +290,9 @@ int benchmark_measure(const string_t *root, int argc, char **argv)
     bool real = !strcmp(backend, "qfloat"), complex_backend = !strcmp(backend, "qcomplex");
     bool exact = benchmark_backend_exact(backend), integer = !strcmp(backend, "exact-integer");
     bool number = !strcmp(backend, "number-double") || !strcmp(backend, "mpfr") || !strcmp(backend, "mpc") || exact;
+    if (changing && (op->integer_only || (strcmp(backend, "mpfr") && strcmp(backend, "mpc")))) return 3;
     if (!real && !complex_backend && !number) return 2;
-    if ((op->integer_only && !integer) || (exact && !op->integer_only && argc != 5)) return 3;
+    if ((op->integer_only && !integer) || (exact && !op->integer_only && argc < 5)) return 3;
     if ((!bits && !exact) || (exact && bits)) return 2;
     if (real && !benchmark_operation_supported(op, false)) return 3;
     if (complex_backend && !benchmark_operation_supported(op, true)) return 3;
@@ -233,24 +302,27 @@ int benchmark_measure(const string_t *root, int argc, char **argv)
     /* Keep these bounded exact workloads below the library's rational rounding threshold. */
     if (clock_getres(CLOCK_MONOTONIC, &resolution) || num_set_default_prec_bits(bits ? bits : 16384)) return 1;
     benchmark_state_t state = {.operation = op, .exact = exact, .integer = integer, .bits = bits};
-    bool ok = benchmark_prepare(&state, backend, bits, argc == 5 ? argv[4] : NULL);
+    bool ok = benchmark_prepare(&state, backend, bits, argc >= 5 ? argv[4] : NULL);
     bool (*chunk)(benchmark_state_t *, unsigned, uint64_t *) =
         real ? benchmark_batch_real : complex_backend ? benchmark_batch_complex : benchmark_batch_number;
     unsigned iterations = 1;
     uint64_t duration = 0;
     uint64_t warm_start = 0, warm_end = 0;
     ok = benchmark_now(&warm_start) && ok;
-    do {
+    warm_end = warm_start;
+    while (!cold && !changing && ok && warm_end >= warm_start && warm_end - warm_start < 100000000) {
         if (ok) ok = benchmark_batch(&state, 1, &duration, chunk) && benchmark_now(&warm_end);
-    } while (ok && warm_end >= warm_start && warm_end - warm_start < 100000000);
-    if (ok) ok = benchmark_batch(&state, 1, &duration, chunk);
-    while (ok && duration < 5000000 && iterations < 1048576u) {
+    }
+    if (!cold && !changing && ok) ok = benchmark_batch(&state, 1, &duration, chunk);
+    while (!cold && !changing && ok && duration < 5000000 && iterations < 1048576u) {
         iterations *= 2;
         ok = benchmark_batch(&state, iterations, &duration, chunk);
     }
     double values[101];
     for (unsigned i = 0; ok && i < samples; ++i) {
-        ok = benchmark_batch(&state, iterations, &duration, chunk);
+        if (changing) ok = benchmark_change(&state);
+        if (ok) ok = cold ? benchmark_cold(&state, &duration, chunk)
+                          : benchmark_batch(&state, iterations, &duration, chunk);
         values[i] = (double)duration / iterations;
     }
     for (unsigned i = 0; i < op->arity; ++i) num_destroy(state.number + i);

@@ -1,5 +1,149 @@
 -- Precision regressions for previously failing or timed-out benchmark functions.
 
+WITH precisions(digits) AS (VALUES(300),(1234)), orders(value) AS (VALUES(3),(64),(65))
+INSERT OR IGNORE INTO number_cases(name, operation, input, expected, precision)
+SELECT 'polygamma_half_coefficient_' || orders.value || '_' || digits,
+       'polygamma_half', orders.value, '0', digits FROM orders CROSS JOIN precisions;
+
+WITH precisions(digits) AS (VALUES(80),(300),(1234)),
+cases(name, operation, input) AS (VALUES
+    ('trigamma_reflection_centre', 'trigamma_reflection', '0.5+0.125i'),
+    ('trigamma_reflection_shifted', 'trigamma_reflection', '0.75+0.125i'),
+    ('tetragamma_reflection_centre', 'tetragamma_reflection', '0.5+0.125i'),
+    ('tetragamma_reflection_shifted', 'tetragamma_reflection', '0.75+0.125i'))
+INSERT OR IGNORE INTO number_cases(name, operation, input, expected, precision)
+SELECT name || '_' || digits, operation, input, '0', digits FROM cases CROSS JOIN precisions;
+
+WITH precisions(digits) AS (VALUES(300),(1234)),
+orders(name, value) AS (VALUES('negative_eight','-8'),('negative_four','-4'),('zero','0'),('two','2'),('eight','8')),
+offsets(name, value) AS (VALUES('real','0.75'),('complex','0.75+0.125i'),('conjugate','0.75-0.125i'))
+INSERT OR IGNORE INTO number_cases(name, operation, input, expected, precision)
+SELECT 'zatahp_integer_reference_' || orders.name || '_' || offsets.name || '_' || digits,
+       'zatahp_reference', orders.value || ';' || offsets.value, '0', digits
+FROM orders CROSS JOIN offsets CROSS JOIN precisions;
+
+WITH precisions(digits) AS (VALUES(80),(300),(1234)),
+cases(name, operation, input) AS (VALUES
+    ('erfinv_reflected', 'erfinv', '-0.875'),
+    ('erfinv_conjugate', 'erfinv', '0.5-0.125i'),
+    ('erfinv_imaginary', 'erfinv', '0.125i'),
+    ('erfinv_near_endpoint', 'erfinv', '0.999999999999999999999999999999'),
+    ('erfinv_near_negative_endpoint', 'erfinv', '-0.999999999999999999999999999999'),
+    ('erfinv_near_complex_endpoint', 'erfinv', '0.999999999999999999999999999999+1e-31i'),
+    ('erfcinv_reflected', 'erfcinv', '1.875'),
+    ('erfcinv_conjugate', 'erfcinv', '0.5-0.125i'),
+    ('erfcinv_near_two', 'erfcinv', '1.999999999999999999999999999999'),
+    ('erfcinv_near_two_complex', 'erfcinv', '1.999999999999999999999999999999-1e-31i'),
+    ('erfcinv_complex_tail', 'erfcinv', '1e-40+1.25e-41i'))
+INSERT OR IGNORE INTO number_cases(name, operation, input, expected, precision)
+SELECT name || '_' || digits, operation, input, input, digits FROM cases CROSS JOIN precisions;
+
+WITH precisions(digits) AS (VALUES(80),(300),(1234)),
+cases(name, input) AS (VALUES
+    ('lerch_integer_real', '0.3125;-15;0.375'),
+    ('lerch_integer_complex', '0.3125+0.125i;-15;0.375+0.125i'),
+    ('lerch_integer_conjugate', '0.3125-0.125i;-15;0.375-0.125i'),
+    ('lerch_integer_alternating', '-0.5+0.125i;-8;0.375+0.125i'),
+    ('lerch_integer_upper_offset', '0.3125+0.125i;-15;-15.75+0.125i'),
+    ('lerch_integer_lower_offset', '0.3125-0.125i;-15;-15.75-0.125i'),
+    ('lerch_integer_zero_order', '0.3125+0.125i;0;0.375+0.125i'),
+    ('lerch_integer_linear', '0.3125+0.125i;-1;0.375+0.125i'),
+    ('lerch_integer_wide_input', '0.3+0.1i;-15;0.7+0.2i'))
+INSERT OR IGNORE INTO number_cases(name, operation, input, expected, precision)
+SELECT name || '_' || digits, 'lerch_integer_reference', input, '0', digits FROM cases CROSS JOIN precisions;
+
+INSERT OR IGNORE INTO number_cases(name, operation, input, expected, precision) VALUES
+    ('lerch_integer_maximum_order', 'lerch_integer_reference', '0.3125+0.125i;-64;0.375+0.125i', '0', 300),
+    ('lerch_integer_maximum_radius', 'lerch_integer_reference', '0.9375;-64;0.375', '0', 80),
+    ('lerch_integer_long_binary_denominator', 'lerch_integer_reference', '0.3125+5.42101086242752217003726400434970855712890625e-20i;-15;0.375', '0', 300),
+    ('lerch_integer_general_small_component', 'lerch_integer_reference', '0.3125+8.2718061255302767487140869206996285356581211090087890625e-25i;-15;0.375', '0', 300),
+    ('lerch_integer_exact_300', 'lerch_integer_exact', '15', '0', 300),
+    ('lerch_integer_exact_1234', 'lerch_integer_exact', '15', '0', 1234),
+    ('lerch_integer_reject_degree', 'lerch_integer_reject', '0.3125;0.375;65', '0', 300),
+    ('lerch_integer_reject_radius', 'lerch_integer_reject', '0.96875;0.375;15', '0', 300),
+    ('lerch_integer_reject_offset', 'lerch_integer_reject', '0.3125;17;15', '0', 300),
+    ('lerch_integer_reject_zero', 'lerch_integer_reject', '0;0;1', '0', 300),
+    ('lerch_integer_reject_cancellation', 'lerch_integer_reject', '-0.5;1/3;1', '0', 300),
+    ('lerch_integer_fallback_radius', 'lerch_reference', '0.96875;-3;0.375', '0', 80),
+    ('lerch_integer_fallback_order', 'lerch_reference', '0.3125;-65;0.375', '0', 300);
+
+INSERT OR IGNORE INTO number_cases(name, operation, input, expected, precision) VALUES
+    ('lerch_integer_fallback_complex_short', 'lerch_reference', '0.3125+0.125i;-65;0.375+0.125i', '0', 34),
+    ('lerch_integer_fallback_complex_radius', 'lerch_reference', '0.96875+0.00390625i;-3;0.375+0.125i', '0', 80),
+    ('lerch_integer_fallback_offset', 'lerch_reference', '0.3125;-15;17', '0', 300),
+    ('lerch_integer_fallback_complex_offset', 'lerch_reference', '0.3125+0.125i;-15;17+0.125i', '0', 300);
+
+WITH precisions(digits) AS (VALUES(310),(1234)),
+cases(name, input) AS (VALUES
+    ('zeta_tail_real', '2.25;576.375'),
+    ('zeta_tail_complex', '2.25+0.125i;576.375+0.125i'),
+    ('zeta_tail_conjugate', '2.25-0.125i;576.375-0.125i'),
+    ('zeta_tail_integer', '2;576.375'),
+    ('zeta_tail_zero', '0;576.375'),
+    ('zeta_tail_negative_order', '-0.25+0.125i;576.375+0.125i'),
+    ('zeta_tail_large_order', '15+1i;576.375+0.125i'),
+    ('zeta_tail_imaginary_order', '2+10i;576.375+0.125i'))
+INSERT OR IGNORE INTO number_cases(name, operation, input, expected, precision)
+SELECT name || '_' || digits, 'zeta_tail_reference', input, '0', digits FROM cases CROSS JOIN precisions;
+
+INSERT OR IGNORE INTO number_cases(name, operation, input, expected, precision) VALUES
+    ('zeta_tail_maximum_precision', 'zeta_tail_reference', '2.25+0.125i;1200.375+0.125i', '0', 2465),
+    ('zeta_tail_reject_precision', 'zeta_tail_reject', '2.25;576.375', '0', 80),
+    ('zeta_tail_reject_order', 'zeta_tail_reject', '17;576.375', '0', 310),
+    ('zeta_tail_reject_endpoint', 'zeta_tail_reject', '2.25;32.375', '0', 310),
+    ('zeta_tail_reject_sector', 'zeta_tail_reject', '2.25;576.375+256i', '0', 310),
+    ('zeta_tail_reject_state', 'zeta_tail_reject', '-8;576.375', '0', 310),
+    ('zeta_tail_reject_pole', 'zeta_tail_reject', '1;576.375', '0', 310),
+    ('zeta_tail_budget_exhausted', 'zeta_tail_budget', '2.25+0.125i;576.375+0.125i', '0', 1234),
+    ('zeta_blocks_late_zero', 'zeta_blocks', '-15;1.375;159', '0', 1234),
+    ('zeta_blocks_early_zero', 'zeta_blocks', '-1;1.375;159', '0', 1234),
+    ('lerch_blocks_large_order_1234', 'lerch_blocks_reference', '0.3125+0.125i;15+0.25i;0.375+0.125i', '0', 1234),
+    ('lerch_blocks_negative_order_1234', 'lerch_blocks_reference', '0.3125+0.125i;-15+0.25i;0.375+0.125i', '0', 1234),
+    ('lerch_blocks_minimum_precision', 'lerch_blocks_reference', '-0.625+0.125i;0.75+0.125i;0.75-0.125i', '0', 155),
+    ('lerch_blocks_maximum_precision', 'lerch_blocks_reference', '0.3125+0.125i;2+0.125i;1.375+0.125i', '0', 2465),
+    ('lerch_blocks_negative_maximum_precision', 'lerch_blocks_reference', '0.3125-0.125i;-15-0.25i;0.375-0.125i', '0', 2465);
+
+INSERT OR IGNORE INTO number_cases(name, operation, input, expected, precision) VALUES
+    ('lerch_real_negative_integer_1234', 'lerch_reference', '0.3125;-15;0.375', '0', 1234);
+
+WITH precisions(digits) AS (VALUES(310),(1234)),
+cases(name, input) AS (VALUES
+    ('zeta_blocks_real', '2.25;1.375;159'),
+    ('zeta_blocks_count', '2.25;1.375;160'),
+    ('zeta_blocks_complex', '2.25+0.125i;1.375+0.125i;159'),
+    ('zeta_blocks_conjugate', '2.25-0.125i;1.375-0.125i;159'),
+    ('zeta_blocks_negative_integer', '-2;1.375;159'),
+    ('zeta_blocks_negative_order', '-2.25+0.125i;1.375+0.125i;159'),
+    ('zeta_blocks_zero_order', '0;1.375;159'),
+    ('zeta_blocks_large_order', '15+4i;0.25+0.125i;159'),
+    ('zeta_blocks_imaginary_offset', '2.25+0.125i;0.25+15i;159'))
+INSERT OR IGNORE INTO number_cases(name, operation, input, expected, precision)
+SELECT name || '_' || digits, 'zeta_blocks', input, '0', digits FROM cases CROSS JOIN precisions;
+
+INSERT OR IGNORE INTO number_cases(name, operation, input, expected, precision) VALUES
+    ('zeta_blocks_minimum_count', 'zeta_blocks', '2.25+0.125i;1.375+0.125i;64', '0', 310),
+    ('zeta_blocks_maximum_count', 'zeta_blocks', '2.25+0.125i;1.375+0.125i;4096', '0', 310),
+    ('zeta_blocks_reject_precision', 'zeta_blocks_reject', '2.25;1.375;128', '0', 64),
+    ('zeta_blocks_reject_offset', 'zeta_blocks_reject', '2.25;0.125;128', '0', 310),
+    ('zeta_blocks_reject_order', 'zeta_blocks_reject', '17;1.375;128', '0', 310),
+    ('zeta_blocks_reject_short', 'zeta_blocks_reject', '2.25;1.375;32', '0', 310),
+    ('zeta_blocks_reject_long', 'zeta_blocks_reject', '2.25;1.375;4097', '0', 310);
+
+WITH precisions(digits) AS (VALUES(64),(300),(1234)),
+cases(name, operation, input) AS (VALUES
+    ('paired_zeta_real', 'zeta_pair', '2.25'),
+    ('paired_zeta_complex', 'zeta_pair', '2.25+0.125i'),
+    ('paired_zeta_negative', 'zeta_pair', '-2.25'),
+    ('paired_zeta_near_pole', 'zeta_pair', '1.0009765625'),
+    ('gamma_log_turns_upper', 'lgamma_turns', '0.75+8.125i'),
+    ('gamma_log_turns_lower', 'lgamma_turns', '-2.75-8.125i'),
+    ('lerch_real_integer', 'lerch_reference', '0.5;2;0.75'),
+    ('lerch_real_fractional', 'lerch_reference', '0.5;1.25;0.75'),
+    ('lerch_real_alternating', 'lerch_reference', '-0.5;1.25;0.75'),
+    ('lerch_real_negative_order', 'lerch_reference', '-0.5;-3.5;0.75'))
+INSERT OR IGNORE INTO number_cases(name, operation, input, expected, precision)
+SELECT name || '_' || digits, operation, input, '0', digits FROM cases CROSS JOIN precisions;
+
 WITH precisions(digits) AS (VALUES(64),(300)),
 cases(name, input) AS (VALUES
     ('lerch_reference_complex', '0.5+0.125i;1.25+0.125i;0.75+0.125i'),

@@ -6,6 +6,7 @@
  * assumed. Unsupported-only operations and backends are omitted without changing stored observations.
  * Source markers delimit managed tables; all documents are prepared before publication, and unrelated
  * prose is preserved byte for byte. No benchmark is executed while rendering documentation.
+ * Parameter-specific workloads display their public operation with a qualifier, retaining their stored keys.
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -16,12 +17,54 @@
 #define MARS_BENCHMARKS_INTERNAL_ACCESS
 #include "benchmarks_internal.h"
 
-static void benchmark_duration(string_t *out, double ns)
+typedef struct {
+    const char *key, *label;
+} benchmark_workload_label_t;
+
+static int benchmark_workload_label_compare(const void *key, const void *entry)
 {
-    if (ns < 1000) string_append_format(out, "%.1f ns", ns);
-    else if (ns < 1000000) string_append_format(out, "%.1f µs", ns / 1000);
-    else if (ns < 1000000000) string_append_format(out, "%.3f ms", ns / 1000000);
-    else string_append_format(out, "%.3f s", ns / 1000000000);
+    const benchmark_workload_label_t *workload = entry;
+    return strcmp(key, workload->key);
+}
+
+static const char *benchmark_workload_label(const char *key)
+{
+    static const benchmark_workload_label_t labels[] = {
+        {"lerch_phi_integer_order", "lerch_phi (integer order)"},
+        {"lerch_phi_negative_order", "lerch_phi (negative order)"},
+        {"zatahp_integral", "zatahp (integer order)"}
+    };
+    const benchmark_workload_label_t *workload = bsearch(key, labels, sizeof labels / sizeof *labels,
+                                                       sizeof *labels, benchmark_workload_label_compare);
+    return workload ? workload->label : key;
+}
+
+/* Group the integer part of a displayed number, keeping its decimal point and fractional digits intact. */
+static bool benchmark_grouped_number(string_t *out, const char *number)
+{
+    size_t sign = number[0] == '-' || number[0] == '+' ? 1u : 0u;
+    size_t end = sign + strspn(number + sign, "0123456789");
+    if (sign && string_append_bytes(out, number, sign) < 0) return false;
+    for (size_t i = sign; i < end; ++i) {
+        if (i > sign && (end - i) % 3 == 0 && string_append_char(out, ' ') < 0) return false;
+        if (string_append_char(out, number[i]) < 0) return false;
+    }
+    return string_append_cstr(out, number + end) >= 0;
+}
+
+static bool benchmark_duration(string_t *out, double ns)
+{
+    const char *unit = "ns";
+    unsigned decimals = 1;
+    double value = ns;
+    if (ns >= 1000000000) { value = ns / 1000000000; unit = "s"; decimals = 3; }
+    else if (ns >= 1000000) { value = ns / 1000000; unit = "ms"; decimals = 3; }
+    else if (ns >= 1000) { value = ns / 1000; unit = "µs"; }
+    string_t *number = string_sprintf("%.*f", (int)decimals, value);
+    bool ok = number && benchmark_grouped_number(out, string_c_str(number)) &&
+              string_append_format(out, " %s", unit) >= 0;
+    string_free(number);
+    return ok;
 }
 
 static bool benchmark_backend_table(sqlite_t *db, long run, const char *backend, const char *heading, string_t *text)
@@ -62,7 +105,7 @@ static bool benchmark_backend_table(sqlite_t *db, long run, const char *backend,
         "SELECT outcome, median_ns, timing_outlier FROM benchmark_result "
         "WHERE run_id = ?1 AND operation = ?2 AND backend = ?3 AND bits = ?4 "
         "  AND arguments = ?5 AND complex_mask = ?6");
-    ok = rows && cell && sqlite_stmt_bind_int64(rows, 1, run) && sqlite_stmt_bind_text(rows, 2, backend);
+    ok = ok && rows && cell && sqlite_stmt_bind_int64(rows, 1, run) && sqlite_stmt_bind_text(rows, 2, backend);
     while (ok && (step = sqlite_stmt_step(rows)) == SQLITE_STEP_ROW) {
         const char *name = sqlite_stmt_column_text(rows, 0);
         const char *arguments = sqlite_stmt_column_text(rows, 1);
@@ -71,7 +114,7 @@ static bool benchmark_backend_table(sqlite_t *db, long run, const char *backend,
         string_t *inputs = benchmark_arguments_markdown(literal, benchmark_backend_exact(backend));
         string_free(literal);
         ok = inputs != NULL;
-        if (ok) string_append_format(text, "| %s | %s |", name, string_c_str(inputs));
+        if (ok) string_append_format(text, "| %s | %s |", benchmark_workload_label(name), string_c_str(inputs));
         string_free(inputs);
         for (unsigned i = 0; ok && i < columns; ++i) {
             ok = sqlite_stmt_bind_int64(cell, 1, run) && sqlite_stmt_bind_text(cell, 2, name) &&
@@ -82,7 +125,7 @@ static bool benchmark_backend_table(sqlite_t *db, long run, const char *backend,
                 const char *outcome = sqlite_stmt_column_text(cell, 0);
                 string_append_cstr(text, " ");
                 if (!strcmp(outcome, "pass")) {
-                    benchmark_duration(text, sqlite_stmt_column_double(cell, 1));
+                    ok = benchmark_duration(text, sqlite_stmt_column_double(cell, 1));
                     if (sqlite_stmt_column_int(cell, 2)) string_append_cstr(text, " †");
                 } else string_append_cstr(text, !strcmp(outcome, "unsupported") ? "—" : outcome);
                 string_append_cstr(text, " |");
@@ -108,7 +151,9 @@ static string_t *benchmark_document(sqlite_t *db, long run, const char *module)
         string_append_format(out, "\nBenchmark run **%ld**, %s (UTC).\n\nMachine: %s.\n\nSystem: %s.\n\n"
             "Compiler: %s; build flags: %s.\n\nMedian per call from %d timed batches.\n\nTiming method: %s.\n\n"
             "Argument parsing, output validation, disposal and database writes are outside timing.\n"
+            "Timings use spaces for thousands grouping and a decimal point; bit counts are ungrouped.\n"
             "Inputs show the actual operands, including +0.125i for permitted complex arguments; integer orders remain real.\n"
+            "Parenthesised qualifiers describe parameter-specific workloads of the same public function.\n"
             "`number-double` includes generic number dispatch; the other fixed profiles call qfloat/qcomplex directly.\n"
             "Requested multiprecision bits do not guarantee that every algorithm achieves that accuracy.\n"
             "Operations and precision columns with only unsupported results are omitted; — denotes an unsupported cell.\n"
@@ -139,7 +184,7 @@ static string_t *benchmark_document(sqlite_t *db, long run, const char *module)
                 "`number_t` uses exact GMP rational arithmetic (MPQ). The operands below have large integer\n"
                 "numerators and denominators; parsing and canonical reduction precede timing. Every result\n"
                 "is checked to remain an exact fraction. Arithmetic cost depends on operand sizes and\n"
-                "cancellation, rather than a floating-point precision. These workloads use a 16,384-bit\n"
+                "cancellation, rather than a floating-point precision. These workloads use a 16384-bit\n"
                 "rational size budget so intermediate results remain exact; general transcendental\n"
                 "functions usually require inexact real or complex results.\n\n");
             heading = "";

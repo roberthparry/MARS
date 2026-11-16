@@ -7,6 +7,24 @@ CREATE TABLE IF NOT EXISTS mars_lab_cases (
 CREATE INDEX IF NOT EXISTS mars_lab_cases_operation ON mars_lab_cases(operation, name);
 
 INSERT INTO test_case_runner(module, source, parent, table_name, operation) VALUES (
+    'mars_lab.calculation_times', 'tools/mars_lab/tests/test_lab_presentation.c',
+    'tests.test_lab_presentation_calculation_time', 'mars_lab_cases', 'calculation_time')
+ON CONFLICT(module) DO UPDATE SET table_name=excluded.table_name, operation=excluded.operation;
+INSERT OR IGNORE INTO mars_lab_cases(name, operation, input, expected) VALUES
+    ('calculation_time_zero', 'calculation_time', '{"calculation_time_ns":"0"}', '0 ns'),
+    ('calculation_time_nanoseconds', 'calculation_time', '{"calculation_time_ns":"999"}', '999 ns'),
+    ('calculation_time_microsecond', 'calculation_time', '{"calculation_time_ns":"1000"}', '1.0 µs'),
+    ('calculation_time_microseconds', 'calculation_time', '{"calculation_time_ns":"12345"}', '12.3 µs'),
+    ('calculation_time_millisecond', 'calculation_time', '{"calculation_time_ns":"1000000"}', '1.0 ms'),
+    ('calculation_time_second', 'calculation_time', '{"calculation_time_ns":"1000000000"}', '1.00 s'),
+    ('calculation_time_seconds', 'calculation_time', '{"calculation_time_ns":"1234567890"}', '1.23 s'),
+    ('calculation_time_absent', 'calculation_time', '{}', ''),
+    ('calculation_time_negative', 'calculation_time', '{"calculation_time_ns":"-1"}', ''),
+    ('calculation_time_nonfinite', 'calculation_time', '{"calculation_time_ns":"NaN"}', ''),
+    ('calculation_time_overflow', 'calculation_time', '{"calculation_time_ns":"18446744073709551616"}', ''),
+    ('calculation_time_trailing_junk', 'calculation_time', '{"calculation_time_ns":"12 ns"}', '');
+
+INSERT INTO test_case_runner(module, source, parent, table_name, operation) VALUES (
     'mars_lab.numeric_callables', 'tools/mars_lab/tests/test_lab_numeric.c',
     'tests.test_lab_numeric_callables', 'mars_lab_cases', 'numeric_callable')
 ON CONFLICT(module) DO UPDATE SET table_name=excluded.table_name, operation=excluded.operation;

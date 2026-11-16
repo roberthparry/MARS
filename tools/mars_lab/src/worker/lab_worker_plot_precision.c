@@ -157,10 +157,13 @@ static sampler_status_t evaluate_plot_derivatives(number_t parameter, number_t *
      * pullbacks leave tangents unavailable; the ordinary value remains useful. */
     if (plot->first) {
         *y = lab_worker_sample_eval(plot->value, &parameter);
+        /* Tangents and curvature have no meaning outside the formula's native domain. */
+        if (!finite_real(*y))
+            return SAMPLER_VALUE;
         *dy = lab_worker_sample_eval(plot->first, &parameter);
     } else if (expr_eval_derivatives(plot->expression, 1, variables, y, dy) != 0)
         *y = expr_eval(plot->expression);
-    if (plot->second)
+    if (plot->second && finite_real(*y))
         *ddy = lab_worker_sample_eval(plot->second, &parameter);
     return SAMPLER_VALUE;
 }

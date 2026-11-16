@@ -1505,7 +1505,7 @@ static int number_mpfr_polygamma_order_mut(mpfr_t value, unsigned int order)
 {
     mpfr_prec_t target_prec;
     mpfr_prec_t prec;
-    mpfr_t y, inv, inv2, power, term, sum, asymp, fact;
+    mpfr_t y, inv, inv2, power, term, sum, asymp, fact, coefficient, factorial_bound, power_bound, bound;
     unsigned long shift_target;
     size_t n;
     bool converged = false;
@@ -1520,7 +1520,8 @@ static int number_mpfr_polygamma_order_mut(mpfr_t value, unsigned int order)
     target_prec = mpfr_get_prec(value);
     prec = target_prec + NUMBER_POLYGAMMA_GUARD_BITS;
     shift_target = number_polygamma_shift_target(target_prec);
-    mpfr_inits2(prec, y, inv, inv2, power, term, sum, asymp, fact, (mpfr_ptr)0);
+    mpfr_inits2(prec, y, inv, inv2, power, term, sum, asymp, fact, coefficient, (mpfr_ptr)0);
+    mpfr_inits2(64, factorial_bound, power_bound, bound, (mpfr_ptr)0);
     mpfr_set(y, value, MPFR_RNDN);
     mpfr_set_zero(sum, 1);
     mpfr_set_zero(asymp, 1);
@@ -1550,13 +1551,18 @@ static int number_mpfr_polygamma_order_mut(mpfr_t value, unsigned int order)
 
     mpfr_mul(power, power, inv, MPFR_RNDN);
     for (n = 1u; n <= number_bernoulli_term_budget(target_prec); ++n) {
-        if (number_coefficient_bernoulli(term, n) != 0) {
-            mpfr_clears(y, inv, inv2, power, term, sum, asymp, fact, (mpfr_ptr)0);
+        mpfr_abs(power_bound, power, MPFR_RNDU);
+        mpfr_prec_t coefficient_precision = number_polygamma_coefficient_precision(
+            factorial_bound, bound, power_bound, n, order, prec);
+        if (mpfr_get_prec(coefficient) != coefficient_precision) mpfr_set_prec(coefficient, coefficient_precision);
+        if (number_coefficient_bernoulli(coefficient, n) != 0) {
+            mpfr_clears(y, inv, inv2, power, term, sum, asymp, fact, coefficient, (mpfr_ptr)0);
+            mpfr_clears(factorial_bound, power_bound, bound, (mpfr_ptr)0);
             return -1;
         }
         for (unsigned int j = 1u; j < order; ++j)
-            mpfr_mul_ui(term, term, (unsigned long)(2u * n + j), MPFR_RNDN);
-        mpfr_mul(term, term, power, MPFR_RNDN);
+            mpfr_mul_ui(coefficient, coefficient, (unsigned long)(2u * n + j), MPFR_RNDN);
+        mpfr_mul(term, coefficient, power, MPFR_RNDN);
         mpfr_add(asymp, asymp, term, MPFR_RNDN);
         if (number_mpfr_term_below_target(term, target_prec)) {
             converged = true;
@@ -1566,7 +1572,8 @@ static int number_mpfr_polygamma_order_mut(mpfr_t value, unsigned int order)
     }
 
     if (!converged) {
-        mpfr_clears(y, inv, inv2, power, term, sum, asymp, fact, (mpfr_ptr)0);
+        mpfr_clears(y, inv, inv2, power, term, sum, asymp, fact, coefficient, (mpfr_ptr)0);
+        mpfr_clears(factorial_bound, power_bound, bound, (mpfr_ptr)0);
         return -1;
     }
 
@@ -1574,7 +1581,8 @@ static int number_mpfr_polygamma_order_mut(mpfr_t value, unsigned int order)
         mpfr_neg(asymp, asymp, MPFR_RNDN);
     mpfr_add(sum, sum, asymp, MPFR_RNDN);
     mpfr_set(value, sum, MPFR_RNDN);
-    mpfr_clears(y, inv, inv2, power, term, sum, asymp, fact, (mpfr_ptr)0);
+    mpfr_clears(y, inv, inv2, power, term, sum, asymp, fact, coefficient, (mpfr_ptr)0);
+    mpfr_clears(factorial_bound, power_bound, bound, (mpfr_ptr)0);
     return 0;
 }
 
@@ -1584,7 +1592,7 @@ static int number_mpc_polygamma_order(mpc_ptr out, mpc_srcptr z, unsigned int or
     mpfr_prec_t work_prec;
     unsigned long shift_target;
     mpc_t y, inv, inv2, power, term, sum, asymp;
-    mpfr_t fact, coeff, radius2;
+    mpfr_t fact, coeff, radius2, factorial_bound, power_bound, bound;
     size_t n;
     bool converged = false;
     int rc = 0;
@@ -1606,6 +1614,7 @@ static int number_mpc_polygamma_order(mpc_ptr out, mpc_srcptr z, unsigned int or
     mpfr_init2(fact, work_prec);
     mpfr_init2(coeff, work_prec);
     mpfr_init2(radius2, work_prec);
+    mpfr_inits2(64, factorial_bound, power_bound, bound, (mpfr_ptr)0);
 
     mpc_set(y, z, MPC_RNDNN);
     mpc_set_ui(sum, 0u, MPC_RNDNN);
@@ -1640,6 +1649,10 @@ static int number_mpc_polygamma_order(mpc_ptr out, mpc_srcptr z, unsigned int or
 
     mpc_mul(power, power, inv, MPC_RNDNN);
     for (n = 1u; n <= number_bernoulli_term_budget(target_prec); ++n) {
+        number_mpc_abs_upper(power_bound, power);
+        mpfr_prec_t coefficient_precision = number_polygamma_coefficient_precision(
+            factorial_bound, bound, power_bound, n, order, work_prec);
+        if (mpfr_get_prec(coeff) != coefficient_precision) mpfr_set_prec(coeff, coefficient_precision);
         if (number_coefficient_bernoulli(coeff, n) != 0) {
             rc = -1;
             break;
@@ -1665,6 +1678,7 @@ static int number_mpc_polygamma_order(mpc_ptr out, mpc_srcptr z, unsigned int or
     }
 
     mpfr_clear(radius2);
+    mpfr_clears(factorial_bound, power_bound, bound, (mpfr_ptr)0);
     mpfr_clear(coeff);
     mpfr_clear(fact);
     mpc_clear(asymp);
@@ -1693,7 +1707,7 @@ static int number_mpc_digamma_positive(mpc_ptr out, mpc_srcptr z, mpc_rnd_t rnd)
     mpfr_prec_t work_prec = target_prec + NUMBER_POLYGAMMA_GUARD_BITS;
     unsigned long shift_target = number_polygamma_shift_target(target_prec);
     mpc_t y, inv, inv2, power, term, sum;
-    mpfr_t coeff, radius2;
+    mpfr_t coeff, radius2, factorial_bound, power_bound, bound;
     bool converged = false;
     int rc = 0;
 
@@ -1705,6 +1719,7 @@ static int number_mpc_digamma_positive(mpc_ptr out, mpc_srcptr z, mpc_rnd_t rnd)
     mpc_init2(sum, work_prec);
     mpfr_init2(coeff, work_prec);
     mpfr_init2(radius2, work_prec);
+    mpfr_inits2(64, factorial_bound, power_bound, bound, (mpfr_ptr)0);
 
     mpc_set(y, z, MPC_RNDNN);
     mpc_set_ui(sum, 0u, MPC_RNDNN);
@@ -1726,6 +1741,10 @@ static int number_mpc_digamma_positive(mpc_ptr out, mpc_srcptr z, mpc_rnd_t rnd)
     mpc_set(power, inv2, MPC_RNDNN);
 
     for (size_t n = 1u; n <= number_bernoulli_term_budget(target_prec); ++n) {
+        number_mpc_abs_upper(power_bound, power);
+        mpfr_prec_t coefficient_precision = number_polygamma_coefficient_precision(
+            factorial_bound, bound, power_bound, n, 0u, work_prec);
+        if (mpfr_get_prec(coeff) != coefficient_precision) mpfr_set_prec(coeff, coefficient_precision);
         if (number_coefficient_bernoulli(coeff, n) != 0) {
             rc = -1;
             break;
@@ -1746,6 +1765,7 @@ static int number_mpc_digamma_positive(mpc_ptr out, mpc_srcptr z, mpc_rnd_t rnd)
         mpc_set(out, sum, rnd);
 
     mpfr_clear(radius2);
+    mpfr_clears(factorial_bound, power_bound, bound, (mpfr_ptr)0);
     mpfr_clear(coeff);
     mpc_clear(sum);
     mpc_clear(term);
@@ -1806,7 +1826,7 @@ static unsigned long number_zeta_sum_terms(mpfr_prec_t precision, mpc_srcptr arg
     return accuracy > oscillation ? accuracy : oscillation;
 }
 
-static int number_mpc_zeta_euler_maclaurin(mpc_ptr out, mpc_srcptr s, bool want_derivative, mpc_rnd_t rnd)
+static int number_mpc_zeta_pair(mpc_ptr out, mpc_ptr slope, mpc_srcptr s, mpc_rnd_t rnd)
 {
     mpfr_prec_t target = mpc_get_prec(out), work = target + 128;
     unsigned long count = number_zeta_sum_terms(target, s);
@@ -1815,13 +1835,26 @@ static int number_mpc_zeta_euler_maclaurin(mpc_ptr out, mpc_srcptr s, bool want_
     mpc_init2(derivative, work);
     mpc_init2(endpoint, work);
     mpc_set_ui(endpoint, count, MPC_RNDNN);
-    number_zeta_finite_sum(sum, want_derivative ? derivative : NULL, s, count);
-    int status = number_zeta_tail(sum, want_derivative ? derivative : NULL, s, endpoint, target,
+    number_zeta_finite_sum(sum, slope ? derivative : NULL, s, count);
+    int status = number_zeta_tail(sum, slope ? derivative : NULL, s, endpoint, target,
                                   number_bernoulli_term_budget(target), NUMBER_POLYGAMMA_TERM_GUARD_BITS);
-    if (!status) mpc_set(out, want_derivative ? derivative : sum, rnd);
+    if (!status) {
+        mpc_set(out, sum, rnd);
+        if (slope) mpc_set(slope, derivative, rnd);
+    }
     mpc_clear(endpoint);
     mpc_clear(derivative);
     mpc_clear(sum);
+    return status;
+}
+
+static int number_mpc_zeta_euler_maclaurin(mpc_ptr out, mpc_srcptr s, bool want_derivative, mpc_rnd_t rnd)
+{
+    mpc_t value, slope;
+    mpc_init2(value, mpc_get_prec(out)); mpc_init2(slope, mpc_get_prec(out));
+    int status = number_mpc_zeta_pair(value, want_derivative ? slope : NULL, s, rnd);
+    if (!status) mpc_set(out, want_derivative ? slope : value, rnd);
+    mpc_clear(slope); mpc_clear(value);
     return status;
 }
 
@@ -1845,9 +1878,14 @@ static int number_mpc_zetah_euler_maclaurin(mpc_ptr out, mpc_srcptr s, mpc_srcpt
     mpc_init2(term, work); mpc_init2(temporary, work); mpc_init2(endpoint, work);
     mpc_set_ui(sum, 0u, MPC_RNDNN);
     mpc_set_ui(derivative, 0u, MPC_RNDNN);
-    /* At small precisions and integral orders, direct terms avoid the guarded cache's extra setup cost. */
-    bool reuse = target >= 1024 && !(mpfr_zero_p(mpc_imagref(s)) && mpfr_integer_p(mpc_realref(s)));
-    for (unsigned long n = 0ul; n < count; ++n) {
+    /* Value-only integral orders retain direct powers. The block recurrence differentiates rising factorials
+     * without division, so derivative blocks also remain valid when an integral order makes a factor zero. */
+    bool integral = mpfr_zero_p(mpc_imagref(s)) && mpfr_integer_p(mpc_realref(s));
+    bool reuse = (integral && !want_derivative && mpfr_fits_slong_p(mpc_realref(s), MPFR_RNDN)) ||
+                 (target >= 1024 && !integral);
+    bool blocked = (!integral || want_derivative) &&
+        number_zeta_shifted_sum(sum, want_derivative ? derivative : NULL, s, a, count);
+    for (unsigned long n = 0ul; !blocked && n < count; ++n) {
         if (reuse) number_dirichlet_power(term, a, s, n);
         else {
             number_zeta_logarithm(logarithm, a, n);
@@ -1886,16 +1924,9 @@ static int number_mpfr_zeta_mut(mpfr_t value)
     if (mpfr_get_prec(value) >= 1024 && mpfr_get_prec(value) <= 8192 &&
         mpfr_number_p(value) && mpfr_sgn(value) > 0 &&
         mpfr_cmp_ui(value, 64u) <= 0 && !mpfr_integer_p(value)) {
-        mpc_t input, result;
-        mpc_init2(input, mpfr_get_prec(value));
-        mpc_init2(result, mpfr_get_prec(value));
-        mpc_set_fr(input, value, MPC_RNDNN);
-        int status = number_mpc_zeta_euler_maclaurin(result, input, false, MPC_RNDNN);
-        if (!status && mpfr_number_p(mpc_realref(result)) && mpfr_zero_p(mpc_imagref(result)))
-            mpfr_set(value, mpc_realref(result), MPFR_RNDN);
-        else status = -1;
-        mpc_clear(input);
-        mpc_clear(result);
+        mpfr_prec_t target = mpfr_get_prec(value);
+        int status = number_zeta_real(value, NULL, value, NULL, number_bernoulli_term_budget(target),
+                                      NUMBER_POLYGAMMA_TERM_GUARD_BITS);
         if (!status) return 0;
     }
     mpfr_zeta(value, value, MPFR_RNDN);
@@ -1905,24 +1936,27 @@ static int number_mpfr_zeta_mut(mpfr_t value)
 static int number_mpfr_zetap_mut(mpfr_t value)
 {
     mpfr_prec_t precision = mpfr_get_prec(value);
-    mpc_t in;
-    mpc_t out;
-    int rc;
-
-    mpc_init2(in, precision);
-    mpc_init2(out, precision);
-    mpc_set_fr(in, value, MPC_RNDNN);
-    rc = number_mpc_zetap_mut(out, in, MPC_RNDNN);
-    if (rc == 0)
-        mpfr_set(value, mpc_realref(out), MPFR_RNDN);
-    mpc_clear(out);
-    mpc_clear(in);
+    mpfr_t sum, slope;
+    mpfr_inits2(precision, sum, slope, (mpfr_ptr)0);
+    int rc = number_zeta_real(sum, slope, value, NULL, number_bernoulli_term_budget(precision),
+                              NUMBER_POLYGAMMA_TERM_GUARD_BITS);
+    if (!rc) mpfr_set(value, slope, MPFR_RNDN);
+    mpfr_clears(sum, slope, (mpfr_ptr)0);
     return rc;
 }
 
 static int number_mpfr_zetah_common_mut(mpfr_t s, const mpfr_t a, bool want_derivative)
 {
     mpfr_prec_t precision = mpfr_get_prec(s);
+    if (mpfr_number_p(a) && mpfr_sgn(a) > 0) {
+        mpfr_t sum, slope;
+        mpfr_inits2(precision, sum, slope, (mpfr_ptr)0);
+        int status = number_zeta_real(sum, want_derivative ? slope : NULL, s, a,
+                                      number_bernoulli_term_budget(precision), NUMBER_POLYGAMMA_TERM_GUARD_BITS);
+        if (!status) mpfr_set(s, want_derivative ? slope : sum, MPFR_RNDN);
+        mpfr_clears(sum, slope, (mpfr_ptr)0);
+        return status;
+    }
     mpc_t complex_s;
     mpc_t complex_a;
     mpc_t out;
@@ -5001,6 +5035,46 @@ number_t num_zeta(const number_t number)
 
     return number_apply_nonreal_complex_unary_or_dispatch(number, number_double_zeta, qf_zeta, qc_zeta,
                                                           number_mpfr_zeta_mut, number_mpc_zeta_mut);
+}
+
+/* Share the finite sum and analytic Euler–Maclaurin recurrence between zeta and its derivative. */
+number_t num_zeta_pair(const number_t number, number_t *derivative)
+{
+    if (!derivative) return num_zeta(number);
+    *derivative = NUM_NAN;
+    number_math_family_t family = number_math_family_value(&number);
+    if (!num_is_finite(number) || family < NUMBER_MATH_MPFR) {
+        *derivative = num_zetap(number);
+        return num_zeta(number);
+    }
+    size_t bits = num_get_prec_bits(number);
+    if (!bits) bits = num_get_default_prec_bits();
+    number_t value = NUM_NAN;
+    if (family == NUMBER_MATH_MPFR) {
+        number_t *input = number_coerce(&number, NUMBER_MPFR);
+        mpfr_t sum, slope;
+        mpfr_inits2(bits, sum, slope, (mpfr_ptr)0);
+        int status = input ? number_zeta_real(sum, slope, number_impl_const(input)->value.mpfr->value,
+            NULL, number_bernoulli_term_budget(bits), NUMBER_POLYGAMMA_TERM_GUARD_BITS) : -1;
+        if (!status) {
+            value = number_take(number_wrap_mpfr(number_mpfr_from_mpfr(sum, bits)));
+            *derivative = number_take(number_wrap_mpfr(number_mpfr_from_mpfr(slope, bits)));
+        }
+        mpfr_clears(sum, slope, (mpfr_ptr)0);
+        number_box_free(input);
+    } else {
+        number_t *input = number_coerce(&number, NUMBER_COMPLEX);
+        mpc_t argument, sum, slope;
+        mpc_init2(argument, bits); mpc_init2(sum, bits); mpc_init2(slope, bits);
+        if (input && !number_complex_get_mpc(argument, number_impl_const(input)->value.cx, bits) &&
+            !number_mpc_zeta_pair(sum, slope, argument, MPC_RNDNN)) {
+            value = number_take_mpc_complex_result(sum, bits);
+            *derivative = number_take_mpc_complex_result(slope, bits);
+        }
+        mpc_clear(slope); mpc_clear(sum); mpc_clear(argument);
+        number_box_free(input);
+    }
+    return value;
 }
 
 /* Evaluate the Hurwitz zeta function while preserving the selected numeric backend. */

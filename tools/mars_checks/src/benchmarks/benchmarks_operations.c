@@ -22,6 +22,15 @@ static qcomplex_t benchmark_c_abs(qcomplex_t a)
     return qc_make(qc_abs(a), QF_ZERO);
 }
 
+/* Measure requesting both outputs through the shared native evaluation. */
+static number_t benchmark_n_zeta_pair(number_t a)
+{
+    number_t derivative;
+    number_t value = num_zeta_pair(a, &derivative);
+    num_destroy(&derivative);
+    return value;
+}
+
 static qcomplex_t benchmark_c_arg(qcomplex_t a)
 {
     return qc_make(qc_arg(a), QF_ZERO);
@@ -734,6 +743,14 @@ static const benchmark_operation_t operations[] = {
      {.n3 = num_lerch_phi},
      {.r3 = qf_lerch_phi}, {.c3 = qc_lerch_phi},
      {"0.3", "2", "1.4"}, 7, false},
+    {"lerch_phi_integer_order", 3,
+     {.n3 = num_lerch_phi},
+     {.r3 = qf_lerch_phi}, {.c3 = qc_lerch_phi},
+     {"0.3125", "-15", "0.375"}, 5, false},
+    {"lerch_phi_negative_order", 3,
+     {.n3 = num_lerch_phi},
+     {.r3 = qf_lerch_phi}, {.c3 = qc_lerch_phi},
+     {"0.3125", "-15", "0.375"}, 7, false},
     {"lg", 1,
      {.n1 = num_lg},
      {.r1 = qf_lg}, {.c1 = qc_lg},
@@ -951,9 +968,17 @@ static const benchmark_operation_t operations[] = {
      {.n2 = num_zatahp},
      {.r2 = qf_zatahp}, {.c2 = qc_zatahp},
      {"2.3", "1.4"}, 3, false},
+    {"zatahp_integral", 2,
+     {.n2 = num_zatahp},
+     {.r2 = qf_zatahp}, {.c2 = qc_zatahp},
+     {"-4", "0.75"}, 2, false},
     {"zeta", 1,
      {.n1 = num_zeta},
      {.r1 = qf_zeta}, {.c1 = qc_zeta},
+     {"2.345"}, 1, false},
+    {"zeta_pair", 1,
+     {.n1 = benchmark_n_zeta_pair},
+     {.r1 = NULL}, {.c1 = NULL},
      {"2.345"}, 1, false},
     {"zetah", 2,
      {.n2 = num_zetah},

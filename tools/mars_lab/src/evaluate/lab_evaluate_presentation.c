@@ -10,6 +10,7 @@
  * server owns transport and deadlines; no browser mathematical parsing is needed.
  */
 #include <ctype.h>
+#include <errno.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -360,6 +361,34 @@ static bool lab_pres_card_markup(json_t *entries, json_t *seen, const json_t *ob
     return ok;
 }
 
+/* Format optional worker timing once, keeping units and numeric policy out of the browser. */
+static bool lab_pres_calculation_time(json_t *metadata, const json_t *fields)
+{
+    const char *text = lab_eval_text(fields, "calculation_time_ns");
+    char *end = NULL;
+    unsigned long long elapsed = 0u;
+    if (*text >= '0' && *text <= '9') {
+        errno = 0;
+        elapsed = strtoull(text, &end, 10);
+        if (errno || !end || *end)
+            end = NULL;
+    }
+    string_t *display = !end ? string_new() : elapsed < 1000u ? string_sprintf("%llu ns", elapsed)
+                         : elapsed < 1000000u ? string_sprintf("%.1f µs", (double)elapsed / 1000.0)
+                         : elapsed < 1000000000u ? string_sprintf("%.1f ms", (double)elapsed / 1000000.0)
+                                                : string_sprintf("%.2f s", (double)elapsed / 1000000000.0);
+    bool ok = display && lab_eval_set(metadata, "calculation_time", string_c_str(display));
+    const json_t *cards = lab_eval_get(metadata, "calculus");
+    static const char *const actions[] = {"derivative", "integral", "plot"};
+    for (size_t i = 0u; ok && i < sizeof actions / sizeof *actions; ++i) {
+        json_t *card = (json_t *)lab_eval_get(cards, actions[i]);
+        if (card)
+            ok = lab_eval_set(card, "calculation_time", string_c_str(display));
+    }
+    string_free(display);
+    return ok;
+}
+
 /* Enrich completed native responses without changing their mathematical representations. */
 bool lab_presentation_adapt(json_t *fields)
 {
@@ -367,7 +396,7 @@ bool lab_presentation_adapt(json_t *fields)
         return false;
     json_t *metadata = json_new_object(), *calculus = json_new_array(), *solutions = json_new_array();
     bool ok = metadata && calculus && solutions &&
-              lab_pres_calculus_cards(metadata, fields, calculus);
+              lab_pres_calculus_cards(metadata, fields, calculus) && lab_pres_calculation_time(metadata, fields);
     const string_t *programme_output = json_string_value(lab_eval_get(fields, "output"));
     if (ok && programme_output) {
         string_t *display = lab_pres_display_numbers(programme_output);

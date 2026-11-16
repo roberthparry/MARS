@@ -73,7 +73,15 @@ bool equ_solution_pairs_text(const struct _expr_function_temporaries_t *plan, co
 
 int equ_set_display_TeX(equation_t *equation, const string_t *lhs, const string_t *rhs);
 const string_t *equ_lhs_display_TeX(const equation_t *equation);
+
+/**
+ * @brief Borrow an equation's optional custom right-side mathematical notation.
+ * @param[in] equation Borrowed equation, not changed; NULL is accepted.
+ * @return Borrowed notation, or NULL when absent. Do not free it; metadata changes or equ_free() invalidate it.
+ * Mutable equation access requires external synchronisation.
+ */
 const string_t *equ_rhs_display_TeX(const equation_t *equation);
+
 const string_t *equ_lhs_display_unbound(const equation_t *equation);
 const string_t *equ_rhs_display_unbound(const equation_t *equation);
 void equ_set_power_series_domain(equation_t *equation, bool power_series);

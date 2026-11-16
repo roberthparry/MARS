@@ -2,7 +2,7 @@
  * @file diffequ_solve_sturm_liouville.c
  * @brief Sturm-Liouville normalisation and recognised bases.
  *
- * Reduces supported second-order equations and constructs factorised, affine or power-law Bessel solution
+ * Reduces supported second-order equations and constructs factorised, affine or scaled/power-law Bessel solution
  * families. The transformation is structural and subject to its coefficient and domain requirements.
  *
  * This is an implementation unit for diffequ_t. Specialised solving paths apply only to recognised
@@ -1018,6 +1018,12 @@ de_attempt_t de_attempt_sturm_liouville(const diffequ_t *de, const expr_t *indep
     solution = de_power_law_bessel_solution(de, independent, dependent, &form);
     if (solution) {
         *solver_out = DE_SOLVER_POWER_LAW_BESSEL;
+        goto make_solution;
+    }
+
+    solution = de_bessel_solution(de, independent, dependent, form.leading, form.first, form.dependent, form.forcing);
+    if (solution) {
+        *solver_out = DE_SOLVER_BESSEL;
         goto make_solution;
     }
 

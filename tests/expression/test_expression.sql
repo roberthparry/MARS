@@ -802,3 +802,20 @@ INSERT INTO test_case_runner(module, source, parent, table_name, operation) VALU
     'expression.test_from_string_unevaluated_integral_check_parse_simplified_expr_1', 'tests/expression/test_expr_from_string.c', 'tests.test_expr_t_from_string.test_from_string_unevaluated_integral', 'expression_cases', 'test_from_string_unevaluated_integral_check_parse_simplified_expr_1')
 ON CONFLICT(module) DO UPDATE SET table_name=excluded.table_name, operation=excluded.operation;
 INSERT OR IGNORE INTO expression_cases(name, operation, input, expected) VALUES ('unevaluated integral explicit bounds simplify structurally', 'test_from_string_unevaluated_integral_check_parse_simplified_expr_1', '{ ∫_1^3 1/t·dt }', '∫^3_1 1/t·dt');
+
+INSERT INTO test_case_runner(module, source, parent, table_name, operation) VALUES (
+    'expression.reciprocal_product_TeX', 'tests/expression/test_expr_to_string.c',
+    'tests.test_expr_t_to_string.test_to_string_all.test_to_string_reciprocal_products_TeX',
+    'expression_cases', 'reciprocal_product_TeX')
+ON CONFLICT(module) DO UPDATE SET table_name=excluded.table_name, operation=excluded.operation;
+
+INSERT OR IGNORE INTO expression_cases(name, operation, input, expected) VALUES
+    ('reciprocal_root_sum_right', 'reciprocal_product_TeX', '(a*cos(t)+b*sin(t))*abs(t)^(-1/2)', '\frac{a\mkern-2mu \cos(t) + b\mkern-2mu \sin(t)}{\sqrt{\left| t \right|}}'),
+    ('reciprocal_root_sum_left', 'reciprocal_product_TeX', 'abs(s)^(-1/2)*(p*cos(s)+q*sin(s))', '\frac{p\mkern-2mu \cos(s) + q\mkern-2mu \sin(s)}{\sqrt{\left| s \right|}}'),
+    ('reciprocal_cube_root', 'reciprocal_product_TeX', '(p+q)*z^(-1/3)', '\frac{p + q}{\sqrt[3]{z}}'),
+    ('reciprocal_square', 'reciprocal_product_TeX', 'v*x^(-2)', '\frac{v}{x^{2}}');
+
+INSERT OR IGNORE INTO expression_cases(name, operation, input, expected) VALUES
+    ('reciprocal_root_multiple_factors', 'reciprocal_product_TeX', '2*(a*cos(t)+b*sin(t))*abs(t)^(-1/2)', '}{\sqrt{\left| t \right|}}'),
+    ('reciprocal_multiple_powers', 'reciprocal_product_TeX', 'a*x^(-1/2)*y^(-1/3)', '}{\sqrt{x}\mkern-2mu \sqrt[3]{y}}'),
+    ('reciprocal_unit_power', 'reciprocal_product_TeX', 'a*x^(-1)', '\frac{a}{x}');

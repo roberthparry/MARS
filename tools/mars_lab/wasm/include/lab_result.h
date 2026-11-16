@@ -68,6 +68,15 @@ void lab_result_presentation_install(jsref caches, jsref data);
 void lab_result_syntax_install(jsref caches, jsref data);
 
 /**
+ * @brief Project the server-formatted calculation duration beside the Value-card title.
+ * @param data Borrowed scoped native response with presentation.calculation_time, a calculus card with
+ * calculation_time, or zero to clear the readout. Missing metadata clears and hides the previous duration.
+ * @return No value. The DOM retains only the supplied text; no handle or response is retained.
+ * This synchronous browser-thread operation performs no calculation or timing of its own.
+ */
+void lab_result_calculation_time(jsref data);
+
+/**
  * @brief Test native permission for an exact display/full-text pair.
  * @param cache Scoped expansions Map from display strings to Maps of full strings and Boolean permissions.
  * @param display Scoped compact-text string used as the outer cache key.

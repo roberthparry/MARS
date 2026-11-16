@@ -915,6 +915,7 @@ define BENCH_DB_HELP
 @printf '  %-30s %s\n' "report [RUN] / update-docs [RUN]" "Print Markdown / refresh marked documentation tables"
 @printf '  %-30s %s\n' "retention / prune" "Show or change retention limits / apply saved limits"
 @echo "  run and stats: --operation NAME, --backend NAME, --bits N."
+@echo "  run also accepts comma-separated operation names and --mode warm|cold|changing."
 @echo "    Backends: number-double, qfloat, qcomplex, mpfr, mpc, exact-integer, exact-fraction."
 @echo "    Unrestricted integer/fraction arithmetic uses exact-integer/exact-fraction with no floating precision."
 @echo "    Precision profiles: 53 (double), 106 (qfloat/qcomplex), 256/512/768/1024/2048/4096 (mpfr/mpc)."

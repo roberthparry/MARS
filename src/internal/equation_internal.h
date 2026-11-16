@@ -277,6 +277,14 @@ void equ_set_fractional_coefficients(equation_t *equation, bool fractional);
 int equ_set_display_TeX(equation_t *equation, const string_t *lhs, const string_t *rhs);
 
 /**
+ * @brief Borrow an equation's optional custom mathematical notation for its right side.
+ * @param[in] equation Borrowed equation, not changed; NULL is accepted.
+ * @return Borrowed notation, or NULL when no override is installed. Do not free it; it remains valid until the
+ * equation's display metadata changes or equ_free() releases the equation. Access mutable equations serially.
+ */
+const string_t *equ_rhs_display_TeX(const equation_t *equation);
+
+/**
  * @brief Attach display-only plain notation; expression and function styles retain the underlying algebra.
  * @param equation Borrowed equation whose native metadata or solution set is inspected or updated as documented.
  * @param lhs Borrowed mathematical side or copied display notation, according to the declared parameter type.

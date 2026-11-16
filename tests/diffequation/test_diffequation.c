@@ -39,6 +39,7 @@
 #include "test_diffequ_interval.h"
 #include "test_diffequ_energy.h"
 #include "test_diffequ_emden.h"
+#include "test_diffequ_bessel.h"
 
 TEST_SUITE_CONFIG(TEST_CONFIG_GLOBAL);
 
@@ -5350,6 +5351,7 @@ int tests_main(void)
     RUN_TEST_CASE(test_diffequ_parses_linear_ode_and_constant);
     RUN_TEST_CASE(test_diffequ_expression_text_round_trips);
     RUN_TEST_CASE(test_diffequ_expression_integer_powers);
+    RUN_TEST_CASE(test_diffequ_solution_notation);
     RUN_TEST_CASE(test_diffequ_autonomous_transport);
     RUN_TEST_CASE(test_diffequ_affine_transport);
     RUN_TEST_CASE(test_diffequ_time_affine_transport);
@@ -5435,6 +5437,7 @@ int tests_main(void)
     RUN_TEST_CASE(test_diffequ_solves_oscillatory_sturm_liouville_problem);
     RUN_TEST_CASE(test_diffequ_normalizes_variable_coefficient_sturm_liouville);
     RUN_TEST_CASE(test_diffequ_solves_power_law_bessel_family);
+    RUN_TEST_CASE(test_diffequ_bessel);
     RUN_TEST_CASE(test_diffequ_solves_forced_power_law_lommel_family);
     RUN_TEST_CASE(test_diffequ_solves_third_order_constant_coefficient_problem);
     RUN_TEST_CASE(test_diffequ_solves_high_order_repeated_root);
@@ -5624,6 +5627,8 @@ int tests_main(void)
                                   "diffequation,readme,output,linearisation");
     TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_diffequation_trajectory, readme_examples,
                                   "diffequation,readme,output,trajectory");
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_diffequation_bessel, readme_examples,
+                                  "diffequation,readme,output,bessel");
 
     return TESTS_EXIT_CODE();
 }

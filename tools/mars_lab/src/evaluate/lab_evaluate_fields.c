@@ -32,6 +32,7 @@ static const field_t field_table[] = {
     {"bound_lower", "bound_lower", false},
     {"bound_upper", "bound_upper", false},
     {"bound_var", "bound_var", false},
+    {"calculation_time_ns", "calculation_time_ns", false},
     {"cols", "cols", false},
     {"complex", "complex", false},
     {"conditioned_expression", "conditioned_expression", true},

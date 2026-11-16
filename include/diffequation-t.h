@@ -232,7 +232,10 @@ typedef enum {
     DE_SOLVER_AUTONOMOUS_ENERGY,
 
     /** Time-translation and scaling reduction of an autonomous modified-Emden equation. */
-    DE_SOLVER_EMDEN_QUADRATURE
+    DE_SOLVER_EMDEN_QUADRATURE,
+
+    /** Ordinary/modified scaled Bessel equations and their Euler and elementary half-order limits. */
+    DE_SOLVER_BESSEL
 } de_solver_t;
 
 /**
