@@ -602,6 +602,7 @@ int tests_main(void)
     test_lab_integer_plot_cases();
     test_lab_numeric_cases();
     test_lab_evaluation_cases();
+    test_lab_weather_cases();
     test_lab_render_job_cases();
     test_lab_diagnostic_cases();
     test_lab_evaluation_extra_cases();

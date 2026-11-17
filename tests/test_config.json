@@ -6113,6 +6113,49 @@
       "test_lab_wasm_math_dependency": true
     }
   },
+  "tools/mars_lab/tests/test_lab_weather.c": {
+    "tests": {
+      "enabled": true,
+      "test_lab_weather_diagnostics": {
+        "enabled": true,
+        "weather_argument": true,
+        "weather_array_success": true,
+        "weather_cancelled": true,
+        "weather_cap": true,
+        "weather_client_unavailable": true,
+        "weather_connection": true,
+        "weather_disabled_key": true,
+        "weather_dns": true,
+        "weather_http_failure": true,
+        "weather_invalid_key": true,
+        "weather_invalid_url": true,
+        "weather_io": true,
+        "weather_limit": true,
+        "weather_malicious_error_code": true,
+        "weather_memory": true,
+        "weather_missing_key": true,
+        "weather_missing_location": true,
+        "weather_missing_town": true,
+        "weather_no_response": true,
+        "weather_protocol": true,
+        "weather_provider_error_in_success": true,
+        "weather_provider_internal": true,
+        "weather_provider_unknown": true,
+        "weather_quota": true,
+        "weather_rate": true,
+        "weather_restriction": true,
+        "weather_subscription": true,
+        "weather_success": true,
+        "weather_timeout": true,
+        "weather_tls": true,
+        "weather_tls_word": true,
+        "weather_unclassified_provider_error": true,
+        "weather_unknown_transport": true,
+        "weather_unreadable_success": true
+      },
+      "test_lab_weather_status_cards": true
+    }
+  },
   "tools/mars_lab/tests/test_lab_wire.c": {
     "tests": {
       "enabled": true,

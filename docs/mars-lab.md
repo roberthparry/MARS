@@ -5194,6 +5194,18 @@ They are displayed as soon as the native datetime helper completes; weather is
 fetched asynchronously and updates its own card afterwards, without delaying
 or replacing those results.
 
+Unavailable weather reports the native failure instead of a single generic
+provider message. The DateTime Weather card distinguishes an invalid or disabled
+key, account quota or access restrictions, DNS and verified-TLS connection
+failures, timeouts, unreadable responses, and missing data for the selected date.
+The Almanac adds the same **Weather status** alongside its estimated or cached
+observing conditions. Recognised [WeatherAPI error codes](https://www.weatherapi.com/docs/error-codes/)
+are included to identify account failures; raw provider messages, transport
+diagnostics, request URLs and API keys are never copied into these statuses.
+The existing shared four-second request deadline is unchanged. Configuration is
+loaded when the native server starts, so a changed key requires restarting the
+server and requesting fresh weather from the corresponding browser address.
+
 Each lookup sends the configured key, selected date, latitude and longitude
 from the local Lab server to WeatherAPI.com over HTTPS. The key is not sent to
 the browser. MARS retains only validated current temperatures in a bounded local

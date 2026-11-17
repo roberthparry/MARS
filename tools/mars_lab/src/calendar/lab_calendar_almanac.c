@@ -369,6 +369,11 @@ static json_t *lab_cal_observer_summary(const json_t *options, const char *town,
             lab_cal_set((json_t *)json_array_get(summary, 1), "jurisdiction_flag", string_c_str(parent));
         string_free(parent);
     }
+    if (*lab_cal_text(options, "weather_status")) {
+        string_t *weather_status = string_new_with(lab_cal_text(options, "weather_status"));
+        lab_cal_summary_cell(summary, "Weather status", weather_status);
+        string_free(weather_status);
+    }
     return summary;
 }
 

@@ -18,6 +18,7 @@
 #include <time.h>
 
 #include "globe-t.h"
+#include "http-t.h"
 #include "lab_calendar.h"
 
 /** @brief Render current setup-origin sky information at a supplied UTC instant for native tests and the header route. */
@@ -148,6 +149,20 @@ json_t *lab_cal_location_fields(const json_t *fields, const json_t *options);
 
 /** @brief Prepare weather cards using a bounded native HTTPS request. */
 json_t *lab_cal_weather(const json_t *options);
+
+/**
+ * @brief Explain a failed weather request using credential-free native messages.
+ * @param client_ready True if the HTTPS client was created successfully.
+ * @param error Transport category from the completed request, distinct from HTTP status.
+ * @param detail Optional borrowed local transport text; inspected only for bounded DNS/TLS classification.
+ * @param status HTTP status, or zero when no response was received.
+ * @param payload Optional borrowed provider object, including error responses.
+ * @return Owned diagnostic released with string_free(), or NULL for a readable successful response or an
+ * allocation failure. Neither raw provider text nor transport text is returned. Inputs remain owned by
+ * their caller and need only survive this synchronous call; no configuration or network access occurs.
+ */
+string_t *lab_cal_weather_failure(bool client_ready, http_error_t error, const string_t *detail, long status,
+                                 const json_t *payload);
 
 /**
  * @brief Prepare approximate observing conditions using optional weather or a seasonal fallback.

@@ -4,8 +4,8 @@
  *
  * Reads the inherited encrypted-configuration snapshot, performs
  * verified HTTPS requests sharing a four-second deadline and emits the browser's
- * weather fields and sections. Provider errors remain an unavailable weather
- * card and never expose the API key in diagnostics. Almanac conditions use UTC
+ * weather fields and sections. Provider errors produce specific, credential-free
+ * weather status messages shared with the Almanac. Almanac conditions use UTC
  * timestamp matching, adjacent-hour interpolation and explicitly labelled fallbacks.
  * Hourly sea-level pressure is converted to estimated observer pressure for refraction;
  * both references remain available for the worksheet and its copied text.
@@ -34,14 +34,17 @@ static void lab_cal_measurement(json_t *fields, const char *key, double value, c
     string_free(text);
 }
 
-static json_t *lab_cal_weather_payload(const json_t *options, const string_t *key, int span, size_t timeout_ms)
+static json_t *lab_cal_weather_payload(const json_t *options, const string_t *key, int span, size_t timeout_ms,
+                                      string_t **failure)
 {
+    *failure = NULL;
     string_t *escaped = http_url_encode(key);
     double latitude, longitude;
     if (!lab_cal_number(lab_cal_text(options, "lat"), &latitude) ||
         !lab_cal_number(lab_cal_text(options, "lon"), &longitude)) {
         string_free(escaped);
-        return json_new_object();
+        *failure = string_new_with("MARS could not read the weather location coordinates.");
+        return NULL;
     }
     const char *endpoint = span < 0 ? "history" : span < 14 ? "forecast" : "future";
     string_t *url = string_sprintf("https://api.weatherapi.com/v1/%s.json?key=%s&q=%.6f,%.6f&dt=%s", endpoint,
@@ -51,14 +54,20 @@ static json_t *lab_cal_weather_payload(const json_t *options, const string_t *ke
     http_client_t *client = http_client_new();
     http_limits_t limits = {.connect_timeout_ms = timeout_ms, .total_timeout_ms = timeout_ms,
                             .max_body_bytes = 2 * 1024 * 1024};
-    http_client_set_limits(client, &limits);
     http_request_t *request = http_request_new(HTTP_GET, url);
     string_t *accept = string_new_with("Accept"), *json = string_new_with("application/json");
     string_t *agent = string_new_with("User-Agent"), *agent_value = string_new_with("MARS-Lab/1.0");
-    http_request_set_header(request, accept, json);
-    http_request_set_header(request, agent, agent_value);
-    http_response_t *response = http_client_send(client, request);
-    json_t *payload = http_response_ok(response) ? http_response_json(response) : NULL;
+    bool ready = escaped && url && client && request && accept && json && agent && agent_value &&
+                 http_client_set_limits(client, &limits) && http_request_set_header(request, accept, json) &&
+                 http_request_set_header(request, agent, agent_value);
+    http_response_t *response = ready ? http_client_send(client, request) : NULL;
+    json_t *payload = http_response_json(response);
+    *failure = lab_cal_weather_failure(client != NULL, ready ? http_client_error(client) : HTTP_ERROR_ARGUMENT,
+                                       http_client_error_text(client), http_response_status(response), payload);
+    if (*failure || !http_response_ok(response) || json_type(payload) != JSON_OBJECT) {
+        json_free(payload);
+        payload = NULL;
+    }
     http_response_free(response);
     http_request_free(request);
     http_client_free(client);
@@ -95,7 +104,7 @@ int lab_cal_weather_day_shift(const json_t *options, const json_t *weather)
 }
 
 static json_t *lab_cal_weather_adjacent(const json_t *options, const string_t *key, int span, int shift,
-                                       size_t timeout_ms)
+                                       size_t timeout_ms, string_t **failure)
 {
     datetime_t *day = datetime_from_string(lab_cal_text(options, "date"));
     if (!day) return NULL;
@@ -108,7 +117,7 @@ static json_t *lab_cal_weather_adjacent(const json_t *options, const string_t *k
     }
     json_t *request = json_clone(options);
     lab_cal_set(request, "date", string_c_str(date));
-    json_t *payload = lab_cal_weather_payload(request, key, span + shift, timeout_ms);
+    json_t *payload = lab_cal_weather_payload(request, key, span + shift, timeout_ms, failure);
     json_free(request);
     string_free(date);
     return payload;
@@ -118,23 +127,27 @@ static json_t *lab_cal_fetch_weather(const json_t *options, const string_t *key,
 {
     struct timespec start = {0}, end = {0};
     bool timed = clock_gettime(CLOCK_MONOTONIC, &start) == 0;
-    json_t *payload = lab_cal_weather_payload(options, key, span, 4000), *adjacent = NULL;
+    string_t *failure = NULL, *adjacent_failure = NULL;
+    json_t *payload = lab_cal_weather_payload(options, key, span, 4000, &failure), *adjacent = NULL;
     int shift = lab_cal_weather_day_shift(options, payload);
     if (shift && timed && clock_gettime(CLOCK_MONOTONIC, &end) == 0) {
         double elapsed = (end.tv_sec - start.tv_sec) * 1000.0 + (end.tv_nsec - start.tv_nsec) / 1000000.0;
         if (elapsed >= 0 && elapsed < 3999)
-            adjacent = lab_cal_weather_adjacent(options, key, span, shift, (size_t)(4000 - elapsed));
+            adjacent = lab_cal_weather_adjacent(options, key, span, shift, (size_t)(4000 - elapsed),
+                                                &adjacent_failure);
     }
     lab_cal_weather_remember(options, payload, time(NULL));
     lab_cal_weather_remember(options, adjacent, time(NULL));
     json_t *fields = json_new_object();
     const json_t *forecast = lab_cal_get(payload, "forecast");
     const json_t *days = lab_cal_get(forecast, "forecastday");
+    bool selected_day = false;
     /* At most fourteen forecast days: a bounded provider array, not a key lookup. */
     for (size_t i = 0; i < json_array_size(days) && i < 14; ++i) {
         const json_t *entry = json_array_get(days, i);
         if (strcmp(lab_cal_text(entry, "date"), lab_cal_text(options, "date")))
             continue;
+        selected_day = true;
         const json_t *day = lab_cal_get(entry, "day");
         double minimum, maximum, value;
         if (!lab_cal_provider_number(day, "mintemp_c", &minimum) ||
@@ -155,6 +168,12 @@ static json_t *lab_cal_fetch_weather(const json_t *options, const string_t *key,
         string_free(summary);
         break;
     }
+    if (failure || adjacent_failure)
+        lab_cal_set(fields, "weather_status", string_c_str(failure ? failure : adjacent_failure));
+    else if (!*lab_cal_text(fields, "weather_min_c") || !*lab_cal_text(fields, "weather_max_c"))
+        lab_cal_set(fields, "weather_status", selected_day ?
+            "WeatherAPI returned no usable minimum and maximum temperatures for the selected date." :
+            "WeatherAPI returned no forecast for the selected date; check the date and account's weather access.");
     if (*lab_cal_text(options, "observing_conditions")) {
         json_t *conditions = json_clone(options);
         lab_cal_observing_conditions(conditions, adjacent ? adjacent : payload);
@@ -162,6 +181,8 @@ static json_t *lab_cal_fetch_weather(const json_t *options, const string_t *key,
     }
     json_free(payload);
     json_free(adjacent);
+    string_free(failure);
+    string_free(adjacent_failure);
     return fields;
 }
 
@@ -189,7 +210,10 @@ json_t *lab_cal_weather(const json_t *options)
     json_t *fields = reason ? json_new_object() : lab_cal_fetch_weather(options, key, (int)span);
     bool available = *lab_cal_text(fields, "weather_min_c") && *lab_cal_text(fields, "weather_max_c");
     if (!available && !reason)
-        reason = "The weather provider did not return data.";
+        reason = *lab_cal_text(fields, "weather_status") ? lab_cal_text(fields, "weather_status") :
+                 "WeatherAPI returned no usable weather data.";
+    if (!available && !*lab_cal_text(fields, "weather_status"))
+        lab_cal_set(fields, "weather_status", reason);
     string_free(key);
     json_t *response = json_new_object(), *sections = json_new_array(), *rows = json_new_array();
     lab_cal_take(response, "ok", json_new_bool(true));
@@ -226,6 +250,7 @@ void lab_cal_atmosphere(json_t *options)
 {
     lab_cal_set(options, "observing_conditions", "yes");
     json_t *weather = lab_cal_weather(options);
+    lab_cal_set(options, "weather_status", lab_cal_text(lab_cal_get(weather, "fields"), "weather_status"));
     const json_t *conditions = lab_cal_get(lab_cal_get(weather, "fields"), "observing_conditions");
     if (conditions) {
         static const char *keys[] = {"temperature_c", "pressure_hpa", "pressure_msl_hpa",

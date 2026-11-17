@@ -171,3 +171,44 @@ INSERT OR IGNORE INTO mars_lab_cases(name, operation, input, expected) VALUES
     ('equation_unwrapped_inverse_plot', 'equation_parameters',
      '{"expression":"x=-(2*atanh(sqrt(C+2*exp(y))/sqrt(C)))/sqrt(C)+D","wrt":"x","action":"plot","plot_source_mode":"equation","precision":40}',
      '{"status":"200","parameters":{"C":"-1","D":"1"},"plot_marker":"data-series","bindings":{"x":"variable","y":"variable","C":"constant","D":"constant"}}');
+
+-- Weather failures retain actionable status without publishing raw provider or transport text.
+INSERT INTO test_case_runner(module, source, parent, table_name, operation) VALUES (
+    'mars_lab.weather_diagnostics', 'tools/mars_lab/tests/test_lab_weather.c',
+    'tests.test_lab_weather_diagnostics', 'mars_lab_cases', 'weather_diagnostic')
+ON CONFLICT(module) DO UPDATE SET table_name=excluded.table_name, operation=excluded.operation;
+INSERT OR IGNORE INTO mars_lab_cases(name, operation, input, expected) VALUES
+    ('weather_client_unavailable', 'weather_diagnostic', '{"client":false,"error":0,"status":0,"payload":{}}', 'MARS could not initialise its HTTPS client; check the installed libcurl runtime.'),
+    ('weather_argument', 'weather_diagnostic', '{"client":true,"error":1,"status":0,"payload":{},"detail":"fixture-weather-key https://example.invalid/private"}', 'MARS could not prepare the weather request.'),
+    ('weather_memory', 'weather_diagnostic', '{"client":true,"error":2,"status":0,"payload":{},"detail":"fixture-weather-key https://example.invalid/private"}', 'MARS could not allocate memory for the weather request.'),
+    ('weather_connection', 'weather_diagnostic', '{"client":true,"error":3,"status":0,"payload":{},"detail":"fixture-weather-key https://example.invalid/private"}', 'MARS could not connect to WeatherAPI; check the network connection.'),
+    ('weather_timeout', 'weather_diagnostic', '{"client":true,"error":4,"status":0,"payload":{},"detail":"fixture-weather-key https://example.invalid/private"}', 'The WeatherAPI request timed out; try again.'),
+    ('weather_limit', 'weather_diagnostic', '{"client":true,"error":5,"status":0,"payload":{},"detail":"fixture-weather-key https://example.invalid/private"}', 'The WeatherAPI response exceeded MARS''s supported size limit.'),
+    ('weather_cancelled', 'weather_diagnostic', '{"client":true,"error":6,"status":0,"payload":{},"detail":"fixture-weather-key https://example.invalid/private"}', 'The weather request was cancelled.'),
+    ('weather_io', 'weather_diagnostic', '{"client":true,"error":7,"status":0,"payload":{},"detail":"fixture-weather-key https://example.invalid/private"}', 'MARS could not read the weather response.'),
+    ('weather_protocol', 'weather_diagnostic', '{"client":true,"error":8,"status":0,"payload":{},"detail":"fixture-weather-key https://example.invalid/private"}', 'The WeatherAPI connection used an unsupported protocol.'),
+    ('weather_unknown_transport', 'weather_diagnostic', '{"client":true,"error":99,"status":0,"payload":{},"detail":"fixture-weather-key https://example.invalid/private"}', 'The weather request did not complete.'),
+    ('weather_dns', 'weather_diagnostic', '{"client":true,"error":3,"status":0,"payload":{},"detail":"Couldn''t resolve host name; fixture-weather-key"}', 'MARS could not resolve api.weatherapi.com; check DNS and the network connection.'),
+    ('weather_tls', 'weather_diagnostic', '{"client":true,"error":3,"status":0,"payload":{},"detail":"SSL peer certificate was not OK; fixture-weather-key"}', 'MARS could not verify the HTTPS connection to WeatherAPI; check the system clock and CA certificates.'),
+    ('weather_tls_word', 'weather_diagnostic', '{"client":true,"error":3,"status":0,"payload":{},"detail":"TLS handshake failed; fixture-weather-key"}', 'MARS could not verify the HTTPS connection to WeatherAPI; check the system clock and CA certificates.'),
+    ('weather_missing_key', 'weather_diagnostic', '{"client":true,"error":0,"status":403,"payload":{"error":{"code":1002,"message":"fixture-weather-key https://example.invalid/private"}}}', 'WeatherAPI did not receive an API key (error 1002).'),
+    ('weather_missing_location', 'weather_diagnostic', '{"client":true,"error":0,"status":403,"payload":{"error":{"code":1003,"message":"fixture-weather-key https://example.invalid/private"}}}', 'WeatherAPI did not receive a location (error 1003).'),
+    ('weather_invalid_url', 'weather_diagnostic', '{"client":true,"error":0,"status":403,"payload":{"error":{"code":1005,"message":"fixture-weather-key https://example.invalid/private"}}}', 'WeatherAPI rejected the request URL (error 1005).'),
+    ('weather_missing_town', 'weather_diagnostic', '{"client":true,"error":0,"status":403,"payload":{"error":{"code":1006,"message":"fixture-weather-key https://example.invalid/private"}}}', 'WeatherAPI could not identify the selected location (error 1006).'),
+    ('weather_invalid_key', 'weather_diagnostic', '{"client":true,"error":0,"status":403,"payload":{"error":{"code":2006,"message":"fixture-weather-key https://example.invalid/private"}}}', 'WeatherAPI rejected the configured API key; re-enter it in weather setup (error 2006).'),
+    ('weather_quota', 'weather_diagnostic', '{"client":true,"error":0,"status":403,"payload":{"error":{"code":2007,"message":"fixture-weather-key https://example.invalid/private"}}}', 'WeatherAPI''s monthly request quota has been exceeded (error 2007).'),
+    ('weather_disabled_key', 'weather_diagnostic', '{"client":true,"error":0,"status":403,"payload":{"error":{"code":2008,"message":"fixture-weather-key https://example.invalid/private"}}}', 'The configured WeatherAPI key has been disabled (error 2008).'),
+    ('weather_subscription', 'weather_diagnostic', '{"client":true,"error":0,"status":403,"payload":{"error":{"code":2009,"message":"fixture-weather-key https://example.invalid/private"}}}', 'The WeatherAPI account does not have access to this weather service (error 2009).'),
+    ('weather_restriction', 'weather_diagnostic', '{"client":true,"error":0,"status":403,"payload":{"error":{"code":2010,"message":"fixture-weather-key https://example.invalid/private"}}}', 'WeatherAPI rejected this computer because of the key''s website, app or IP restrictions (error 2010).'),
+    ('weather_cap', 'weather_diagnostic', '{"client":true,"error":0,"status":403,"payload":{"error":{"code":2011,"message":"fixture-weather-key https://example.invalid/private"}}}', 'The WeatherAPI key''s monthly request cap has been reached (error 2011).'),
+    ('weather_rate', 'weather_diagnostic', '{"client":true,"error":0,"status":403,"payload":{"error":{"code":2012,"message":"fixture-weather-key https://example.invalid/private"}}}', 'WeatherAPI is receiving requests too quickly; try again shortly (error 2012).'),
+    ('weather_provider_internal', 'weather_diagnostic', '{"client":true,"error":0,"status":403,"payload":{"error":{"code":9999,"message":"fixture-weather-key https://example.invalid/private"}}}', 'WeatherAPI reported an internal service error (error 9999).'),
+    ('weather_provider_unknown', 'weather_diagnostic', '{"client":true,"error":0,"status":403,"payload":{"error":{"code":2345,"message":"fixture-weather-key"}}}', 'WeatherAPI reported error 2345 (HTTP 403).'),
+    ('weather_provider_error_in_success', 'weather_diagnostic', '{"client":true,"error":0,"status":200,"payload":{"error":{"code":2006,"message":"fixture-weather-key"}}}', 'WeatherAPI rejected the configured API key; re-enter it in weather setup (error 2006).'),
+    ('weather_http_failure', 'weather_diagnostic', '{"client":true,"error":0,"status":503,"payload":{"message":"fixture-weather-key"}}', 'WeatherAPI returned HTTP 503; weather is unavailable.'),
+    ('weather_malicious_error_code', 'weather_diagnostic', '{"client":true,"error":0,"status":401,"payload":{"error":{"code":"fixture-weather-key","message":"fixture-weather-key"}}}', 'WeatherAPI returned HTTP 401; weather is unavailable.'),
+    ('weather_unreadable_success', 'weather_diagnostic', '{"client":true,"error":0,"status":200,"payload":null}', 'WeatherAPI returned a response MARS could not read.'),
+    ('weather_array_success', 'weather_diagnostic', '{"client":true,"error":0,"status":200,"payload":[]}', 'WeatherAPI returned a response MARS could not read.'),
+    ('weather_unclassified_provider_error', 'weather_diagnostic', '{"client":true,"error":0,"status":200,"payload":{"error":{"message":"fixture-weather-key"}}}', 'WeatherAPI returned a response MARS could not read.'),
+    ('weather_no_response', 'weather_diagnostic', '{"client":true,"error":0,"status":0,"payload":null}', 'The weather request did not complete.'),
+    ('weather_success', 'weather_diagnostic', '{"client":true,"error":0,"status":200,"payload":{}}', '');

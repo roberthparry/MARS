@@ -69,6 +69,13 @@ bool test_lab_offshore_database(void);
 /** Register and run mathematical and calendar adapter integration assertions. */
 void test_lab_evaluation_cases(void);
 
+/**
+ * @brief Register offline weather diagnostics, credential-redaction and status-card regressions.
+ * @return No value. The sequential harness owns database-backed inputs; isolated state is released before
+ * return and no network request, user setting, account credential or persistent fixture is retained.
+ */
+void test_lab_weather_cases(void);
+
 /** @brief Run executor-backed renderer and diagnostic regressions sequentially. */
 void test_lab_render_job_cases(void);
 
