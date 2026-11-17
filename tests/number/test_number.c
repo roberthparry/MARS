@@ -70,6 +70,7 @@ int tests_main(void)
     TEST_SECTION("README Output Examples");
     printf(C_YELLOW "\nRunning number README-equivalent examples...\n" C_RESET);
     TEST_RUN_OUTPUT_IN_GROUP_TAGS(run_number_readme_example_tests, readme_examples, "number,readme,output");
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(run_number_readme_appell, readme_examples, "number,readme,output,appell");
     TEST_RUN_OUTPUT_IN_GROUP_TAGS(run_number_readme_mersenne_prime_search, readme_examples,
                                   "number,readme,mersenne,output");
 

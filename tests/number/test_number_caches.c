@@ -3,8 +3,8 @@
  * @brief Stateful checks of private logarithm and Dirichlet-power reuse and directed complex bounds.
  *
  * These number-module white-box fixtures compare cached logarithms with independent MPC evaluations across keys,
- * signed branch-cut zeros, precision changes and uncached indices. Bernoulli prefixes and their precision upgrades
- * are checked against independent MPFR integer-zeta references. Integer logarithms also cover precision reuse,
+ * signed branch-cut zeros, precision changes and uncached indices. Even zeta coefficients and Bernoulli prefixes
+ * are checked against independent MPFR references across precision upgrades. Integer logarithms cover precision reuse,
  * direct calculation beyond the cache limits and invalid input. Concurrent callers exercise copied ownership
  * without running independent test cases or suites in parallel. Ordinary mathematical input cases remain in SQL.
  * Dirichlet powers are checked against higher-precision MPC evaluations across both keys, signed branch-cut zeros,
@@ -15,10 +15,10 @@
 #include <pthread.h>
 
 #include "number-t.h"
-#define MARS_NUMBER_INTERNAL_ACCESS
-#include "number/number_internal.h"
 #include "test_harness.h"
 #include "test_number.h"
+#define MARS_NUMBER_INTERNAL_ACCESS
+#include "number/number_internal.h"
 
 static bool cloned_constant_precision_is_preserved(void)
 {
@@ -107,7 +107,7 @@ static bool cache_power_matches(mpc_srcptr offset, mpc_srcptr exponent, unsigned
     return ok;
 }
 
-/* Check both coefficient forms after prefix extension or precision reuse, without using their production recurrence. */
+/* Check both Bernoulli forms and even zeta after prefix extension, using independent MPFR references. */
 static bool cache_coefficient_matches(unsigned long index, mpfr_prec_t precision)
 {
     mpfr_t value, reference, scale, error, bound;
@@ -124,6 +124,11 @@ static bool cache_coefficient_matches(unsigned long index, mpfr_prec_t precision
     ok = ok && mpfr_number_p(error) && mpfr_lessequal_p(error, bound);
     mpfr_fac_ui(scale, 2ul * index, MPFR_RNDN); mpfr_mul(reference, reference, scale, MPFR_RNDN);
     ok = number_coefficient_bernoulli(value, index) == 0 && ok;
+    mpfr_sub(error, value, reference, MPFR_RNDN); mpfr_abs(error, error, MPFR_RNDU);
+    mpfr_abs(bound, reference, MPFR_RNDD); mpfr_mul_2si(bound, bound, -precision + 4, MPFR_RNDD);
+    ok = ok && mpfr_number_p(error) && mpfr_lessequal_p(error, bound);
+    mpfr_zeta_ui(reference, 2ul * index, MPFR_RNDN);
+    ok = number_coefficient_zeta(value, 2ul * index) == 0 && ok;
     mpfr_sub(error, value, reference, MPFR_RNDN); mpfr_abs(error, error, MPFR_RNDU);
     mpfr_abs(bound, reference, MPFR_RNDD); mpfr_mul_2si(bound, bound, -precision + 4, MPFR_RNDD);
     ok = ok && mpfr_number_p(error) && mpfr_lessequal_p(error, bound);
@@ -191,6 +196,48 @@ void run_number_cache_tests(void)
     const mpfr_prec_t coefficient_bits[] = {128, 128, 256, 16320, 512, 4096, 128, 4096, 256, 128, 2048, 512, 4096};
     for (size_t i = 0; i < sizeof coefficient_indices / sizeof *coefficient_indices; ++i)
         ASSERT_TRUE(cache_coefficient_matches(coefficient_indices[i], coefficient_bits[i]));
+    /* Exact prefix conversion must preserve higher-precision entries and remain valid after growth and upgrades. */
+    ASSERT_FALSE(number_coefficient_zeta_prefix(31, 2048));
+    ASSERT_FALSE(number_coefficient_zeta_prefix(1025, 2048));
+    ASSERT_FALSE(number_coefficient_zeta_prefix(64, 512));
+    ASSERT_TRUE(number_coefficient_zeta_prefix(64, 6144));
+    ASSERT_TRUE(cache_coefficient_matches(3, 16320));
+    ASSERT_TRUE(cache_coefficient_matches(31, 4096));
+    ASSERT_TRUE(cache_coefficient_matches(64, 6144));
+    ASSERT_TRUE(number_coefficient_zeta_prefix(32, 2048));
+    ASSERT_TRUE(number_coefficient_zeta_prefix(96, 8192));
+    ASSERT_TRUE(cache_coefficient_matches(63, 6144));
+    ASSERT_TRUE(cache_coefficient_matches(96, 8192));
+    /* A caller's restricted exponent range must not leave non-finite coefficients in the shared cache. */
+    mpfr_exp_t saved_emax = mpfr_get_emax();
+    mpfr_flags_t saved_flags = mpfr_flags_save();
+    int restricted = mpfr_set_emax(2);
+    bool rejected = !number_coefficient_zeta_prefix(97, 9000);
+    int restored = mpfr_set_emax(saved_emax);
+    mpfr_flags_restore(saved_flags, MPFR_FLAGS_ALL);
+    ASSERT_TRUE(!restricted && !restored && rejected);
+    ASSERT_TRUE(number_coefficient_zeta_prefix(97, 9000));
+    ASSERT_TRUE(cache_coefficient_matches(97, 8192));
+    /* Raw Bernoulli preparation uses its own prefix state and must preserve normalised/zeta entries. */
+    ASSERT_FALSE(number_coefficient_bernoulli_prepare(31, 2048));
+    ASSERT_FALSE(number_coefficient_bernoulli_prepare(1025, 2048));
+    ASSERT_FALSE(number_coefficient_bernoulli_prepare(64, 512));
+    ASSERT_TRUE(number_coefficient_bernoulli_prepare(64, 6144));
+    ASSERT_TRUE(cache_coefficient_matches(3, 16320));
+    ASSERT_TRUE(cache_coefficient_matches(31, 4096));
+    ASSERT_TRUE(cache_coefficient_matches(64, 6144));
+    ASSERT_TRUE(number_coefficient_bernoulli_prepare(32, 2048));
+    ASSERT_TRUE(number_coefficient_bernoulli_prepare(96, 8192));
+    ASSERT_TRUE(cache_coefficient_matches(63, 6144));
+    ASSERT_TRUE(cache_coefficient_matches(96, 8192));
+    saved_flags = mpfr_flags_save();
+    restricted = mpfr_set_emax(2);
+    rejected = !number_coefficient_bernoulli_prepare(97, 9000);
+    restored = mpfr_set_emax(saved_emax);
+    mpfr_flags_restore(saved_flags, MPFR_FLAGS_ALL);
+    ASSERT_TRUE(!restricted && !restored && rejected);
+    ASSERT_TRUE(number_coefficient_bernoulli_prepare(97, 9000));
+    ASSERT_TRUE(cache_coefficient_matches(97, 8192));
     mpc_t offset;
     mpc_t exponent;
     mpc_init2(offset, 512);

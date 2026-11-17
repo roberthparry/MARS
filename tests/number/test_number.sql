@@ -1,5 +1,207 @@
 -- Precision regressions for previously failing or timed-out benchmark functions.
 
+-- Full-width defining-series references exercise product trees and both precision crossovers.
+WITH precisions(digits) AS (VALUES(80),(300),(900),(1234)),
+operations(name) AS (VALUES('bessel_i_reference'),('bessel_j_reference'),
+    ('struve_h_reference'),('struve_l_reference')),
+arguments(name,nu,z) AS (VALUES
+    ('real','2','0.7'),
+    ('zero_order','0','0.75+0.125i'),
+    ('larger_order','5','1.25+0.125i'),
+    ('complex_argument','2','0.7+0.125i'),
+    ('complex_order','0.5+0.125i','1.25-0.125i'),
+    ('negative_bank','0.5','-1.25+0i'),
+    ('negative_order','-0.5','0.75+0.125i'),
+    ('outside_radius','2','7+0.125i'))
+INSERT OR IGNORE INTO number_cases(name,operation,input,expected,precision)
+SELECT 'cylinder_tree_' || operations.name || '_' || arguments.name || '_' || digits,
+       operations.name, nu || ';' || z, '0', digits
+FROM precisions CROSS JOIN operations CROSS JOIN arguments;
+
+WITH precisions(digits) AS (VALUES(80),(300),(900),(1234)), derivative(value) AS (VALUES('0'),('1')),
+arguments(name,mu,nu,z) AS (VALUES
+    ('real','0.5','0.7','1.2'),
+    ('complex','0.5+0.125i','0.7+0.125i','1.2+0.125i'),
+    ('conjugate','0.5-0.125i','0.7-0.125i','1.2-0.125i'),
+    ('negative_bank','0.5','0.7','-1.2+0i'),
+    ('vanishing_leading_derivative','-1','0.7+0.125i','0.75+0.125i'),
+    ('negative_lower','-4.125','0.75','0.7+0.125i'),
+    ('outside_radius','0.5+0.125i','0.7','7+0.125i'))
+INSERT OR IGNORE INTO number_cases(name,operation,input,expected,precision)
+SELECT 'cylinder_tree_lommel_' || name || '_' || value || '_' || digits, 'lommel_reference',
+       mu || ';' || nu || ';' || z || ';' || value, '0', digits
+FROM precisions CROSS JOIN derivative CROSS JOIN arguments;
+
+INSERT OR IGNORE INTO number_cases(name,operation,input,expected,precision) VALUES
+    ('cylinder_tree_alias_real','two_lower_alias','1.25;2.5;-0.5;1','0',1234),
+    ('cylinder_tree_alias_complex','two_lower_alias','1.25+0.125i;2.5-0.125i;0.7+0.125i;0.5+0.125i','0',1234),
+    ('cylinder_tree_alias_zero_weight','two_lower_alias','1.25;2.5;-0.5;0','0',1234),
+    ('cylinder_tree_reject_lower','two_lower_reject','-0.5;1.5;0.25;1','0',1234),
+    ('cylinder_tree_reject_radius','two_lower_reject','1;2;8.125;1','0',1234),
+    ('cylinder_tree_reject_weight','two_lower_reject','1;2;0.25;33','0',1234);
+
+WITH families(value) AS (VALUES(2),(3),(4)), precisions(digits) AS (VALUES(80),(300),(1234)),
+arguments(name,x,y) AS (VALUES('real','0.0625','0.03125'),
+    ('complex','0.0625+0.015625i','0.03125-0.015625i'))
+INSERT OR IGNORE INTO number_cases(name,operation,input,expected,precision)
+SELECT 'appell_family_reduction_' || value || '_' || name || '_' || digits,
+       'appell_family_reduction', value || ';' || x || ';' || y, '0', digits
+FROM families CROSS JOIN precisions CROSS JOIN arguments;
+
+WITH families(value) AS (VALUES(2),(3),(4)),
+arguments(name,x,y) AS (VALUES('real','0.0625','0.03125'),
+    ('complex','0.0625+0.015625i','0.03125-0.015625i'))
+INSERT OR IGNORE INTO number_cases(name,operation,input,expected,precision)
+SELECT 'appell_family_reduction_native_' || value || '_' || name,
+       'appell_family_reduction_native', value || ';' || x || ';' || y, '0', 32
+FROM families CROSS JOIN arguments;
+
+WITH families(value) AS (VALUES(2),(3),(4)), precisions(digits) AS (VALUES(80),(300),(1234)),
+arguments(name, x, y) AS (VALUES
+    ('real','0.0625','0.03125'),
+    ('complex','0.0625+0.015625i','0.03125-0.015625i'),
+    ('conjugate','0.0625-0.015625i','0.03125+0.015625i'),
+    ('negative','-0.125','0.0625'))
+INSERT OR IGNORE INTO number_cases(name,operation,input,expected,precision)
+SELECT 'appell_family_' || value || '_' || name || '_' || digits, 'appell_family',
+       value || ';' || x || ';' || y, '0', digits FROM families CROSS JOIN precisions CROSS JOIN arguments;
+
+WITH families(value) AS (VALUES(2),(3),(4)),
+arguments(name,x,y) AS (VALUES('real','0.0625','0.03125'),('complex','0.0625+0.015625i','0.03125-0.015625i'))
+INSERT OR IGNORE INTO number_cases(name,operation,input,expected,precision)
+SELECT 'appell_family_native_' || value || '_' || name, 'appell_family_native',
+       value || ';' || x || ';' || y, '0', 32 FROM families CROSS JOIN arguments;
+
+WITH families(value) AS (VALUES(2),(3),(4)), precisions(digits) AS (VALUES(80),(300))
+INSERT OR IGNORE INTO number_cases(name,operation,input,expected,precision)
+SELECT 'appell_family_terminate_' || value || '_' || digits, 'appell_family_terminate',
+       value || ';2;3', '0', digits FROM families CROSS JOIN precisions;
+
+INSERT OR IGNORE INTO number_cases(name,operation,input,expected,precision) VALUES
+    ('appell_family_outside_f2','appell_family_reject','2;0.75;0.75','0',80),
+    ('appell_family_outside_f3','appell_family_reject','3;1.125;0.125','0',80),
+    ('appell_family_outside_f4','appell_family_reject','4;0.3;0.3','0',80),
+    ('appell_family_opposing_f3','appell_family','3;0.125;-0.125','0',300);
+
+WITH precisions(digits) AS (VALUES(300),(1234)), powers(value) AS (VALUES(1),(2),(3),(4)),
+cases(name, input, stop) AS (VALUES
+    ('real', '0.5', '96'),
+    ('complex', '0.75+0.125i', '96'),
+    ('conjugate', '0.75-0.125i', '96'),
+    ('near_pole', '0.00000095367431640625+0.00000095367431640625i', '96'),
+    ('imaginary_dominant', '0.125+32i', '96'),
+    ('long', '2.25+0.125i', '714'),
+    ('last_block', '90.25+0.125i', '96'),
+    ('empty', '100+0.125i', '96'))
+INSERT OR IGNORE INTO number_cases(name, operation, input, expected, precision)
+SELECT 'polygamma_blocks_' || name || '_' || powers.value || '_' || digits,
+       'polygamma_blocks', input || ';' || powers.value || ';' || stop, '0', digits
+FROM cases CROSS JOIN powers CROSS JOIN precisions;
+
+INSERT OR IGNORE INTO number_cases(name, operation, input, expected, precision) VALUES
+    ('polygamma_blocks_low_precision', 'polygamma_blocks_reject', '0.5;2;96', '0', 80),
+    ('polygamma_blocks_negative', 'polygamma_blocks_reject', '-0.5;2;96', '0', 300),
+    ('polygamma_blocks_imaginary', 'polygamma_blocks_reject', '0.5i;2;96', '0', 300),
+    ('polygamma_blocks_zero', 'polygamma_blocks_reject', '0;2;96', '0', 300),
+    ('polygamma_blocks_zero_power', 'polygamma_blocks_reject', '0.5;0;96', '0', 300),
+    ('polygamma_blocks_high_power', 'polygamma_blocks_reject', '0.5;5;96', '0', 300),
+    ('polygamma_blocks_zero_limit', 'polygamma_blocks_reject', '0.5;2;0', '0', 300),
+    ('polygamma_blocks_high_limit', 'polygamma_blocks_reject', '0.5;2;65537', '0', 300);
+
+WITH precisions(digits) AS (VALUES(80),(300),(1234)),
+cases(name, input) AS (VALUES
+    ('real', '0.5;1;1;2.5;0.25;0.3125'),
+    ('complex', '0.5+0.125i;1;1;2.5+0.125i;0.2+0.125i;0.3+0.125i'),
+    ('conjugate', '0.5-0.125i;1;1;2.5-0.125i;0.2-0.125i;0.3-0.125i'),
+    ('alternating', '0.5;1;1;2.5;-0.3125;0.25'),
+    ('close', '0.5+0.125i;1;1;2.5+0.125i;0.25+0.125i;0.2509765625+0.125i'),
+    ('eight', '0.5+0.125i;1;1;8.5+0.125i;0.25+0.125i;0.3125+0.0625i'))
+INSERT OR IGNORE INTO number_cases(name, operation, input, expected, precision)
+SELECT 'appell_precision_distinct_' || name || '_' || digits, 'appell_partial_fraction', input, '0', digits
+FROM cases CROSS JOIN precisions;
+
+WITH precisions(digits) AS (VALUES(80),(300),(1234)),
+cases(name, operation, input) AS (VALUES
+    ('appell_precision_equal_real', 'appell_equal', '0.5;0.75;1.25;2.5;0.25;0.25'),
+    ('appell_precision_equal_complex', 'appell_equal',
+        '0.5+0.125i;0.75+0.125i;1.25-0.125i;2.5+0.125i;0.25+0.125i;0.25+0.125i'),
+    ('appell_precision_equal_conjugate', 'appell_equal',
+        '0.5-0.125i;0.75-0.125i;1.25+0.125i;2.5-0.125i;0.25-0.125i;0.25-0.125i'),
+    ('appell_precision_equal_alternating', 'appell_equal', '0.5;0.75;1.25;2.5;-0.3125;-0.3125'),
+    ('appell_precision_equal_negative_complex', 'appell_equal',
+        '0.5+0.125i;0.75+0.125i;1.25-0.125i;2.5+0.125i;-0.25+0.125i;-0.25+0.125i'),
+    ('appell_precision_equal_cancellation', 'appell_equal',
+        '0.5+0.125i;-3+0.125i;3.5-0.125i;2.5+0.125i;0.25+0.125i;0.25+0.125i'),
+    ('appell_precision_equal_zero', 'appell_equal', '0.5;0.75;-0.75;2.5;0.25;0.25'),
+    ('appell_precision_equal_eight', 'appell_equal', '0.5;0.75;1.25;8.5;0.25;0.25'),
+    ('appell_precision_radius_limit', 'appell_reduced', '0.5;2.5;0;2.5;0.4375;0.125'),
+    ('appell_precision_radius_above', 'appell_reduced', '0.5;2.5;0;2.5;0.453125;0.125'),
+    ('appell_precision_parameter_limit', 'appell_reduced', '1;8;0;8;0.3125;0.125'),
+    ('appell_precision_contraction_fallback', 'appell_reduced', '0.5;2.5;0;2.5;0.4;0.4'))
+INSERT OR IGNORE INTO number_cases(name, operation, input, expected, precision)
+SELECT name || '_' || digits, operation, input, '0', digits FROM cases CROSS JOIN precisions;
+
+WITH precisions(name, digits) AS (VALUES('maximum',2465),('above',2490)),
+cases(name, input) AS (VALUES
+    ('real', '0.5;0.75;1.25;2.5;0.25;0.25'),
+    ('complex', '0.5+0.125i;0.75+0.125i;1.25-0.125i;2.5+0.125i;0.25+0.125i;0.25+0.125i'))
+INSERT OR IGNORE INTO number_cases(name, operation, input, expected, precision)
+SELECT 'appell_precision_' || cases.name || '_' || precisions.name, 'appell_equal', input, '0', digits
+FROM cases CROSS JOIN precisions;
+
+WITH precisions(digits) AS (VALUES(80),(300),(1234)),
+cases(name, operation, input) AS (VALUES
+    ('clausen_blocks_real', 'clausen_reference', '0.75'),
+    ('clausen_blocks_real_lower_boundary', 'clausen_reference', '0.125'),
+    ('clausen_blocks_real_upper_boundary', 'clausen_reference', '0.875'),
+    ('clausen_blocks_real_negative', 'clausen_reference', '-0.75'),
+    ('clausen_blocks_complex', 'clausen_reference', '0.75+0.125i'),
+    ('clausen_blocks_conjugate', 'clausen_reference', '0.75-0.125i'),
+    ('clausen_blocks_negative', 'clausen_reference', '-0.75+0.125i'),
+    ('clausen_blocks_lower_boundary', 'clausen_reference', '0.125+0.5i'),
+    ('clausen_blocks_upper_boundary', 'clausen_reference', '0.875+0.5i'),
+    ('clausen_blocks_fallback', 'clausen_reference', '1+0.125i'),
+    ('appell_rising_real', 'appell_reduced', '0.5;2.5;0;2.5;0.25;0.375'),
+    ('appell_rising_complex', 'appell_reduced', '0.5+0.125i;2.5+0.125i;0;2.5+0.125i;0.25+0.125i;0.375'),
+    ('appell_rising_eight', 'appell_reduced', '0.5+0.125i;8.5+0.125i;0;8.5+0.125i;0.25+0.125i;0.375'),
+    ('appell_rising_noncompact', 'appell_reduced', '0.7+0.1i;2.7+0.1i;0;2.7+0.1i;0.25+0.125i;0.375'),
+    ('appell_rising_negative', 'appell_reduced', '-0.5+0.125i;2.5+0.125i;0;2.5+0.125i;0.25+0.125i;0.375'))
+INSERT OR IGNORE INTO number_cases(name, operation, input, expected, precision)
+SELECT name || '_' || digits, operation, input, '0', digits FROM cases CROSS JOIN precisions;
+
+WITH precisions(digits) AS (VALUES(80),(300),(1234)),
+cases(name, input) AS (VALUES
+    ('gamma_split_real', '2.5;1.5'),
+    ('gamma_split_complex', '2.5+0.125i;1.5+0.25i'),
+    ('gamma_split_conjugate', '2.5-0.125i;1.5-0.25i'),
+    ('gamma_split_alternating', '2.5;-1.5+0.25i'),
+    ('gamma_split_order_minimum', '0.125+0.125i;1.5+0.25i'),
+    ('gamma_split_order_below', '0.0625+0.125i;1.5+0.25i'),
+    ('gamma_split_order_maximum', '16+0.125i;7.5+0.125i'),
+    ('gamma_split_order_above', '16.125+0.125i;7.5+0.125i'),
+    ('gamma_split_imaginary_maximum', '2.5+1i;1.5+0.25i'),
+    ('gamma_split_imaginary_above', '2.5+1.125i;1.5+0.25i'),
+    ('gamma_split_argument_maximum', '2.5;8'),
+    ('gamma_split_argument_above', '2.5;8.125'))
+INSERT OR IGNORE INTO number_cases(name, operation, input, expected, precision)
+SELECT name || '_' || digits, 'gamma_lower_reference', input, '0', digits FROM cases CROSS JOIN precisions;
+
+WITH precisions(digits) AS (VALUES(80),(300),(1234)),
+cases(name, input) AS (VALUES
+    ('polylog_blocks_real', '2;0.75'),
+    ('polylog_blocks_negative', '2;-0.75'),
+    ('polylog_blocks_complex', '2;0.5+0.125i'),
+    ('polylog_blocks_conjugate', '2;-0.5-0.125i'),
+    ('polylog_blocks_small', '2;0.0009765625+0.000244140625i'),
+    ('polylog_blocks_near_boundary', '2;0.875+0.125i'),
+    ('polylog_blocks_fallback', '2;0.875+0.25i'),
+    ('polylog_blocks_order_three', '3;0.5+0.125i'),
+    ('polylog_blocks_real_order_three', '3;0.75'),
+    ('polylog_blocks_order_seven', '7;-0.5+0.125i'),
+    ('polylog_blocks_order_limit', '32;0.5+0.125i'))
+INSERT OR IGNORE INTO number_cases(name, operation, input, expected, precision)
+SELECT name || '_' || digits, 'polylog_reference', input, '0', digits FROM cases CROSS JOIN precisions;
+
 WITH precisions(digits) AS (VALUES(300),(1234)), orders(value) AS (VALUES(3),(64),(65))
 INSERT OR IGNORE INTO number_cases(name, operation, input, expected, precision)
 SELECT 'polygamma_half_coefficient_' || orders.value || '_' || digits,
@@ -171,6 +373,73 @@ CREATE TABLE IF NOT EXISTS number_cases (
     enabled INTEGER NOT NULL DEFAULT 1 CHECK (enabled IN (0, 1))
 ) WITHOUT ROWID;
 CREATE INDEX IF NOT EXISTS number_cases_operation ON number_cases(operation, name);
+
+-- Independent full-width references cover both hypergeometric kernels and their ordinary-series fallbacks.
+WITH precisions(digits) AS (VALUES(80),(180),(300),(1234)), cases(name,operation,input) AS (VALUES
+    ('exponential_real','pfq_0f0_reference','0.7'),
+    ('exponential_complex','pfq_0f0_reference','0.7+0.125i'),
+    ('exponential_outside_reduction','pfq_0f0_reference','8.125'),
+    ('binomial_real','pfq_1f0_reference','0.7;0.3'),
+    ('binomial_complex','pfq_1f0_reference','0.7+0.125i;0.3-0.125i'),
+    ('binomial_negative_argument','pfq_1f0_reference','1.25+0.125i;-0.625'),
+    ('kummer_real','pfq_1f1_reference','0.7;2.5;0.3'),
+    ('kummer_complex','pfq_1f1_reference','0.7+0.125i;2.5+0.125i;0.3+0.125i'),
+    ('kummer_real_lower','pfq_1f1_reference','0.7+0.125i;2.5;0.3+0.125i'),
+    ('kummer_conjugate','pfq_1f1_reference','0.7-0.125i;2.5-0.125i;0.3-0.125i'),
+    ('kummer_negative_argument','pfq_1f1_reference','0.7+0.125i;2.5+0.125i;-3+0.125i'),
+    ('kummer_boundary','pfq_1f1_reference','0.125+1i;16+1i;8'),
+    ('kummer_cancellation','pfq_1f1_reference','16+1i;0.125-1i;-8'),
+    ('kummer_outside_argument','pfq_1f1_reference','0.7+0.125i;2.5+0.125i;8.125'),
+    ('kummer_negative_upper','pfq_1f1_reference','-0.25+0.125i;2.5;0.3'),
+    ('kummer_negative_lower','pfq_1f1_reference','0.7;-0.25+0.125i;0.3'),
+    ('kummer_zero_upper','pfq_1f1_reference','0;2.5;0.3'),
+    ('kummer_zero_argument','pfq_1f1_reference','0.7;2.5;0'),
+    ('gauss_real','pfq_2f1_reference','0.7;1.25;2.5;0.3'),
+    ('gauss_complex','pfq_2f1_reference','0.7+0.125i;1.25-0.125i;2.5+0.125i;0.3+0.125i'),
+    ('gauss_split_boundary','pfq_2f1_reference','0.7;1.25;2.5;0.625'),
+    ('gauss_outside_split','pfq_2f1_reference','0.7;1.25;2.5;0.75'),
+    ('bessel_entire','pfq_0f1_reference','1.25+0.125i;0.7-0.125i'),
+    ('balanced_entire','pfq_2f2_reference','0.7+0.125i;1.25;2.5-0.125i;3.5;0.3+0.125i'),
+    ('cubic_balanced','pfq_3f2_reference','0.7;1.25+0.125i;1.5;2.5;3.5-0.125i;0.3'),
+    ('lower_zero_pole','pfq_pole','0.7;0;0.3'),
+    ('lower_negative_pole','pfq_pole','0.7;-2;0.3'))
+INSERT OR IGNORE INTO number_cases(name,operation,input,expected,precision)
+SELECT 'pfq_split_' || name || '_' || digits, operation, input, '0', digits
+FROM precisions CROSS JOIN cases;
+
+INSERT OR IGNORE INTO number_cases(name,operation,input,expected,precision) VALUES
+    ('pfq_split_upper_work_limit','pfq_1f1_reference','0.7+0.125i;2.5+0.125i;0.3+0.125i','0',5000);
+
+-- The split uses a=1/2 and the squared argument; test its working-size and |z|^2=8 boundaries independently.
+WITH precisions(digits) AS (VALUES(150),(180),(300),(1234)), operations(value) AS (VALUES('erf'),('erfc')),
+arguments(name,input) AS (VALUES
+    ('tiny','0.0009765625+0.0009765625i'),
+    ('reflected','-0.75-0.125i'),
+    ('conjugate','0.75-0.125i'),
+    ('imaginary','2.75i'),
+    ('boundary','2+2i'),
+    ('outside','2+2.125i'))
+INSERT OR IGNORE INTO number_cases(name,operation,input,expected,precision)
+SELECT 'error_split_' || value || '_' || name || '_' || digits, value, input, '0', digits
+FROM precisions CROSS JOIN operations CROSS JOIN arguments;
+
+WITH precisions(digits) AS (VALUES(80),(300),(1234)),
+operations(value) AS (VALUES('erfinv_reference'),('erfcinv_reference')),
+arguments(name,input) AS (VALUES('moderate','0.5+0.125i'),('reflected','-0.75+0.125i'),
+    ('endpoint','0.875+0.03125i'),('conjugate','0.5-0.125i'))
+INSERT OR IGNORE INTO number_cases(name,operation,input,expected,precision)
+SELECT 'error_split_' || value || '_' || name || '_' || digits, value, input, '0', digits
+FROM precisions CROSS JOIN operations CROSS JOIN arguments;
+
+WITH precisions(digits) AS (VALUES(80),(300),(1234)), arguments(name,input) AS (VALUES
+    ('real_left','0.3;0.7+0.125i'),
+    ('real_right','0.7+0.125i;0.3'),
+    ('both_real','0.3;-0.7'),
+    ('zero_scalar','0;0.7-0.125i'),
+    ('tiny_component','0.7+1e-200i;-0.3'))
+INSERT OR IGNORE INTO number_cases(name,operation,input,expected,precision)
+SELECT 'guarded_scalar_' || name || '_' || digits, 'guarded_scalar_product', input, '0', digits
+FROM precisions CROSS JOIN arguments;
 
 WITH precisions(digits) AS (VALUES(34),(80),(300),(1234)),
 cases(name, operation, input, expected) AS (VALUES

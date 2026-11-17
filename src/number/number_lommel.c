@@ -4,6 +4,7 @@
  *
  * Implements the defining power series at the participating MPC precision. Terms and their differentiated
  * counterparts share the same recurrence, preserving branch conventions and avoiding finite differences.
+ * Bounded high-precision cases use a checked product tree, including the derivative's linear term weights.
  * Real-only legacy paths remain in number_maths.c; complex double-double adapters round this guarded kernel.
  */
 #include <math.h>
@@ -31,9 +32,10 @@ static int lommel_series(mpc_ptr out, mpc_srcptr mu, mpc_srcptr nu, mpc_srcptr a
     if (!isfinite(magnitude) || magnitude > 1000) { mpc_set_nan(out); return -1; }
     mpfr_prec_t work = target + 96 + (mpfr_prec_t)ceil(3 * magnitude);
     if (work > 65536) { mpc_set_nan(out); return -1; }
-    mpc_t z, square, exponent, nu_square, denominator, term, contribution, sum;
+    mpc_t z, square, exponent, nu_square, denominator, term, contribution, sum, ratio;
     mpc_init2(z, work); mpc_init2(square, work); mpc_init2(exponent, work); mpc_init2(nu_square, work);
     mpc_init2(denominator, work); mpc_init2(term, work); mpc_init2(contribution, work); mpc_init2(sum, work);
+    mpc_init2(ratio, work);
     mpfr_t size, absolute_sum, threshold, tolerance, tail_start;
     mpfr_inits2(work, size, absolute_sum, threshold, tolerance, tail_start, (mpfr_ptr)0);
     mpc_abs(tail_start, nu, MPFR_RNDU);
@@ -64,6 +66,24 @@ static int lommel_series(mpc_ptr out, mpc_srcptr mu, mpc_srcptr nu, mpc_srcptr a
     }
     mpc_pow(term, z, exponent, MPC_RNDNN);
     mpc_div(term, term, denominator, MPC_RNDNN);
+    if (work >= 1024 && work <= 16384) {
+        /* D(k)=4*(k+(mu-nu+1)/2)*(k+(mu+nu+1)/2). The initial term supplies D(0).
+         * Differentiation weights term k by mu+1+2*k; divide the weighted total by z just once. */
+        mpc_sub(contribution, exponent, nu, MPC_RNDNN);
+        mpc_div_2ui(contribution, contribution, 1u, MPC_RNDNN);
+        mpc_add_ui(contribution, contribution, 1u, MPC_RNDNN);
+        mpc_add(denominator, exponent, nu, MPC_RNDNN);
+        mpc_div_2ui(denominator, denominator, 1u, MPC_RNDNN);
+        mpc_add_ui(denominator, denominator, 1u, MPC_RNDNN);
+        mpc_div_2ui(ratio, square, 2u, MPC_RNDNN);
+        mpc_neg(ratio, ratio, MPC_RNDNN);
+        if (number_mpc_two_lower_series(sum, contribution, denominator, ratio, derivative ? exponent : NULL, target)) {
+            mpc_mul(sum, sum, term, MPC_RNDNN);
+            if (derivative) mpc_div(sum, sum, z, MPC_RNDNN);
+            ok = lommel_finite(sum);
+            goto done;
+        }
+    }
     if (derivative) {
         mpc_mul(contribution, term, exponent, MPC_RNDNN);
         mpc_div(contribution, contribution, z, MPC_RNDNN);
@@ -107,7 +127,7 @@ done:
     else mpc_set_nan(out);
     mpfr_clears(size, absolute_sum, threshold, tolerance, tail_start, (mpfr_ptr)0);
     mpc_clear(z); mpc_clear(square); mpc_clear(exponent); mpc_clear(nu_square); mpc_clear(denominator);
-    mpc_clear(term); mpc_clear(contribution); mpc_clear(sum);
+    mpc_clear(term); mpc_clear(contribution); mpc_clear(sum); mpc_clear(ratio);
     return ok ? 0 : -1;
 }
 

@@ -39,14 +39,16 @@ const char *benchmark_protocol_for(const char *mode)
 
 typedef struct {
     const benchmark_operation_t *operation;
-    number_t number[6];
-    qfloat_t real[6];
-    qcomplex_t complex_values[6];
+    number_t number[7];
+    qfloat_t real[7];
+    qcomplex_t complex_values[7];
     volatile double sink;
     bool exact;
     bool integer;
     unsigned bits;
     bool precision_limited;
+    bool fixed_real;
+    bool fixed_complex;
 } benchmark_state_t;
 
 static bool benchmark_now(uint64_t *value)
@@ -88,6 +90,9 @@ static bool benchmark_batch_number(benchmark_state_t *state, unsigned iterations
     else if (op->arity == 6)
         for (unsigned i = 0; i < iterations; ++i)
             output[i] = op->number.n6(a[0], a[1], a[2], a[3], a[4], a[5]);
+    else if (op->arity == 7)
+        for (unsigned i = 0; i < iterations; ++i)
+            output[i] = op->number.n7(a[0], a[1], a[2], a[3], a[4], a[5], a[6]);
     else return false;
     if (!benchmark_now(&end) || end < start) return false;
     bool ok = true;
@@ -124,6 +129,9 @@ static bool benchmark_batch_real(benchmark_state_t *state, unsigned iterations, 
     else if (op->arity == 6)
         for (unsigned i = 0; i < iterations; ++i)
             output[i] = op->real.r6(a[0], a[1], a[2], a[3], a[4], a[5]);
+    else if (op->arity == 7)
+        for (unsigned i = 0; i < iterations; ++i)
+            output[i] = op->real.r7(a[0], a[1], a[2], a[3], a[4], a[5], a[6]);
     else return false;
     if (!benchmark_now(&end) || end < start) return false;
     bool ok = true;
@@ -154,6 +162,9 @@ static bool benchmark_batch_complex(benchmark_state_t *state, unsigned iteration
     else if (op->arity == 6)
         for (unsigned i = 0; i < iterations; ++i)
             output[i] = op->complex_fn.c6(a[0], a[1], a[2], a[3], a[4], a[5]);
+    else if (op->arity == 7)
+        for (unsigned i = 0; i < iterations; ++i)
+            output[i] = op->complex_fn.c7(a[0], a[1], a[2], a[3], a[4], a[5], a[6]);
     else return false;
     if (!benchmark_now(&end) || end < start) return false;
     bool ok = true;
@@ -223,6 +234,16 @@ static bool benchmark_change(benchmark_state_t *state)
     bool ok = true;
     for (unsigned i = 0; i < state->operation->arity; ++i) {
         if (state->operation->complex_mask && !(state->operation->complex_mask & (1u << i))) continue;
+        if (state->fixed_real) {
+            state->real[i] = qf_add(state->real[i], qf_from_double(1.0 / 128));
+            ok = benchmark_real_finite(state->real[i]) && ok;
+            continue;
+        }
+        if (state->fixed_complex) {
+            state->complex_values[i].re = qf_add(state->complex_values[i].re, qf_from_double(1.0 / 128));
+            ok = benchmark_complex_finite(state->complex_values[i]) && ok;
+            continue;
+        }
         number_t next = num_add(state->number[i], step);
         num_destroy(state->number + i);
         state->number[i] = next;
@@ -290,7 +311,7 @@ int benchmark_measure(const string_t *root, int argc, char **argv)
     bool real = !strcmp(backend, "qfloat"), complex_backend = !strcmp(backend, "qcomplex");
     bool exact = benchmark_backend_exact(backend), integer = !strcmp(backend, "exact-integer");
     bool number = !strcmp(backend, "number-double") || !strcmp(backend, "mpfr") || !strcmp(backend, "mpc") || exact;
-    if (changing && (op->integer_only || (strcmp(backend, "mpfr") && strcmp(backend, "mpc")))) return 3;
+    if (changing && (op->integer_only || exact)) return 3;
     if (!real && !complex_backend && !number) return 2;
     if ((op->integer_only && !integer) || (exact && !op->integer_only && argc < 5)) return 3;
     if ((!bits && !exact) || (exact && bits)) return 2;
@@ -301,7 +322,8 @@ int benchmark_measure(const string_t *root, int argc, char **argv)
     struct timespec resolution;
     /* Keep these bounded exact workloads below the library's rational rounding threshold. */
     if (clock_getres(CLOCK_MONOTONIC, &resolution) || num_set_default_prec_bits(bits ? bits : 16384)) return 1;
-    benchmark_state_t state = {.operation = op, .exact = exact, .integer = integer, .bits = bits};
+    benchmark_state_t state = {.operation = op, .exact = exact, .integer = integer, .bits = bits,
+                                .fixed_real = real, .fixed_complex = complex_backend};
     bool ok = benchmark_prepare(&state, backend, bits, argc >= 5 ? argv[4] : NULL);
     bool (*chunk)(benchmark_state_t *, unsigned, uint64_t *) =
         real ? benchmark_batch_real : complex_backend ? benchmark_batch_complex : benchmark_batch_number;

@@ -1648,6 +1648,74 @@ matrix_t *mat_clausen2(const matrix_t *A);
  */
 matrix_t *mat_clausen(unsigned long order, const matrix_t *A);
 
+/**
+ * @brief Evaluate Appell F1 by joint functional calculus of two commuting square matrices.
+ * @param[in] a Scalar hypergeometric parameter, borrowed by value and never consumed.
+ * @param[in] b1 Scalar hypergeometric parameter, borrowed by value and never consumed.
+ * @param[in] b2 Scalar hypergeometric parameter, borrowed by value and never consumed.
+ * @param[in] c Scalar hypergeometric parameter, borrowed by value and never consumed.
+ * @param[in] x Borrowed first square matrix; not modified or consumed.
+ * @param[in] y Borrowed second square matrix of the same shape; not modified or consumed.
+ * @return Owned matrix released with mat_free(), or NULL for invalid shapes, non-commutation, numerical
+ * poles, unsupported convergence or exhausted budgets. Diagonal pairs support numerical and symbolic entries;
+ * other pairs require numerical entries, dimension at most 64 and the supported matrix-norm series region.
+ * Terminating polynomials can extend coverage outside that region. Independent calls retain ordinary
+ * matrix/number context synchronisation; no new shared state or ownership transfer is introduced.
+ */
+matrix_t *mat_appell_F1(number_t a, number_t b1, number_t b2, number_t c, const matrix_t *x, const matrix_t *y);
+
+/**
+ * @brief Evaluate Appell F2 by joint functional calculus of two commuting square matrices.
+ * @param[in] a Scalar hypergeometric parameter, borrowed by value and never consumed.
+ * @param[in] b1 Scalar hypergeometric parameter, borrowed by value and never consumed.
+ * @param[in] b2 Scalar hypergeometric parameter, borrowed by value and never consumed.
+ * @param[in] c1 Scalar hypergeometric parameter, borrowed by value and never consumed.
+ * @param[in] c2 Scalar hypergeometric parameter, borrowed by value and never consumed.
+ * @param[in] x Borrowed first square matrix; not modified or consumed.
+ * @param[in] y Borrowed second square matrix of the same shape; not modified or consumed.
+ * @return Owned matrix released with mat_free(), or NULL for invalid shapes, non-commutation, numerical
+ * poles, unsupported convergence or exhausted budgets. Diagonal pairs support numerical and symbolic entries;
+ * other pairs require numerical entries, dimension at most 64 and the supported matrix-norm series region.
+ * Terminating polynomials can extend coverage outside that region. Independent calls retain ordinary
+ * matrix/number context synchronisation; no new shared state or ownership transfer is introduced.
+ */
+matrix_t *mat_appell_F2(number_t a, number_t b1, number_t b2, number_t c1, number_t c2,
+    const matrix_t *x, const matrix_t *y);
+
+/**
+ * @brief Evaluate Appell F3 by joint functional calculus of two commuting square matrices.
+ * @param[in] a1 Scalar hypergeometric parameter, borrowed by value and never consumed.
+ * @param[in] a2 Scalar hypergeometric parameter, borrowed by value and never consumed.
+ * @param[in] b1 Scalar hypergeometric parameter, borrowed by value and never consumed.
+ * @param[in] b2 Scalar hypergeometric parameter, borrowed by value and never consumed.
+ * @param[in] c Scalar hypergeometric parameter, borrowed by value and never consumed.
+ * @param[in] x Borrowed first square matrix; not modified or consumed.
+ * @param[in] y Borrowed second square matrix of the same shape; not modified or consumed.
+ * @return Owned matrix released with mat_free(), or NULL for invalid shapes, non-commutation, numerical
+ * poles, unsupported convergence or exhausted budgets. Diagonal pairs support numerical and symbolic entries;
+ * other pairs require numerical entries, dimension at most 64 and the supported matrix-norm series region.
+ * Terminating polynomials can extend coverage outside that region. Independent calls retain ordinary
+ * matrix/number context synchronisation; no new shared state or ownership transfer is introduced.
+ */
+matrix_t *mat_appell_F3(number_t a1, number_t a2, number_t b1, number_t b2, number_t c,
+    const matrix_t *x, const matrix_t *y);
+
+/**
+ * @brief Evaluate Appell F4 by joint functional calculus of two commuting square matrices.
+ * @param[in] a Scalar hypergeometric parameter, borrowed by value and never consumed.
+ * @param[in] b Scalar hypergeometric parameter, borrowed by value and never consumed.
+ * @param[in] c1 Scalar hypergeometric parameter, borrowed by value and never consumed.
+ * @param[in] c2 Scalar hypergeometric parameter, borrowed by value and never consumed.
+ * @param[in] x Borrowed first square matrix; not modified or consumed.
+ * @param[in] y Borrowed second square matrix of the same shape; not modified or consumed.
+ * @return Owned matrix released with mat_free(), or NULL for invalid shapes, non-commutation, numerical
+ * poles, unsupported convergence or exhausted budgets. Diagonal pairs support numerical and symbolic entries;
+ * other pairs require numerical entries, dimension at most 64 and the supported matrix-norm series region.
+ * Terminating polynomials can extend coverage outside that region. Independent calls retain ordinary
+ * matrix/number context synchronisation; no new shared state or ownership transfer is introduced.
+ */
+matrix_t *mat_appell_F4(number_t a, number_t b, number_t c1, number_t c2, const matrix_t *x, const matrix_t *y);
+
 /** @brief Return the principal order-one polylogarithm matrix function. */
 matrix_t *mat_polylog1(const matrix_t *A);
 

@@ -34,15 +34,9 @@ enum {
     squared_unary_rule_kind_first = EXPR_PATTERN_UNARY_SIN,
     squared_unary_rule_kind_last = EXPR_PATTERN_UNARY_COTH,
     squared_unary_rule_kind_count = squared_unary_rule_kind_last - squared_unary_rule_kind_first + 1,
-    squared_unary_op_kind_first = EXPR_KIND_SIN,
-    squared_unary_op_kind_last = EXPR_KIND_COTH,
-    squared_unary_op_kind_count = squared_unary_op_kind_last - squared_unary_op_kind_first + 1,
     cubed_unary_rule_kind_first = EXPR_PATTERN_UNARY_SIN,
     cubed_unary_rule_kind_last = EXPR_PATTERN_UNARY_COT,
-    cubed_unary_rule_kind_count = cubed_unary_rule_kind_last - cubed_unary_rule_kind_first + 1,
-    cubed_unary_op_kind_first = EXPR_KIND_SIN,
-    cubed_unary_op_kind_last = EXPR_KIND_COT,
-    cubed_unary_op_kind_count = cubed_unary_op_kind_last - cubed_unary_op_kind_first + 1
+    cubed_unary_rule_kind_count = cubed_unary_rule_kind_last - cubed_unary_rule_kind_first + 1
 };
 
 static expr_t *build_double_angle_squared_raw(const expr_t *u, expr_apply_unary_fn oscillation_fn, bool scaled_first,
@@ -316,45 +310,33 @@ static const cubed_unary_rule_t *find_cubed_unary_rule(expr_pattern_unary_affine
 
 static bool squared_unary_kind_from_op(expr_op_kind_t op_kind, expr_pattern_unary_affine_kind_t *kind_out)
 {
-    static const expr_pattern_unary_affine_kind_t kinds[] = {
-        [EXPR_KIND_SIN - squared_unary_op_kind_first] = EXPR_PATTERN_UNARY_SIN,
-        [EXPR_KIND_COS - squared_unary_op_kind_first] = EXPR_PATTERN_UNARY_COS,
-        [EXPR_KIND_TAN - squared_unary_op_kind_first] = EXPR_PATTERN_UNARY_TAN,
-        [EXPR_KIND_SEC - squared_unary_op_kind_first] = EXPR_PATTERN_UNARY_SEC,
-        [EXPR_KIND_COSEC - squared_unary_op_kind_first] = EXPR_PATTERN_UNARY_COSEC,
-        [EXPR_KIND_COT - squared_unary_op_kind_first] = EXPR_PATTERN_UNARY_COT,
-        [EXPR_KIND_SINH - squared_unary_op_kind_first] = EXPR_PATTERN_UNARY_SINH,
-        [EXPR_KIND_COSH - squared_unary_op_kind_first] = EXPR_PATTERN_UNARY_COSH,
-        [EXPR_KIND_TANH - squared_unary_op_kind_first] = EXPR_PATTERN_UNARY_TANH,
-        [EXPR_KIND_SECH - squared_unary_op_kind_first] = EXPR_PATTERN_UNARY_SECH,
-        [EXPR_KIND_COSECH - squared_unary_op_kind_first] = EXPR_PATTERN_UNARY_COSECH,
-        [EXPR_KIND_COTH - squared_unary_op_kind_first] = EXPR_PATTERN_UNARY_COTH};
-
-    if (!kind_out || (unsigned)op_kind < (unsigned)squared_unary_op_kind_first ||
-        (unsigned)op_kind > (unsigned)squared_unary_op_kind_last) {
+    static const expr_pattern_unary_affine_kind_t kinds[12] = {
+        EXPR_PATTERN_UNARY_SIN, EXPR_PATTERN_UNARY_COS, EXPR_PATTERN_UNARY_TAN,
+        EXPR_PATTERN_UNARY_SEC, EXPR_PATTERN_UNARY_COSEC, EXPR_PATTERN_UNARY_COT,
+        EXPR_PATTERN_UNARY_SINH, EXPR_PATTERN_UNARY_COSH, EXPR_PATTERN_UNARY_TANH,
+        EXPR_PATTERN_UNARY_SECH, EXPR_PATTERN_UNARY_COSECH, EXPR_PATTERN_UNARY_COTH
+    };
+    unsigned slot = expr_trig_slot(op_kind);
+    if (!kind_out || slot >= 12u) {
         return false;
     }
 
-    *kind_out = kinds[op_kind - squared_unary_op_kind_first];
+    *kind_out = kinds[slot];
     return find_squared_unary_rule(*kind_out) != NULL;
 }
 
 static bool cubed_unary_kind_from_op(expr_op_kind_t op_kind, expr_pattern_unary_affine_kind_t *kind_out)
 {
-    static const expr_pattern_unary_affine_kind_t kinds[] = {
-        [EXPR_KIND_SIN - cubed_unary_op_kind_first] = EXPR_PATTERN_UNARY_SIN,
-        [EXPR_KIND_COS - cubed_unary_op_kind_first] = EXPR_PATTERN_UNARY_COS,
-        [EXPR_KIND_TAN - cubed_unary_op_kind_first] = EXPR_PATTERN_UNARY_TAN,
-        [EXPR_KIND_SEC - cubed_unary_op_kind_first] = EXPR_PATTERN_UNARY_SEC,
-        [EXPR_KIND_COSEC - cubed_unary_op_kind_first] = EXPR_PATTERN_UNARY_COSEC,
-        [EXPR_KIND_COT - cubed_unary_op_kind_first] = EXPR_PATTERN_UNARY_COT};
-
-    if (!kind_out || (unsigned)op_kind < (unsigned)cubed_unary_op_kind_first ||
-        (unsigned)op_kind > (unsigned)cubed_unary_op_kind_last) {
+    static const expr_pattern_unary_affine_kind_t kinds[6] = {
+        EXPR_PATTERN_UNARY_SIN, EXPR_PATTERN_UNARY_COS, EXPR_PATTERN_UNARY_TAN,
+        EXPR_PATTERN_UNARY_SEC, EXPR_PATTERN_UNARY_COSEC, EXPR_PATTERN_UNARY_COT
+    };
+    unsigned slot = expr_trig_slot(op_kind);
+    if (!kind_out || slot >= 6u) {
         return false;
     }
 
-    *kind_out = kinds[op_kind - cubed_unary_op_kind_first];
+    *kind_out = kinds[slot];
     return find_cubed_unary_rule(*kind_out) != NULL;
 }
 

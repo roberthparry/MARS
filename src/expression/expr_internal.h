@@ -62,189 +62,201 @@ bool expr_contains_calculus_request(const expr_t *expr);
 
 typedef enum { EXPR_OP_ATOM, EXPR_OP_UNARY, EXPR_OP_BINARY } expr_arity_t;
 
+/**
+ * @brief Native expression operation identifiers in alphabetical order.
+ * @details Dispatch tables use these symbolic identifiers; EXPR_KIND_COUNT remains the final sentinel.
+ */
 typedef enum {
-    EXPR_KIND_CONST,
-    EXPR_KIND_VAR,
-    EXPR_KIND_ADD,
-    EXPR_KIND_SUB,
-    EXPR_KIND_MUL,
-    EXPR_KIND_DIV,
-    EXPR_KIND_POW,
-    EXPR_KIND_POW_D,
-    EXPR_KIND_ATAN2,
-    EXPR_KIND_NEG,
-    EXPR_KIND_SIN,
-    EXPR_KIND_COS,
-    EXPR_KIND_TAN,
-    EXPR_KIND_SEC,
-    EXPR_KIND_COSEC,
-    EXPR_KIND_COT,
-    EXPR_KIND_SINH,
-    EXPR_KIND_COSH,
-    EXPR_KIND_TANH,
-    EXPR_KIND_SECH,
-    EXPR_KIND_COSECH,
-    EXPR_KIND_COTH,
-    EXPR_KIND_ASIN,
-    EXPR_KIND_ACOS,
-    EXPR_KIND_ATAN,
-    EXPR_KIND_ASEC,
-    EXPR_KIND_ACOSEC,
-    EXPR_KIND_ACOT,
-    EXPR_KIND_ASINH,
-    EXPR_KIND_ACOSH,
-    EXPR_KIND_ATANH,
-    EXPR_KIND_ASECH,
-    EXPR_KIND_ACOSECH,
-    EXPR_KIND_ACOTH,
-    EXPR_KIND_EXP,
-    EXPR_KIND_LOG,
-    EXPR_KIND_LOG10,
-    EXPR_KIND_SQRT,
-    EXPR_KIND_CUBRT,
-    EXPR_KIND_ROOT,
-    EXPR_KIND_FLOOR,
-    EXPR_KIND_ROUND,
-    EXPR_KIND_ROUNDN,
-    EXPR_KIND_ROUNDS,
-    EXPR_KIND_CEIL,
-    EXPR_KIND_ABS,
-    EXPR_KIND_CONJ,
-    EXPR_KIND_HYPOT,
-    EXPR_KIND_ERF,
-    EXPR_KIND_ERFC,
-    EXPR_KIND_LGAMMA,
-    EXPR_KIND_ERFINV,
-    EXPR_KIND_ERFCINV,
-    EXPR_KIND_GAMMA,
-    EXPR_KIND_DIGAMMA,
-    EXPR_KIND_QDIGAMMA,
-    EXPR_KIND_TRIGAMMA,
-    EXPR_KIND_ZETA,
-    EXPR_KIND_ZETAP,
-    EXPR_KIND_ZETAH,
-    EXPR_KIND_ZATAHP,
-    EXPR_KIND_GAMMAINV,
-    EXPR_KIND_LAMBERT_W,
-    EXPR_KIND_LAMBERT_WN,
-    EXPR_KIND_LAMBERT_W0,
-    EXPR_KIND_LAMBERT_WM1,
-    EXPR_KIND_NORMAL_PDF,
-    EXPR_KIND_NORMAL_CDF,
-    EXPR_KIND_NORMAL_LOGPDF,
-    EXPR_KIND_EI,
-    EXPR_KIND_LI,
-    EXPR_KIND_E1,
-    EXPR_KIND_DILOG,
-    EXPR_KIND_CLAUSEN2,
-    EXPR_KIND_CLAUSEN,
-    EXPR_KIND_POLYLOG1,
-    EXPR_KIND_POLYLOG,
-    EXPR_KIND_HARMONIC_POLY,
-    EXPR_KIND_CHEBYSHEV_T,
-    EXPR_KIND_CHEBYSHEV_U,
-    EXPR_KIND_HERMITE_H,
-    EXPR_KIND_CONVOLUTION,
-    EXPR_KIND_CAUSAL_CONVOLUTION,
-    EXPR_KIND_LERCH_PHI,
-    EXPR_KIND_LERCH_PHI_PACK,
-    EXPR_KIND_LEGENDRE_CHI,
-    EXPR_KIND_BESSEL_J,
-    EXPR_KIND_BESSEL_Y,
-    EXPR_KIND_BESSEL_K,
-    EXPR_KIND_BESSEL_I,
-    EXPR_KIND_STRUVE_L,
-    EXPR_KIND_STRUVE_H,
-    EXPR_KIND_LOMMEL_S,
-    EXPR_KIND_LOMMEL_S_PACK,
-    EXPR_KIND_APPELL_F1,
-    EXPR_KIND_APPELL_F1_PACK,
-    EXPR_KIND_LAURICELLA_F,
-    EXPR_KIND_HYPERGEOMETRIC_PFQ,
-    EXPR_KIND_HYPERGEOMETRIC_PFQ_PACK,
-    EXPR_KIND_VERSIN,
-    EXPR_KIND_VERCOS,
-    EXPR_KIND_COVERSIN,
-    EXPR_KIND_COVERCOS,
-    EXPR_KIND_HAVERSIN,
-    EXPR_KIND_HAVERCOS,
-    EXPR_KIND_HACOVERSIN,
-    EXPR_KIND_HACOVERCOS,
-    EXPR_KIND_ARCVERSIN,
-    EXPR_KIND_ARCVERCOS,
-    EXPR_KIND_ARCCOVERSIN,
-    EXPR_KIND_ARCCOVERCOS,
-    EXPR_KIND_ARCHAVERSIN,
-    EXPR_KIND_ARCHAVERCOS,
-    EXPR_KIND_ARCHACOVERSIN,
-    EXPR_KIND_ARCHACOVERCOS,
-    EXPR_KIND_BETA,
-    EXPR_KIND_LOGBETA,
-    EXPR_KIND_GAMMAINC_LOWER,
-    EXPR_KIND_GAMMAINC_UPPER,
-    EXPR_KIND_GAMMAINC_P,
-    EXPR_KIND_GAMMAINC_Q,
-    EXPR_KIND_POLYGAMMA,
-    EXPR_KIND_FACTORIAL,
-    EXPR_KIND_FIBONACCI,
-    EXPR_KIND_PARTITION,
-    EXPR_KIND_ISQRT,
-    EXPR_KIND_GCD,
-    EXPR_KIND_LCM,
-    EXPR_KIND_MOD,
-    EXPR_KIND_MODINV,
-    EXPR_KIND_IS_PRIME,
-    EXPR_KIND_NEXT_PRIME,
-    EXPR_KIND_PREV_PRIME,
-    EXPR_KIND_BIT_AND,
-    EXPR_KIND_BIT_OR,
-    EXPR_KIND_BIT_XOR,
-    EXPR_KIND_BIT_NOT,
-    EXPR_KIND_SHL,
-    EXPR_KIND_SHR,
-    EXPR_KIND_FACTORS,
-    EXPR_KIND_INTEGRAL,
-    EXPR_KIND_INTEGRAL_META,
-    EXPR_KIND_INTEGRAL_BOUNDS,
-    EXPR_KIND_INDEXED_SYMBOL,
-    EXPR_KIND_SUMMATION,
-    EXPR_KIND_PRODUCT,
-    EXPR_KIND_FORMAL_DERIVATIVE,
-    EXPR_KIND_ORDERED_DERIVATIVE,
-    EXPR_KIND_ARBITRARY_FUNCTION,
-    EXPR_KIND_LAPLACE,
-    EXPR_KIND_INVERSE_LAPLACE,
-    EXPR_KIND_FOURIER,
-    EXPR_KIND_INVERSE_FOURIER,
-    EXPR_KIND_SGN,
-    EXPR_KIND_STEP,
-    EXPR_KIND_RECT,
-    EXPR_KIND_TRI,
-    EXPR_KIND_CIRC,
-    EXPR_KIND_SINC,
-    EXPR_KIND_DELTA,
-    EXPR_KIND_ANALYTIC_DELTA,
-    EXPR_KIND_PRINCIPAL_VALUE,
-    EXPR_KIND_FINITE_PART,
-    EXPR_KIND_REAL_DOMAIN,
-    EXPR_KIND_NONNEGATIVE_INTEGER,
-    EXPR_KIND_REAL_PARAMETER,
-    EXPR_KIND_REAL_GREATER, /**< Indicator that two finite real operands satisfy strict ordering. */
-    EXPR_KIND_REAL_AT_LEAST, /**< Indicator that two finite real operands satisfy inclusive ordering. */
-    EXPR_KIND_REAL_BOUND,
-    EXPR_KIND_IMAG_COORDINATE,
-    EXPR_KIND_ARGUMENT_LIST,
-    EXPR_KIND_INTEGER_PACK, /**< Private unevaluated integer operand pair. */
-    EXPR_KIND_POWMOD, /**< Exact integer powmod operation. */
-    EXPR_KIND_BIT_LENGTH, /**< Exact integer bit length operation. */
-    EXPR_KIND_SET_BIT, /**< Exact integer set bit operation. */
-    EXPR_KIND_CLEAR_BIT, /**< Exact integer clear bit operation. */
-    EXPR_KIND_TEST_BIT, /**< Exact integer test bit operation. */
-    EXPR_KIND_PROVE_PRIME, /**< Exact integer prove prime operation. */
-    EXPR_KIND_DIVMOD, /**< Exact integer divmod operation. */
-    EXPR_KIND_GCDEXT, /**< Exact integer gcdext operation. */
-    EXPR_KIND_COUNT
+    EXPR_KIND_ABS,                          /**< Native abs expression operation. */
+    EXPR_KIND_ACOS,                         /**< Native acos expression operation. */
+    EXPR_KIND_ACOSEC,                       /**< Native acosec expression operation. */
+    EXPR_KIND_ACOSECH,                      /**< Native acosech expression operation. */
+    EXPR_KIND_ACOSH,                        /**< Native acosh expression operation. */
+    EXPR_KIND_ACOT,                         /**< Native acot expression operation. */
+    EXPR_KIND_ACOTH,                        /**< Native acoth expression operation. */
+    EXPR_KIND_ADD,                          /**< Native add expression operation. */
+    EXPR_KIND_ANALYTIC_DELTA,               /**< Native analytic delta expression operation. */
+    EXPR_KIND_APPELL_F1,                    /**< Appell F₁ application. */
+    EXPR_KIND_APPELL_F2,                    /**< Appell F₂ application. */
+    EXPR_KIND_APPELL_F3,                    /**< Appell F₃ application. */
+    EXPR_KIND_APPELL_F4,                    /**< Appell F₄ application. */
+    EXPR_KIND_ARBITRARY_FUNCTION,           /**< Native arbitrary function expression operation. */
+    EXPR_KIND_ARCCOVERCOS,                  /**< Native arccovercos expression operation. */
+    EXPR_KIND_ARCCOVERSIN,                  /**< Native arccoversin expression operation. */
+    EXPR_KIND_ARCHACOVERCOS,                /**< Native archacovercos expression operation. */
+    EXPR_KIND_ARCHACOVERSIN,                /**< Native archacoversin expression operation. */
+    EXPR_KIND_ARCHAVERCOS,                  /**< Native archavercos expression operation. */
+    EXPR_KIND_ARCHAVERSIN,                  /**< Native archaversin expression operation. */
+    EXPR_KIND_ARCVERCOS,                    /**< Native arcvercos expression operation. */
+    EXPR_KIND_ARCVERSIN,                    /**< Native arcversin expression operation. */
+    EXPR_KIND_ARGUMENT_LIST,                /**< Native argument list expression operation. */
+    EXPR_KIND_ASEC,                         /**< Native asec expression operation. */
+    EXPR_KIND_ASECH,                        /**< Native asech expression operation. */
+    EXPR_KIND_ASIN,                         /**< Native asin expression operation. */
+    EXPR_KIND_ASINH,                        /**< Native asinh expression operation. */
+    EXPR_KIND_ATAN,                         /**< Native atan expression operation. */
+    EXPR_KIND_ATAN2,                        /**< Native atan2 expression operation. */
+    EXPR_KIND_ATANH,                        /**< Native atanh expression operation. */
+    EXPR_KIND_BESSEL_I,                     /**< Native bessel i expression operation. */
+    EXPR_KIND_BESSEL_J,                     /**< Native bessel j expression operation. */
+    EXPR_KIND_BESSEL_K,                     /**< Native bessel k expression operation. */
+    EXPR_KIND_BESSEL_Y,                     /**< Native bessel y expression operation. */
+    EXPR_KIND_BETA,                         /**< Native beta expression operation. */
+    EXPR_KIND_BIT_AND,                      /**< Native bit and expression operation. */
+    EXPR_KIND_BIT_LENGTH,                   /**< Exact integer bit length operation. */
+    EXPR_KIND_BIT_NOT,                      /**< Native bit not expression operation. */
+    EXPR_KIND_BIT_OR,                       /**< Native bit or expression operation. */
+    EXPR_KIND_BIT_XOR,                      /**< Native bit xor expression operation. */
+    EXPR_KIND_CAUSAL_CONVOLUTION,           /**< Native causal convolution expression operation. */
+    EXPR_KIND_CEIL,                         /**< Native ceil expression operation. */
+    EXPR_KIND_CHEBYSHEV_T,                  /**< Native chebyshev t expression operation. */
+    EXPR_KIND_CHEBYSHEV_U,                  /**< Native chebyshev u expression operation. */
+    EXPR_KIND_CIRC,                         /**< Native circ expression operation. */
+    EXPR_KIND_CLAUSEN,                      /**< Native clausen expression operation. */
+    EXPR_KIND_CLAUSEN2,                     /**< Native clausen2 expression operation. */
+    EXPR_KIND_CLEAR_BIT,                    /**< Exact integer clear bit operation. */
+    EXPR_KIND_CONJ,                         /**< Native conj expression operation. */
+    EXPR_KIND_CONST,                        /**< Numerical constant leaf. */
+    EXPR_KIND_CONVOLUTION,                  /**< Native convolution expression operation. */
+    EXPR_KIND_COS,                          /**< Native cos expression operation. */
+    EXPR_KIND_COSEC,                        /**< Native cosec expression operation. */
+    EXPR_KIND_COSECH,                       /**< Native cosech expression operation. */
+    EXPR_KIND_COSH,                         /**< Native cosh expression operation. */
+    EXPR_KIND_COT,                          /**< Native cot expression operation. */
+    EXPR_KIND_COTH,                         /**< Native coth expression operation. */
+    EXPR_KIND_COVERCOS,                     /**< Native covercos expression operation. */
+    EXPR_KIND_COVERSIN,                     /**< Native coversin expression operation. */
+    EXPR_KIND_CUBRT,                        /**< Native cubrt expression operation. */
+    EXPR_KIND_DELTA,                        /**< Native delta expression operation. */
+    EXPR_KIND_DIGAMMA,                      /**< Native digamma expression operation. */
+    EXPR_KIND_DILOG,                        /**< Native dilog expression operation. */
+    EXPR_KIND_DIV,                          /**< Native div expression operation. */
+    EXPR_KIND_DIVMOD,                       /**< Exact integer divmod operation. */
+    EXPR_KIND_E1,                           /**< Native e1 expression operation. */
+    EXPR_KIND_EI,                           /**< Native ei expression operation. */
+    EXPR_KIND_ERF,                          /**< Native erf expression operation. */
+    EXPR_KIND_ERFC,                         /**< Native erfc expression operation. */
+    EXPR_KIND_ERFCINV,                      /**< Native erfcinv expression operation. */
+    EXPR_KIND_ERFINV,                       /**< Native erfinv expression operation. */
+    EXPR_KIND_EXP,                          /**< Native exp expression operation. */
+    EXPR_KIND_FACTORIAL,                    /**< Native factorial expression operation. */
+    EXPR_KIND_FACTORS,                      /**< Native factors expression operation. */
+    EXPR_KIND_FIBONACCI,                    /**< Native fibonacci expression operation. */
+    EXPR_KIND_FINITE_PART,                  /**< Native finite part expression operation. */
+    EXPR_KIND_FLOOR,                        /**< Native floor expression operation. */
+    EXPR_KIND_FORMAL_DERIVATIVE,            /**< Formal derivative with explicit differentiation coordinates. */
+    EXPR_KIND_FOURIER,                      /**< Native fourier expression operation. */
+    EXPR_KIND_GAMMA,                        /**< Native gamma expression operation. */
+    EXPR_KIND_GAMMAINC_LOWER,               /**< Native gammainc lower expression operation. */
+    EXPR_KIND_GAMMAINC_P,                   /**< Native gammainc p expression operation. */
+    EXPR_KIND_GAMMAINC_Q,                   /**< Native gammainc q expression operation. */
+    EXPR_KIND_GAMMAINC_UPPER,               /**< Native gammainc upper expression operation. */
+    EXPR_KIND_GAMMAINV,                     /**< Native gammainv expression operation. */
+    EXPR_KIND_GCD,                          /**< Native gcd expression operation. */
+    EXPR_KIND_GCDEXT,                       /**< Exact integer gcdext operation. */
+    EXPR_KIND_HACOVERCOS,                   /**< Native hacovercos expression operation. */
+    EXPR_KIND_HACOVERSIN,                   /**< Native hacoversin expression operation. */
+    EXPR_KIND_HARMONIC_POLY,                /**< Native harmonic poly expression operation. */
+    EXPR_KIND_HAVERCOS,                     /**< Native havercos expression operation. */
+    EXPR_KIND_HAVERSIN,                     /**< Native haversin expression operation. */
+    EXPR_KIND_HERMITE_H,                    /**< Native hermite h expression operation. */
+    EXPR_KIND_HYPERGEOMETRIC_PFQ,           /**< Native hypergeometric pfq expression operation. */
+    EXPR_KIND_HYPOT,                        /**< Native hypot expression operation. */
+    EXPR_KIND_IMAG_COORDINATE,              /**< Native imag coordinate expression operation. */
+    EXPR_KIND_INDEXED_SYMBOL,               /**< Native indexed symbol expression operation. */
+    EXPR_KIND_INTEGRAL,                     /**< Native integral expression operation. */
+    EXPR_KIND_INTEGRAL_BOUNDS,              /**< Native integral bounds expression operation. */
+    EXPR_KIND_INTEGRAL_META,                /**< Native integral meta expression operation. */
+    EXPR_KIND_INVERSE_FOURIER,              /**< Native inverse fourier expression operation. */
+    EXPR_KIND_INVERSE_LAPLACE,              /**< Native inverse laplace expression operation. */
+    EXPR_KIND_ISQRT,                        /**< Native isqrt expression operation. */
+    EXPR_KIND_IS_PRIME,                     /**< Native is prime expression operation. */
+    EXPR_KIND_LAMBERT_W,                    /**< Native lambert w expression operation. */
+    EXPR_KIND_LAMBERT_W0,                   /**< Native lambert w0 expression operation. */
+    EXPR_KIND_LAMBERT_WM1,                  /**< Native lambert wm1 expression operation. */
+    EXPR_KIND_LAMBERT_WN,                   /**< Native lambert wn expression operation. */
+    EXPR_KIND_LAPLACE,                      /**< Native laplace expression operation. */
+    EXPR_KIND_LAURICELLA_F,                 /**< Native lauricella f expression operation. */
+    EXPR_KIND_LCM,                          /**< Native lcm expression operation. */
+    EXPR_KIND_LEGENDRE_CHI,                 /**< Native legendre chi expression operation. */
+    EXPR_KIND_LERCH_PHI,                    /**< Native lerch phi expression operation. */
+    EXPR_KIND_LGAMMA,                       /**< Native lgamma expression operation. */
+    EXPR_KIND_LI,                           /**< Native li expression operation. */
+    EXPR_KIND_LOG,                          /**< Native log expression operation. */
+    EXPR_KIND_LOG10,                        /**< Native log10 expression operation. */
+    EXPR_KIND_LOGBETA,                      /**< Native logbeta expression operation. */
+    EXPR_KIND_LOMMEL_S,                     /**< Native lommel s expression operation. */
+    EXPR_KIND_MOD,                          /**< Native mod expression operation. */
+    EXPR_KIND_MODINV,                       /**< Native modinv expression operation. */
+    EXPR_KIND_MUL,                          /**< Native mul expression operation. */
+    EXPR_KIND_NEG,                          /**< Native neg expression operation. */
+    EXPR_KIND_NEXT_PRIME,                   /**< Native next prime expression operation. */
+    EXPR_KIND_NONNEGATIVE_INTEGER,          /**< Native nonnegative integer expression operation. */
+    EXPR_KIND_NORMAL_CDF,                   /**< Native normal cdf expression operation. */
+    EXPR_KIND_NORMAL_LOGPDF,                /**< Native normal logpdf expression operation. */
+    EXPR_KIND_NORMAL_PDF,                   /**< Native normal pdf expression operation. */
+    EXPR_KIND_ORDERED_DERIVATIVE,           /**< Derivative with an expression-valued order. */
+    EXPR_KIND_PARTITION,                    /**< Native partition expression operation. */
+    EXPR_KIND_POLYGAMMA,                    /**< Native polygamma expression operation. */
+    EXPR_KIND_POLYLOG,                      /**< Native polylog expression operation. */
+    EXPR_KIND_POLYLOG1,                     /**< Native polylog1 expression operation. */
+    EXPR_KIND_POW,                          /**< Native pow expression operation. */
+    EXPR_KIND_POWMOD,                       /**< Exact integer powmod operation. */
+    EXPR_KIND_POW_D,                        /**< Native pow d expression operation. */
+    EXPR_KIND_PREV_PRIME,                   /**< Native prev prime expression operation. */
+    EXPR_KIND_PRINCIPAL_VALUE,              /**< Native principal value expression operation. */
+    EXPR_KIND_PRODUCT,                      /**< Native product expression operation. */
+    EXPR_KIND_PROVE_PRIME,                  /**< Exact integer prove prime operation. */
+    EXPR_KIND_QDIGAMMA,                     /**< Native qdigamma expression operation. */
+    EXPR_KIND_REAL_AT_LEAST,                /**< Indicator that two finite real operands satisfy inclusive ordering. */
+    EXPR_KIND_REAL_BOUND,                   /**< Native real bound expression operation. */
+    EXPR_KIND_REAL_DOMAIN,                  /**< Native real domain expression operation. */
+    EXPR_KIND_REAL_GREATER,                 /**< Indicator that two finite real operands satisfy strict ordering. */
+    EXPR_KIND_REAL_PARAMETER,               /**< Native real parameter expression operation. */
+    EXPR_KIND_RECT,                         /**< Native rect expression operation. */
+    EXPR_KIND_ROOT,                         /**< Native root expression operation. */
+    EXPR_KIND_ROUND,                        /**< Native round expression operation. */
+    EXPR_KIND_ROUNDN,                       /**< Native roundn expression operation. */
+    EXPR_KIND_ROUNDS,                       /**< Native rounds expression operation. */
+    EXPR_KIND_SEC,                          /**< Native sec expression operation. */
+    EXPR_KIND_SECH,                         /**< Native sech expression operation. */
+    EXPR_KIND_SET_BIT,                      /**< Exact integer set bit operation. */
+    EXPR_KIND_SGN,                          /**< Native sgn expression operation. */
+    EXPR_KIND_SHL,                          /**< Native shl expression operation. */
+    EXPR_KIND_SHR,                          /**< Native shr expression operation. */
+    EXPR_KIND_SIN,                          /**< Native sin expression operation. */
+    EXPR_KIND_SINC,                         /**< Native sinc expression operation. */
+    EXPR_KIND_SINH,                         /**< Native sinh expression operation. */
+    EXPR_KIND_SQRT,                         /**< Native sqrt expression operation. */
+    EXPR_KIND_STEP,                         /**< Native step expression operation. */
+    EXPR_KIND_STRUVE_H,                     /**< Native struve h expression operation. */
+    EXPR_KIND_STRUVE_L,                     /**< Native struve l expression operation. */
+    EXPR_KIND_SUB,                          /**< Native sub expression operation. */
+    EXPR_KIND_SUMMATION,                    /**< Native summation expression operation. */
+    EXPR_KIND_TAN,                          /**< Native tan expression operation. */
+    EXPR_KIND_TANH,                         /**< Native tanh expression operation. */
+    EXPR_KIND_TEST_BIT,                     /**< Exact integer test bit operation. */
+    EXPR_KIND_TRI,                          /**< Native tri expression operation. */
+    EXPR_KIND_TRIGAMMA,                     /**< Native trigamma expression operation. */
+    EXPR_KIND_VAR,                          /**< Variable leaf. */
+    EXPR_KIND_VERCOS,                       /**< Native vercos expression operation. */
+    EXPR_KIND_VERSIN,                       /**< Native versin expression operation. */
+    EXPR_KIND_ZATAHP,                       /**< Native zatahp expression operation. */
+    EXPR_KIND_ZETA,                         /**< Native zeta expression operation. */
+    EXPR_KIND_ZETAH,                        /**< Native zetah expression operation. */
+    EXPR_KIND_ZETAP,                        /**< Native zetap expression operation. */
+    EXPR_KIND_COUNT                         /**< Number of operation identifiers; the final sentinel. */
 } expr_op_kind_t;
+
+/**
+ * @brief Look up a circular or hyperbolic trigonometric operation in the shared compact dispatch map.
+ * @param[in] kind Operation identifier; unsupported identifiers are accepted and rejected without a search.
+ * @return Slot 0--5 for sin, cos, tan, sec, cosec, cot; slot 6--11 for their hyperbolic counterparts;
+ * 12 for every other kind. Slots describe this map's mathematical roles independently of global enum values.
+ * Uses checked offsets within small alphabetical enum ranges, with a dense six-byte map where the mathematical
+ * order differs. No allocation, mutation or ownership transfer occurs; immutable data permit concurrent calls.
+ */
+unsigned expr_trig_slot(expr_op_kind_t kind);
 
 typedef enum expr_diff_kind { EXPR_DIFF_SMOOTH = 0, EXPR_DIFF_NONE } expr_diff_kind_t;
 
@@ -664,7 +676,6 @@ extern const expr_ops_t ops_clausen;
 expr_t *expr_clausen_xp(const expr_t *order, const expr_t *argument);
 expr_t *expr_clausen_sum_closed_form(const expr_t *expr);
 extern const expr_ops_t ops_lerch_phi;
-extern const expr_ops_t ops_lerch_phi_pack;
 extern const expr_ops_t ops_legendre_chi;
 extern const expr_ops_t ops_bessel_J;
 extern const expr_ops_t ops_bessel_Y;
@@ -682,12 +693,11 @@ expr_t *expr_struve_H_hypergeometric(const expr_t *order, const expr_t *argument
 /** Expand a finite numerical Struve order into its principal hypergeometric form, or return NULL at parameter poles. */
 expr_t *expr_struve_L_hypergeometric(const expr_t *order, const expr_t *argument);
 extern const expr_ops_t ops_lommel_S;
-extern const expr_ops_t ops_lommel_S_pack;
+/** @brief Immutable Appell F1 operation table; static lifetime, with no ownership transfer. */
 extern const expr_ops_t ops_appell_F1;
-extern const expr_ops_t ops_appell_F1_pack;
+
 extern const expr_ops_t ops_lauricella_F;
 extern const expr_ops_t ops_hypergeometric_pFq;
-extern const expr_ops_t ops_hypergeometric_pFq_pack;
 extern const expr_ops_t ops_gammainv;
 extern const expr_ops_t ops_lambert_w;
 extern const expr_ops_t ops_lambert_Wn;
@@ -799,8 +809,6 @@ expr_t *expr_alias_sinhcosh(const expr_t *argument, const expr_t *component);
  * @return Owned expression released with expr_free(), or NULL for unsupported arity.
  */
 expr_t *expr_clausen_args(size_t count, expr_t *const *arguments);
-/** @brief Immutable integer pack dispatch; owned by expression and valid for the process lifetime. */
-extern const expr_ops_t ops_integer_pack;
 /** @brief Immutable powmod dispatch; owned by expression and valid for the process lifetime. */
 extern const expr_ops_t ops_powmod;
 /** @brief Immutable bit length dispatch; owned by expression and valid for the process lifetime. */
@@ -963,6 +971,18 @@ bool expr_lerch_phi_unpack(const expr_t *expr, const expr_t **z, const expr_t **
 expr_t *expr_legendre_chi_xp(const expr_t *order, const expr_t *arg);
 expr_t *expr_lambert_Wn_xp(const expr_t *branch, const expr_t *arg);
 bool expr_lommel_S_unpack(const expr_t *expr, const expr_t **mu, const expr_t **nu, const expr_t **argument);
+/**
+ * @brief Read the borrowed arguments of an Appell F1 node from its shared argument lists.
+ * @param[in] expr Borrowed graph node, or NULL.
+ * @param[out] a Optional destination for the common upper parameter.
+ * @param[out] b1 Optional destination for the first separate upper parameter.
+ * @param[out] b2 Optional destination for the second separate upper parameter.
+ * @param[out] c Optional destination for the common lower parameter.
+ * @param[out] x Optional destination for the first variable.
+ * @param[out] y Optional destination for the second variable.
+ * @return True for a valid F1 node; false clears supplied destinations. Returned pointers are borrowed and
+ * remain valid while the expression remains alive. No graph mutation, allocation or ownership transfer occurs.
+ */
 bool expr_appell_F1_unpack(const expr_t *expr, const expr_t **a, const expr_t **b1, const expr_t **b2, const expr_t **c,
                            const expr_t **x, const expr_t **y);
 bool expr_lauricella_F_unpack(const expr_t *expr, const expr_t **a, const expr_t ***b, const expr_t **c,
@@ -1455,5 +1475,68 @@ expr_t *expr_apply_reapplicable_unary_function(const expr_t *prototype, const ex
  * @return True when the requested operation succeeds; false when unavailable, invalid or unsuccessful.
  */
 bool expr_stringin_function_hash_is_valid(void);
+
+/** @brief Immutable operation table for Appell F2; static lifetime, no ownership transfer. */
+extern const expr_ops_t ops_appell_F2;
+
+/**
+ * @brief Construct Appell F2 from parser arguments without consuming them.
+ * @param count Required argument count, 7; other counts are rejected.
+ * @param[in] arguments Borrowed array of count expression pointers; each valid pointer is retained by the result.
+ * @return Owned expression released with expr_free(), or NULL for an invalid count or argument.
+ * No shared state is modified; callers must provide the normal expression-context synchronisation.
+ */
+expr_t *expr_appell_F2_args(size_t count, expr_t *const *arguments);
+
+/** @brief Immutable operation table for Appell F3; static lifetime, no ownership transfer. */
+extern const expr_ops_t ops_appell_F3;
+
+/**
+ * @brief Construct Appell F3 from parser arguments without consuming them.
+ * @param count Required argument count, 7; other counts are rejected.
+ * @param[in] arguments Borrowed array of count expression pointers; each valid pointer is retained by the result.
+ * @return Owned expression released with expr_free(), or NULL for an invalid count or argument.
+ * No shared state is modified; callers must provide the normal expression-context synchronisation.
+ */
+expr_t *expr_appell_F3_args(size_t count, expr_t *const *arguments);
+
+/** @brief Immutable operation table for Appell F4; static lifetime, no ownership transfer. */
+extern const expr_ops_t ops_appell_F4;
+
+/**
+ * @brief Construct Appell F4 from parser arguments without consuming them.
+ * @param count Required argument count, 6; other counts are rejected.
+ * @param[in] arguments Borrowed array of count expression pointers; each valid pointer is retained by the result.
+ * @return Owned expression released with expr_free(), or NULL for an invalid count or argument.
+ * No shared state is modified; callers must provide the normal expression-context synchronisation.
+ */
+expr_t *expr_appell_F4_args(size_t count, expr_t *const *arguments);
+
+/**
+ * @brief Classify a packed Appell F1, F2, F3 or F4 expression by its operation identifier.
+ * @param[in] expression Borrowed graph node, or NULL.
+ * @return The family index from one to four, or zero for another operation or invalid node.
+ * No allocation, graph mutation or ownership transfer occurs.
+ */
+unsigned expr_appell_family(const expr_t *expression);
+
+/**
+ * @brief Unpack the canonical scalar parameters and two variables of an Appell expression.
+ * @param[in] expression Borrowed Appell F1, F2, F3 or F4 node.
+ * @param[out] arguments Caller-owned array with room for seven borrowed expression pointers.
+ * @param[out] count Receives six for F1/F4 or seven for F2/F3 when successful.
+ * @return True for a valid packed expression; false leaves outputs unspecified. Pointers remain valid while
+ * the graph remains alive. No allocation, ownership transfer or graph mutation occurs.
+ */
+bool expr_appell_unpack(const expr_t *expression, const expr_t **arguments, size_t *count);
+
+/**
+ * @brief Build a non-resonant Appell antiderivative with one affine variable argument.
+ * @param[in] expression Borrowed Appell F1, F2, F3 or F4 node with constant scalar parameters.
+ * @param[in] wrt Borrowed integration variable; not consumed.
+ * @return Owned primitive released with expr_free(), or NULL when affine matching, non-zero parameter
+ * factors or valid decremented lower parameters cannot be established. No numerical fallback is fabricated.
+ */
+expr_t *expr_integrate_appell(const expr_t *expression, const expr_t *wrt);
 
 #endif /* EXPR_INTERNAL_H */

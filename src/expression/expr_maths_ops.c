@@ -84,8 +84,6 @@ static expr_t *expr_math_wrap_binary(const expr_ops_t *ops, const expr_t *a, con
     return expr_new_binary_internal(ops, a, b);
 }
 
-static expr_t *expr_appell_F1_pack(const expr_t *left, const expr_t *right);
-static expr_t *expr_appell_F1_from_packs(const expr_t *params, const expr_t *vars);
 static expr_t *expr_lauricella_F_from_packs(const expr_t *params, const expr_t *vars);
 static expr_t *expr_hypergeometric_pFq_pack(const expr_t *left, const expr_t *right);
 static expr_t *expr_hypergeometric_pFq_from_pack(const expr_t *parameters, const expr_t *argument);
@@ -4676,17 +4674,6 @@ const expr_ops_t ops_lerch_phi = {.eval = eval_lerch_phi,
                                   .integrate = expr_integrate_dispatch_primitive,
                                   .simplify = expr_simplify_rebuild_binary_operator,
                                   .fold_const_unary = NULL};
-const expr_ops_t ops_lerch_phi_pack = {.eval = eval_lerch_phi_pack,
-                                       .deriv = deriv_lerch_phi_pack,
-                                       .reverse = expr_reverse_parameter_pack,
-                                       .kind = EXPR_KIND_LERCH_PHI_PACK,
-                                       .arity = EXPR_OP_BINARY,
-                                       .expression_name = "lerch_phi_pack",
-                                       .function_name = "lerchphipack",
-                                       .apply_unary = NULL,
-                                       .apply_binary = NULL,
-                                       .simplify = expr_simplify_rebuild_binary_operator,
-                                       .fold_const_unary = NULL};
 const expr_ops_t ops_legendre_chi = {.eval = eval_legendre_chi,
                                      .deriv = deriv_legendre_chi,
                                      .reverse = expr_reverse_legendre_chi,
@@ -4722,42 +4709,6 @@ const expr_ops_t ops_lommel_S = {.eval = eval_lommel_S,
                                  .integrate = expr_integrate_dispatch_primitive,
                                  .simplify = expr_simplify_rebuild_binary_operator,
                                  .fold_const_unary = NULL};
-const expr_ops_t ops_lommel_S_pack = {.eval = eval_lommel_S_pack,
-                                      .deriv = deriv_lommel_S_pack,
-                                      .reverse = expr_reverse_parameter_pack,
-                                      .kind = EXPR_KIND_LOMMEL_S_PACK,
-                                      .arity = EXPR_OP_BINARY,
-                                      .diff_kind = EXPR_DIFF_NONE,
-                                      .expression_name = "lommel_S_pack",
-                                      .function_name = "lommelspack",
-                                      .apply_unary = NULL,
-                                      .apply_binary = expr_lommel_S_pack,
-                                      .simplify = expr_simplify_rebuild_binary_operator,
-                                      .fold_const_unary = NULL};
-const expr_ops_t ops_appell_F1 = {.eval = eval_appell_F1,
-                                  .deriv = deriv_appell_F1,
-                                  .reverse = expr_reverse_not_differentiable,
-                                  .reverse_many = expr_reverse_appell_F1_many,
-                                  .kind = EXPR_KIND_APPELL_F1,
-                                  .arity = EXPR_OP_BINARY,
-                                  .expression_name = "F₁",
-                                  .function_name = "appellf1",
-                                  .apply_unary = NULL,
-                                  .apply_binary = expr_appell_F1_from_packs,
-                                  .simplify = expr_simplify_rebuild_binary_operator,
-                                  .fold_const_unary = NULL};
-const expr_ops_t ops_appell_F1_pack = {.eval = eval_appell_F1_pack,
-                                       .deriv = deriv_appell_F1_pack,
-                                       .reverse = expr_reverse_parameter_pack,
-                                       .kind = EXPR_KIND_APPELL_F1_PACK,
-                                       .arity = EXPR_OP_BINARY,
-                                       .diff_kind = EXPR_DIFF_NONE,
-                                       .expression_name = "appell_F1_pack",
-                                       .function_name = "appellf1pack",
-                                       .apply_unary = NULL,
-                                       .apply_binary = expr_appell_F1_pack,
-                                       .simplify = expr_simplify_rebuild_binary_operator,
-                                       .fold_const_unary = NULL};
 const expr_ops_t ops_lauricella_F = {.eval = eval_lauricella_F,
                                      .deriv = deriv_lauricella_F,
                                      .reverse = expr_reverse_not_differentiable,
@@ -4782,18 +4733,6 @@ const expr_ops_t ops_hypergeometric_pFq = {.eval = eval_hypergeometric_pFq,
                                            .integrate = expr_integrate_dispatch_primitive,
                                            .simplify = expr_simplify_rebuild_binary_operator,
                                            .fold_const_unary = NULL};
-const expr_ops_t ops_hypergeometric_pFq_pack = {.eval = eval_hypergeometric_pFq_pack,
-                                                .deriv = deriv_hypergeometric_pFq_pack,
-                                                .reverse = expr_reverse_parameter_pack,
-                                                .kind = EXPR_KIND_HYPERGEOMETRIC_PFQ_PACK,
-                                                .arity = EXPR_OP_BINARY,
-                                                .diff_kind = EXPR_DIFF_NONE,
-                                                .expression_name = "hypergeometric_pFq_pack",
-                                                .function_name = "hypergeometricpfqpack",
-                                                .apply_unary = NULL,
-                                                .apply_binary = expr_hypergeometric_pFq_pack,
-                                                .simplify = expr_simplify_rebuild_binary_operator,
-                                                .fold_const_unary = NULL};
 const expr_ops_t ops_gammainv = {.eval = eval_gammainv,
                                  .deriv = deriv_gammainv,
                                  .reverse = expr_reverse_gammainv,
@@ -5365,7 +5304,6 @@ expr_t *expr_apply_unary_kind(expr_op_kind_t kind, const expr_t *arg)
         [EXPR_KIND_ZETAH] = &ops_zetah,
         [EXPR_KIND_ZATAHP] = &ops_zatahp,
         [EXPR_KIND_LERCH_PHI] = &ops_lerch_phi,
-        [EXPR_KIND_LERCH_PHI_PACK] = &ops_lerch_phi_pack,
         [EXPR_KIND_DILOG] = &ops_dilog,
         [EXPR_KIND_CLAUSEN2] = &ops_clausen2,
         [EXPR_KIND_CLAUSEN] = &ops_clausen,
@@ -5745,7 +5683,7 @@ expr_t *expr_harmonic_poly(const expr_t *degree, const expr_t *argument)
 /* Construct a native Lerch-transcendent expression. */
 expr_t *expr_lerch_phi(const expr_t *z, const expr_t *s, const expr_t *a)
 {
-    expr_t *parameters = expr_math_wrap_binary(&ops_lerch_phi_pack, z, s);
+    expr_t *parameters = expr_math_wrap_binary(&ops_argument_list, z, s);
     expr_t *out = parameters ? expr_math_wrap_binary(&ops_lerch_phi, parameters, a) : NULL;
 
     expr_free(parameters);
@@ -5894,7 +5832,7 @@ expr_t *expr_lommel_S_argument_derivative_expansion(const expr_t *mu, const expr
 
 static expr_t *expr_lommel_S_pack(const expr_t *mu, const expr_t *nu)
 {
-    return expr_math_wrap_binary(&ops_lommel_S_pack, mu, nu);
+    return expr_math_wrap_binary(&ops_argument_list, mu, nu);
 }
 
 static expr_t *expr_lommel_S_from_pack(const expr_t *parameters, const expr_t *argument)
@@ -5902,44 +5840,12 @@ static expr_t *expr_lommel_S_from_pack(const expr_t *parameters, const expr_t *a
     return expr_math_wrap_binary(&ops_lommel_S, parameters, argument);
 }
 
-static expr_t *expr_appell_F1_pack(const expr_t *left, const expr_t *right)
-{
-    return expr_math_wrap_binary(&ops_appell_F1_pack, left, right);
-}
 
-static expr_t *expr_appell_F1_from_packs(const expr_t *params, const expr_t *vars)
-{
-    return expr_math_wrap_binary(&ops_appell_F1, params, vars);
-}
 
-expr_t *expr_appell_F1(const expr_t *a, const expr_t *b1, const expr_t *b2, const expr_t *c, const expr_t *x,
-                       const expr_t *y)
-{
-    expr_t *ab = NULL;
-    expr_t *bc = NULL;
-    expr_t *params = NULL;
-    expr_t *vars = NULL;
-    expr_t *out = NULL;
-
-    if (!a || !b1 || !b2 || !c || !x || !y)
-        return NULL;
-
-    ab = expr_appell_F1_pack(a, b1);
-    bc = expr_appell_F1_pack(b2, c);
-    params = ab && bc ? expr_appell_F1_pack(ab, bc) : NULL;
-    vars = expr_appell_F1_pack(x, y);
-    out = params && vars ? expr_math_wrap_binary(&ops_appell_F1, params, vars) : NULL;
-
-    expr_free(vars);
-    expr_free(params);
-    expr_free(bc);
-    expr_free(ab);
-    return out;
-}
 
 static expr_t *expr_hypergeometric_pFq_pack(const expr_t *left, const expr_t *right)
 {
-    return expr_math_wrap_binary(&ops_hypergeometric_pFq_pack, left, right);
+    return expr_math_wrap_binary(&ops_argument_list, left, right);
 }
 
 static expr_t *expr_hypergeometric_pFq_from_pack(const expr_t *parameters, const expr_t *argument)

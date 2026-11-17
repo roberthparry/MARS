@@ -3,18 +3,19 @@
  * @brief Stateful aliasing checks for the number module's real and complex Appell kernels.
  *
  * Each of the six input slots becomes the output in turn, for compact dyadic and full-precision parameters.
- * Independent product identities supply references with extra guard bits. This white-box fixture belongs to
+ * Independent product and reduced-function identities supply references with extra guard bits, including
+ * positive integral parameter differences. This white-box fixture belongs to
  * the number module; ordinary data-driven Appell identities and failure cases remain in test_number.sql.
  */
 #include <stdio.h>
 
 #include "number-t.h"
-#define MARS_NUMBER_INTERNAL_ACCESS
-#include "number/number_internal.h"
 #include "test_harness.h"
 #include "test_number.h"
+#define MARS_NUMBER_INTERNAL_ACCESS
+#include "number/number_internal.h"
 
-static bool appell_real_aliases(mpfr_prec_t bits, bool compact)
+static bool appell_real_aliases(mpfr_prec_t bits, bool compact, bool rising)
 {
     const double inputs[] = {0.5, 0.75, 1.25, 0.5, 0.25, 0.375};
     mpfr_t values[6], reference, left, right, exponent, error, bound;
@@ -27,6 +28,11 @@ static bool appell_real_aliases(mpfr_prec_t bits, bool compact)
             mpfr_set_str(values[0], "0.7", 10, MPFR_RNDN);
             mpfr_set(values[3], values[0], MPFR_RNDN);
         }
+        if (rising) {
+            mpfr_add_ui(values[3], values[0], 2u, MPFR_RNDN);
+            mpfr_set(values[1], values[3], MPFR_RNDN);
+            mpfr_set_zero(values[2], 1);
+        }
         mpfr_ui_sub(left, 1u, values[4], MPFR_RNDN);
         mpfr_neg(exponent, values[1], MPFR_RNDN);
         mpfr_pow(left, left, exponent, MPFR_RNDN);
@@ -34,6 +40,11 @@ static bool appell_real_aliases(mpfr_prec_t bits, bool compact)
         mpfr_neg(exponent, values[2], MPFR_RNDN);
         mpfr_pow(right, right, exponent, MPFR_RNDN);
         mpfr_mul(reference, left, right, MPFR_RNDN);
+        if (rising) {
+            mpfr_ui_sub(left, 1u, values[4], MPFR_RNDN);
+            mpfr_neg(exponent, values[0], MPFR_RNDN);
+            mpfr_pow(reference, left, exponent, MPFR_RNDN);
+        }
         int status = number_mpfr_appell_F1(values[alias], values[0], values[1], values[2],
                                           values[3], values[4], values[5]);
         mpfr_sub(error, values[alias], reference, MPFR_RNDU);
@@ -48,7 +59,7 @@ static bool appell_real_aliases(mpfr_prec_t bits, bool compact)
     return ok;
 }
 
-static bool appell_complex_aliases(mpfr_prec_t bits, bool compact)
+static bool appell_complex_aliases(mpfr_prec_t bits, bool compact, bool rising)
 {
     const double inputs[] = {0.5, 0.75, 1.25, 0.5, 0.25, 0.375};
     mpc_t values[6], reference, left, right, exponent, difference;
@@ -65,6 +76,11 @@ static bool appell_complex_aliases(mpfr_prec_t bits, bool compact)
             mpfr_set_str(mpc_imagref(values[0]), "0.1", 10, MPFR_RNDN);
             mpc_set(values[3], values[0], MPC_RNDNN);
         }
+        if (rising) {
+            mpc_add_ui(values[3], values[0], 2u, MPC_RNDNN);
+            mpc_set(values[1], values[3], MPC_RNDNN);
+            mpc_set_ui(values[2], 0u, MPC_RNDNN);
+        }
         mpc_ui_sub(left, 1u, values[4], MPC_RNDNN);
         mpc_neg(exponent, values[1], MPC_RNDNN);
         mpc_pow(left, left, exponent, MPC_RNDNN);
@@ -72,6 +88,11 @@ static bool appell_complex_aliases(mpfr_prec_t bits, bool compact)
         mpc_neg(exponent, values[2], MPC_RNDNN);
         mpc_pow(right, right, exponent, MPC_RNDNN);
         mpc_mul(reference, left, right, MPC_RNDNN);
+        if (rising) {
+            mpc_ui_sub(left, 1u, values[4], MPC_RNDNN);
+            mpc_neg(exponent, values[0], MPC_RNDNN);
+            mpc_pow(reference, left, exponent, MPC_RNDNN);
+        }
         int status = number_mpc_appell_F1(values[alias], values[0], values[1], values[2],
                                          values[3], values[4], values[5], MPC_RNDNN);
         mpc_sub(difference, values[alias], reference, MPC_RNDNN);
@@ -93,10 +114,12 @@ void run_number_appell_alias_tests(void)
     const mpfr_prec_t precisions[] = {256, 1024};
     bool ok = true;
     for (size_t i = 0; i < sizeof precisions / sizeof *precisions; ++i) {
-        ok = appell_real_aliases(precisions[i], true) && ok;
-        ok = appell_real_aliases(precisions[i], false) && ok;
-        ok = appell_complex_aliases(precisions[i], true) && ok;
-        ok = appell_complex_aliases(precisions[i], false) && ok;
+        for (unsigned rising = 0; rising < 2; ++rising) {
+            ok = appell_real_aliases(precisions[i], true, rising) && ok;
+            ok = appell_real_aliases(precisions[i], false, rising) && ok;
+            ok = appell_complex_aliases(precisions[i], true, rising) && ok;
+            ok = appell_complex_aliases(precisions[i], false, rising) && ok;
+        }
     }
     ASSERT_TRUE(ok);
 }

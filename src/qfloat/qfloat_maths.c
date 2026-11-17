@@ -3,7 +3,7 @@
  * @brief Double-double elementary and special functions.
  *
  * Implements the broad real mathematical function families, including supported multivariate and special-function
- * series. Dedicated cylindrical and orthogonal-polynomial families are split into their own units.
+ * series. Dedicated Appell, cylindrical and orthogonal-polynomial families are split into their own units.
  *
  * This implements fixed double-double real arithmetic for qfloat_t. Its approximately 106-bit representation
  * is not arbitrary precision or a universal accuracy guarantee.
@@ -3346,14 +3346,6 @@ qfloat_t qf_lauricella_F(qfloat_t a, const qfloat_t *b, qfloat_t c, const qfloat
 
     free(coefficients);
     return sum;
-}
-
-qfloat_t qf_appell_F1(qfloat_t a, qfloat_t b1, qfloat_t b2, qfloat_t c, qfloat_t x, qfloat_t y)
-{
-    const qfloat_t b[2] = {b1, b2};
-    const qfloat_t variables[2] = {x, y};
-
-    return qf_lauricella_F(a, b, c, variables, 2u);
 }
 
 qfloat_t qf_hypergeometric_pFq(const qfloat_t *upper, size_t upper_count, const qfloat_t *lower, size_t lower_count,

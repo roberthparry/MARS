@@ -128,4 +128,11 @@ expr_t *make_expr_l07(void);
 expr_t *make_expr_l08(void);
 expr_t *make_expr_l09(void);
 
+/**
+ * @brief Run SQL-authored Appell parser, value, calculus, reverse-mode and rendering checks.
+ * @return Nothing; failures are reported through the ordinary test harness. Database selections are preserved,
+ * temporary expressions and bindings are released, and the caller's numerical precision is restored.
+ */
+void test_expr_appell(void);
+
 #endif

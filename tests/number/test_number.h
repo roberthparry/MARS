@@ -37,6 +37,63 @@ void run_number_special_function_tests(void);
  * @return Nothing; records failures through the test harness. Restores the caller's default precision.
  */
 void run_number_benchmark_regressions(void);
+
+/**
+ * @brief Compare Bessel I with its independently summed defining series.
+ * @param[in] arguments Borrowed two-element array containing the order and argument.
+ * @return Scoped relative error, or NaN on unresolved input; the SQL runner owns the active numeric scope.
+ * Preserves inputs and default precision. No scratch storage escapes; call sequentially with other tests.
+ */
+number_t test_number_bessel_i_reference(const number_t *arguments);
+
+/**
+ * @brief Compare Bessel J with its independently summed defining series.
+ * @param[in] arguments Borrowed two-element array containing the order and argument.
+ * @return Scoped relative error, or NaN on unresolved input; the SQL runner owns the active numeric scope.
+ * Preserves inputs and default precision. No scratch storage escapes; call sequentially with other tests.
+ */
+number_t test_number_bessel_j_reference(const number_t *arguments);
+
+/**
+ * @brief Compare Struve H with its independently summed defining series.
+ * @param[in] arguments Borrowed two-element array containing the order and argument.
+ * @return Scoped relative error, or NaN on unresolved input; the SQL runner owns the active numeric scope.
+ * Preserves inputs and default precision. No scratch storage escapes; call sequentially with other tests.
+ */
+number_t test_number_struve_h_reference(const number_t *arguments);
+
+/**
+ * @brief Compare Struve L with its independently summed defining series.
+ * @param[in] arguments Borrowed two-element array containing the order and argument.
+ * @return Scoped relative error, or NaN on unresolved input; the SQL runner owns the active numeric scope.
+ * Preserves inputs and default precision. No scratch storage escapes; call sequentially with other tests.
+ */
+number_t test_number_struve_l_reference(const number_t *arguments);
+
+/**
+ * @brief Compare Lommel s or its argument derivative with an independent full-width series.
+ * @param[in] arguments Borrowed array containing mu, nu, z and a non-zero derivative selector.
+ * @return Scoped relative error, or NaN on unresolved input; the SQL runner owns the active numeric scope.
+ * Preserves inputs and default precision. No scratch storage escapes; call sequentially with other tests.
+ */
+number_t test_number_lommel_reference(const number_t *arguments);
+
+/**
+ * @brief Check that rejected product-tree attempts leave aliased operands unchanged.
+ * @param[in] arguments Borrowed array containing two lower parameters, the argument and derivative weight.
+ * @return Borrowed zero on success or one on failure; do not release the constant independently.
+ * Owns and releases local MPC scratch, preserving inputs and default precision; call tests sequentially.
+ */
+number_t test_number_two_lower_reject(const number_t *arguments);
+
+/**
+ * @brief Compare every accepted product-tree output alias with an independent weighted series.
+ * @param[in] arguments Borrowed array containing two lower parameters, the argument and derivative weight.
+ * @return Borrowed zero on success or one on failure; do not release the constant independently.
+ * Owns and releases local MPC scratch, preserving inputs and default precision; call tests sequentially.
+ */
+number_t test_number_two_lower_alias(const number_t *arguments);
+
 void run_number_bessel_k_ownership_tests(void);
 void run_number_bessel_y_tests(void);
 void run_number_bessel_y_qfloat_ownership_tests(void);
@@ -73,6 +130,15 @@ void run_number_backend_parity_tests(void);
  */
 void run_number_real_complex_conversion_tests(void);
 void run_number_readme_example_tests(void);
+
+/**
+ * @brief Execute the Appell README example across fixed, multiprecision, expression and matrix APIs.
+ * @return No value; the active sequential harness records output mismatches.
+ * Owns and releases all temporary values, matrices and expressions. No ownership transfers to callers;
+ * run after the ordinary number tests with the other README examples.
+ */
+void run_number_readme_appell(void);
+
 void run_number_readme_mersenne_prime_search(void);
 
 #define TEST_ASSERT_NUMBER_EQ(got, want)                                                                        \

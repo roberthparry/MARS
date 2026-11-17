@@ -183,6 +183,33 @@ void num_scope_resume_cleanup(num_scope_t **scope);
  */
 number_t num_lommel_S_derivative_internal(const number_t mu, const number_t nu, const number_t argument);
 
+/**
+ * @brief Bounded Appell series plan shared with commuting-matrix functional calculus.
+ * @details The fields contain values only and own no storage; no release is required.
+ */
+typedef struct _number_appell_plan_t {
+    unsigned degree; /**< Last total degree, including the independently bounded polynomial/geometric tail. */
+    size_t working_bits; /**< Guarded arithmetic precision; never more than the scalar kernel's 32768-bit budget. */
+    long m_last; /**< Last first-axis degree for a terminating numerator or zero variable; LONG_MAX otherwise. */
+    long n_last; /**< Last second-axis degree for a terminating numerator or zero variable; LONG_MAX otherwise. */
+} number_appell_plan_t;
+
+/**
+ * @brief Plan the absolutely convergent joint-matrix series without evaluating a scalar Appell result.
+ * @param family Appell family index, one through four.
+ * @param[in] parameters Borrowed array of four parameters for F1/F4 or five for F2/F3, in public API order.
+ * @param x_radius Finite non-negative first matrix norm, passed by value without ownership transfer.
+ * @param y_radius Finite non-negative second matrix norm, passed by value without ownership transfer.
+ * @param precision Required output precision in bits, below the scalar working budget.
+ * @param[out] plan Caller-owned destination, valid only when the function returns true.
+ * @return True when a polynomial or geometric tail proves a sufficient bounded degree; false for invalid
+ * parameters, denominator poles, unsupported norms, convergence regions or numerical budgets. No arguments
+ * are consumed. Temporary storage is local; independent calls are thread-safe.
+ */
+bool number_appell_series_plan(unsigned family, const number_t *parameters, number_t x_radius,
+                                number_t y_radius, size_t precision, number_appell_plan_t *plan);
+
+
 /** @brief Suspend numeric scope allocation until lexical-scope cleanup resumes it automatically. */
 #define NUM_SCOPE_SUSPEND(name)                                                                                        \
     __attribute__((cleanup(num_scope_resume_cleanup))) num_scope_t *(name) = number_scope_suspend()

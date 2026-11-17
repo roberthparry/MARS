@@ -48,6 +48,14 @@ typedef union {
      */
     number_t (*n6)(number_t a, number_t b, number_t c, number_t d, number_t e, number_t f);
 
+    /** @brief Evaluate a seven-operand number operation without consuming its operands.
+     * @param[in] a First operand. @param[in] b Second operand. @param[in] c Third operand.
+     * @param[in] d Fourth operand. @param[in] e Fifth operand. @param[in] f Sixth operand.
+     * @param[in] g Seventh operand. All operands remain borrowed throughout the call.
+     * @return Owned result, released with num_destroy(); a non-finite result fails the measurement.
+     */
+    number_t (*n7)(number_t a, number_t b, number_t c, number_t d, number_t e, number_t f, number_t g);
+
     /** @brief Evaluate a unary fixed precision real operation.
      * @param[in] a Operand copied by value.
      * @return Result by value, requiring no release; NaN or infinity fails the measurement.
@@ -74,6 +82,14 @@ typedef union {
      */
     qfloat_t (*r6)(qfloat_t a, qfloat_t b, qfloat_t c, qfloat_t d, qfloat_t e, qfloat_t f);
 
+    /** @brief Evaluate a seven-operand fixed precision real operation.
+     * @param[in] a First operand. @param[in] b Second operand. @param[in] c Third operand.
+     * @param[in] d Fourth operand. @param[in] e Fifth operand. @param[in] f Sixth operand.
+     * @param[in] g Seventh operand. Operands and results are copied by value; no release is required.
+     * @return Numerical result; NaN or infinity fails the measurement.
+     */
+    qfloat_t (*r7)(qfloat_t a, qfloat_t b, qfloat_t c, qfloat_t d, qfloat_t e, qfloat_t f, qfloat_t g);
+
     /** @brief Evaluate a unary fixed precision complex operation.
      * @param[in] a Operand copied by value.
      * @return Result by value, requiring no release; a non-finite component fails the measurement.
@@ -99,16 +115,24 @@ typedef union {
      * @return Result by value, requiring no release; a non-finite component fails the measurement.
      */
     qcomplex_t (*c6)(qcomplex_t a, qcomplex_t b, qcomplex_t c, qcomplex_t d, qcomplex_t e, qcomplex_t f);
+
+    /** @brief Evaluate a seven-operand fixed precision complex operation.
+     * @param[in] a First operand. @param[in] b Second operand. @param[in] c Third operand.
+     * @param[in] d Fourth operand. @param[in] e Fifth operand. @param[in] f Sixth operand.
+     * @param[in] g Seventh operand. Operands and results are copied by value; no release is required.
+     * @return Numerical result; a non-finite component fails the measurement.
+     */
+    qcomplex_t (*c7)(qcomplex_t a, qcomplex_t b, qcomplex_t c, qcomplex_t d, qcomplex_t e, qcomplex_t f, qcomplex_t g);
 } benchmark_function_t;
 
 /** @brief Static mathematical operation and typed backend entry points. */
 typedef struct {
     const char *name; /**< Canonical operation identifier; also the SQL catalogue primary key. */
-    unsigned arity; /**< Number of operands: one, two, three or six. */
+    unsigned arity; /**< Number of operands: one, two, three, six or seven. */
     benchmark_function_t number; /**< Generic number entry point, always present. */
     benchmark_function_t real; /**< Direct qfloat entry point, or zero when unavailable. */
     benchmark_function_t complex_fn; /**< Direct qcomplex entry point, or zero when unavailable. */
-    const char *arguments[6]; /**< Domain-appropriate real operand literals, parsed outside timing. */
+    const char *arguments[7]; /**< Domain-appropriate real operand literals, parsed outside timing. */
     unsigned complex_mask; /**< Bits marking operands which receive a non-zero imaginary part. */
     bool integer_only; /**< Integer-specific API, restricted to the unrestricted integer profile. */
 } benchmark_operation_t;

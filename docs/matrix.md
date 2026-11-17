@@ -157,6 +157,27 @@ polynomials, Lerch and q-digamma series, and spectral signal functions.
 matrix functions. Formatting, integration and beautification retain their
 separate source files because they have distinct responsibilities.
 
+## Appell functions of two matrices
+
+`mat_appell_F1(a,b1,b2,c,X,Y)`, `mat_appell_F2(a,b1,b2,c1,c2,X,Y)`,
+`mat_appell_F3(a1,a2,b1,b2,c,X,Y)` and `mat_appell_F4(a,b,c1,c2,X,Y)` take borrowed
+`number_t` scalar parameters and two borrowed square matrices of matching size.
+They return a new matrix, released with `mat_free()`, or NULL when unsupported.
+
+Pairs of diagonal numerical matrices use the scalar functions on corresponding eigenvalues.
+Symbolic diagonal pairs retain their expression bindings. General numerical pairs must commute
+exactly in their stored arithmetic and have dimension at most 64. Their infinity norms must lie
+within the scalar convergence region, unless the series terminates as a finite polynomial.
+The evaluator uses guarded joint matrix series, limited to total degree 2048 and 100000 cells.
+It stops immediately when an entire coefficient row is structurally zero, since both recurrence
+directions then remain zero. This avoids computing a scalar convergence bound's remaining terms
+for nilpotent matrix pairs.
+Invalid lower parameters, non-commutation, incompatible shapes and exhausted work budgets return
+NULL. General non-diagonal symbolic pairs and analytic continuation are not implemented.
+
+See the [runnable cross-module Appell example](number.md#appell-functions-f₂-f₃-and-f₄), including
+its output, for evaluation on a commuting nilpotent pair.
+
 ## Signal functions
 
 `mat_sgn`, `mat_step`, `mat_rect`, `mat_tri`, `mat_circ` and `mat_sinc` apply their

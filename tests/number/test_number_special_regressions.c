@@ -5,6 +5,8 @@
  * Checks defining identities and independent error-function and zeta references, rather than accepting any finite
  * answer. SQL supplies arguments and decimal precision; the C runner retains the executable mathematics. The
  * Maclaurin reference differs from the production Kummer series and uses extra working precision.
+ * Hypergeometric references use full-width term summation without product trees, additive ratio polynomials or
+ * shortened state, covering the accelerated paths and their ordinary-series fallbacks independently.
  */
 #include <mpc.h>
 #include <stdio.h>
@@ -13,11 +15,20 @@
 
 #include "number-t.h"
 #include "string-t.h"
-#define MARS_NUMBER_INTERNAL_ACCESS
-#include "number/number_internal.h"
 #include "test_harness.h"
 #include "test_database.h"
 #include "test_number.h"
+#define MARS_NUMBER_INTERNAL_ACCESS
+#include "number/number_internal.h"
+
+/* Retain exact rational and multiprecision inputs when constructing an independent MPC reference. */
+static bool regression_mpc_input(mpc_ptr out, number_t input)
+{
+    number_t *converted = number_coerce(&input, NUMBER_COMPLEX);
+    bool ok = converted && !number_complex_get_mpc(out, number_impl_const(converted)->value.cx, mpc_get_prec(out));
+    number_box_free(converted);
+    return ok;
+}
 
 static number_t regression_erf_reference(number_t input)
 {
@@ -27,8 +38,7 @@ static number_t regression_erf_reference(number_t input)
     mpc_init2(z, precision); mpc_init2(square, precision); mpc_init2(term, precision);
     mpc_init2(sum, precision); mpc_init2(addend, precision);
     mpfr_inits2(precision, pi, size, (mpfr_ptr)0);
-    /* Reference inputs are exactly representable binary fractions. */
-    mpc_set_d_d(z, num_to_double(num_real_part(input)), num_to_double(num_imag_part(input)), MPC_RNDNN);
+    if (!regression_mpc_input(z, input)) mpc_set_nan(z);
     mpc_sqr(square, z, MPC_RNDNN);
     mpc_neg(square, square, MPC_RNDNN);
     mpc_set(term, z, MPC_RNDNN);
@@ -77,6 +87,16 @@ static number_t regression_qc_erf(const number_t *a)
 
 static number_t regression_erfinv(const number_t *a) { return num_erf(num_erfinv(a[0])); }
 static number_t regression_erfcinv(const number_t *a) { return num_erfc(num_erfcinv(a[0])); }
+
+static number_t regression_erfinv_reference(const number_t *a)
+{
+    return num_sub(regression_erf_reference(num_erfinv(a[0])), a[0]);
+}
+
+static number_t regression_erfcinv_reference(const number_t *a)
+{
+    return num_sub(num_sub(NUM_ONE, regression_erf_reference(num_erfcinv(a[0]))), a[0]);
+}
 
 /* Reject a finite answer whose representation silently narrowed before checking its mathematics. */
 static number_t regression_resolved(number_t value)
@@ -161,6 +181,42 @@ static number_t regression_gamma_lower_one(const number_t *a)
                    num_sub(NUM_ONE, num_exp(num_neg(a[0]))));
 }
 
+/* The alternating expansion omits the production series' exp(-z) factor and Pochhammer recurrence. */
+static number_t regression_gamma_lower_reference(const number_t *a)
+{
+    mpfr_prec_t precision = (mpfr_prec_t)num_get_default_prec_bits() + 128;
+    mpc_t order, z, power, sum, term, denominator, prefactor;
+    mpc_init2(order, precision); mpc_init2(z, precision); mpc_init2(power, precision);
+    mpc_init2(sum, precision); mpc_init2(term, precision); mpc_init2(denominator, precision);
+    mpc_init2(prefactor, precision);
+    mpfr_t magnitude;
+    mpfr_init2(magnitude, precision);
+    mpc_set_d_d(order, num_to_double(num_real_part(a[0])), num_to_double(num_imag_part(a[0])), MPC_RNDNN);
+    mpc_set_d_d(z, num_to_double(num_real_part(a[1])), num_to_double(num_imag_part(a[1])), MPC_RNDNN);
+    mpc_set_ui(power, 1u, MPC_RNDNN); mpc_set_ui(sum, 0u, MPC_RNDNN);
+    bool converged = false;
+    for (unsigned long n = 0; n < 200000; ++n) {
+        mpc_add_ui(denominator, order, n, MPC_RNDNN);
+        mpc_div(term, power, denominator, MPC_RNDNN);
+        mpc_add(sum, sum, term, MPC_RNDNN);
+        number_mpc_abs_upper(magnitude, term);
+        if (mpfr_zero_p(magnitude) || mpfr_get_exp(magnitude) < -precision + 16) {
+            converged = true;
+            break;
+        }
+        mpc_mul(power, power, z, MPC_RNDNN);
+        mpc_div_ui(power, power, n + 1u, MPC_RNDNN);
+        mpc_neg(power, power, MPC_RNDNN);
+    }
+    mpc_pow(prefactor, z, order, MPC_RNDNN); mpc_mul(sum, sum, prefactor, MPC_RNDNN);
+    number_t reference = converged ? number_take(number_wrap_complex_mpc(sum, precision)) : num_clone(NUM_NAN);
+    number_t result = num_div(num_sub(num_gammainc_lower(a[0], a[1]), reference), num_abs(reference));
+    mpfr_clear(magnitude);
+    mpc_clear(order); mpc_clear(z); mpc_clear(power); mpc_clear(sum); mpc_clear(term);
+    mpc_clear(denominator); mpc_clear(prefactor);
+    return result;
+}
+
 static number_t regression_gamma_regularised(const number_t *a)
 {
     number_t p = regression_resolved(num_gammainc_P(a[0], a[1]));
@@ -204,6 +260,60 @@ static number_t regression_hypergeometric_terminating(const number_t *a)
     return num_sub(value, num_pow_int(num_sub(NUM_ONE, a[1]), 3));
 }
 
+/* Independent full-precision term summation uses ordinary MPC products and divisions, never either fast kernel. */
+static number_t regression_pfq_reference_value(const number_t *a, size_t p, size_t q)
+{
+    mpfr_prec_t precision = (mpfr_prec_t)num_get_default_prec_bits() + 256;
+    mpc_t parameters[5], z, term, sum, factor, denominator, shift;
+    mpc_init2(z, precision); mpc_init2(term, precision); mpc_init2(sum, precision);
+    mpc_init2(factor, precision); mpc_init2(denominator, precision); mpc_init2(shift, precision);
+    bool ok = regression_mpc_input(z, a[p + q]), converged = false;
+    for (size_t j = 0; j < p + q; ++j) {
+        mpc_init2(parameters[j], precision);
+        ok = regression_mpc_input(parameters[j], a[j]) && ok;
+    }
+    mpfr_t magnitude;
+    mpfr_init2(magnitude, precision);
+    mpc_set_ui(term, 1u, MPC_RNDNN); mpc_set_ui(sum, 1u, MPC_RNDNN);
+    for (unsigned long n = 0; ok && n < 50000ul; ++n) {
+        mpc_set(factor, z, MPC_RNDNN); mpc_set_ui(denominator, n + 1ul, MPC_RNDNN);
+        for (size_t j = 0; j < p + q; ++j) {
+            mpc_add_ui(shift, parameters[j], n, MPC_RNDNN);
+            if (j < p) mpc_mul(factor, factor, shift, MPC_RNDNN);
+            else mpc_mul(denominator, denominator, shift, MPC_RNDNN);
+        }
+        mpc_mul(term, term, factor, MPC_RNDNN); mpc_div(term, term, denominator, MPC_RNDNN);
+        mpc_add(sum, sum, term, MPC_RNDNN);
+        mpc_abs(magnitude, term, MPFR_RNDU);
+        /* Authored balanced cases have |z|<=3/4 and bounded parameters, so the late geometric ratio is <0.9. */
+        if (n >= 64ul && (mpfr_zero_p(magnitude) || mpfr_get_exp(magnitude) < -precision + 32)) {
+            converged = true;
+            break;
+        }
+    }
+    number_t value = regression_resolved(num_hypergeometric_pFq(a, p, a + p, q, a[p + q]));
+    number_t reference = converged ? number_take(number_wrap_complex_mpc(sum, precision)) : NUM_NAN;
+    number_t error = num_sub(value, reference);
+    if (!num_is_zero(reference)) error = num_div(error, num_abs(reference));
+    for (size_t j = 0; j < p + q; ++j) mpc_clear(parameters[j]);
+    mpfr_clear(magnitude);
+    mpc_clear(z); mpc_clear(term); mpc_clear(sum); mpc_clear(factor); mpc_clear(denominator); mpc_clear(shift);
+    return error;
+}
+
+static number_t regression_pfq_0f0_reference(const number_t *a) { return regression_pfq_reference_value(a, 0, 0); }
+static number_t regression_pfq_0f1_reference(const number_t *a) { return regression_pfq_reference_value(a, 0, 1); }
+static number_t regression_pfq_1f0_reference(const number_t *a) { return regression_pfq_reference_value(a, 1, 0); }
+static number_t regression_pfq_1f1_reference(const number_t *a) { return regression_pfq_reference_value(a, 1, 1); }
+static number_t regression_pfq_2f1_reference(const number_t *a) { return regression_pfq_reference_value(a, 2, 1); }
+static number_t regression_pfq_2f2_reference(const number_t *a) { return regression_pfq_reference_value(a, 2, 2); }
+static number_t regression_pfq_3f2_reference(const number_t *a) { return regression_pfq_reference_value(a, 3, 2); }
+
+static number_t regression_pfq_pole(const number_t *a)
+{
+    return num_is_nan(num_hypergeometric_pFq(a, 1, a + 1, 1, a[2])) ? NUM_ZERO : NUM_ONE;
+}
+
 static number_t regression_lerch_log(const number_t *a)
 {
     number_t one = num_add(num_new_with_prec_bits(num_get_default_prec_bits()), NUM_ONE);
@@ -235,15 +345,6 @@ typedef enum {
     LERCH_REFERENCE_BLOCKS,
     LERCH_REFERENCE_INTEGER
 } lerch_reference_kind_t;
-
-/* Retain exact rational inputs when constructing the independently summed high-precision reference. */
-static bool regression_mpc_input(mpc_ptr out, number_t input)
-{
-    number_t *converted = number_coerce(&input, NUMBER_COMPLEX);
-    bool ok = converted && !number_complex_get_mpc(out, number_impl_const(converted)->value.cx, mpc_get_prec(out));
-    number_box_free(converted);
-    return ok;
-}
 
 static number_t regression_lerch_reference_value(const number_t *a, lerch_reference_kind_t kind)
 {
@@ -363,6 +464,54 @@ static bool regression_mpc_close(mpc_srcptr value, mpc_srcptr reference, mpfr_pr
     bool ok = mpfr_number_p(error) && mpfr_lessequal_p(error, bound);
     mpfr_clears(error, bound, (mpfr_ptr)0); mpc_clear(difference);
     return ok;
+}
+
+static number_t regression_polygamma_blocks(const number_t *a)
+{
+    mpfr_prec_t bits = (mpfr_prec_t)num_get_default_prec_bits(), work = bits + 128;
+    unsigned power = (unsigned)num_to_double(a[1]);
+    unsigned long limit = (unsigned long)num_to_double(a[2]);
+    mpc_t base, original, result, reference, shifted, term;
+    mpc_init2(base, work); mpc_init2(original, work); mpc_init2(result, work);
+    mpc_init2(reference, work + 256); mpc_init2(shifted, work + 256); mpc_init2(term, work + 256);
+    bool ok = regression_mpc_input(base, a[0]);
+    mpc_set(original, base, MPC_RNDNN);
+    ok = number_mpc_reciprocal_sum(result, base, power, limit) && ok;
+    mpc_set_ui(reference, 0u, MPC_RNDNN);
+    mpc_set(shifted, original, MPC_RNDNN);
+    unsigned count = 0;
+    while (ok && mpfr_less_p(mpc_realref(shifted), mpc_realref(base)) && count++ < 65552) {
+        mpc_pow_ui(term, shifted, power, MPC_RNDNN);
+        mpc_ui_div(term, 1u, term, MPC_RNDNN);
+        mpc_add(reference, reference, term, MPC_RNDNN);
+        mpc_add_ui(shifted, shifted, 1u, MPC_RNDNN);
+    }
+    ok = mpc_cmp(shifted, base) == 0 && regression_mpc_close(result, reference, bits + 32) && ok;
+    if (mpfr_zero_p(mpc_imagref(original))) {
+        mpfr_t real_base, real_result;
+        mpfr_inits2(work, real_base, real_result, (mpfr_ptr)0);
+        mpfr_set(real_base, mpc_realref(original), MPFR_RNDN);
+        ok = number_mpfr_reciprocal_sum(real_result, real_base, power, limit) && ok;
+        ok = mpfr_equal_p(real_base, mpc_realref(base)) && mpfr_equal_p(real_result, mpc_realref(result)) && ok;
+        mpfr_clears(real_base, real_result, (mpfr_ptr)0);
+    }
+    mpc_clear(term); mpc_clear(shifted); mpc_clear(reference); mpc_clear(result);
+    mpc_clear(original); mpc_clear(base);
+    return ok ? NUM_ZERO : NUM_ONE;
+}
+
+static number_t regression_polygamma_blocks_reject(const number_t *a)
+{
+    mpfr_prec_t work = (mpfr_prec_t)num_get_default_prec_bits() + 128;
+    mpc_t base, original, result;
+    mpc_init2(base, work); mpc_init2(original, work); mpc_init2(result, work);
+    bool ok = regression_mpc_input(base, a[0]);
+    mpc_set(original, base, MPC_RNDNN); mpc_set_si(result, 37, MPC_RNDNN);
+    ok = !number_mpc_reciprocal_sum(result, base, (unsigned)num_to_double(a[1]),
+                                   (unsigned long)num_to_double(a[2])) && ok;
+    ok = mpc_cmp(base, original) == 0 && mpc_cmp_si(result, 37) == 0 && ok;
+    mpc_clear(result); mpc_clear(original); mpc_clear(base);
+    return ok ? NUM_ZERO : NUM_ONE;
 }
 
 /* SQL uses dyadic components. Independent full-width powers and logarithms check both finite sums.
@@ -643,6 +792,116 @@ static number_t regression_dilog_diagonal(const number_t *a)
     return num_sub(sum, reference);
 }
 
+/* Independent integer-zeta coefficients check the new dilogarithm continuation against the defining expansion. */
+static number_t regression_clausen_reference(const number_t *a)
+{
+    mpfr_prec_t precision = (mpfr_prec_t)num_get_default_prec_bits() + 128;
+    mpc_t z, ratio, term, sum, logarithm, add;
+    mpc_init2(z, precision); mpc_init2(ratio, precision); mpc_init2(term, precision);
+    mpc_init2(sum, precision); mpc_init2(logarithm, precision); mpc_init2(add, precision);
+    mpfr_t period, coefficient, magnitude;
+    mpfr_inits2(precision, period, coefficient, magnitude, (mpfr_ptr)0);
+    mpc_set_d_d(z, num_to_double(num_real_part(a[0])), num_to_double(num_imag_part(a[0])), MPC_RNDNN);
+    bool negative = mpfr_sgn(mpc_realref(z)) < 0;
+    if (negative) mpc_neg(z, z, MPC_RNDNN);
+    mpc_log(logarithm, z, MPC_RNDNN);
+    mpc_ui_sub(logarithm, 1u, logarithm, MPC_RNDNN);
+    mpc_mul(sum, z, logarithm, MPC_RNDNN);
+    mpfr_const_pi(period, MPFR_RNDN); mpfr_mul_2ui(period, period, 1u, MPFR_RNDN);
+    mpfr_sqr(period, period, MPFR_RNDN);
+    mpc_sqr(ratio, z, MPC_RNDNN); mpc_div_fr(ratio, ratio, period, MPC_RNDNN);
+    mpc_mul(term, z, ratio, MPC_RNDNN); mpc_div_ui(term, term, 3u, MPC_RNDNN);
+    bool converged = false;
+    for (unsigned long j = 1; j < 10000; ++j) {
+        mpfr_zeta_ui(coefficient, 2u * j, MPFR_RNDN);
+        mpc_mul_fr(add, term, coefficient, MPC_RNDNN); mpc_add(sum, sum, add, MPC_RNDNN);
+        number_mpc_abs_upper(magnitude, add);
+        if (mpfr_zero_p(magnitude) || mpfr_get_exp(magnitude) < -precision + 16) {
+            converged = true;
+            break;
+        }
+        mpc_mul(term, term, ratio, MPC_RNDNN);
+        mpc_mul_ui(term, term, (2u * j) * (2u * j + 1u), MPC_RNDNN);
+        mpc_div_ui(term, term, (2u * j + 2u) * (2u * j + 3u), MPC_RNDNN);
+    }
+    if (negative) mpc_neg(sum, sum, MPC_RNDNN);
+    number_t reference = converged ? number_take(number_wrap_complex_mpc(sum, precision)) : num_clone(NUM_NAN);
+    number_t result = num_sub(num_clausen2(a[0]), reference);
+    mpfr_clears(period, coefficient, magnitude, (mpfr_ptr)0);
+    mpc_clear(z); mpc_clear(ratio); mpc_clear(term); mpc_clear(sum); mpc_clear(logarithm); mpc_clear(add);
+    return result;
+}
+
+static number_t regression_appell_reduced(const number_t *a)
+{
+    number_t value = num_appell_F1(a[0], a[1], a[2], a[3], a[4], a[5]);
+    return num_sub(value, num_pow(num_sub(NUM_ONE, a[4]), num_neg(a[0])));
+}
+
+/* Equal arguments reduce the double series to an independently evaluated Gauss hypergeometric series. */
+static number_t regression_appell_equal(const number_t *a)
+{
+    number_t upper[] = {a[0], num_add(a[1], a[2])};
+    number_t reference = num_hypergeometric_pFq(upper, 2, a + 3, 1, a[4]);
+    return num_sub(num_appell_F1(a[0], a[1], a[2], a[3], a[4], a[5]), reference);
+}
+
+/* For b1=b2=1, partial fractions reduce distinct arguments to two independent Gauss evaluations.
+ * Extra reference bits protect the subtraction when x and y are close, while preserving the exact supplied inputs. */
+static number_t regression_appell_partial_fraction(const number_t *a)
+{
+    number_t values[] = {num_clone(a[0]), num_clone(a[3]), num_clone(a[4]), num_clone(a[5])};
+    size_t saved = num_get_default_prec_bits(), reference_bits = saved + 128;
+    if (num_set_default_prec_bits(reference_bits)) return NUM_NAN;
+    for (unsigned i = 0; i < 4; ++i) {
+        if (num_set_prec_bits(values + i, reference_bits)) {
+            num_set_default_prec_bits(saved);
+            return NUM_NAN;
+        }
+    }
+    number_t upper[] = {values[0], NUM_ONE};
+    number_t left = num_hypergeometric_pFq(upper, 2, values + 1, 1, values[2]);
+    number_t right = num_hypergeometric_pFq(upper, 2, values + 1, 1, values[3]);
+    number_t reference = num_div(num_sub(num_mul(values[2], left), num_mul(values[3], right)),
+                                 num_sub(values[2], values[3]));
+    num_set_default_prec_bits(saved);
+    return num_sub(num_appell_F1(a[0], a[1], a[2], a[3], a[4], a[5]), reference);
+}
+
+/* Dyadic SQL inputs are exact in double; the reference sums individual powers at extra precision. */
+static number_t regression_polylog_reference(const number_t *a)
+{
+    unsigned long order = (unsigned long)num_to_double(a[0]);
+    mpfr_prec_t precision = (mpfr_prec_t)num_get_default_prec_bits() + 128;
+    mpc_t z, power, sum, term;
+    mpc_init2(z, precision); mpc_init2(power, precision); mpc_init2(sum, precision); mpc_init2(term, precision);
+    mpfr_t denominator, magnitude;
+    mpfr_inits2(precision, denominator, magnitude, (mpfr_ptr)0);
+    mpc_set_d_d(z, num_to_double(num_real_part(a[1])), num_to_double(num_imag_part(a[1])), MPC_RNDNN);
+    mpc_set(power, z, MPC_RNDNN); mpc_set_ui(sum, 0u, MPC_RNDNN);
+    bool converged = false;
+    for (unsigned long k = 1; k <= 200000; ++k) {
+        mpfr_ui_pow_ui(denominator, k, order, MPFR_RNDN);
+        mpc_div_fr(term, power, denominator, MPC_RNDNN);
+        mpc_add(sum, sum, term, MPC_RNDNN);
+        number_mpc_abs_upper(magnitude, term);
+        if (mpfr_zero_p(magnitude) || mpfr_get_exp(magnitude) < -precision + 16) {
+            converged = true;
+            break;
+        }
+        mpc_mul(power, power, z, MPC_RNDNN);
+    }
+    if (order == 2 && num_is_real(a[1])) {
+        mpfr_li2(mpc_realref(sum), mpc_realref(z), MPFR_RNDN);
+        mpfr_set_zero(mpc_imagref(sum), 1);
+    }
+    number_t reference = converged ? number_take(number_wrap_complex_mpc(sum, precision)) : num_clone(NUM_NAN);
+    number_t result = num_sub(num_polylog(a[0], a[1]), reference);
+    mpfr_clears(denominator, magnitude, (mpfr_ptr)0);
+    mpc_clear(z); mpc_clear(power); mpc_clear(sum); mpc_clear(term);
+    return result;
+}
+
 static number_t regression_polylog_half(const number_t *a)
 {
     number_t log_two = num_ln(NUM_TWO);
@@ -754,6 +1013,109 @@ static number_t regression_polygamma_half(const number_t *a)
     return num_div(num_sub(num_polygamma((unsigned int)order, NUM_HALF), reference), reference);
 }
 
+static number_t regression_appell_family_value(unsigned family, number_t x, number_t y, bool terminating)
+{
+    number_t first = terminating ? NUM_NEG_ONE : NUM_ONE;
+    if (family == 2) return num_appell_F2(first, NUM_ONE, NUM_ONE, NUM_ONE, NUM_ONE, x, y);
+    if (family == 3) return num_appell_F3(first, first, NUM_ONE, NUM_ONE, NUM_TWO, x, y);
+    return num_appell_F4(first, NUM_ONE, NUM_ONE, NUM_ONE, x, y);
+}
+
+static number_t regression_appell_family(const number_t *a)
+{
+    unsigned family = (unsigned)num_to_double(a[0]);
+    number_t x = a[1], y = a[2], reference;
+    number_t remaining = num_sub(num_sub(NUM_ONE, x), y);
+    if (family == 2) reference = num_inv(remaining);
+    else if (family == 3) {
+        number_t logarithm = num_ln(num_mul(num_sub(NUM_ONE, x), num_sub(NUM_ONE, y)));
+        reference = num_div(num_neg(logarithm), num_sub(num_add(x, y), num_mul(x, y)));
+    } else {
+        number_t discriminant = num_sub(num_sqr(remaining), num_mul(num_create_from_long(4), num_mul(x, y)));
+        reference = num_inv(num_sqrt(discriminant));
+    }
+    return num_div(num_sub(regression_appell_family_value(family, x, y, false), reference), reference);
+}
+
+static number_t regression_appell_family_terminate(const number_t *a)
+{
+    unsigned family = (unsigned)num_to_double(a[0]);
+    number_t x = a[1], y = a[2], reference = num_sub(num_sub(NUM_ONE, x), y);
+    if (family == 3) reference = num_add(num_sub(NUM_ONE, num_div(num_add(x, y), NUM_TWO)),
+                                      num_div(num_mul(x, y), num_create_from_long(6)));
+    return num_sub(regression_appell_family_value(family, x, y, true), reference);
+}
+
+static number_t regression_appell_family_reject(const number_t *a)
+{
+    return num_is_nan(regression_appell_family_value((unsigned)num_to_double(a[0]), a[1], a[2], false)) ?
+        NUM_ZERO : NUM_ONE;
+}
+
+static number_t regression_appell_family_native(const number_t *a)
+{
+    unsigned family = (unsigned)num_to_double(a[0]);
+    qcomplex_t x = regression_qcomplex(a[1]), y = regression_qcomplex(a[2]);
+    qcomplex_t value = family == 2 ? qc_appell_F2(QC_ONE, QC_ONE, QC_ONE, QC_ONE, QC_ONE, x, y) :
+        family == 3 ? qc_appell_F3(QC_ONE, QC_ONE, QC_ONE, QC_ONE, qc_make(qf_from_double(2), QF_ZERO), x, y) :
+                      qc_appell_F4(QC_ONE, QC_ONE, QC_ONE, QC_ONE, x, y);
+    number_t reference = regression_appell_family_value(family, a[1], a[2], false);
+    number_t error = num_div(num_sub(num_create_from_qcomplex(value), reference), reference);
+    if (num_is_real(a[1]) && num_is_real(a[2])) {
+        qfloat_t real = family == 2 ? qf_appell_F2(QF_ONE, QF_ONE, QF_ONE, QF_ONE, QF_ONE,
+                                                  qc_real(x), qc_real(y)) :
+            family == 3 ? qf_appell_F3(QF_ONE, QF_ONE, QF_ONE, QF_ONE, qf_from_double(2),
+                                       qc_real(x), qc_real(y)) :
+                          qf_appell_F4(QF_ONE, QF_ONE, QF_ONE, QF_ONE, qc_real(x), qc_real(y));
+        error = num_add(num_abs(error), num_abs(num_div(num_sub(num_create_from_qfloat(real), reference), reference)));
+    }
+    return error;
+}
+
+static number_t regression_appell_family_reduction_value(const number_t *a, bool native)
+{
+    unsigned family = (unsigned)num_to_double(a[0]);
+    number_t x = a[1], y = a[2], value, reference;
+    number_t half = NUM_HALF, three_quarters = num_create_from_frac(3, 4);
+    number_t five_quarters = num_create_from_frac(5, 4), five_halves = num_create_from_frac(5, 2);
+    if (family == 2) {
+        reference = num_pow(num_sub(num_sub(NUM_ONE, x), y), num_neg(half));
+        value = native ? num_create_from_qcomplex(qc_appell_F2(regression_qcomplex(half),
+            regression_qcomplex(three_quarters), regression_qcomplex(five_quarters),
+            regression_qcomplex(three_quarters), regression_qcomplex(five_quarters),
+            regression_qcomplex(x), regression_qcomplex(y))) :
+            num_appell_F2(half, three_quarters, five_quarters, three_quarters, five_quarters, x, y);
+    } else if (family == 3) {
+        reference = num_mul(num_pow(num_sub(NUM_ONE, y), num_neg(five_quarters)),
+            num_appell_F1(half, three_quarters, five_quarters, five_halves, x, num_div(y, num_sub(y, NUM_ONE))));
+        value = native ? num_create_from_qcomplex(qc_appell_F3(regression_qcomplex(half), QC_TWO,
+            regression_qcomplex(three_quarters), regression_qcomplex(five_quarters),
+            regression_qcomplex(five_halves), regression_qcomplex(x), regression_qcomplex(y))) :
+            num_appell_F3(half, NUM_TWO, three_quarters, five_quarters, five_halves, x, y);
+    } else {
+        number_t upper[] = {half, three_quarters};
+        number_t first = num_hypergeometric_pFq(upper, 2, &five_quarters, 1, x);
+        number_t second = num_hypergeometric_pFq(upper, 2, &NUM_ONE, 1, y);
+        reference = num_mul(first, second);
+        number_t left = num_mul(x, num_sub(NUM_ONE, y)), right = num_mul(y, num_sub(NUM_ONE, x));
+        value = native ? num_create_from_qcomplex(qc_appell_F4(regression_qcomplex(half),
+            regression_qcomplex(three_quarters), regression_qcomplex(five_quarters), QC_ONE,
+            regression_qcomplex(left), regression_qcomplex(right))) :
+            num_appell_F4(half, three_quarters, five_quarters, NUM_ONE, left, right);
+    }
+    return num_div(num_sub(value, reference), reference);
+}
+
+static number_t regression_appell_family_reduction(const number_t *a)
+{
+    return regression_appell_family_reduction_value(a, false);
+}
+
+static number_t regression_appell_family_reduction_native(const number_t *a)
+{
+    return regression_appell_family_reduction_value(a, true);
+}
+
 static number_t regression_zeta_reflection(const number_t *a)
 {
     /* Reflect the Hurwitz offset about one half: zeta(s, 1/2) = (2^s - 1) zeta(s).
@@ -821,6 +1183,29 @@ static number_t regression_double_clausen(const number_t *a)
     return num_sub(value, num_clausen2(a[0]));
 }
 
+/* A real operand reduces the guarded product to correctly rounded independent component products.
+ * Exercise each input as the destination as well as a disjoint result, retaining both inputs until conversion. */
+static number_t regression_guarded_scalar_product(const number_t *a)
+{
+    mpfr_prec_t bits = (mpfr_prec_t)num_get_default_prec_bits();
+    mpc_t left, right, output, reference;
+    mpc_init2(left, bits); mpc_init2(right, bits); mpc_init2(output, bits); mpc_init2(reference, bits);
+    mpfr_t scratch[4];
+    for (unsigned j = 0; j < 4u; ++j) mpfr_init2(scratch[j], bits);
+    bool ok = true;
+    for (unsigned alias = 0; ok && alias < 3u; ++alias) {
+        ok = regression_mpc_input(left, a[0]) && regression_mpc_input(right, a[1]);
+        if (!ok) break;
+        mpc_mul(reference, left, right, MPC_RNDNN);
+        mpc_ptr destination = alias == 1u ? left : alias == 2u ? right : output;
+        number_mpc_mul_guarded(destination, left, right, scratch);
+        ok = mpc_cmp(destination, reference) == 0;
+    }
+    for (unsigned j = 0; j < 4u; ++j) mpfr_clear(scratch[j]);
+    mpc_clear(left); mpc_clear(right); mpc_clear(output); mpc_clear(reference);
+    return ok ? NUM_ZERO : NUM_ONE;
+}
+
 typedef struct {
     const char *name;
     size_t arity;
@@ -829,18 +1214,30 @@ typedef struct {
 
 static const regression_operation_t regression_operations[] = {
     {"acosec", 1, regression_acosec},
+    {"appell_equal", 6, regression_appell_equal},
+    {"appell_family", 3, regression_appell_family},
+    {"appell_family_native", 3, regression_appell_family_native},
+    {"appell_family_reduction", 3, regression_appell_family_reduction},
+    {"appell_family_reduction_native", 3, regression_appell_family_reduction_native},
+    {"appell_family_reject", 3, regression_appell_family_reject},
+    {"appell_family_terminate", 3, regression_appell_family_terminate},
     {"appell_linear", 6, regression_appell_linear},
     {"appell_log", 6, regression_appell_log},
     {"appell_nan", 6, regression_appell_nan},
+    {"appell_partial_fraction", 6, regression_appell_partial_fraction},
     {"appell_product", 6, regression_appell_product},
     {"appell_quadratic", 6, regression_appell_quadratic},
+    {"appell_reduced", 6, regression_appell_reduced},
     {"asec", 1, regression_asec},
     {"bessel_half", 1, regression_bessel_half},
+    {"bessel_i_reference", 2, test_number_bessel_i_reference},
+    {"bessel_j_reference", 2, test_number_bessel_j_reference},
     {"bessel_k", 2, regression_bessel_K},
     {"chi", 2, regression_chi},
     {"chi_limit", 2, regression_chi_limit},
     {"clausen_catalan", 1, regression_clausen_catalan},
     {"clausen_odd", 1, regression_clausen_odd},
+    {"clausen_reference", 1, regression_clausen_reference},
     {"digamma", 1, regression_digamma},
     {"dilog_diagonal", 1, regression_dilog_diagonal},
     {"double_clausen", 1, regression_double_clausen},
@@ -853,15 +1250,19 @@ static const regression_operation_t regression_operations[] = {
     {"erf", 1, regression_erf},
     {"erfc", 1, regression_erfc},
     {"erfcinv", 1, regression_erfcinv},
+    {"erfcinv_reference", 1, regression_erfcinv_reference},
     {"erfinv", 1, regression_erfinv},
+    {"erfinv_reference", 1, regression_erfinv_reference},
     {"gamma_inverse_complex", 1, regression_gamma_inverse_complex},
     {"gamma_lower_one", 1, regression_gamma_lower_one},
+    {"gamma_lower_reference", 2, regression_gamma_lower_reference},
     {"gamma_recurrence", 1, regression_gamma_recurrence},
     {"gamma_reflection", 1, regression_gamma_reflection},
     {"gamma_regularised", 2, regression_gamma_regularised},
     {"gamma_upper_one", 1, regression_gamma_upper_one},
     {"gamma_upper_recurrence", 2, regression_gamma_upper_recurrence},
     {"gammainv", 1, regression_gammainv},
+    {"guarded_scalar_product", 2, regression_guarded_scalar_product},
     {"hypergeometric_binomial", 2, regression_hypergeometric_binomial},
     {"hypergeometric_exact", 1, regression_hypergeometric_exact},
     {"hypergeometric_exp", 1, regression_hypergeometric_exp},
@@ -878,24 +1279,40 @@ static const regression_operation_t regression_operations[] = {
     {"lgamma_turns", 1, regression_lgamma_turns},
     {"lommel", 1, regression_lommel},
     {"lommel_recurrence", 3, regression_lommel_recurrence},
+    {"lommel_reference", 4, test_number_lommel_reference},
     {"normal_cdf", 1, regression_normal_cdf},
     {"normal_logpdf", 1, regression_normal_logpdf},
     {"normal_pdf", 1, regression_normal_pdf},
     {"normal_tail", 1, regression_normal_tail},
+    {"pfq_0f0_reference", 1, regression_pfq_0f0_reference},
+    {"pfq_0f1_reference", 2, regression_pfq_0f1_reference},
+    {"pfq_1f0_reference", 2, regression_pfq_1f0_reference},
+    {"pfq_1f1_reference", 3, regression_pfq_1f1_reference},
+    {"pfq_2f1_reference", 4, regression_pfq_2f1_reference},
+    {"pfq_2f2_reference", 5, regression_pfq_2f2_reference},
+    {"pfq_3f2_reference", 6, regression_pfq_3f2_reference},
+    {"pfq_pole", 3, regression_pfq_pole},
     {"polygamma", 1, regression_polygamma},
+    {"polygamma_blocks", 3, regression_polygamma_blocks},
+    {"polygamma_blocks_reject", 3, regression_polygamma_blocks_reject},
     {"polygamma_half", 1, regression_polygamma_half},
     {"polygamma_value", 1, regression_polygamma_value},
     {"polylog_half", 1, regression_polylog_half},
     {"polylog_limit", 2, regression_polylog_limit},
+    {"polylog_reference", 2, regression_polylog_reference},
     {"qc_bessel_half", 1, regression_qc_bessel_half},
     {"qc_erf", 1, regression_qc_erf},
     {"qc_erfcinv", 1, regression_qc_erfcinv},
     {"qc_lommel", 1, regression_qc_lommel},
     {"qf_normal_tail", 1, regression_qf_normal_tail},
+    {"struve_h_reference", 2, test_number_struve_h_reference},
+    {"struve_l_reference", 2, test_number_struve_l_reference},
     {"tetragamma", 1, regression_tetragamma},
     {"tetragamma_reflection", 1, regression_tetragamma_reflection},
     {"trigamma", 1, regression_trigamma},
     {"trigamma_reflection", 1, regression_trigamma_reflection},
+    {"two_lower_alias", 4, test_number_two_lower_alias},
+    {"two_lower_reject", 4, test_number_two_lower_reject},
     {"zatahp", 2, regression_zatahp},
     {"zatahp_reference", 2, regression_zatahp_reference},
     {"zatahp_zero", 1, regression_zatahp_zero},
@@ -956,6 +1373,16 @@ static void regression_row(const void *data)
 /* Run SQL-authored accuracy regressions at fixed and multiprecision working sizes. */
 void run_number_benchmark_regressions(void)
 {
+    /* Validate the sorted test registry once, before any binary-search dispatch can hide an authored case. */
+    bool sorted = true;
+    for (size_t j = 1; j < sizeof regression_operations / sizeof *regression_operations; ++j) {
+        if (strcmp(regression_operations[j - 1].name, regression_operations[j].name) >= 0) {
+            sorted = false;
+            break;
+        }
+    }
+    TEST_ASSERT_TRUE(sorted, "special-function test operations remain strictly sorted and unique");
+    if (!sorted) return;
     test_run_database_cases(__FILE__, __LINE__, "number.benchmark_regressions",
         "tests.run_number_benchmark_regressions", regression_row);
 }

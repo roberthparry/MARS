@@ -37,7 +37,7 @@ static expr_t *integer_binary(const expr_ops_t *ops, const expr_t *left, const e
 /* Keep the operand pair unevaluated, including when both operands are constants. */
 expr_t *expr_integer_pack(const expr_t *left, const expr_t *right)
 {
-    return integer_binary(&ops_integer_pack, left, right);
+    return integer_binary(&ops_argument_list, left, right);
 }
 
 expr_t *expr_integer_from_pack(const expr_ops_t *ops, const expr_t *parameters, const expr_t *third)
@@ -70,7 +70,7 @@ static expr_t *gcdext_from_pack(const expr_t *pair, const expr_t *component)
 
 bool expr_integer_unpack(const expr_t *expression, const expr_t **a, const expr_t **b, const expr_t **c)
 {
-    if (!expression || !expr_is_op(expression->a, &ops_integer_pack) || !expression->b)
+    if (!expression || !expr_is_op(expression->a, &ops_argument_list) || !expression->b)
         return false;
     *a = expression->a->a;
     *b = expression->a->b;
@@ -93,11 +93,6 @@ static bool integer_index(number_t value, size_t *index)
     return ok;
 }
 
-static number_t eval_integer_pack(expr_t *expression)
-{
-    (void)expression;
-    return NUM_NAN;
-}
 
 static number_t eval_powmod(expr_t *expression)
 {
@@ -155,12 +150,6 @@ static number_t eval_integer_component(expr_t *expression)
     return result;
 }
 
-const expr_ops_t ops_integer_pack = {
-    .eval = eval_integer_pack, .deriv = deriv_not_differentiable, .reverse = expr_reverse_not_differentiable,
-    .kind = EXPR_KIND_INTEGER_PACK, .arity = EXPR_OP_BINARY, .diff_kind = EXPR_DIFF_NONE,
-    .expression_name = "integer_parameters", .function_name = "integer_parameters",
-    .apply_binary = expr_integer_pack, .simplify = expr_simplify_rebuild_binary_operator
-};
 
 const expr_ops_t ops_powmod = {
     .eval = eval_powmod, .deriv = deriv_not_differentiable, .reverse = expr_reverse_not_differentiable,

@@ -3,7 +3,8 @@
  * @brief Clausen function evaluation.
  *
  * Computes supported Clausen values and the order-two convenience form. Argument reduction and the layer's numeric
- * representation determine the evaluation path.
+ * representation determine the evaluation path. Moderate complex order-two arguments use the shared dilogarithm
+ * continuation; other orders retain the coefficient series and precision-aware even-zeta reuse.
  *
  * This belongs to number_t's shared scalar layer. Preserve exactness, precision policy and the distinction between
  * borrowed aliases and independently owned numeric values.
@@ -38,6 +39,44 @@ static bool number_clausen_small(mpfr_srcptr term, mpfr_srcptr sum, mpfr_prec_t 
     mpfr_div_2ui(scratch, scratch, (unsigned long)bits, MPFR_RNDN);
     return mpfr_cmpabs(term, scratch) <= 0;
 }
+
+/* A directed logarithm supplies a conservative prefix length; the ordinary series still validates convergence. */
+static void number_clausen_coefficients(mpfr_srcptr ratio, mpfr_prec_t precision)
+{
+    if (precision < 1024 || !mpfr_number_p(ratio) || mpfr_sgn(ratio) <= 0) return;
+    mpfr_exp_t exponent = mpfr_get_exp(ratio);
+    if (exponent >= 0 || exponent < -precision) return;
+    mpfr_t length;
+    mpfr_init2(length, 64);
+    mpfr_log2(length, ratio, MPFR_RNDU); mpfr_neg(length, length, MPFR_RNDD);
+    mpfr_ui_div(length, (unsigned long)precision + 64u, length, MPFR_RNDU);
+    size_t count = mpfr_cmp_ui(length, 1024u) < 0 ? (size_t)mpfr_get_ui(length, MPFR_RNDU) + 1u : 0;
+    mpfr_clear(length);
+    number_coefficient_zeta_prefix(count, precision);
+}
+
+
+/* Log(exp(i*z)) = i*z for this reduced strip. Using that value avoids a near-unit MPC logarithm. */
+static void number_clausen_dilog(mpc_ptr out, mpc_srcptr z, mpfr_srcptr pi)
+{
+    mpfr_prec_t precision = mpc_get_prec(out);
+    mpc_t argument, value, logarithm, polynomial;
+    mpc_init2(argument, precision); mpc_init2(value, precision);
+    mpc_init2(logarithm, precision); mpc_init2(polynomial, precision);
+    mpc_mul_i(argument, z, 1, MPC_RNDNN);
+    mpc_exp(argument, argument, MPC_RNDNN);
+    mpc_ui_sub(argument, 1u, argument, MPC_RNDNN);
+    number_mpc_dilog(value, argument, MPC_RNDNN);
+    mpc_log(logarithm, argument, MPC_RNDNN);
+    mpc_mul(out, z, logarithm, MPC_RNDNN); mpc_neg(out, out, MPC_RNDNN);
+    mpc_mul_i(value, value, 1, MPC_RNDNN); mpc_add(out, out, value, MPC_RNDNN);
+    mpc_mul_fr(polynomial, z, pi, MPC_RNDNN); mpc_div_ui(polynomial, polynomial, 2u, MPC_RNDNN);
+    mpc_mul_i(polynomial, polynomial, -1, MPC_RNDNN); mpc_add(out, out, polynomial, MPC_RNDNN);
+    mpc_sqr(polynomial, z, MPC_RNDNN); mpc_div_ui(polynomial, polynomial, 4u, MPC_RNDNN);
+    mpc_mul_i(polynomial, polynomial, 1, MPC_RNDNN); mpc_add(out, out, polynomial, MPC_RNDNN);
+    mpc_clear(argument); mpc_clear(value); mpc_clear(logarithm); mpc_clear(polynomial);
+}
+
 
 /* The real path never constructs a complex value. */
 static void number_mpfr_clausen(mpfr_ptr out, unsigned long order, mpfr_srcptr input)
@@ -88,6 +127,7 @@ static void number_mpfr_clausen(mpfr_ptr out, unsigned long order, mpfr_srcptr i
         mpfr_sub(x, pi, x, MPFR_RNDN);
         mpfr_div(ratio, x, pi, MPFR_RNDN);
         mpfr_sqr(ratio, ratio, MPFR_RNDN);
+        number_clausen_coefficients(ratio, precision);
         mpfr_set(term, ratio, MPFR_RNDN);
         mpfr_set_ui_2exp(quarter, 1ul, -2, MPFR_RNDN);
         mpfr_const_log2(sum, MPFR_RNDN);
@@ -141,6 +181,7 @@ static void number_mpfr_clausen(mpfr_ptr out, unsigned long order, mpfr_srcptr i
     mpfr_mul_2ui(pi, pi, 1u, MPFR_RNDN);
     mpfr_div(ratio, x, pi, MPFR_RNDN);
     mpfr_sqr(ratio, ratio, MPFR_RNDN);
+    number_clausen_coefficients(ratio, precision);
     mpfr_mul(term, term, ratio, MPFR_RNDN);
     mpfr_mul_2ui(term, term, 1u, MPFR_RNDN);
     mpfr_div_ui(term, term, order, MPFR_RNDN);
@@ -236,6 +277,8 @@ static void number_mpc_clausen(mpc_ptr out, unsigned long order, mpc_srcptr inpu
         mpc_sqr(ratio, work, MPC_RNDNN);
         mpfr_sqr(scratch, pi, MPFR_RNDN);
         mpc_div_fr(ratio, ratio, scratch, MPC_RNDNN);
+        mpc_abs(magnitude, ratio, MPFR_RNDU);
+        number_clausen_coefficients(magnitude, precision);
         mpc_set(term, ratio, MPC_RNDNN);
         mpfr_set_ui_2exp(quarter, 1ul, -2, MPFR_RNDN);
         mpfr_const_log2(scratch, MPFR_RNDN);
@@ -258,6 +301,9 @@ static void number_mpc_clausen(mpc_ptr out, unsigned long order, mpc_srcptr inpu
         mpc_mul(sum, sum, work, MPC_RNDNN);
         goto finish_series;
     }
+    bool dilog_region = order == 2ul && precision >= 448 && mpfr_cmp_d(mpc_realref(z), 0.125) >= 0 &&
+                        mpfr_cmp_d(mpc_realref(z), 0.875) <= 0 && mpfr_cmp_d(mpc_imagref(z), 0.5) <= 0;
+    if (dilog_region) { number_clausen_dilog(sum, z, pi); goto done; }
     if (mpfr_cmp_ui(mpc_imagref(z), 2ul) <= 0) {
         if (order == 1ul) {
             mpc_div_ui(work, z, 2ul, MPC_RNDNN);
@@ -297,6 +343,8 @@ static void number_mpc_clausen(mpc_ptr out, unsigned long order, mpc_srcptr inpu
         mpfr_mul_2ui(scratch, pi, 1u, MPFR_RNDN);
         mpfr_sqr(scratch, scratch, MPFR_RNDN);
         mpc_div_fr(ratio, square, scratch, MPC_RNDNN);
+        mpc_abs(magnitude, ratio, MPFR_RNDU);
+        number_clausen_coefficients(magnitude, precision);
         mpc_mul(term, term, ratio, MPC_RNDNN);
         mpc_mul_ui(term, term, 2ul, MPC_RNDNN);
         mpc_div_ui(term, term, order, MPC_RNDNN);

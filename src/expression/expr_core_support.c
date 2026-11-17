@@ -2,7 +2,8 @@
  * @file expr_core_support.c
  * @brief Expression cloning and shared core helpers.
  *
- * Copies graph metadata and creates independent or symbol-linked clones. These helpers support transformations
+ * Provides compact operation dispatch, copies graph metadata and creates independent or symbol-linked clones.
+ * These helpers support transformations
  * that must preserve symbol relationships without accidentally sharing mutable graph state.
  *
  * This is part of the expr_t implementation. Preserve expression ownership, symbol identity and mathematical
@@ -16,10 +17,36 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "expression-t.h"
 #include "number-t.h"
 #define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_internal.h"
-#include "expression-t.h"
+
+/* Use the small alphabetical enum ranges; sinc is deliberately excluded from the sine pair. */
+unsigned expr_trig_slot(expr_op_kind_t kind)
+{
+    static const unsigned char cos_slots[] = {
+        [EXPR_KIND_COS - EXPR_KIND_COS]    = 1,
+        [EXPR_KIND_COSEC - EXPR_KIND_COS]  = 4,
+        [EXPR_KIND_COSECH - EXPR_KIND_COS] = 10,
+        [EXPR_KIND_COSH - EXPR_KIND_COS]   = 7,
+        [EXPR_KIND_COT - EXPR_KIND_COS]    = 5,
+        [EXPR_KIND_COTH - EXPR_KIND_COS]   = 11
+    };
+    _Static_assert(sizeof cos_slots == 6u, "Cosine and cotangent kinds must remain consecutive.");
+    _Static_assert(EXPR_KIND_SECH == EXPR_KIND_SEC + 1 && EXPR_KIND_TANH == EXPR_KIND_TAN + 1,
+                   "Secant and tangent pairs must remain consecutive.");
+    _Static_assert(EXPR_KIND_SINC == EXPR_KIND_SIN + 1 && EXPR_KIND_SINH == EXPR_KIND_SIN + 2,
+                   "Sine kinds must retain the intervening sinc operation.");
+    unsigned offset = (unsigned)kind - (unsigned)EXPR_KIND_COS;
+    if (offset < sizeof cos_slots) return cos_slots[offset];
+    offset = (unsigned)kind - (unsigned)EXPR_KIND_SEC;
+    if (offset < 2u) return 3u + 6u * offset;
+    offset = (unsigned)kind - (unsigned)EXPR_KIND_SIN;
+    if (offset == 0u || offset == 2u) return 3u * offset;
+    offset = (unsigned)kind - (unsigned)EXPR_KIND_TAN;
+    return offset < 2u ? 2u + 6u * offset : 12u;
+}
 
 typedef struct expr_default_constant_alias {
     const char *key;

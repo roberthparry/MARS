@@ -1332,6 +1332,53 @@ qfloat_t qf_hermite_Hn(unsigned long degree, qfloat_t argument);
 qfloat_t qf_appell_F1(qfloat_t a, qfloat_t b1, qfloat_t b2, qfloat_t c, qfloat_t x, qfloat_t y);
 
 /**
+ * @brief Evaluate Appell F₂(a; b1, b2; c1, c2; x, y).
+ * @details Uses the defining series for |x| + |y| < 1; finite terminating numerator polynomials
+ * are also supported outside that region. Denominator poles, exhausted numerical budgets and unsupported
+ * analytic continuation return the native NaN value. Independent calls are thread-safe.
+ * @param[in] a Borrowed hypergeometric parameter, passed by value and never modified.
+ * @param[in] b1 Borrowed hypergeometric parameter, passed by value and never modified.
+ * @param[in] b2 Borrowed hypergeometric parameter, passed by value and never modified.
+ * @param[in] c1 Borrowed hypergeometric parameter, passed by value and never modified.
+ * @param[in] c2 Borrowed hypergeometric parameter, passed by value and never modified.
+ * @param[in] x Borrowed series variable, passed by value and never modified.
+ * @param[in] y Borrowed series variable, passed by value and never modified.
+ * @return Fixed-precision result owning no separate storage; no release is required.
+ */
+qfloat_t qf_appell_F2(qfloat_t a, qfloat_t b1, qfloat_t b2, qfloat_t c1, qfloat_t c2, qfloat_t x, qfloat_t y);
+
+/**
+ * @brief Evaluate Appell F₃(a1, a2; b1, b2; c; x, y).
+ * @details Uses the defining series for max(|x|, |y|) < 1; finite terminating numerator polynomials
+ * are also supported outside that region. Denominator poles, exhausted numerical budgets and unsupported
+ * analytic continuation return the native NaN value. Independent calls are thread-safe.
+ * @param[in] a1 Borrowed hypergeometric parameter, passed by value and never modified.
+ * @param[in] a2 Borrowed hypergeometric parameter, passed by value and never modified.
+ * @param[in] b1 Borrowed hypergeometric parameter, passed by value and never modified.
+ * @param[in] b2 Borrowed hypergeometric parameter, passed by value and never modified.
+ * @param[in] c Borrowed hypergeometric parameter, passed by value and never modified.
+ * @param[in] x Borrowed series variable, passed by value and never modified.
+ * @param[in] y Borrowed series variable, passed by value and never modified.
+ * @return Fixed-precision result owning no separate storage; no release is required.
+ */
+qfloat_t qf_appell_F3(qfloat_t a1, qfloat_t a2, qfloat_t b1, qfloat_t b2, qfloat_t c, qfloat_t x, qfloat_t y);
+
+/**
+ * @brief Evaluate Appell F₄(a, b; c1, c2; x, y).
+ * @details Uses the defining series for sqrt(|x|) + sqrt(|y|) < 1; finite terminating numerator polynomials
+ * are also supported outside that region. Denominator poles, exhausted numerical budgets and unsupported
+ * analytic continuation return the native NaN value. Independent calls are thread-safe.
+ * @param[in] a Borrowed hypergeometric parameter, passed by value and never modified.
+ * @param[in] b Borrowed hypergeometric parameter, passed by value and never modified.
+ * @param[in] c1 Borrowed hypergeometric parameter, passed by value and never modified.
+ * @param[in] c2 Borrowed hypergeometric parameter, passed by value and never modified.
+ * @param[in] x Borrowed series variable, passed by value and never modified.
+ * @param[in] y Borrowed series variable, passed by value and never modified.
+ * @return Fixed-precision result owning no separate storage; no release is required.
+ */
+qfloat_t qf_appell_F4(qfloat_t a, qfloat_t b, qfloat_t c1, qfloat_t c2, qfloat_t x, qfloat_t y);
+
+/**
  * @brief Compute the Lauricella hypergeometric function F_D in n variables.
  *
  * The b and x arrays must each contain variable_count values.  The defining

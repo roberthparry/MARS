@@ -199,6 +199,15 @@ static inline matrix_t *test_mat_square_expr(size_t n) {
 int test_mat_bindings_set_d(mat_bindings_t *bindings, const char *name, double value);
 
 void run_matrix_core_tests(void);
+
+/**
+ * @brief Check supported Appell matrix pairs, rejected domains and retained symbolic bindings.
+ * @return No value; records assertions through the active sequential harness.
+ * Owns and releases temporary matrices and expressions. Restores the default numerical precision;
+ * database case inputs remain borrowed. No ownership transfers to callers.
+ */
+void run_matrix_appell_tests(void);
+
 void run_matrix_function_tests(void);
 void run_matrix_function_regression_tests(void);
 void run_matrix_fromstring_tests(void);

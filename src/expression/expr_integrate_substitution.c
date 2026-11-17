@@ -91,16 +91,6 @@ typedef struct {
     exp_unary_double_angle_rule_set_t double_angle;
 } exp_unary_rule_entry_t;
 
-enum {
-    exp_unary_rule_kind_first = EXPR_KIND_SIN,
-    exp_unary_rule_kind_last = EXPR_KIND_COTH,
-    exp_unary_rule_kind_count = exp_unary_rule_kind_last - exp_unary_rule_kind_first + 1,
-    exp_unary_double_angle_trig_kind_first = EXPR_KIND_SIN,
-    exp_unary_double_angle_trig_kind_last = EXPR_KIND_COS,
-    exp_unary_double_angle_hyperbolic_kind_first = EXPR_KIND_SINH,
-    exp_unary_double_angle_hyperbolic_kind_last = EXPR_KIND_COSH
-};
-
 static const exp_unary_rule_entry_t exp_unary_rule_entries[] = {
     {.substitution = {true, EXPR_KIND_COS, 1u, {{0u, 1}}, 1u, {{1u, -1}}, 2u, {{0u, 1}, {2u, -1}}},
      .double_angle =
@@ -135,42 +125,24 @@ static const exp_unary_rule_entry_t exp_unary_rule_entries[] = {
      .has_square_relation = true,
      .square_relation = {EXPR_KIND_COSECH, 2u, {{0u, -1}, {2u, 1}}}}};
 
-_Static_assert(sizeof(exp_unary_rule_entries) / sizeof(exp_unary_rule_entries[0]) == exp_unary_rule_kind_count,
-               "exp_unary_rule_entries must follow EXPR_KIND_SIN..EXPR_KIND_COTH");
-
 static const exp_unary_rule_entry_t *exp_unary_rule_entry_for_kind(expr_op_kind_t kind)
 {
-    unsigned int index = 0u;
-
-    if ((unsigned)kind < (unsigned)exp_unary_rule_kind_first || (unsigned)kind > (unsigned)exp_unary_rule_kind_last) {
-        return NULL;
-    }
-
-    index = (unsigned)kind - (unsigned)exp_unary_rule_kind_first;
-    if (index >= sizeof(exp_unary_rule_entries) / sizeof(exp_unary_rule_entries[0])) {
-        return NULL;
-    }
-
-    return &exp_unary_rule_entries[index];
+    unsigned slot = expr_trig_slot(kind);
+    return slot < 12u ? &exp_unary_rule_entries[slot] : NULL;
 }
 
 static exp_unary_double_angle_outer_slot_t exp_unary_double_angle_outer_slot_for_kind(expr_op_kind_t kind)
 {
-    if ((unsigned)kind >= (unsigned)exp_unary_double_angle_trig_kind_first &&
-        (unsigned)kind <= (unsigned)exp_unary_double_angle_trig_kind_last) {
-        return (
-            exp_unary_double_angle_outer_slot_t)(EXP_UNARY_DOUBLE_ANGLE_OUTER_SIN +
-                                                 ((unsigned)kind - (unsigned)exp_unary_double_angle_trig_kind_first));
-    }
-
-    if ((unsigned)kind >= (unsigned)exp_unary_double_angle_hyperbolic_kind_first &&
-        (unsigned)kind <= (unsigned)exp_unary_double_angle_hyperbolic_kind_last) {
-        return (exp_unary_double_angle_outer_slot_t)(EXP_UNARY_DOUBLE_ANGLE_OUTER_SINH +
-                                                     ((unsigned)kind -
-                                                      (unsigned)exp_unary_double_angle_hyperbolic_kind_first));
-    }
-
-    return EXP_UNARY_DOUBLE_ANGLE_OUTER_INVALID;
+    static const exp_unary_double_angle_outer_slot_t slots[12] = {
+        EXP_UNARY_DOUBLE_ANGLE_OUTER_SIN, EXP_UNARY_DOUBLE_ANGLE_OUTER_COS,
+        EXP_UNARY_DOUBLE_ANGLE_OUTER_INVALID, EXP_UNARY_DOUBLE_ANGLE_OUTER_INVALID,
+        EXP_UNARY_DOUBLE_ANGLE_OUTER_INVALID, EXP_UNARY_DOUBLE_ANGLE_OUTER_INVALID,
+        EXP_UNARY_DOUBLE_ANGLE_OUTER_SINH, EXP_UNARY_DOUBLE_ANGLE_OUTER_COSH,
+        EXP_UNARY_DOUBLE_ANGLE_OUTER_INVALID, EXP_UNARY_DOUBLE_ANGLE_OUTER_INVALID,
+        EXP_UNARY_DOUBLE_ANGLE_OUTER_INVALID, EXP_UNARY_DOUBLE_ANGLE_OUTER_INVALID
+    };
+    unsigned slot = expr_trig_slot(kind);
+    return slot < 12u ? slots[slot] : EXP_UNARY_DOUBLE_ANGLE_OUTER_INVALID;
 }
 
 static bool collect_substitution_candidates(const expr_t *expr, const expr_t *root, const expr_t *wrt,

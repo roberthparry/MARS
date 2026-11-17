@@ -46,7 +46,7 @@ string_t *benchmark_arguments_text(const char *arguments, const char *backend, u
         string_t *source = string_new_with(arguments), *out = string_new();
         size_t count = 0;
         string_t **parts = source ? string_split(source, ",", &count) : NULL;
-        bool ok = out && parts && count > 0 && count <= 6 && (complex_mask >> count) == 0;
+        bool ok = out && parts && count > 0 && count <= 7 && (complex_mask >> count) == 0;
         for (size_t i = 0; ok && i < count; ++i) {
             string_trim(parts[i]);
             bool imaginary = (complex_mask & (1u << i)) != 0;
@@ -125,11 +125,11 @@ static string_t *benchmark_fraction_TeX(const char *text, size_t slash)
 
 static string_t *benchmark_fraction_arguments(const string_t *inputs, bool markdown, bool *changed)
 {
-    size_t count = 0, separators[6] = {0};
+    size_t count = 0, separators[7] = {0};
     string_t **parts = string_split(inputs, ",", &count);
     string_t *out = NULL;
     *changed = false;
-    bool ok = parts && count && count <= 6;
+    bool ok = parts && count && count <= 7;
     for (size_t i = 0; ok && i < count; ++i) {
         string_trim(parts[i]);
         separators[i] = benchmark_fraction_separator(parts[i]);

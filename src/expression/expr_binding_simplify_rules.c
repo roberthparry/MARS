@@ -2642,19 +2642,10 @@ static const int8_t s_binding_trig_exact_index[BINDING_TRIG_EXACT_TWELFTH_COUNT]
     [20] = 13, [21] = 14,
     [22] = 15, [23] = BINDING_TRIG_EXACT_INDEX_MISSING};
 
-enum {
-    BINDING_TRIG_EXACT_RULE_KIND_MIN = (int)EXPR_KIND_SIN,
-    BINDING_TRIG_EXACT_RULE_KIND_MAX = (int)EXPR_KIND_COT,
-    BINDING_TRIG_EXACT_RULE_KIND_COUNT = BINDING_TRIG_EXACT_RULE_KIND_MAX - BINDING_TRIG_EXACT_RULE_KIND_MIN + 1
+static const binding_trig_exact_rule_t *const s_binding_trig_exact_rule_tables[6] = {
+    s_binding_trig_exact_rules_sin, s_binding_trig_exact_rules_cos, s_binding_trig_exact_rules_tan,
+    s_binding_trig_exact_rules_sec, s_binding_trig_exact_rules_cosec, s_binding_trig_exact_rules_cot
 };
-
-static const binding_trig_exact_rule_t *const s_binding_trig_exact_rule_tables[BINDING_TRIG_EXACT_RULE_KIND_COUNT] = {
-    [EXPR_KIND_SIN - BINDING_TRIG_EXACT_RULE_KIND_MIN] = s_binding_trig_exact_rules_sin,
-    [EXPR_KIND_COS - BINDING_TRIG_EXACT_RULE_KIND_MIN] = s_binding_trig_exact_rules_cos,
-    [EXPR_KIND_TAN - BINDING_TRIG_EXACT_RULE_KIND_MIN] = s_binding_trig_exact_rules_tan,
-    [EXPR_KIND_SEC - BINDING_TRIG_EXACT_RULE_KIND_MIN] = s_binding_trig_exact_rules_sec,
-    [EXPR_KIND_COSEC - BINDING_TRIG_EXACT_RULE_KIND_MIN] = s_binding_trig_exact_rules_cosec,
-    [EXPR_KIND_COT - BINDING_TRIG_EXACT_RULE_KIND_MIN] = s_binding_trig_exact_rules_cot};
 
 static const binding_trig_exact_rule_t *binding_trig_exact_rule_lookup(const expr_ops_t *ops, long twelfths)
 {
@@ -2662,12 +2653,12 @@ static const binding_trig_exact_rule_t *binding_trig_exact_rule_lookup(const exp
     int kind;
     int8_t index;
 
-    kind = ops ? (int)ops->kind : -1;
+    kind = ops ? (int)expr_trig_slot(ops->kind) : -1;
     if (!ops || twelfths < 0L || twelfths >= (long)BINDING_TRIG_EXACT_TWELFTH_COUNT ||
-        kind < BINDING_TRIG_EXACT_RULE_KIND_MIN || kind > BINDING_TRIG_EXACT_RULE_KIND_MAX)
+        (unsigned)kind >= 6u)
         return NULL;
 
-    rules = s_binding_trig_exact_rule_tables[kind - BINDING_TRIG_EXACT_RULE_KIND_MIN];
+    rules = s_binding_trig_exact_rule_tables[kind];
     if (!rules)
         return NULL;
 

@@ -7,19 +7,30 @@
  * values and actual polar conversions still use their ordinary modulus. Only number-module implementations use
  * these helpers; callers retain their initialised MPFR destinations and all input ownership.
  * Guarded complex multiplication supplies an explicit absolute error allowance for finite series polynomials,
- * allowing three rounded real products without MPC's correctly rounded component contract.
+ * allowing three rounded real products without MPC's correctly rounded component contract. Real operands use
+ * one or two real products, with both components completed before writing an aliased destination.
  */
 #include <limits.h>
 
 #define MARS_NUMBER_INTERNAL_ACCESS
 #include "number_internal.h"
 
-/* Use three rounded real products where the owning series provides an absolute error budget. */
+/* Use one, two or three real products according to the operands, within the owning series' absolute error budget. */
 void number_mpc_mul_guarded(mpc_ptr out, mpc_srcptr left, mpc_srcptr right, mpfr_t *scratch)
 {
     if (mpfr_zero_p(mpc_imagref(left)) && mpfr_zero_p(mpc_imagref(right))) {
         mpfr_mul(mpc_realref(out), mpc_realref(left), mpc_realref(right), MPFR_RNDN);
         mpfr_set_zero(mpc_imagref(out), 1);
+        return;
+    }
+    if (mpfr_zero_p(mpc_imagref(right)) || mpfr_zero_p(mpc_imagref(left))) {
+        mpc_srcptr scalar = mpfr_zero_p(mpc_imagref(right)) ? right : left;
+        mpc_srcptr value = scalar == right ? left : right;
+        /* Finish both products before writing either output component, including when out aliases the scalar. */
+        mpfr_mul(scratch[0], mpc_realref(value), mpc_realref(scalar), MPFR_RNDN);
+        mpfr_mul(scratch[1], mpc_imagref(value), mpc_realref(scalar), MPFR_RNDN);
+        mpfr_set(mpc_realref(out), scratch[0], MPFR_RNDN);
+        mpfr_set(mpc_imagref(out), scratch[1], MPFR_RNDN);
         return;
     }
     mpfr_mul(scratch[0], mpc_realref(left), mpc_realref(right), MPFR_RNDN);

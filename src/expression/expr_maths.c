@@ -543,11 +543,6 @@ number_t eval_harmonic_poly(expr_t *expr)
 {
     return expr_eval_binary_num(expr, num_harmonic_poly);
 }
-number_t eval_lerch_phi_pack(expr_t *expr)
-{
-    (void)expr;
-    return NUM_NAN;
-}
 bool expr_lerch_phi_unpack(const expr_t *expr, const expr_t **z, const expr_t **s, const expr_t **a)
 {
     if (z)
@@ -557,7 +552,7 @@ bool expr_lerch_phi_unpack(const expr_t *expr, const expr_t **z, const expr_t **
     if (a)
         *a = NULL;
     if (!expr || !expr_is_op(expr, &ops_lerch_phi) || !expr->a || !expr->b ||
-        !expr_is_op(expr->a, &ops_lerch_phi_pack) || !expr->a->a || !expr->a->b)
+        !expr_is_op(expr->a, &ops_argument_list) || !expr->a->a || !expr->a->b)
         return false;
     if (z)
         *z = expr->a->a;
@@ -591,11 +586,6 @@ number_t eval_bessel_J(expr_t *expr)
 {
     return expr_eval_binary_num(expr, num_bessel_J);
 }
-number_t eval_lommel_S_pack(expr_t *expr)
-{
-    (void)expr;
-    return NUM_NAN;
-}
 bool expr_lommel_S_unpack(const expr_t *expr, const expr_t **mu, const expr_t **nu, const expr_t **argument)
 {
     const expr_t *parameters;
@@ -610,7 +600,7 @@ bool expr_lommel_S_unpack(const expr_t *expr, const expr_t **mu, const expr_t **
         return false;
 
     parameters = expr->a;
-    if (!expr_is_op(parameters, &ops_lommel_S_pack) || !parameters->a || !parameters->b)
+    if (!expr_is_op(parameters, &ops_argument_list) || !parameters->a || !parameters->b)
         return false;
 
     if (mu)
@@ -633,80 +623,7 @@ number_t eval_lommel_S(expr_t *expr)
                         expr_eval_num_internal((expr_t *)argument));
 }
 
-number_t eval_appell_F1_pack(expr_t *expr)
-{
-    (void)expr;
-    return NUM_NAN;
-}
-bool expr_appell_F1_unpack(const expr_t *expr, const expr_t **a, const expr_t **b1, const expr_t **b2, const expr_t **c,
-                           const expr_t **x, const expr_t **y)
-{
-    const expr_t *params;
-    const expr_t *vars;
-    const expr_t *ab;
-    const expr_t *bc;
 
-    if (a)
-        *a = NULL;
-    if (b1)
-        *b1 = NULL;
-    if (b2)
-        *b2 = NULL;
-    if (c)
-        *c = NULL;
-    if (x)
-        *x = NULL;
-    if (y)
-        *y = NULL;
-    if (!expr || !expr_is_op(expr, &ops_appell_F1) || !expr->a || !expr->b)
-        return false;
-
-    params = expr->a;
-    vars = expr->b;
-    if (!expr_is_op(params, &ops_appell_F1_pack) || !expr_is_op(vars, &ops_appell_F1_pack) || !params->a ||
-        !params->b || !vars->a || !vars->b)
-        return false;
-
-    ab = params->a;
-    bc = params->b;
-    if (!expr_is_op(ab, &ops_appell_F1_pack) || !expr_is_op(bc, &ops_appell_F1_pack) || !ab->a || !ab->b || !bc->a ||
-        !bc->b)
-        return false;
-
-    if (a)
-        *a = ab->a;
-    if (b1)
-        *b1 = ab->b;
-    if (b2)
-        *b2 = bc->a;
-    if (c)
-        *c = bc->b;
-    if (x)
-        *x = vars->a;
-    if (y)
-        *y = vars->b;
-    return true;
-}
-number_t eval_appell_F1(expr_t *expr)
-{
-    const expr_t *a = NULL;
-    const expr_t *b1 = NULL;
-    const expr_t *b2 = NULL;
-    const expr_t *c = NULL;
-    const expr_t *x = NULL;
-    const expr_t *y = NULL;
-
-    if (!expr_appell_F1_unpack(expr, &a, &b1, &b2, &c, &x, &y))
-        return NUM_NAN;
-    return num_appell_F1(expr_eval_num_internal(a), expr_eval_num_internal(b1), expr_eval_num_internal(b2),
-                         expr_eval_num_internal(c), expr_eval_num_internal(x), expr_eval_num_internal(y));
-}
-
-number_t eval_hypergeometric_pFq_pack(expr_t *expr)
-{
-    (void)expr;
-    return NUM_NAN;
-}
 
 static bool hypergeometric_parameter_count(const expr_t *expr, size_t *out)
 {
@@ -728,7 +645,7 @@ static bool hypergeometric_parameter_values(const expr_t *values, size_t count, 
         out[0] = values;
         return true;
     }
-    if (!expr_is_op(values, &ops_hypergeometric_pFq_pack) || !values->a || !values->b)
+    if (!expr_is_op(values, &ops_argument_list) || !values->a || !values->b)
         return false;
     if (!hypergeometric_parameter_values(values->a, count - 1u, out))
         return false;
@@ -741,7 +658,7 @@ static bool hypergeometric_parameter_set_unpack(const expr_t *set, const expr_t 
     const expr_t **values = NULL;
     size_t count = 0u;
 
-    if (!set || !values_out || !count_out || !expr_is_op(set, &ops_hypergeometric_pFq_pack) || !set->a || !set->b ||
+    if (!set || !values_out || !count_out || !expr_is_op(set, &ops_argument_list) || !set->a || !set->b ||
         !hypergeometric_parameter_count(set->a, &count))
         return false;
     if (count > 0u) {
@@ -782,10 +699,10 @@ bool expr_lauricella_F_unpack(const expr_t *expr, const expr_t **a, const expr_t
         !expr->b)
         return false;
     parameters = expr->a;
-    if (!expr_is_op(parameters, &ops_hypergeometric_pFq_pack) || !parameters->a || !parameters->b)
+    if (!expr_is_op(parameters, &ops_argument_list) || !parameters->a || !parameters->b)
         return false;
     a_c = parameters->a;
-    if (!expr_is_op(a_c, &ops_hypergeometric_pFq_pack) || !a_c->a || !a_c->b ||
+    if (!expr_is_op(a_c, &ops_argument_list) || !a_c->a || !a_c->b ||
         !hypergeometric_parameter_set_unpack(parameters->b, &b_values, &b_count) ||
         !hypergeometric_parameter_set_unpack(expr->b, &x_values, &x_count) || b_count != x_count) {
         free(x_values);
@@ -857,7 +774,7 @@ bool expr_hypergeometric_pFq_unpack(const expr_t *expr, const expr_t ***upper, s
         return false;
 
     parameters = expr->a;
-    if (!expr_is_op(parameters, &ops_hypergeometric_pFq_pack) || !parameters->a || !parameters->b)
+    if (!expr_is_op(parameters, &ops_argument_list) || !parameters->a || !parameters->b)
         return false;
     if (!hypergeometric_parameter_set_unpack(parameters->a, &upper_values, &p) ||
         !hypergeometric_parameter_set_unpack(parameters->b, &lower_values, &q)) {
@@ -2057,11 +1974,6 @@ expr_t *integrate_polylog1(const expr_t *expr, const expr_t *wrt)
     return out;
 }
 
-expr_t *deriv_lerch_phi_pack(expr_t *expr)
-{
-    (void)expr;
-    return expr_new_const(NUM_NAN);
-}
 
 expr_t *deriv_lerch_phi(expr_t *expr)
 {
@@ -2205,11 +2117,6 @@ expr_t *deriv_legendre_chi(expr_t *expr)
     return out;
 }
 
-expr_t *deriv_appell_F1_pack(expr_t *expr)
-{
-    (void)expr;
-    return expr_new_const(NUM_NAN);
-}
 
 static bool expr_derivative_is_zero_local(const expr_t *expr)
 {
@@ -2267,11 +2174,6 @@ expr_t *deriv_bessel_J(expr_t *expr)
 }
 
 
-expr_t *deriv_lommel_S_pack(expr_t *expr)
-{
-    (void)expr;
-    return expr_new_const(NUM_NAN);
-}
 
 expr_t *deriv_lommel_S(expr_t *expr)
 {
@@ -2295,30 +2197,6 @@ expr_t *deriv_lommel_S(expr_t *expr)
     return out ? out : expr_new_const(NUM_NAN);
 }
 
-expr_t *deriv_appell_F1(expr_t *expr)
-{
-    const expr_t *a = NULL;
-    const expr_t *b1 = NULL;
-    const expr_t *b2 = NULL;
-    const expr_t *c = NULL;
-    const expr_t *x = NULL;
-    const expr_t *y = NULL;
-    const expr_t *parameters[2];
-    const expr_t *variables[2];
-    expr_t *lauricella = NULL;
-    expr_t *out = NULL;
-
-    if (!expr_appell_F1_unpack(expr, &a, &b1, &b2, &c, &x, &y))
-        return expr_new_const(NUM_NAN);
-    parameters[0] = b1;
-    parameters[1] = b2;
-    variables[0] = x;
-    variables[1] = y;
-    lauricella = expr_lauricella_F(a, 2u, parameters, c, variables);
-    out = lauricella ? expr_get_dx_internal(lauricella) : NULL;
-    expr_free(lauricella);
-    return out ? out : expr_new_const(NUM_NAN);
-}
 
 expr_t *deriv_lauricella_F(expr_t *expr)
 {
@@ -2395,11 +2273,6 @@ cleanup:
     return out ? out : expr_new_const(NUM_NAN);
 }
 
-expr_t *deriv_hypergeometric_pFq_pack(expr_t *expr)
-{
-    (void)expr;
-    return expr_new_const(NUM_ZERO);
-}
 
 expr_t *deriv_hypergeometric_pFq(expr_t *expr)
 {

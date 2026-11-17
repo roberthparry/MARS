@@ -334,6 +334,7 @@ int tests_main(void)
 
     TEST_SECTION("Functions");
     TEST_RUN_IN_GROUP(run_matrix_function_tests, tests, NULL);
+    TEST_RUN_IN_GROUP(run_matrix_appell_tests, tests, NULL);
     TEST_RUN_IN_GROUP(run_matrix_function_regression_tests, tests, NULL);
 
     TEST_SECTION("String Parsing");

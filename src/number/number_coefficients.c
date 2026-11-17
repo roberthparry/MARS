@@ -4,9 +4,12 @@
  *
  * Shares integer zeta values, integer logarithms and both ordinary and factorial-normalised even Bernoulli
  * coefficients between Clausen, zeta and polygamma evaluation. Direct indices avoid searches. A mutex protects lazy
- * precision upgrades; callers receive copies and never retain cache storage. Even Bernoulli coefficients share
+ * precision upgrades; callers receive copies and never retain cache storage. Even zeta and Bernoulli coefficients share
  * the guarded recurrence from (t/2)coth(t/2), avoiding a separate integer-zeta evaluation for every coefficient.
- * Cached significands, including the recurrence's inverse factorials, are limited to
+ * Known long even-zeta and ordinary Bernoulli prefixes can instead use the exact positive tangent-number recurrence,
+ * with local GMP integers and guarded conversion. Raw Bernoulli conversion omits factorials and pi powers;
+ * sequential powers avoid repeated exponentiation for even zeta. Cached significands,
+ * including the recurrence's inverse factorials, are limited to
  * eight MiB, with fixed index metadata; requests beyond those bounds are evaluated without retention. Shutdown releases only
  * entries that were initialised. No application policy or persistent storage enters this numeric cache.
  */
@@ -32,6 +35,8 @@ static coefficient_entry_t *coefficient_owned[COEFFICIENT_KINDS * COEFFICIENT_SL
 static size_t coefficient_count, coefficient_bytes;
 static size_t coefficient_prefix_count;
 static mpfr_prec_t coefficient_prefix_precision;
+static size_t coefficient_exact_count[2];
+static mpfr_prec_t coefficient_exact_precision[2];
 static pthread_mutex_t coefficient_lock = PTHREAD_MUTEX_INITIALIZER;
 
 static int coefficient_zeta(mpfr_ptr out, size_t order)
@@ -91,6 +96,118 @@ static bool coefficient_reserve(coefficient_entry_t *entry, mpfr_prec_t precisio
     return true;
 }
 
+/* Brent--Harvey, Fast Computation of Bernoulli, Tangent and Secant Numbers, Fig. 2 (arXiv:1108.0286).
+ * The positive integer recurrence is exact; only conversion and sequential powers need arithmetic guard bits. */
+static bool coefficient_exact_prefix(size_t count, mpfr_prec_t requested, bool raw)
+{
+    if (count < 32 || count > 1024 || requested < 1024 || requested > COEFFICIENT_MAX_BITS - 160) return false;
+    if (pthread_mutex_lock(&coefficient_lock)) return false;
+    mpfr_prec_t precision = ((requested + 63) / 64) * 64;
+    if (coefficient_exact_precision[raw] >= precision) {
+        bool ready = coefficient_exact_count[raw] >= count;
+        if (ready || count - coefficient_exact_count[raw] <= 16) {
+            pthread_mutex_unlock(&coefficient_lock);
+            return ready;
+        }
+    }
+    /* Conversion retains 96 extra bits and at most 1024 multiply/divide steps. Check the bounded cache first. */
+    size_t bytes = coefficient_bytes;
+    for (size_t n = 1; n <= count; ++n) {
+        coefficient_entry_t *entries[] = { raw ? &coefficient_cache[COEFFICIENT_BERNOULLI][n] :
+            &coefficient_cache[COEFFICIENT_NORMALISED][n], &coefficient_cache[COEFFICIENT_ZETA][2 * n] };
+        for (unsigned j = 0; j < (raw ? 1u : 2u); ++j) {
+            if (entries[j]->precision >= precision) continue;
+            size_t previous = entries[j]->precision ? mpfr_custom_get_size(mpfr_get_prec(entries[j]->value)) : 0;
+            size_t stored = mpfr_custom_get_size(precision + (j ? 0 : 96));
+            bytes += stored - previous;
+        }
+    }
+    if (bytes > COEFFICIENT_MAX_BYTES) { pthread_mutex_unlock(&coefficient_lock); return false; }
+    bool ok = true;
+    mpz_t tangent[1025], factorial, denominator;
+    for (size_t n = 1; n <= count; ++n) mpz_init(tangent[n]);
+    mpz_inits(factorial, denominator, NULL);
+    mpz_set_ui(tangent[1], 1u);
+    for (size_t n = 2; n <= count; ++n) mpz_mul_ui(tangent[n], tangent[n - 1], n - 1);
+    for (size_t k = 2; k <= count; ++k) {
+        for (size_t j = k; j <= count; ++j) {
+            mpz_mul_ui(tangent[j], tangent[j], j - k + 2);
+            mpz_addmul_ui(tangent[j], tangent[j - 1], j - k);
+        }
+    }
+    mpfr_t square, power, value;
+    mpfr_inits2(precision + 96, square, power, value, (mpfr_ptr)0);
+    if (!raw) {
+        mpfr_const_pi(square, MPFR_RNDN); mpfr_mul_2ui(square, square, 1u, MPFR_RNDN);
+        mpfr_sqr(square, square, MPFR_RNDN); mpfr_set_ui(power, 1u, MPFR_RNDN);
+    }
+    mpz_set_ui(factorial, 1u);
+    for (size_t n = 1; ok && n <= count; ++n) {
+        if (!raw && n > 1) {
+            mpz_mul_ui(factorial, factorial, 2 * n - 2);
+            mpz_mul_ui(factorial, factorial, 2 * n - 1);
+        }
+        /* B_(2n)/(2n)! = (-1)^(n-1) T_n / ((2n-1)!*2^(2n)*(2^(2n)-1)).
+         * The raw projection instead multiplies by 2n and omits (2n-1)!. */
+        mpz_set_ui(denominator, 1u); mpz_mul_2exp(denominator, denominator, 2 * n);
+        mpz_sub_ui(denominator, denominator, 1u);
+        mpfr_set_z(value, tangent[n], MPFR_RNDN);
+        if (raw) mpfr_mul_ui(value, value, 2 * n, MPFR_RNDN);
+        else mpfr_div_z(value, value, factorial, MPFR_RNDN);
+        mpfr_div_z(value, value, denominator, MPFR_RNDN);
+        mpfr_div_2ui(value, value, 2 * n, MPFR_RNDN);
+        if (!mpfr_number_p(value) || mpfr_zero_p(value)) { ok = false; break; }
+        if (raw) {
+            /* B_(2n) = (-1)^(n-1)*2n*T_n/(2^(2n)*(2^(2n)-1)). No pi or factorial is needed. */
+            if (!(n & 1u)) mpfr_neg(value, value, MPFR_RNDN);
+            coefficient_entry_t *entry = &coefficient_cache[COEFFICIENT_BERNOULLI][n];
+            if (entry->precision <= precision) {
+                ok = coefficient_reserve(entry, precision, 96);
+                if (ok) mpfr_set(entry->value, value, MPFR_RNDN);
+            }
+            continue;
+        }
+        coefficient_entry_t *normalised = &coefficient_cache[COEFFICIENT_NORMALISED][n];
+        if (!(n & 1u)) mpfr_neg(value, value, MPFR_RNDN);
+        /* A lower precision prefetch must not overwrite an independently validated higher precision coefficient. */
+        if (normalised->precision <= precision) {
+            ok = coefficient_reserve(normalised, precision, 96);
+            if (!ok) break;
+            mpfr_set(normalised->value, value, MPFR_RNDN);
+        }
+        mpfr_abs(value, value, MPFR_RNDN);
+        mpfr_mul(power, power, square, MPFR_RNDN);
+        mpfr_mul(value, value, power, MPFR_RNDN); mpfr_div_2ui(value, value, 1u, MPFR_RNDN);
+        if (!mpfr_number_p(value) || mpfr_zero_p(value)) { ok = false; break; }
+        coefficient_entry_t *zeta = &coefficient_cache[COEFFICIENT_ZETA][2 * n];
+        if (zeta->precision <= precision) {
+            ok = coefficient_reserve(zeta, precision, 0);
+            if (ok) mpfr_set(zeta->value, value, MPFR_RNDN);
+        }
+    }
+    if (ok) {
+        coefficient_exact_count[raw] = count;
+        coefficient_exact_precision[raw] = precision;
+    }
+    mpfr_clears(square, power, value, (mpfr_ptr)0);
+    mpz_clears(factorial, denominator, NULL);
+    for (size_t n = 1; n <= count; ++n) mpz_clear(tangent[n]);
+    pthread_mutex_unlock(&coefficient_lock);
+    return ok;
+}
+
+/* Prepare a known even-zeta prefix, preserving independently validated higher-precision entries. */
+bool number_coefficient_zeta_prefix(size_t count, mpfr_prec_t requested)
+{
+    return coefficient_exact_prefix(count, requested, false);
+}
+
+/* Prepare ordinary Bernoulli coefficients directly from exact tangent numbers, without unused zeta entries. */
+bool number_coefficient_bernoulli_prepare(size_t count, mpfr_prec_t requested)
+{
+    return coefficient_exact_prefix(count, requested, true);
+}
+
 /* b_n = 2n*c_n - sum_(j=1)^(n-1) b_(n-j)*c_j, with c_n = 1/(4^n*(2n+1)!).
  * Successive omitted magnitudes have ratio below 16/((2j+2)(2j+3)); hence their tail is at most four terms.
  * Keeping 48 extra relative bits in that tail and 96 arithmetic guard bits covers accumulation across 4096 slots.
@@ -102,10 +219,10 @@ static bool coefficient_bernoulli_prefix(size_t index, mpfr_prec_t precision)
     mpfr_init2(term, work);
     mpfr_inits2(64, magnitude, bound, (mpfr_ptr)0);
     bool ok = true;
-    if (coefficient_prefix_precision != precision) {
+    if (coefficient_prefix_precision < precision) {
         coefficient_prefix_precision = precision;
         coefficient_prefix_count = 0;
-    }
+    } else coefficient_prefix_precision = precision;
     /* Ordinary sequential extensions start at the next direct index; a precision change revalidates the prefix. */
     for (size_t n = coefficient_prefix_count + 1; ok && n <= index; ++n) {
         coefficient_entry_t *value = &coefficient_cache[COEFFICIENT_NORMALISED][n];
@@ -164,9 +281,14 @@ static int coefficient_copy(mpfr_ptr out, size_t index, unsigned kind)
     if (entry->precision < requested) {
         mpfr_prec_t precision = ((requested + 63) / 64) * 64;
         bool bernoulli = kind == COEFFICIENT_BERNOULLI || kind == COEFFICIENT_NORMALISED;
-        if (bernoulli && index && precision <= COEFFICIENT_MAX_BITS - 96 &&
-            coefficient_bernoulli_prefix(index, precision)) {
-            coefficient_entry_t *normalised = &coefficient_cache[COEFFICIENT_NORMALISED][index];
+        bool even_zeta = kind == COEFFICIENT_ZETA && index >= 2 && !(index & 1u);
+        size_t degree = even_zeta ? index / 2u : index;
+        /* A distant isolated zeta request must not construct an otherwise unused Bernoulli prefix. */
+        even_zeta = even_zeta && (degree <= 16 ||
+            (coefficient_prefix_precision >= precision && degree <= coefficient_prefix_count + 16));
+        if ((bernoulli || even_zeta) && degree && precision <= COEFFICIENT_MAX_BITS - 96 &&
+            coefficient_bernoulli_prefix(degree, precision)) {
+            coefficient_entry_t *normalised = &coefficient_cache[COEFFICIENT_NORMALISED][degree];
             if (kind == COEFFICIENT_NORMALISED) {
                 mpfr_set(out, normalised->value, MPFR_RNDN);
                 pthread_mutex_unlock(&coefficient_lock);
@@ -174,8 +296,15 @@ static int coefficient_copy(mpfr_ptr out, size_t index, unsigned kind)
             }
             mpfr_t value;
             mpfr_init2(value, precision + 96);
-            mpfr_fac_ui(value, 2ul * index, MPFR_RNDN);
+            if (even_zeta) {
+                /* zeta(2n) = |B_(2n)/(2n)!|*(2*pi)^(2n)/2, with the prefix's 96 guard bits. */
+                mpfr_const_pi(value, MPFR_RNDN);
+                mpfr_mul_2ui(value, value, 1u, MPFR_RNDN);
+                mpfr_pow_ui(value, value, (unsigned long)index, MPFR_RNDN);
+                mpfr_div_2ui(value, value, 1u, MPFR_RNDN);
+            } else mpfr_fac_ui(value, 2ul * index, MPFR_RNDN);
             mpfr_mul(value, value, normalised->value, MPFR_RNDN);
+            if (even_zeta) mpfr_abs(value, value, MPFR_RNDN);
             mpfr_set(out, value, MPFR_RNDN);
             if (coefficient_reserve(entry, precision, 0)) mpfr_set(entry->value, value, MPFR_RNDN);
             mpfr_clear(value);

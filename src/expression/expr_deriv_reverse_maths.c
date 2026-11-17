@@ -916,47 +916,6 @@ static int expr_reverse_emit_nan(expr_reverse_accumulate_fn accumulate, void *co
     return accumulate(context, child, &contribution);
 }
 
-int expr_reverse_appell_F1_many(const expr_t *expr, const number_t *out_bar, expr_reverse_accumulate_fn accumulate,
-                                void *context)
-{
-    const expr_t *a = NULL;
-    const expr_t *b1 = NULL;
-    const expr_t *b2 = NULL;
-    const expr_t *c = NULL;
-    const expr_t *x = NULL;
-    const expr_t *y = NULL;
-    number_t av;
-    number_t b1v;
-    number_t b2v;
-    number_t cv;
-    number_t xv;
-    number_t yv;
-    number_t a1;
-    number_t c1;
-    number_t x_factor;
-    number_t y_factor;
-
-    if (!expr_appell_F1_unpack(expr, &a, &b1, &b2, &c, &x, &y))
-        return -1;
-    if (expr_reverse_emit_nan(accumulate, context, a) != 0 || expr_reverse_emit_nan(accumulate, context, b1) != 0 ||
-        expr_reverse_emit_nan(accumulate, context, b2) != 0 || expr_reverse_emit_nan(accumulate, context, c) != 0)
-        return -1;
-
-    av = expr_eval_num_internal(a);
-    b1v = expr_eval_num_internal(b1);
-    b2v = expr_eval_num_internal(b2);
-    cv = expr_eval_num_internal(c);
-    xv = expr_eval_num_internal(x);
-    yv = expr_eval_num_internal(y);
-    a1 = num_add(av, NUM_ONE);
-    c1 = num_add(cv, NUM_ONE);
-    x_factor = num_mul(num_div(num_mul(av, b1v), cv), num_appell_F1(a1, num_add(b1v, NUM_ONE), b2v, c1, xv, yv));
-    y_factor = num_mul(num_div(num_mul(av, b2v), cv), num_appell_F1(a1, b1v, num_add(b2v, NUM_ONE), c1, xv, yv));
-    return expr_reverse_emit(out_bar, x_factor, accumulate, context, x) == 0 &&
-                   expr_reverse_emit(out_bar, y_factor, accumulate, context, y) == 0
-               ? 0
-               : -1;
-}
 
 int expr_reverse_lerch_phi_many(const expr_t *expr, const number_t *out_bar, expr_reverse_accumulate_fn accumulate,
                                 void *context)

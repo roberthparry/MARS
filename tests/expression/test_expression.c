@@ -870,6 +870,7 @@ int tests_main(void)
     TEST_SECTION("Fourier transforms and signal functions");
     TEST_RUN_IN_GROUP(test_fourier_and_signal_functions, tests, NULL);
     TEST_RUN_IN_GROUP(test_orthogonal_polynomials, tests, NULL);
+    TEST_RUN_IN_GROUP(test_expr_appell, tests, "expression,appell");
 
     TEST_SECTION("README Output Examples");
     TEST_RUN_IN_GROUP(example_expression_integer_callables, readme_examples, "readme,expression,integer");

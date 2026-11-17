@@ -179,6 +179,37 @@ void emit_expr_appell_F1(const expr_t *f, sbuf_t *b)
     sbuf_putc(b, ')');
 }
 
+void emit_expr_appell_family(const expr_t *expression, sbuf_t *buffer)
+{
+    const expr_t *arguments[7];
+    size_t count = 0;
+    unsigned family = expr_appell_family(expression);
+    if (!expr_appell_unpack(expression, arguments, &count)) return;
+    sbuf_puts(buffer, expr_ops_expression_name(expression->ops)); sbuf_putc(buffer, '(');
+    for (size_t j = 0; j < count; ++j) {
+        if (j) {
+            bool group = family == 2 ? (j == 1 || j == 3 || j == 5) :
+                         family == 3 ? (j == 2 || j == 4 || j == 5) : (j == 2 || j == 4);
+            sbuf_puts(buffer, group ? "; " : ", ");
+        }
+        emit_expr(arguments[j], buffer, 0);
+    }
+    sbuf_putc(buffer, ')');
+}
+
+void emit_func_appell_family(const expr_t *expression, sbuf_t *buffer)
+{
+    const expr_t *arguments[7];
+    size_t count = 0;
+    if (!expr_appell_unpack(expression, arguments, &count)) return;
+    emit_function_builtin_name(buffer, expression->ops); sbuf_putc(buffer, '(');
+    for (size_t j = 0; j < count; ++j) {
+        if (j) sbuf_puts(buffer, ", ");
+        emit_func(arguments[j], buffer, 0);
+    }
+    sbuf_putc(buffer, ')');
+}
+
 void emit_expr_lauricella_F(const expr_t *f, sbuf_t *out)
 {
     const expr_t *a = NULL;

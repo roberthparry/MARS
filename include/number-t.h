@@ -1088,6 +1088,54 @@ number_t num_hermite_Hn(number_t degree, number_t argument);
  */
 number_t num_appell_F1(const number_t a, const number_t b1, const number_t b2, const number_t c, const number_t x,
                        const number_t y);
+
+/**
+ * @brief Evaluate Appell F₂(a; b1, b2; c1, c2; x, y).
+ * @details Uses the defining series for |x| + |y| < 1; finite terminating numerator polynomials
+ * are also supported outside that region. Denominator poles, exhausted numerical budgets and unsupported
+ * analytic continuation return NaN. Independent calls are thread-safe.
+ * @param[in] a Borrowed hypergeometric parameter, passed by value and never modified.
+ * @param[in] b1 Borrowed hypergeometric parameter, passed by value and never modified.
+ * @param[in] b2 Borrowed hypergeometric parameter, passed by value and never modified.
+ * @param[in] c1 Borrowed hypergeometric parameter, passed by value and never modified.
+ * @param[in] c2 Borrowed hypergeometric parameter, passed by value and never modified.
+ * @param[in] x Borrowed series variable, passed by value and never modified.
+ * @param[in] y Borrowed series variable, passed by value and never modified.
+ * @return Owned numerical result; release with num_destroy(), or use a NUM_SCOPE.
+ */
+number_t num_appell_F2(number_t a, number_t b1, number_t b2, number_t c1, number_t c2, number_t x, number_t y);
+
+/**
+ * @brief Evaluate Appell F₃(a1, a2; b1, b2; c; x, y).
+ * @details Uses the defining series for max(|x|, |y|) < 1; finite terminating numerator polynomials
+ * are also supported outside that region. Denominator poles, exhausted numerical budgets and unsupported
+ * analytic continuation return NaN. Independent calls are thread-safe.
+ * @param[in] a1 Borrowed hypergeometric parameter, passed by value and never modified.
+ * @param[in] a2 Borrowed hypergeometric parameter, passed by value and never modified.
+ * @param[in] b1 Borrowed hypergeometric parameter, passed by value and never modified.
+ * @param[in] b2 Borrowed hypergeometric parameter, passed by value and never modified.
+ * @param[in] c Borrowed hypergeometric parameter, passed by value and never modified.
+ * @param[in] x Borrowed series variable, passed by value and never modified.
+ * @param[in] y Borrowed series variable, passed by value and never modified.
+ * @return Owned numerical result; release with num_destroy(), or use a NUM_SCOPE.
+ */
+number_t num_appell_F3(number_t a1, number_t a2, number_t b1, number_t b2, number_t c, number_t x, number_t y);
+
+/**
+ * @brief Evaluate Appell F₄(a, b; c1, c2; x, y).
+ * @details Uses the defining series for sqrt(|x|) + sqrt(|y|) < 1; finite terminating numerator polynomials
+ * are also supported outside that region. Denominator poles, exhausted numerical budgets and unsupported
+ * analytic continuation return NaN. Independent calls are thread-safe.
+ * @param[in] a Borrowed hypergeometric parameter, passed by value and never modified.
+ * @param[in] b Borrowed hypergeometric parameter, passed by value and never modified.
+ * @param[in] c1 Borrowed hypergeometric parameter, passed by value and never modified.
+ * @param[in] c2 Borrowed hypergeometric parameter, passed by value and never modified.
+ * @param[in] x Borrowed series variable, passed by value and never modified.
+ * @param[in] y Borrowed series variable, passed by value and never modified.
+ * @return Owned numerical result; release with num_destroy(), or use a NUM_SCOPE.
+ */
+number_t num_appell_F4(number_t a, number_t b, number_t c1, number_t c2, number_t x, number_t y);
+
 /**
  * @brief Evaluate the Lauricella F_D series at the participating numeric precision.
  * @param[in] a Borrowed common upper parameter; not consumed.

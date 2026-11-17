@@ -2299,6 +2299,8 @@ Related implementations share a source file without changing their public APIs:
 
 - `expr_bessel.c` contains the Bessel I, K and Y expression nodes and their
   evaluation, differentiation, integration and simplification rules.
+- `expr_struve.c` contains both ordinary Struve H and modified Struve L nodes,
+  their shared parameter checks, and their derivative, reverse-mode, integral and simplification rules.
 - `expr_special.c` contains Clausen functions and their summation recognition,
   alongside orthogonal-polynomial nodes and calculus.
 - `expr_deriv_reverse.c` contains reverse-mode traversal, adjoint accumulation
@@ -2315,6 +2317,12 @@ Related implementations share a source file without changing their public APIs:
 - `expr_distribution_notation.c` keeps distribution-qualification parsing and
   rendering together; `expr_stringout_support.c` includes Cartesian composition
   presentations alongside other shared output helpers.
+
+Operation identifiers remain alphabetically ordered. Consecutive families such as
+Appell F₁–F₄ use checked offsets; trigonometric classification uses small enum ranges
+and a dense six-byte map. Integration feature selection uses those ranges and direct
+operation comparisons. Compile-time checks protect the required adjacency without
+assigning explicit enum values or maintaining numeric hash seeds.
 
 ### Node Model
 
@@ -2826,6 +2834,23 @@ placement and displacement data together, while retaining the aligned layout.
 - `expr_t *expr_bessel_Y(const expr_t *order, const expr_t *argument)` — Bessel function of the second kind Y_order(argument), with a symbolic real order
 - `expr_t *expr_lommel_S(const expr_t *mu, const expr_t *nu, const expr_t *argument)` — lower-case Lommel function s_mu,nu(argument); differentiation with respect to the argument is supported
 - `expr_t *expr_appell_F1(const expr_t *a, const expr_t *b1, const expr_t *b2, const expr_t *c, const expr_t *x, const expr_t *y)` — Appell hypergeometric function F₁(a; b₁, b₂; c; x, y)
+- `expr_appell_F2(a, b1, b2, c1, c2, x, y)` — F₂(a; b₁, b₂; c₁, c₂; x, y).
+- `expr_appell_F3(a1, a2, b1, b2, c, x, y)` — F₃(a₁, a₂; b₁, b₂; c; x, y).
+- `expr_appell_F4(a, b, c1, c2, x, y)` — F₄(a, b; c₁, c₂; x, y).
+
+These constructors retain borrowed `const expr_t *` arguments and return an owned expression,
+released with `expr_free()`, or NULL for invalid arguments. All four Appell functions use shared
+argument-list nodes internally. Argument differentiation uses contiguous parameter shifts and
+the chain rule; parameter derivatives remain formal. Integration supports a single affine variable
+argument when the decremented parameters and inverse coefficient are provably valid; otherwise
+the ordinary formal integral is retained. Finite sums use normal native summation and bindings.
+
+F₂–F₄ accept the aliases `appell_Fn`, `appellfn`, `Fn`, `fn`, `F_n` and the subscripted `F₂`,
+`F₃`, `F₄`, with `n` replaced by 2, 3 or 4. Native mathematical output groups parameter lists
+with semicolons, Function output uses the canonical `appellfn(...)` spelling, and TeX renders
+the corresponding subscripted F. Numerical evaluation follows the scalar convergence regions
+and failure guards in [number](number.md#appell-functions-f₂-f₃-and-f₄), which also supplies a
+runnable example and its output.
 - `expr_t *expr_lauricella_F(const expr_t *a, size_t variable_count, const expr_t *const *b, const expr_t *c, const expr_t *const *x)` — Lauricella F_D in `variable_count` variables; Appell F₁ is the two-variable member of this family
 - `expr_t *expr_hypergeometric_pFq(size_t upper_count, const expr_t *const *upper, size_t lower_count, const expr_t *const *lower, const expr_t *argument)` — generalised hypergeometric pFq with explicit upper and lower parameter arrays
 

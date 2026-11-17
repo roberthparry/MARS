@@ -36,6 +36,69 @@
 unsigned long number_series_integer_power(unsigned long base, unsigned long exponent);
 
 /**
+ * @brief Prepare a known long prefix of even zeta and normalised Bernoulli coefficients.
+ * @param count Number of coefficients, from 32 through 1024; zeta orders range from two through 2*count.
+ * @param precision Requested relative bits, from 1024 through 16224.
+ * @return True when the bounded cache contains the requested prefix; false for unsupported sizes, insufficient
+ * cache space, non-finite conversion or a nearby cached prefix needing at most sixteen additional entries.
+ * Ordinary requests remain available after either result. This operation uses an exact tangent-number recurrence and guarded
+ * conversion. Local integers are released before return; no ownership transfers. Shared coefficient access is
+ * serialised. Cache contents and precision upgrades remain valid after an incomplete reservation attempt.
+ */
+bool number_coefficient_zeta_prefix(size_t count, mpfr_prec_t precision);
+
+/**
+ * @brief Optionally prepare a long ordinary Bernoulli prefix from exact positive tangent numbers.
+ * @param[in] count Number of even Bernoulli coefficients, from 32 to 1024.
+ * @param[in] precision Requested coefficient precision in bits, from 1024 to 16224.
+ * @return True when the complete prefix is ready. False for unsupported requests, a bounded-cache limit,
+ * short growth better handled by ordinary extension, lock failure or non-finite conversion. Valid earlier
+ * entries remain usable, and higher-precision entries are preserved. No pointers or ownership are transferred.
+ * The shared cache is mutex-protected; this operation is thread-safe and retains at most the module cache limit.
+ */
+bool number_coefficient_bernoulli_prepare(size_t count, mpfr_prec_t precision);
+
+/**
+ * @brief Attempt an integer polylogarithm using finite power blocks and directed error bounds.
+ * @param[out] out Initialised caller-owned MPC destination, selecting 384 through 16384 result bits.
+ * May alias input; unchanged on failure.
+ * @param order Integer order from two through 32.
+ * @param[in] input Borrowed finite argument with non-zero modulus at most 0.9.
+ * @return True only when absolute roundoff and geometric-tail bounds meet the requested precision;
+ * false selects the ordinary evaluator for unsupported parameters or an exhausted iteration/error budget.
+ * An explicitly aliased input is updated only on success; no shared state is modified. All local power storage
+ * is cleared before return, and no pointers escape. Independent calls are thread-safe; clear out using mpc_clear().
+ */
+bool number_mpc_polylog_blocks(mpc_ptr out, unsigned order, mpc_srcptr input);
+
+/**
+ * @brief Evaluate the principal complex dilogarithm with native analytic continuation.
+ * @param[out] out Initialised caller-owned MPC destination selecting precision; may alias z.
+ * @param[in] z Borrowed complex argument, valid for the duration of this synchronous call.
+ * @param rnd Final MPC rounding direction used by the evaluator.
+ * @return Zero after writing the value, including NaN for non-finite unsupported inputs. Local temporaries
+ * are released before return; no ownership transfers. Independent calls use disjoint scratch storage and
+ * synchronised mathematical coefficient access. Clear out using mpc_clear() when finished.
+ */
+int number_mpc_dilog(mpc_ptr out, mpc_srcptr z, mpc_rnd_t rnd);
+
+/**
+ * @brief Attempt the lower-gamma series sum z^n/(a+1)_n using guarded binary splitting.
+ * Also supplies the Kummer representation of complex error functions when a=1/2 and z is their squared argument.
+ * @param[out] out Initialised MPC destination, selecting 640 through 32768 working bits; may alias an input.
+ * Unchanged when the attempt fails.
+ * @param[out] absolute_sum Initialised MPFR destination for a directed majorant of the absolute series.
+ * Must be disjoint from all complex inputs and out; unchanged on failure.
+ * @param[in] a Borrowed finite order with real part in [0.125,16] and imaginary part in [-1,1].
+ * @param[in] z Borrowed finite non-zero argument with modulus at most eight.
+ * @param target Required result bits, at least 32 below out's working precision.
+ * @return True only after geometric-tail and roundoff bounds pass; false selects the ordinary series outside
+ * these limits or on an exhausted error budget. No shared state is modified. All local recursive scratch is
+ * released before return. Independent calls are thread-safe; callers clear their own output destinations.
+ */
+bool number_mpc_gamma_series(mpc_ptr out, mpfr_ptr absolute_sum, mpc_srcptr a, mpc_srcptr z, mpfr_prec_t target);
+
+/**
  * @brief Attempt the high-precision Lerch defining sum with finite weighted binomial blocks.
  * @param[out] out Caller-owned initialised MPC destination, unchanged if the attempt fails.
  * @param[in] argument Borrowed complex z, with modulus strictly below one.
@@ -254,13 +317,29 @@ void number_mpc_abs_upper(mpfr_ptr out, mpc_srcptr value);
 void number_mpc_abs_lower(mpfr_ptr out, mpc_srcptr value);
 
 /**
- * @brief Multiply finite complex values using three rounded real products within an absolute error budget.
+ * @brief Try a checked product-tree sum of w^k/((a)_k*(b)_k), optionally weighted by power+2*k.
+ * @param[out] out Initialised caller-owned MPC destination selecting working precision; may alias an input.
+ * @param[in] a Borrowed first rising-factorial parameter, valid throughout the call.
+ * @param[in] b Borrowed second rising-factorial parameter, valid throughout the call.
+ * @param[in] w Borrowed series argument, valid throughout the call.
+ * @param[in] power Optional borrowed derivative weight; NULL selects the unweighted sum.
+ * @param target Required result precision in bits, with guard bits supplied by out's working precision.
+ * @return True after proving the tail and roundoff bounds; false leaves out unchanged for a caller-owned fallback.
+ * Supports bounded positive-real-part parameters and working precision 1024..16384 bits, with a higher crossover
+ * for wholly real inputs. All scratch storage is released internally; independent calls are thread-safe.
+ */
+bool number_mpc_two_lower_series(mpc_ptr out, mpc_srcptr a, mpc_srcptr b, mpc_srcptr w,
+                                  mpc_srcptr power, mpfr_prec_t target);
+
+/**
+ * @brief Multiply finite complex values using at most three real products within an absolute error budget.
  * @param[out] out Caller-owned initialised MPC destination; may alias either input.
  * @param[in] left Borrowed finite complex multiplicand.
  * @param[in] right Borrowed finite complex multiplier.
  * @param[in,out] scratch Four distinct initialised MPFR temporaries at out's precision, disjoint from all operands.
  * @return Nothing. Each component's absolute error is at most 16*2^(-p)*|left|_1*|right|_1 for precision p,
- * away from exponent underflow/overflow. This is guarded series arithmetic, not correctly rounded MPC
+ * away from exponent underflow/overflow. Two real operands need one real product; exactly one needs two.
+ * This is guarded series arithmetic, not correctly rounded MPC
  * multiplication, and does not promise signed-zero conventions. Only use inside an explicit absolute
  * roundoff allowance. No allocation or ownership transfer occurs; independent scratch storage is thread-safe.
  */
@@ -282,6 +361,43 @@ void number_mpc_mul_guarded(mpc_ptr out, mpc_srcptr left, mpc_srcptr right, mpfr
  */
 mpfr_prec_t number_polygamma_coefficient_precision(mpfr_ptr factorial, mpfr_ptr bound, mpfr_srcptr power_upper,
                                                    size_t index, unsigned order, mpfr_prec_t work);
+
+/**
+ * @brief Optionally prepare the Bernoulli prefix required by a guarded polygamma asymptotic expansion.
+ * @param[in] inverse_upper Borrowed finite positive upper bound on the modulus of the inverse shifted argument.
+ * @param[in] order Polygamma order, with zero denoting digamma.
+ * @param[in] target Required output precision in bits.
+ * @param[in] work Guarded coefficient working precision in bits.
+ * @return Nothing. Unsupported budgets or cache-preparation failures leave ordinary coefficient lookup in use.
+ * Uses a directed 64-bit factorial/power majorant, work in 1024..8320 and orders through 64. No operand is
+ * modified and no ownership is transferred. The optional shared coefficient preparation is thread-safe.
+ */
+void number_polygamma_prepare(mpfr_srcptr inverse_upper, unsigned order, mpfr_prec_t target, mpfr_prec_t work);
+
+/**
+ * @brief Sum a finite right-half-plane reciprocal-power recurrence using polynomial blocks.
+ * @param[out] out Caller-owned MPC destination, disjoint from base, at the guarded working precision.
+ * @param[in,out] base Positive-real-part initial argument; advanced by the number of summed unit shifts.
+ * @param[in] power Reciprocal power, from one to four.
+ * @param[in] limit Required final argument modulus, from one to 65536; blocks may overshoot by fifteen shifts.
+ * @return True on success, with out = sum((original_base+k)^(-power)). False for unsupported precision,
+ * power, limit or argument, leaving both operands unchanged. Requires equal precisions in 640..32768 and
+ * 128 caller-supplied guard bits for the polynomial and Newton-identity cancellation. No retained state or
+ * ownership transfer occurs. Independent calls are thread-safe; release operands normally with mpc_clear().
+ */
+bool number_mpc_reciprocal_sum(mpc_ptr out, mpc_ptr base, unsigned power, unsigned long limit);
+
+/**
+ * @brief Sum a finite positive-real reciprocal-power recurrence using the guarded polynomial kernel.
+ * @param[out] out Caller-owned MPFR destination, disjoint from base, at the guarded working precision.
+ * @param[in,out] base Positive initial argument, advanced by the summed unit shifts.
+ * @param[in] power Reciprocal power from one to four.
+ * @param[in] limit Required final argument, from one to 65536; blocks may overshoot by fifteen shifts.
+ * @return True on success; false leaves both operands unchanged for unsupported arguments or unequal
+ * precisions outside 640..32768. The caller must supply 128 guard bits. No retained state or ownership
+ * transfer occurs. Independent calls are thread-safe; release operands normally with mpfr_clear().
+ */
+bool number_mpfr_reciprocal_sum(mpfr_ptr out, mpfr_ptr base, unsigned power, unsigned long limit);
 
 /**
  * @brief Conservatively test a scaled series term against a relative precision target using binary exponents.
@@ -862,6 +978,9 @@ int number_mpc_lommel_S_derivative(mpc_ptr out, mpc_srcptr mu, mpc_srcptr nu, mp
  * @return Zero after convergence, or -1 with NaN on an unsupported domain, singular denominator or exhausted guard.
  * Evaluation stays in real arithmetic. Shifted parameters preserve every input bit and permitted integer shift;
  * coefficient recurrences are periodically refreshed and directed exponent checks can only delay acceptance.
+ * Bounded positive-real-part rising-factorial cases can shorten late coefficient state, propagating directed
+ * absolute errors and retrying the full-precision recurrence if its final error check fails. Output precision
+ * and distinct borrowed inputs remain unchanged; an aliased destination is written only after evaluation.
  * No ownership transfers; callers initialise and clear their own MPFR values. No shared mutable state is used.
  */
 int number_mpfr_appell_F1(mpfr_ptr out, mpfr_srcptr a, mpfr_srcptr b1, mpfr_srcptr b2, mpfr_srcptr c,
@@ -878,6 +997,8 @@ int number_mpfr_appell_F1(mpfr_ptr out, mpfr_srcptr a, mpfr_srcptr b1, mpfr_srcp
  * @return Zero after convergence, or -1 with NaN on an unsupported domain, pole or exhausted numerical guard.
  * Compact dyadic parameters use exact quadratic ratio coefficients with a real denominator; other parameters
  * retain complex division. No input or output precision is narrowed by the compact representation.
+ * Bounded positive-real-part rising-factorial cases can shorten late coefficient state under a directed
+ * absolute-error check; an unsuccessful check retries full precision before writing an aliased destination.
  * All operands remain caller-owned and valid throughout the call; no internal storage escapes.
  */
 int number_mpc_appell_F1(mpc_ptr out, mpc_srcptr a, mpc_srcptr b1, mpc_srcptr b2, mpc_srcptr c,

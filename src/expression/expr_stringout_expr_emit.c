@@ -833,6 +833,10 @@ static void emit_expr_inner(const expr_t *f, sbuf_t *b, int parent_prec)
             emit_expr_appell_F1(f, b);
             return;
         }
+        if (expr_appell_family(f)) {
+            emit_expr_appell_family(f, b);
+            return;
+        }
         if (expr_is_op(f, &ops_lauricella_F)) {
             emit_expr_lauricella_F(f, b);
             return;
@@ -841,8 +845,9 @@ static void emit_expr_inner(const expr_t *f, sbuf_t *b, int parent_prec)
             emit_expr_hypergeometric_pFq(f, b);
             return;
         }
-        if ((expr_is_op(f, &ops_lerch_phi) && f->a && expr_is_op(f->a, &ops_lerch_phi_pack)) ||
-            (f->a && expr_is_op(f->a, &ops_integer_pack))) {
+        if ((expr_is_op(f, &ops_lerch_phi) || expr_is_op(f, &ops_powmod) ||
+             expr_is_op(f, &ops_divmod) || expr_is_op(f, &ops_gcdext)) &&
+            f->a && expr_is_op(f->a, &ops_argument_list)) {
             sbuf_puts(b, expr_ops_expression_name(f->ops));
             sbuf_putc(b, '(');
             emit_expr(f->a->a, b, 0);

@@ -1075,10 +1075,8 @@ static expr_t *expr_simplify_trig_product_pair(expr_t *a, expr_t *b)
         [TANGENT][COTANGENT] = {NULL,       NULL,      3u, true },
         [SECANT][COTANGENT]  = {expr_cosec, expr_cosech, 2u, false},
     };
-    _Static_assert(EXPR_KIND_SINH - EXPR_KIND_SIN == TRIG_COUNT &&
-                   EXPR_KIND_COTH - EXPR_KIND_SINH + 1 == TRIG_COUNT, "Native trigonometric sextets must be contiguous");
-    unsigned first = a && a->ops ? (unsigned)a->ops->kind - EXPR_KIND_SIN : 2u * TRIG_COUNT;
-    unsigned second = b && b->ops ? (unsigned)b->ops->kind - EXPR_KIND_SIN : 2u * TRIG_COUNT;
+    unsigned first = a && a->ops ? expr_trig_slot(a->ops->kind) : 2u * TRIG_COUNT;
+    unsigned second = b && b->ops ? expr_trig_slot(b->ops->kind) : 2u * TRIG_COUNT;
     if (first < 2u * TRIG_COUNT && second < 2u * TRIG_COUNT && first / TRIG_COUNT == second / TRIG_COUNT &&
         expr_struct_eq(a->a, b->a)) {
         bool hyperbolic = first >= TRIG_COUNT;

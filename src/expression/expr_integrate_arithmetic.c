@@ -78,23 +78,8 @@ typedef struct expr_integrate_div_rule_stage {
     unsigned int any_features;
 } expr_integrate_div_rule_stage_t;
 
-typedef struct expr_integrate_mul_rule_feature_entry {
-    expr_op_kind_t kind;
-    unsigned int features;
-} expr_integrate_mul_rule_feature_entry_t;
-
-typedef struct expr_integrate_div_rule_feature_entry {
-    expr_op_kind_t kind;
-    unsigned int numerator_features;
-    unsigned int denominator_features;
-} expr_integrate_div_rule_feature_entry_t;
-
 typedef expr_t *(*expr_integrate_mul_rule_dispatch_fn)(const expr_integrate_mul_rule_t *rule, const expr_t *expr,
                                                        const expr_t *wrt);
-
-enum { EXPR_INTEGRATE_MUL_FEATURE_KIND_MIN = EXPR_KIND_SIN, EXPR_INTEGRATE_MUL_FEATURE_KIND_MAX = EXPR_KIND_E1 };
-
-enum { EXPR_INTEGRATE_DIV_FEATURE_KIND_MIN = EXPR_KIND_ADD, EXPR_INTEGRATE_DIV_FEATURE_KIND_MAX = EXPR_KIND_SQRT };
 
 static expr_t *integrate_scaled_rule(const expr_t *expr, const expr_t *wrt);
 static expr_t *integrate_inverse_power_zeta_difference(const expr_t *expr, const expr_t *wrt);
@@ -102,13 +87,6 @@ static expr_t *integrate_trigonometric_progression_closed_form(const expr_t *exp
 static expr_t *integrate_inverse_symbolic_square_sum(const expr_t *expr, const expr_t *wrt);
 static expr_t *integrate_mul_rule_by_distribution(const expr_t *expr, const expr_t *wrt);
 static expr_t *integrate_scale_antiderivative_sum(const expr_t *factor, const expr_t *antiderivative);
-static bool integrate_rule_kind_bit(expr_op_kind_t kind, expr_op_kind_t min_kind, expr_op_kind_t max_kind,
-                                    uint64_t *bit_out);
-static uint64_t integrate_rule_kind_range_mask(expr_op_kind_t first_kind, expr_op_kind_t last_kind,
-                                               expr_op_kind_t min_kind, expr_op_kind_t max_kind);
-static size_t integrate_rule_kind_index(uint64_t recognized_kind_mask, uint64_t kind_bit);
-static uint64_t integrate_mul_rule_recognized_kind_mask(void);
-static uint64_t integrate_div_rule_recognized_kind_mask(void);
 static unsigned int integrate_mul_rule_direct_features(const expr_t *expr);
 static unsigned int integrate_mul_rule_expr_features(const expr_t *expr);
 static expr_t *integrate_mul_rule_dispatch(unsigned int features, const expr_t *expr, const expr_t *wrt);
@@ -275,52 +253,6 @@ static const expr_integrate_mul_rule_stage_t integrate_mul_rule_stages[] = {
     {.rules = integrate_mul_by_parts_expint_rules, .required_features = EXPR_INTEGRATE_MUL_FEATURE_BY_PARTS_UNARY},
     {.rules = integrate_mul_special_product_rules, .any_features = EXPR_INTEGRATE_MUL_FEATURE_SPECIAL_PRODUCT},
     {.rules = NULL}};
-
-static const expr_integrate_mul_rule_feature_entry_t integrate_mul_rule_feature_table[] = {
-    {.kind = EXPR_KIND_SIN, .features = EXPR_INTEGRATE_MUL_FEATURE_TRIG},
-    {.kind = EXPR_KIND_COS, .features = EXPR_INTEGRATE_MUL_FEATURE_TRIG},
-    {.kind = EXPR_KIND_TAN, .features = EXPR_INTEGRATE_MUL_FEATURE_TRIG},
-    {.kind = EXPR_KIND_SEC, .features = EXPR_INTEGRATE_MUL_FEATURE_TRIG},
-    {.kind = EXPR_KIND_COSEC, .features = EXPR_INTEGRATE_MUL_FEATURE_TRIG},
-    {.kind = EXPR_KIND_COT, .features = EXPR_INTEGRATE_MUL_FEATURE_TRIG},
-    {.kind = EXPR_KIND_SINH, .features = EXPR_INTEGRATE_MUL_FEATURE_HYPERBOLIC},
-    {.kind = EXPR_KIND_COSH, .features = EXPR_INTEGRATE_MUL_FEATURE_HYPERBOLIC},
-    {.kind = EXPR_KIND_TANH, .features = EXPR_INTEGRATE_MUL_FEATURE_HYPERBOLIC},
-    {.kind = EXPR_KIND_SECH, .features = EXPR_INTEGRATE_MUL_FEATURE_HYPERBOLIC},
-    {.kind = EXPR_KIND_COSECH, .features = EXPR_INTEGRATE_MUL_FEATURE_HYPERBOLIC},
-    {.kind = EXPR_KIND_COTH, .features = EXPR_INTEGRATE_MUL_FEATURE_HYPERBOLIC},
-    {.kind = EXPR_KIND_ASIN, .features = EXPR_INTEGRATE_MUL_FEATURE_BY_PARTS_UNARY},
-    {.kind = EXPR_KIND_ACOS, .features = EXPR_INTEGRATE_MUL_FEATURE_BY_PARTS_UNARY},
-    {.kind = EXPR_KIND_ATAN, .features = EXPR_INTEGRATE_MUL_FEATURE_BY_PARTS_UNARY},
-    {.kind = EXPR_KIND_ASEC, .features = EXPR_INTEGRATE_MUL_FEATURE_BY_PARTS_UNARY},
-    {.kind = EXPR_KIND_ACOSEC, .features = EXPR_INTEGRATE_MUL_FEATURE_BY_PARTS_UNARY},
-    {.kind = EXPR_KIND_ACOT, .features = EXPR_INTEGRATE_MUL_FEATURE_BY_PARTS_UNARY},
-    {.kind = EXPR_KIND_ASINH, .features = EXPR_INTEGRATE_MUL_FEATURE_BY_PARTS_UNARY},
-    {.kind = EXPR_KIND_ACOSH, .features = EXPR_INTEGRATE_MUL_FEATURE_BY_PARTS_UNARY},
-    {.kind = EXPR_KIND_ATANH, .features = EXPR_INTEGRATE_MUL_FEATURE_BY_PARTS_UNARY},
-    {.kind = EXPR_KIND_ASECH, .features = EXPR_INTEGRATE_MUL_FEATURE_BY_PARTS_UNARY},
-    {.kind = EXPR_KIND_ACOSECH, .features = EXPR_INTEGRATE_MUL_FEATURE_BY_PARTS_UNARY},
-    {.kind = EXPR_KIND_ACOTH, .features = EXPR_INTEGRATE_MUL_FEATURE_BY_PARTS_UNARY},
-    {.kind = EXPR_KIND_EXP, .features = EXPR_INTEGRATE_MUL_FEATURE_EXP},
-    {.kind = EXPR_KIND_LOG, .features = EXPR_INTEGRATE_MUL_FEATURE_LOG},
-    {.kind = EXPR_KIND_LOG10, .features = EXPR_INTEGRATE_MUL_FEATURE_LOG},
-    {.kind = EXPR_KIND_ERF, .features = EXPR_INTEGRATE_MUL_FEATURE_BY_PARTS_UNARY},
-    {.kind = EXPR_KIND_ERFC, .features = EXPR_INTEGRATE_MUL_FEATURE_BY_PARTS_UNARY},
-    {.kind = EXPR_KIND_NORMAL_PDF, .features = EXPR_INTEGRATE_MUL_FEATURE_BY_PARTS_UNARY},
-    {.kind = EXPR_KIND_NORMAL_CDF, .features = EXPR_INTEGRATE_MUL_FEATURE_BY_PARTS_UNARY},
-    {.kind = EXPR_KIND_NORMAL_LOGPDF, .features = EXPR_INTEGRATE_MUL_FEATURE_NORMAL_LOGPDF},
-    {.kind = EXPR_KIND_EI, .features = EXPR_INTEGRATE_MUL_FEATURE_BY_PARTS_UNARY},
-    {.kind = EXPR_KIND_LI, .features = EXPR_INTEGRATE_MUL_FEATURE_BY_PARTS_UNARY},
-    {.kind = EXPR_KIND_E1, .features = EXPR_INTEGRATE_MUL_FEATURE_BY_PARTS_UNARY}};
-
-static const expr_integrate_div_rule_feature_entry_t integrate_div_rule_feature_table[] = {
-    {.kind = EXPR_KIND_ADD, .denominator_features = EXPR_INTEGRATE_DIV_FEATURE_DEN_ADD_SUB},
-    {.kind = EXPR_KIND_SUB, .denominator_features = EXPR_INTEGRATE_DIV_FEATURE_DEN_ADD_SUB},
-    {.kind = EXPR_KIND_POW, .denominator_features = EXPR_INTEGRATE_DIV_FEATURE_DEN_POWER},
-    {.kind = EXPR_KIND_POW_D, .denominator_features = EXPR_INTEGRATE_DIV_FEATURE_DEN_POWER},
-    {.kind = EXPR_KIND_LOG, .numerator_features = EXPR_INTEGRATE_DIV_FEATURE_NUM_LOG},
-    {.kind = EXPR_KIND_LOG10, .numerator_features = EXPR_INTEGRATE_DIV_FEATURE_NUM_LOG},
-    {.kind = EXPR_KIND_SQRT, .denominator_features = EXPR_INTEGRATE_DIV_FEATURE_DEN_SQRT}};
 
 static const expr_integrate_binary_rule_fn integrate_div_initial_rules[] = {
     integrate_scaled_rule,
@@ -959,131 +891,29 @@ static expr_t *integrate_scaled_rule(const expr_t *expr, const expr_t *wrt)
     return out;
 }
 
-static bool integrate_rule_kind_bit(expr_op_kind_t kind, expr_op_kind_t min_kind, expr_op_kind_t max_kind,
-                                    uint64_t *bit_out)
-{
-    unsigned int kind_value = (unsigned int)kind;
-
-    if (!bit_out || kind_value < (unsigned int)min_kind || kind_value > (unsigned int)max_kind)
-        return false;
-    *bit_out = UINT64_C(1) << (kind_value - (unsigned int)min_kind);
-    return true;
-}
-
-static uint64_t integrate_rule_kind_range_mask(expr_op_kind_t first_kind, expr_op_kind_t last_kind,
-                                               expr_op_kind_t min_kind, expr_op_kind_t max_kind)
-{
-    uint64_t first_bit;
-    uint64_t last_bit;
-    uint64_t mask = 0u;
-
-    if ((unsigned int)last_kind < (unsigned int)first_kind ||
-        !integrate_rule_kind_bit(first_kind, min_kind, max_kind, &first_bit) ||
-        !integrate_rule_kind_bit(last_kind, min_kind, max_kind, &last_bit))
-        return 0u;
-
-    for (uint64_t bit = first_bit; bit <= last_bit; bit <<= 1u) {
-        mask |= bit;
-        if (bit == last_bit)
-            break;
-    }
-    return mask;
-}
-
-static size_t integrate_rule_kind_index(uint64_t recognized_kind_mask, uint64_t kind_bit)
-{
-    uint64_t lower_bits = recognized_kind_mask & (kind_bit - UINT64_C(1));
-    size_t index = 0u;
-
-    while (lower_bits) {
-        lower_bits &= lower_bits - UINT64_C(1);
-        ++index;
-    }
-    return index;
-}
-
-static uint64_t integrate_mul_rule_recognized_kind_mask(void)
-{
-    uint64_t exp_bit = 0u;
-
-    integrate_rule_kind_bit(EXPR_KIND_EXP, (expr_op_kind_t)EXPR_INTEGRATE_MUL_FEATURE_KIND_MIN,
-                            (expr_op_kind_t)EXPR_INTEGRATE_MUL_FEATURE_KIND_MAX, &exp_bit);
-
-    return integrate_rule_kind_range_mask(EXPR_KIND_SIN, EXPR_KIND_COT,
-                                          (expr_op_kind_t)EXPR_INTEGRATE_MUL_FEATURE_KIND_MIN,
-                                          (expr_op_kind_t)EXPR_INTEGRATE_MUL_FEATURE_KIND_MAX) |
-           integrate_rule_kind_range_mask(EXPR_KIND_SINH, EXPR_KIND_COTH,
-                                          (expr_op_kind_t)EXPR_INTEGRATE_MUL_FEATURE_KIND_MIN,
-                                          (expr_op_kind_t)EXPR_INTEGRATE_MUL_FEATURE_KIND_MAX) |
-           integrate_rule_kind_range_mask(EXPR_KIND_ASIN, EXPR_KIND_ACOTH,
-                                          (expr_op_kind_t)EXPR_INTEGRATE_MUL_FEATURE_KIND_MIN,
-                                          (expr_op_kind_t)EXPR_INTEGRATE_MUL_FEATURE_KIND_MAX) |
-           exp_bit |
-           integrate_rule_kind_range_mask(EXPR_KIND_LOG, EXPR_KIND_LOG10,
-                                          (expr_op_kind_t)EXPR_INTEGRATE_MUL_FEATURE_KIND_MIN,
-                                          (expr_op_kind_t)EXPR_INTEGRATE_MUL_FEATURE_KIND_MAX) |
-           integrate_rule_kind_range_mask(EXPR_KIND_ERF, EXPR_KIND_ERFC,
-                                          (expr_op_kind_t)EXPR_INTEGRATE_MUL_FEATURE_KIND_MIN,
-                                          (expr_op_kind_t)EXPR_INTEGRATE_MUL_FEATURE_KIND_MAX) |
-           integrate_rule_kind_range_mask(EXPR_KIND_NORMAL_PDF, EXPR_KIND_NORMAL_LOGPDF,
-                                          (expr_op_kind_t)EXPR_INTEGRATE_MUL_FEATURE_KIND_MIN,
-                                          (expr_op_kind_t)EXPR_INTEGRATE_MUL_FEATURE_KIND_MAX) |
-           integrate_rule_kind_range_mask(EXPR_KIND_EI, EXPR_KIND_E1,
-                                          (expr_op_kind_t)EXPR_INTEGRATE_MUL_FEATURE_KIND_MIN,
-                                          (expr_op_kind_t)EXPR_INTEGRATE_MUL_FEATURE_KIND_MAX);
-}
-
-static uint64_t integrate_div_rule_recognized_kind_mask(void)
-{
-    uint64_t mask = 0u;
-    uint64_t bit;
-
-    if (integrate_rule_kind_bit(EXPR_KIND_ADD, (expr_op_kind_t)EXPR_INTEGRATE_DIV_FEATURE_KIND_MIN,
-                                (expr_op_kind_t)EXPR_INTEGRATE_DIV_FEATURE_KIND_MAX, &bit))
-        mask |= bit;
-    if (integrate_rule_kind_bit(EXPR_KIND_SUB, (expr_op_kind_t)EXPR_INTEGRATE_DIV_FEATURE_KIND_MIN,
-                                (expr_op_kind_t)EXPR_INTEGRATE_DIV_FEATURE_KIND_MAX, &bit))
-        mask |= bit;
-    if (integrate_rule_kind_bit(EXPR_KIND_POW, (expr_op_kind_t)EXPR_INTEGRATE_DIV_FEATURE_KIND_MIN,
-                                (expr_op_kind_t)EXPR_INTEGRATE_DIV_FEATURE_KIND_MAX, &bit))
-        mask |= bit;
-    if (integrate_rule_kind_bit(EXPR_KIND_POW_D, (expr_op_kind_t)EXPR_INTEGRATE_DIV_FEATURE_KIND_MIN,
-                                (expr_op_kind_t)EXPR_INTEGRATE_DIV_FEATURE_KIND_MAX, &bit))
-        mask |= bit;
-    if (integrate_rule_kind_bit(EXPR_KIND_LOG, (expr_op_kind_t)EXPR_INTEGRATE_DIV_FEATURE_KIND_MIN,
-                                (expr_op_kind_t)EXPR_INTEGRATE_DIV_FEATURE_KIND_MAX, &bit))
-        mask |= bit;
-    if (integrate_rule_kind_bit(EXPR_KIND_LOG10, (expr_op_kind_t)EXPR_INTEGRATE_DIV_FEATURE_KIND_MIN,
-                                (expr_op_kind_t)EXPR_INTEGRATE_DIV_FEATURE_KIND_MAX, &bit))
-        mask |= bit;
-    if (integrate_rule_kind_bit(EXPR_KIND_SQRT, (expr_op_kind_t)EXPR_INTEGRATE_DIV_FEATURE_KIND_MIN,
-                                (expr_op_kind_t)EXPR_INTEGRATE_DIV_FEATURE_KIND_MAX, &bit))
-        mask |= bit;
-
-    return mask;
-}
-
 static unsigned int integrate_mul_rule_direct_features(const expr_t *expr)
 {
-    uint64_t recognized_kind_mask;
-    uint64_t kind_bit;
-    size_t index;
-
-    if (!expr || !expr->ops)
-        return 0u;
-    if (!integrate_rule_kind_bit(expr->ops->kind, (expr_op_kind_t)EXPR_INTEGRATE_MUL_FEATURE_KIND_MIN,
-                                 (expr_op_kind_t)EXPR_INTEGRATE_MUL_FEATURE_KIND_MAX, &kind_bit))
-        return 0u;
-    recognized_kind_mask = integrate_mul_rule_recognized_kind_mask();
-    if (!(recognized_kind_mask & kind_bit))
-        return 0u;
-
-    index = integrate_rule_kind_index(recognized_kind_mask, kind_bit);
-    if (index >= sizeof(integrate_mul_rule_feature_table) / sizeof(integrate_mul_rule_feature_table[0]))
-        return 0u;
-    if (integrate_mul_rule_feature_table[index].kind != expr->ops->kind)
-        return 0u;
-    return integrate_mul_rule_feature_table[index].features;
+    _Static_assert(EXPR_KIND_ACOTH - EXPR_KIND_ACOS == 5 && EXPR_KIND_ATANH - EXPR_KIND_ASEC == 6 &&
+                   EXPR_KIND_ATAN2 == EXPR_KIND_ASEC + 5, "Inverse trigonometric enum ranges changed.");
+    _Static_assert(EXPR_KIND_ERFC - EXPR_KIND_E1 == 3 && EXPR_KIND_LOG10 == EXPR_KIND_LOG + 1 &&
+                   EXPR_KIND_NORMAL_PDF - EXPR_KIND_NORMAL_CDF == 2, "Integration feature enum ranges changed.");
+    if (!expr || !expr->ops) return 0u;
+    expr_op_kind_t kind = expr->ops->kind;
+    if ((unsigned)kind - (unsigned)EXPR_KIND_COS <= (unsigned)(EXPR_KIND_COTH - EXPR_KIND_COS) ||
+        (unsigned)kind - (unsigned)EXPR_KIND_SEC <= (unsigned)(EXPR_KIND_TANH - EXPR_KIND_SEC)) {
+        unsigned slot = expr_trig_slot(kind);
+        if (slot < 12u)
+            return slot < 6u ? EXPR_INTEGRATE_MUL_FEATURE_TRIG : EXPR_INTEGRATE_MUL_FEATURE_HYPERBOLIC;
+    }
+    if ((unsigned)kind - (unsigned)EXPR_KIND_ACOS < 6u ||
+        ((unsigned)kind - (unsigned)EXPR_KIND_ASEC < 7u && kind != EXPR_KIND_ATAN2) ||
+        (unsigned)kind - (unsigned)EXPR_KIND_E1 < 4u || kind == EXPR_KIND_LI)
+        return EXPR_INTEGRATE_MUL_FEATURE_BY_PARTS_UNARY;
+    if ((unsigned)kind - (unsigned)EXPR_KIND_NORMAL_CDF < 3u)
+        return kind == EXPR_KIND_NORMAL_LOGPDF ? EXPR_INTEGRATE_MUL_FEATURE_NORMAL_LOGPDF :
+                                               EXPR_INTEGRATE_MUL_FEATURE_BY_PARTS_UNARY;
+    if ((unsigned)kind - (unsigned)EXPR_KIND_LOG < 2u) return EXPR_INTEGRATE_MUL_FEATURE_LOG;
+    return kind == EXPR_KIND_EXP ? EXPR_INTEGRATE_MUL_FEATURE_EXP : 0u;
 }
 
 static unsigned int integrate_mul_rule_expr_features(const expr_t *expr)
@@ -3348,28 +3178,16 @@ cleanup:
     return out;
 }
 
+
 static unsigned int integrate_div_rule_kind_features(const expr_t *expr, bool numerator)
 {
-    uint64_t recognized_kind_mask;
-    uint64_t kind_bit;
-    size_t index;
-
-    if (!expr || !expr->ops)
-        return 0u;
-    if (!integrate_rule_kind_bit(expr->ops->kind, (expr_op_kind_t)EXPR_INTEGRATE_DIV_FEATURE_KIND_MIN,
-                                 (expr_op_kind_t)EXPR_INTEGRATE_DIV_FEATURE_KIND_MAX, &kind_bit))
-        return 0u;
-    recognized_kind_mask = integrate_div_rule_recognized_kind_mask();
-    if (!(recognized_kind_mask & kind_bit))
-        return 0u;
-
-    index = integrate_rule_kind_index(recognized_kind_mask, kind_bit);
-    if (index >= sizeof(integrate_div_rule_feature_table) / sizeof(integrate_div_rule_feature_table[0]))
-        return 0u;
-    if (integrate_div_rule_feature_table[index].kind != expr->ops->kind)
-        return 0u;
-    return numerator ? integrate_div_rule_feature_table[index].numerator_features
-                     : integrate_div_rule_feature_table[index].denominator_features;
+    if (!expr || !expr->ops) return 0u;
+    expr_op_kind_t kind = expr->ops->kind;
+    if (numerator)
+        return kind == EXPR_KIND_LOG || kind == EXPR_KIND_LOG10 ? EXPR_INTEGRATE_DIV_FEATURE_NUM_LOG : 0u;
+    if (kind == EXPR_KIND_POW || kind == EXPR_KIND_POW_D) return EXPR_INTEGRATE_DIV_FEATURE_DEN_POWER;
+    if (kind == EXPR_KIND_ADD || kind == EXPR_KIND_SUB) return EXPR_INTEGRATE_DIV_FEATURE_DEN_ADD_SUB;
+    return kind == EXPR_KIND_SQRT ? EXPR_INTEGRATE_DIV_FEATURE_DEN_SQRT : 0u;
 }
 
 static unsigned int integrate_div_rule_features(const expr_t *expr, const expr_t *wrt)

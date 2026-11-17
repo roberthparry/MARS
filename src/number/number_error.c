@@ -3,6 +3,8 @@
  * @brief Guarded complex error functions, their inverses and related Gaussian distribution functions.
  *
  * Uses the entire Kummer series for complex erf and erfc, with additional precision for exponential cancellation.
+ * Bounded high-precision arguments share the checked lower-gamma binary split of that same series; other arguments
+ * retain ordinary term recurrence. Both paths validate cancellation after applying the exponential prefactor.
  * Real forward values use MPFR directly. Inverses use a seed followed by checked Halley iteration at increasing
  * working precision; approximate starting values never determine multiprecision accuracy. Binary64 inverses use
  * libc refinement directly; multiprecision answers never accept a fixed-precision approximation as their result.
@@ -55,8 +57,15 @@ static int error_forward(mpc_ptr out, mpc_srcptr input, mpc_rnd_t rounding, bool
     mpc_set_ui(sum, 1u, MPC_RNDNN);
     mpfr_set_ui(absolute_sum, 1u, MPFR_RNDN);
     mpfr_set_ui_2exp(tolerance, 1u, -work + 24, MPFR_RNDN);
-    bool converged = false;
-    for (unsigned long n = 1; n <= ERROR_MAX_SERIES_TERMS; ++n) {
+    /* 1F1(1;3/2;z^2) is the lower-gamma series with a=1/2. Its checked split avoids per-term complex division. */
+    bool split = false;
+    /* For a real square, ordinary real term operations are cheaper below the measured split crossover. */
+    if (work >= 640 && (work >= 1536 || !mpfr_zero_p(mpc_imagref(square)))) {
+        mpc_set_d(result, 0.5, MPC_RNDNN);
+        split = number_mpc_gamma_series(sum, absolute_sum, result, square, work - 32);
+    }
+    bool converged = split;
+    for (unsigned long n = 1; !converged && n <= ERROR_MAX_SERIES_TERMS; ++n) {
         mpc_mul(term, term, square, MPC_RNDNN);
         mpc_mul_2ui(term, term, 1u, MPC_RNDNN);
         mpc_div_ui(term, term, 2 * n + 1, MPC_RNDNN);
@@ -88,7 +97,8 @@ static int error_forward(mpc_ptr out, mpc_srcptr input, mpc_rnd_t rounding, bool
         /* The guard includes the cancellation between 1 and erf(z) for the complementary value. */
         number_mpc_abs_lower(threshold, result);
         mpfr_mul_2si(threshold, threshold, -target - 16, MPFR_RNDD);
-        mpfr_mul_2si(magnitude, absolute_sum, -work + 16, MPFR_RNDU);
+        /* The split proves relative series error below 2^(-work+32); retain its allowance through the prefactor. */
+        mpfr_mul_2si(magnitude, absolute_sum, -work + (split ? 48 : 16), MPFR_RNDU);
         number_mpc_abs_upper(scale, z);
         mpfr_mul(magnitude, magnitude, scale, MPFR_RNDU);
         mpfr_neg(scale, mpc_realref(square), MPFR_RNDN);

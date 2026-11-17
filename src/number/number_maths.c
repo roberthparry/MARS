@@ -579,8 +579,22 @@ static int number_mpfr_Ei_mut(mpfr_t value)
     return number_mpfr_apply_unary(value, mpfr_eint);
 }
 
+/* Share the guarded complex block evaluator without reducing a real input's precision. */
+static bool number_mpfr_polylog_blocks(mpfr_ptr out, unsigned order, mpfr_srcptr value)
+{
+    if (mpfr_get_prec(out) < 384 || !mpfr_number_p(value) || mpfr_cmpabs_ui(value, 1u) >= 0) return false;
+    mpc_t input, result;
+    mpc_init2(input, mpfr_get_prec(out)); mpc_init2(result, mpfr_get_prec(out));
+    mpc_set_fr(input, value, MPC_RNDNN);
+    bool ok = number_mpc_polylog_blocks(result, order, input);
+    if (ok) mpfr_set(out, mpc_realref(result), MPFR_RNDN);
+    mpc_clear(input); mpc_clear(result);
+    return ok;
+}
+
 static int number_mpfr_dilog_mut(mpfr_t value)
 {
+    if (number_mpfr_polylog_blocks(value, 2u, value)) return 0;
     return number_mpfr_apply_unary(value, mpfr_li2);
 }
 
@@ -1289,6 +1303,22 @@ typedef enum {
     NUMBER_MPFR_GAMMAINC_Q
 } number_mpfr_gammainc_mode_t;
 
+static bool number_mpfr_gamma_series(mpfr_ptr sum, mpfr_srcptr a, mpfr_srcptr x, mpfr_prec_t target)
+{
+    mpfr_prec_t precision = mpfr_get_prec(sum);
+    if (precision < 640) return false;
+    mpc_t order, argument, result;
+    mpc_init2(order, precision); mpc_init2(argument, precision); mpc_init2(result, precision);
+    mpfr_t absolute_sum;
+    mpfr_init2(absolute_sum, precision);
+    mpc_set_fr(order, a, MPC_RNDNN); mpc_set_fr(argument, x, MPC_RNDNN);
+    bool ok = number_mpc_gamma_series(result, absolute_sum, order, argument, target + 16);
+    if (ok) mpfr_set(sum, mpc_realref(result), MPFR_RNDN);
+    mpfr_clear(absolute_sum);
+    mpc_clear(order); mpc_clear(argument); mpc_clear(result);
+    return ok;
+}
+
 /* Sum the positive lower tail without subtracting nearly equal complete and upper gamma values. */
 static int number_mpfr_gammainc_lower_series(mpfr_ptr out, mpfr_srcptr a, mpfr_srcptr x, int regularised)
 {
@@ -1318,7 +1348,8 @@ static int number_mpfr_gammainc_lower_series(mpfr_ptr out, mpfr_srcptr a, mpfr_s
     mpfr_inits2(precision, term, sum, denominator, remainder, exponent, factor, (mpfr_ptr)0);
     mpfr_set_ui(term, 1u, MPFR_RNDN);
     mpfr_set_ui(sum, 1u, MPFR_RNDN);
-    for (unsigned long n = 1u; n <= 200000u; ++n) {
+    bool converged = number_mpfr_gamma_series(sum, a, x, target);
+    for (unsigned long n = 1u; !converged && n <= 200000u; ++n) {
         mpfr_add_ui(denominator, a, n, MPFR_RNDN);
         mpfr_div(factor, x, denominator, MPFR_RNDN);
         mpfr_mul(term, term, factor, MPFR_RNDN);
@@ -1330,9 +1361,9 @@ static int number_mpfr_gammainc_lower_series(mpfr_ptr out, mpfr_srcptr a, mpfr_s
             continue;
         mpfr_mul(remainder, term, x, MPFR_RNDU);
         mpfr_div(remainder, remainder, denominator, MPFR_RNDU);
-        if (!number_special_series_converged(remainder, sum, target))
-            continue;
-
+        converged = number_special_series_converged(remainder, sum, target);
+    }
+    if (converged) {
         /* gamma(a,x) = exp(a*log(x)-x) * sum/a; P uses Gamma(a+1). */
         mpfr_log(exponent, x, MPFR_RNDN);
         mpfr_mul(exponent, exponent, a, MPFR_RNDN);
@@ -1349,7 +1380,6 @@ static int number_mpfr_gammainc_lower_series(mpfr_ptr out, mpfr_srcptr a, mpfr_s
         mpfr_exp(factor, exponent, MPFR_RNDN);
         mpfr_set(out, factor, MPFR_RNDN);
         status = 0;
-        break;
     }
     mpfr_clears(term, sum, denominator, remainder, exponent, factor, (mpfr_ptr)0);
     if (status == 0)
@@ -1476,11 +1506,15 @@ static bool number_mpc_term_below_target(mpc_srcptr term, mpfr_prec_t target_pre
            (mpfr_zero_p(mpc_imagref(term)) || mpfr_get_exp(mpc_imagref(term)) <= bound);
 }
 
-static unsigned long number_polygamma_shift_target(mpfr_prec_t target_prec)
+static unsigned long number_polygamma_shift_target(mpfr_prec_t target_prec, unsigned order, bool positive)
 {
-    /* The least asymptotic term is about exp(-2*pi*z). A sixth of the bit count, plus a fixed
-     * margin, keeps that minimum beyond the requested accuracy without thousands of extra shifts. */
+    /* The least asymptotic term is about exp(-2*pi*z). The ordinary recurrence uses a sixth of the
+     * bit count. Cheap polynomial shifts for low orders permit a third, reducing the coefficient prefix
+     * without making changing-input calls spend most of their time on the longer shift sum. */
     unsigned long target = 32ul + (unsigned long)target_prec / 6ul;
+
+    if (positive && target_prec >= 512 && target_prec <= 8192 && order <= 3)
+        target = 32ul + (unsigned long)target_prec / 3ul;
 
     if (target < 64ul)
         target = 64ul;
@@ -1519,7 +1553,8 @@ static int number_mpfr_polygamma_order_mut(mpfr_t value, unsigned int order)
 
     target_prec = mpfr_get_prec(value);
     prec = target_prec + NUMBER_POLYGAMMA_GUARD_BITS;
-    shift_target = number_polygamma_shift_target(target_prec);
+    shift_target = number_polygamma_shift_target(target_prec, order,
+                                                target_prec >= 3072 && mpfr_sgn(value) > 0);
     mpfr_inits2(prec, y, inv, inv2, power, term, sum, asymp, fact, coefficient, (mpfr_ptr)0);
     mpfr_inits2(64, factorial_bound, power_bound, bound, (mpfr_ptr)0);
     mpfr_set(y, value, MPFR_RNDN);
@@ -1527,7 +1562,12 @@ static int number_mpfr_polygamma_order_mut(mpfr_t value, unsigned int order)
     mpfr_set_zero(asymp, 1);
     mpfr_fac_ui(fact, order, MPFR_RNDN);
 
-    while (mpfr_cmp_ui(y, shift_target) < 0) {
+    bool blocked = target_prec >= 3072 && number_mpfr_reciprocal_sum(sum, y, order + 1u, shift_target);
+    if (blocked) {
+        mpfr_mul(sum, sum, fact, MPFR_RNDN);
+        if (!(order & 1u)) mpfr_neg(sum, sum, MPFR_RNDN);
+    }
+    while (!blocked && mpfr_cmp_ui(y, shift_target) < 0) {
         mpfr_pow_ui(term, y, order + 1u, MPFR_RNDN);
         mpfr_div(term, fact, term, MPFR_RNDN);
         if ((order % 2u) == 0u)
@@ -1539,6 +1579,8 @@ static int number_mpfr_polygamma_order_mut(mpfr_t value, unsigned int order)
 
     mpfr_ui_div(inv, 1u, y, MPFR_RNDN);
     mpfr_sqr(inv2, inv, MPFR_RNDN);
+    mpfr_abs(power_bound, inv, MPFR_RNDU);
+    if (target_prec >= 2048) number_polygamma_prepare(power_bound, order, target_prec, prec);
     mpfr_fac_ui(term, order - 1u, MPFR_RNDN);
     mpfr_pow_ui(power, inv, order, MPFR_RNDN);
     mpfr_mul(term, term, power, MPFR_RNDN);
@@ -1602,7 +1644,7 @@ static int number_mpc_polygamma_order(mpc_ptr out, mpc_srcptr z, unsigned int or
 
     target_prec = mpc_get_prec(out);
     work_prec = target_prec + NUMBER_POLYGAMMA_GUARD_BITS;
-    shift_target = number_polygamma_shift_target(target_prec);
+    shift_target = number_polygamma_shift_target(target_prec, order, mpfr_sgn(mpc_realref(z)) > 0);
 
     mpc_init2(y, work_prec);
     mpc_init2(inv, work_prec);
@@ -1621,7 +1663,12 @@ static int number_mpc_polygamma_order(mpc_ptr out, mpc_srcptr z, unsigned int or
     mpc_set_ui(asymp, 0u, MPC_RNDNN);
     mpfr_fac_ui(fact, order, MPFR_RNDN);
 
-    for (;;) {
+    bool blocked = number_mpc_reciprocal_sum(sum, y, order + 1u, shift_target);
+    if (blocked) {
+        mpc_mul_fr(sum, sum, fact, MPC_RNDNN);
+        if (!(order & 1u)) mpc_neg(sum, sum, MPC_RNDNN);
+    }
+    while (!blocked) {
         mpc_norm(radius2, y, MPFR_RNDN);
         if (mpfr_cmp_ui(radius2, shift_target * shift_target) >= 0)
             break;
@@ -1636,6 +1683,8 @@ static int number_mpc_polygamma_order(mpc_ptr out, mpc_srcptr z, unsigned int or
 
     mpc_ui_div(inv, 1u, y, MPC_RNDNN);
     mpc_sqr(inv2, inv, MPC_RNDNN);
+    number_mpc_abs_upper(power_bound, inv);
+    number_polygamma_prepare(power_bound, order, target_prec, work_prec);
 
     mpfr_fac_ui(coeff, order - 1u, MPFR_RNDN);
     mpc_pow_ui(power, inv, order, MPC_RNDNN);
@@ -1705,7 +1754,7 @@ static int number_mpc_digamma_positive(mpc_ptr out, mpc_srcptr z, mpc_rnd_t rnd)
 {
     mpfr_prec_t target_prec = mpc_get_prec(out);
     mpfr_prec_t work_prec = target_prec + NUMBER_POLYGAMMA_GUARD_BITS;
-    unsigned long shift_target = number_polygamma_shift_target(target_prec);
+    unsigned long shift_target = number_polygamma_shift_target(target_prec, 0u, true);
     mpc_t y, inv, inv2, power, term, sum;
     mpfr_t coeff, radius2, factorial_bound, power_bound, bound;
     bool converged = false;
@@ -1723,7 +1772,9 @@ static int number_mpc_digamma_positive(mpc_ptr out, mpc_srcptr z, mpc_rnd_t rnd)
 
     mpc_set(y, z, MPC_RNDNN);
     mpc_set_ui(sum, 0u, MPC_RNDNN);
-    for (;;) {
+    bool blocked = number_mpc_reciprocal_sum(sum, y, 1u, shift_target);
+    if (blocked) mpc_neg(sum, sum, MPC_RNDNN);
+    while (!blocked) {
         mpc_norm(radius2, y, MPFR_RNDN);
         if (mpfr_cmp_ui(radius2, shift_target * shift_target) >= 0)
             break;
@@ -1734,6 +1785,8 @@ static int number_mpc_digamma_positive(mpc_ptr out, mpc_srcptr z, mpc_rnd_t rnd)
 
     mpc_ui_div(inv, 1u, y, MPC_RNDNN);
     mpc_sqr(inv2, inv, MPC_RNDNN);
+    number_mpc_abs_upper(power_bound, inv);
+    number_polygamma_prepare(power_bound, 0u, target_prec, work_prec);
     mpc_log(term, y, MPC_RNDNN);
     mpc_add(sum, sum, term, MPC_RNDNN);
     mpc_div_2ui(term, inv, 1u, MPC_RNDNN);
@@ -5132,6 +5185,7 @@ static mpfr_prec_t number_polylog_target_bits(mpfr_prec_t precision)
 
 static int number_mpfr_polylog_series_int(mpfr_t out, int order, const mpfr_t z)
 {
+    if (order >= 2 && number_mpfr_polylog_blocks(out, (unsigned)order, z)) return 0;
     mpfr_prec_t precision = mpfr_get_prec(out);
     mpfr_t sum, term, add, denom, abs_add, abs_sum, threshold;
 
@@ -5212,6 +5266,7 @@ static int number_mpfr_polylog_int_mut(mpfr_t value, int order)
 
 static int number_mpc_polylog_series_int(mpc_ptr out, int order, mpc_srcptr z, mpc_rnd_t rnd)
 {
+    if (rnd == MPC_RNDNN && order >= 2 && number_mpc_polylog_blocks(out, (unsigned)order, z)) return 0;
     mpfr_prec_t precision = mpc_get_prec(out);
     mpc_t sum, term, add;
     mpfr_t denom, abs_add, abs_sum, threshold;
@@ -5337,7 +5392,8 @@ static int number_mpc_E1(mpc_ptr out, mpc_srcptr z, mpc_rnd_t rnd)
     return status;
 }
 
-static int number_mpc_dilog(mpc_ptr out, mpc_srcptr z, mpc_rnd_t rnd)
+/* Evaluate the principal complex dilogarithm for shared native special-function consumers. */
+int number_mpc_dilog(mpc_ptr out, mpc_srcptr z, mpc_rnd_t rnd)
 {
     mpfr_prec_t precision = mpc_get_prec(out);
     mpfr_t abs_z, abs_one_minus_z, pi2_over_6;
@@ -5376,8 +5432,11 @@ static int number_mpc_dilog(mpc_ptr out, mpc_srcptr z, mpc_rnd_t rnd)
     mpc_init2(log_product, precision);
     mpc_init2(pi2_complex, precision);
     mpc_abs(abs_z, z, MPFR_RNDN);
+    mpc_ui_sub(one_minus_z, 1u, z, rnd);
+    mpc_abs(abs_one_minus_z, one_minus_z, MPFR_RNDN);
+    bool reflect = mpfr_cmp_d(abs_one_minus_z, 0.9) < 0 && mpfr_less_p(abs_one_minus_z, abs_z);
 
-    if (mpfr_cmp_ui(abs_z, 1u) > 0) {
+    if (mpfr_cmp_ui(abs_z, 1u) > 0 && !reflect) {
         mpc_ui_div(inv_z, 1u, z, rnd);
         mpc_neg(log_neg_z, z, rnd);
         mpc_log(log_neg_z, log_neg_z, rnd);
@@ -5394,9 +5453,7 @@ static int number_mpc_dilog(mpc_ptr out, mpc_srcptr z, mpc_rnd_t rnd)
         goto done;
     }
 
-    mpc_ui_sub(one_minus_z, 1u, z, rnd);
-    mpc_abs(abs_one_minus_z, one_minus_z, MPFR_RNDN);
-    if (mpfr_cmp_d(abs_one_minus_z, 0.5) < 0) {
+    if (reflect) {
         number_mpc_dilog(inner, one_minus_z, rnd);
         mpc_log(log_z, z, rnd);
         mpc_log(log_one_minus_z, one_minus_z, rnd);
@@ -5822,16 +5879,6 @@ real_failure:
     free(b_qf);
     return NUM_NAN;
 }
-
-number_t num_appell_F1(const number_t a, const number_t b1, const number_t b2, const number_t c, const number_t x,
-                       const number_t y)
-{
-    const number_t b[2] = {b1, b2};
-    const number_t variables[2] = {x, y};
-
-    return num_lauricella_F(a, b, c, variables, 2u);
-}
-
 
 number_t num_legendre_chi(const number_t order, const number_t number)
 {

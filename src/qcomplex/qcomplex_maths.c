@@ -2,8 +2,9 @@
  * @file qcomplex_maths.c
  * @brief Double-double complex special-function algorithms.
  *
- * Implements supported complex mathematical functions and series, including hypergeometric families. The native
- * fixed-precision layer does not depend on a public multiprecision representation.
+ * Implements supported complex mathematical functions and series, including hypergeometric families.
+ * Appell entry points live in qcomplex_appell.c. The native fixed-precision layer does not depend on a public
+ * multiprecision representation.
  *
  * This implements fixed double-double complex arithmetic for qcomplex_t. It is distinct from configurable
  * multiprecision complex arithmetic in the number module.
@@ -13,9 +14,9 @@
 #include <math.h>
 #include <stdlib.h>
 
+#include "qcomplex-t.h"
 #define MARS_SHARED_QFLOAT_INTERNAL_ACCESS
 #include "internal/qfloat_internal.h"
-#include "qcomplex-t.h"
 
 enum {
     QC_GAMMAINV_NEWTON_MAX_STEPS = 20,
@@ -1211,14 +1212,6 @@ qcomplex_t qc_lauricella_F(qcomplex_t a, const qcomplex_t *b, qcomplex_t c, cons
 
     free(coefficients);
     return sum;
-}
-
-qcomplex_t qc_appell_F1(qcomplex_t a, qcomplex_t b1, qcomplex_t b2, qcomplex_t c, qcomplex_t x, qcomplex_t y)
-{
-    const qcomplex_t b[2] = {b1, b2};
-    const qcomplex_t variables[2] = {x, y};
-
-    return qc_lauricella_F(a, b, c, variables, 2u);
 }
 
 qcomplex_t qc_hypergeometric_pFq(const qcomplex_t *upper, size_t upper_count, const qcomplex_t *lower,

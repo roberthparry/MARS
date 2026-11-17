@@ -287,6 +287,23 @@ void emit_expr_hypergeometric_pFq(const expr_t *f, sbuf_t *b);
 void emit_expr_lommel_S(const expr_t *f, sbuf_t *b);
 void emit_func_polygamma(const expr_t *f, sbuf_t *b);
 void emit_func_appell_F1(const expr_t *f, sbuf_t *b);
+
+/**
+ * @brief Append a native Appell F2, F3 or F4 application with its mathematical parameter groups.
+ * @param[in] expression Borrowed valid Appell graph; never consumed or modified.
+ * @param[in,out] buffer Caller-owned output buffer; appended text follows expression notation.
+ * @return Nothing; invalid packed arguments append no application. No graph ownership is transferred.
+ */
+void emit_expr_appell_family(const expr_t *expression, sbuf_t *buffer);
+
+/**
+ * @brief Append a parseable function-style Appell F2, F3 or F4 call.
+ * @param[in] expression Borrowed valid Appell graph; never consumed or modified.
+ * @param[in,out] buffer Caller-owned output buffer receiving the canonical lowercase call.
+ * @return Nothing; invalid packed arguments append no application. No graph ownership is transferred.
+ */
+void emit_func_appell_family(const expr_t *expression, sbuf_t *buffer);
+
 void emit_func_lauricella_F(const expr_t *f, sbuf_t *out);
 void emit_func_hypergeometric_pFq(const expr_t *f, sbuf_t *b);
 void emit_func_lommel_S(const expr_t *f, sbuf_t *b);

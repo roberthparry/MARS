@@ -115,6 +115,38 @@ static const TeX_model_node_t *lauricella(notation_build_t *build, const expr_t 
     return node(build, TeX_NODE_APPLY, 2u, children);
 }
 
+static const TeX_model_node_t *appell_family(notation_build_t *build, const expr_t *expression)
+{
+    const expr_t *arguments[7];
+    size_t count = 0;
+    unsigned family = expr_appell_family(expression);
+    if (!expr_appell_unpack(expression, arguments, &count)) return NULL;
+    const TeX_model_node_t *groups[4];
+    unsigned group_count = family == 4 ? 3u : 4u;
+    if (family == 2) {
+        groups[0] = notation_build_expr(build, arguments[0]);
+        groups[1] = parameter_list(build, arguments + 1, 2);
+        groups[2] = parameter_list(build, arguments + 3, 2);
+        groups[3] = parameter_list(build, arguments + 5, 2);
+    } else if (family == 3) {
+        groups[0] = parameter_list(build, arguments, 2);
+        groups[1] = parameter_list(build, arguments + 2, 2);
+        groups[2] = notation_build_expr(build, arguments[4]);
+        groups[3] = parameter_list(build, arguments + 5, 2);
+    } else {
+        groups[0] = parameter_list(build, arguments, 2);
+        groups[1] = parameter_list(build, arguments + 2, 2);
+        groups[2] = parameter_list(build, arguments + 4, 2);
+    }
+    const TeX_model_node_t *indexed[] = {
+        notation_build_literal(build, TeX_NODE_FUNCTION_NAME, "F"), size_node(build, family)
+    };
+    const TeX_model_node_t *children[] = {
+        node(build, TeX_NODE_SUBSCRIPT, 2, indexed), node(build, TeX_NODE_PARAMETER_GROUPS, group_count, groups)
+    };
+    return node(build, TeX_NODE_APPLY, 2, children);
+}
+
 static const TeX_model_node_t *hypergeometric(notation_build_t *build, const expr_t *expression)
 {
     const expr_t **upper = NULL, **lower = NULL, *argument;
@@ -162,6 +194,9 @@ const TeX_model_node_t *expr_notation_packed_function(notation_build_t *build, c
         [EXPR_KIND_GCDEXT]             = integer_function,
         [EXPR_KIND_LOMMEL_S]           = lommel,
         [EXPR_KIND_APPELL_F1]          = appell,
+        [EXPR_KIND_APPELL_F2]          = appell_family,
+        [EXPR_KIND_APPELL_F3]          = appell_family,
+        [EXPR_KIND_APPELL_F4]          = appell_family,
         [EXPR_KIND_LAURICELLA_F]       = lauricella,
         [EXPR_KIND_HYPERGEOMETRIC_PFQ] = hypergeometric
     };

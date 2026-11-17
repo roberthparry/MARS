@@ -414,7 +414,7 @@ static bool function_temporary_table_append(function_temporary_table_t *table, c
     size_t ordinal = 1u;
 
     /* Bounds and argument packs are syntax metadata, never standalone expressions. */
-    if (expr_is_op(node, &ops_argument_list) || expr_is_op(node, &ops_hypergeometric_pFq_pack))
+    if (expr_is_op(node, &ops_argument_list))
         return true;
 
     if (table->count == table->capacity) {
@@ -628,7 +628,7 @@ static bool function_collect_shared_temporaries(const expr_t *node, const expr_t
         return true;
     /* Packing nodes are an internal representation detail of variadic
      * hypergeometric functions, not expressions in the MARS language. */
-    if (expr_is_op(node, &ops_hypergeometric_pFq_pack))
+    if (expr_is_op(node, &ops_argument_list))
         return true;
     if (node->ops->arity == EXPR_OP_UNARY && node->a && !expr_is_const(node->a) && !expr_is_var(node->a) &&
         !expr_is_op(node->a, &ops_neg) &&

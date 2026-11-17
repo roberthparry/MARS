@@ -2766,9 +2766,7 @@ static expr_binding_expr_t *parse_binding_atom_mode(binding_parser_t *p, bool al
                     expr_binding_expr_free(c);
                     return NULL;
                 }
-                const expr_ops_t *pack = func->ops == &ops_powmod || func->ops == &ops_divmod ||
-                                                func->ops == &ops_gcdext ? &ops_integer_pack : &ops_lommel_S_pack;
-                parameters = expr_binding_expr_new_binary_op(pack, a, b);
+                parameters = expr_binding_expr_new_binary_op(&ops_argument_list, a, b);
                 return expr_binding_expr_new_binary_op(func->ops, parameters, c);
             } else if (func->is_binary) {
                 expr_binding_expr_t *a = NULL;

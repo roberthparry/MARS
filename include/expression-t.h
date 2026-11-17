@@ -1616,6 +1616,53 @@ expr_t *expr_appell_F1(const expr_t *a, const expr_t *b1, const expr_t *b2, cons
                        const expr_t *y);
 
 /**
+ * @brief Construct Appell F₂(a; b1, b2; c1, c2; x, y) without consuming its arguments.
+ * @param[in] a Borrowed parameter expression; retained by the result.
+ * @param[in] b1 Borrowed parameter expression; retained by the result.
+ * @param[in] b2 Borrowed parameter expression; retained by the result.
+ * @param[in] c1 Borrowed parameter expression; retained by the result.
+ * @param[in] c2 Borrowed parameter expression; retained by the result.
+ * @param[in] x Borrowed argument expression; retained by the result.
+ * @param[in] y Borrowed argument expression; retained by the result.
+ * @return Owned expression, released with expr_free(), or NULL for an invalid argument.
+ * Supports native numerical evaluation, argument derivatives and non-resonant affine primitives.
+ * Parameter derivatives remain formal; numerical continuation follows the scalar API's documented limits.
+ */
+expr_t *expr_appell_F2(const expr_t *a, const expr_t *b1, const expr_t *b2, const expr_t *c1, const expr_t *c2,
+    const expr_t *x, const expr_t *y);
+
+/**
+ * @brief Construct Appell F₃(a1, a2; b1, b2; c; x, y) without consuming its arguments.
+ * @param[in] a1 Borrowed parameter expression; retained by the result.
+ * @param[in] a2 Borrowed parameter expression; retained by the result.
+ * @param[in] b1 Borrowed parameter expression; retained by the result.
+ * @param[in] b2 Borrowed parameter expression; retained by the result.
+ * @param[in] c Borrowed parameter expression; retained by the result.
+ * @param[in] x Borrowed argument expression; retained by the result.
+ * @param[in] y Borrowed argument expression; retained by the result.
+ * @return Owned expression, released with expr_free(), or NULL for an invalid argument.
+ * Supports native numerical evaluation, argument derivatives and non-resonant affine primitives.
+ * Parameter derivatives remain formal; numerical continuation follows the scalar API's documented limits.
+ */
+expr_t *expr_appell_F3(const expr_t *a1, const expr_t *a2, const expr_t *b1, const expr_t *b2, const expr_t *c,
+    const expr_t *x, const expr_t *y);
+
+/**
+ * @brief Construct Appell F₄(a, b; c1, c2; x, y) without consuming its arguments.
+ * @param[in] a Borrowed parameter expression; retained by the result.
+ * @param[in] b Borrowed parameter expression; retained by the result.
+ * @param[in] c1 Borrowed parameter expression; retained by the result.
+ * @param[in] c2 Borrowed parameter expression; retained by the result.
+ * @param[in] x Borrowed argument expression; retained by the result.
+ * @param[in] y Borrowed argument expression; retained by the result.
+ * @return Owned expression, released with expr_free(), or NULL for an invalid argument.
+ * Supports native numerical evaluation, argument derivatives and non-resonant affine primitives.
+ * Parameter derivatives remain formal; numerical continuation follows the scalar API's documented limits.
+ */
+expr_t *expr_appell_F4(const expr_t *a, const expr_t *b, const expr_t *c1, const expr_t *c2,
+    const expr_t *x, const expr_t *y);
+
+/**
  * @brief Construct the Lauricella multivariate hypergeometric function with paired b and x arrays.
  * @param a Borrowed first parameter expression; retained, not consumed.
  * @param variable_count Number of entries in both b and x.

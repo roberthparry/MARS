@@ -819,3 +819,56 @@ INSERT OR IGNORE INTO expression_cases(name, operation, input, expected) VALUES
     ('reciprocal_root_multiple_factors', 'reciprocal_product_TeX', '2*(a*cos(t)+b*sin(t))*abs(t)^(-1/2)', '}{\sqrt{\left| t \right|}}'),
     ('reciprocal_multiple_powers', 'reciprocal_product_TeX', 'a*x^(-1/2)*y^(-1/3)', '}{\sqrt{x}\mkern-2mu \sqrt[3]{y}}'),
     ('reciprocal_unit_power', 'reciprocal_product_TeX', 'a*x^(-1)', '\frac{a}{x}');
+WITH modes(operation) AS (VALUES('appell_value'),('appell_dx'),('appell_dy'),('appell_primitive'),
+    ('appell_reverse'),('appell_roundtrip'),('appell_parse_reject'))
+INSERT INTO test_case_runner(module,source,parent,table_name,operation)
+SELECT 'expression.' || operation, 'tests/expression/test_expr_appell.c', 'tests.test_expr_appell',
+       'expression_cases', operation FROM modes WHERE true
+ON CONFLICT(module) DO UPDATE SET table_name=excluded.table_name, operation=excluded.operation;
+
+WITH families(family,arguments) AS (VALUES
+    (2,'1,1,1,1,1,0,0'),(3,'1,1,1,1,2,0,0'),(4,'1,1,1,1,0,0')),
+aliases(prefix,suffix) AS (VALUES('appell_F',''),('appellf',''),('F',''),('f',''),('F_',''))
+INSERT OR IGNORE INTO expression_cases(name,operation,input,expected,precision)
+SELECT 'appell_alias_' || prefix || family, 'appell_value', prefix || family || '(' || arguments || ')',
+       '1', 80 FROM families CROSS JOIN aliases;
+
+INSERT OR IGNORE INTO expression_cases(name,operation,input,expected,precision) VALUES
+    ('appell_alias_unicode_2','appell_value','F₂(1;1,1;1,1;0,0)','1',80),
+    ('appell_alias_unicode_3','appell_value','F₃(1,1;1,1;2;0,0)','1',80),
+    ('appell_alias_unicode_4','appell_value','F₄(1,1;1,1;0,0)','1',80),
+    ('appell_binding_f2','appell_value','{z|z=appell_F2(1,1,1,1,1,1/16,1/32)}','32/29',80),
+    ('appell_binding_f3','appell_value','{z|z=appell_F3(1,1,1,1,2,1/16,1/32)}',
+        '-ln((1-1/16)*(1-1/32))/(1/16+1/32-1/512)',80),
+    ('appell_binding_f4','appell_value','{z|z=appell_F4(1,1,1,1,1/16,1/32)}',
+        '1/sqrt((1-1/16-1/32)^2-4/512)',80),
+    ('appell_dx_f2','appell_dx','{F2(1,1,1,1,1,x,y)|x=1/16;y=1/32}','(32/29)^2',80),
+    ('appell_dy_f2','appell_dy','{F2(1,1,1,1,1,x,y)|y=1/32;x=1/16}','(32/29)^2',80),
+    ('appell_dx_f3','appell_dx','{F3(1,1,1,1,2,x,y)|x=1/16;y=1/32}',
+        '((1/16+1/32-1/512)/(1-1/16)+ln((1-1/16)*(1-1/32))*(1-1/32))/(1/16+1/32-1/512)^2',80),
+    ('appell_dy_f3','appell_dy','{F3(1,1,1,1,2,x,y)|y=1/32;x=1/16}',
+        '((1/16+1/32-1/512)/(1-1/32)+ln((1-1/16)*(1-1/32))*(1-1/16))/(1/16+1/32-1/512)^2',80),
+    ('appell_dx_f4','appell_dx','{F4(1,1,1,1,x,y)|x=1/16;y=1/32}',
+        '(1-1/16+1/32)/((1-1/16-1/32)^2-4/512)^(3/2)',80),
+    ('appell_dy_f4','appell_dy','{F4(1,1,1,1,x,y)|y=1/32;x=1/16}',
+        '(1+1/16-1/32)/((1-1/16-1/32)^2-4/512)^(3/2)',80),
+    ('appell_primitive_f2','appell_primitive','{F2(2,2,2,3,3,x,y)|x=1/16;y=1/32}','self',80),
+    ('appell_primitive_f3','appell_primitive','{F3(2,2,2,2,3,x,y)|x=1/16;y=1/32}','self',80),
+    ('appell_primitive_f4','appell_primitive','{F4(2,2,3,3,x,y)|x=1/16;y=1/32}','self',80),
+    ('appell_reverse_f2','appell_reverse','{F2(1,1,1,1,1,x,y)|x=1/16;y=1/32}','(32/29)^2',80),
+    ('appell_reverse_f3','appell_reverse','{F3(1,1,1,1,2,x,y)|x=1/16;y=1/32}',
+        '((1/16+1/32-1/512)/(1-1/16)+ln((1-1/16)*(1-1/32))*(1-1/32))/(1/16+1/32-1/512)^2',80),
+    ('appell_reverse_f4','appell_reverse','{F4(1,1,1,1,x,y)|x=1/16;y=1/32}',
+        '(1-1/16+1/32)/((1-1/16-1/32)^2-4/512)^(3/2)',80),
+    ('appell_roundtrip_f2','appell_roundtrip','{F2(1,1,1,1,1,x,y)|x=1/16;y=1/32}','32/29',80),
+    ('appell_roundtrip_f3','appell_roundtrip','{F3(1,1,1,1,2,x,y)|x=1/16;y=1/32}',
+        '-ln((1-1/16)*(1-1/32))/(1/16+1/32-1/512)',80),
+    ('appell_roundtrip_f4','appell_roundtrip','{F4(1,1,1,1,x,y)|x=1/16;y=1/32}',
+        '1/sqrt((1-1/16-1/32)^2-4/512)',80),
+    ('appell_sum_f2','appell_value','@Z_k=0^2 F2(1,1,1,1,1,k/64,1/64)','64/63+64/62+64/61',80),
+    ('appell_sum_f3','appell_value','@Z_k=0^2 F3(1,1,1,1,2,k/64,0)',
+        '1-ln(1-1/64)/(1/64)-ln(1-2/64)/(2/64)',80),
+    ('appell_sum_f4','appell_value','@Z_k=0^2 F4(1,1,1,1,k/64,0)','1+64/63+64/62',80),
+    ('appell_arity_f2','appell_parse_reject','F2(1,1,1,1,0,0)','0',80),
+    ('appell_arity_f3','appell_parse_reject','F3(1,1,1,1,2,0)','0',80),
+    ('appell_arity_f4','appell_parse_reject','F4(1,1,1,1,1,0,0)','0',80);

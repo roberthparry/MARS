@@ -437,6 +437,18 @@ static const benchmark_operation_t operations[] = {
      {.n6 = num_appell_F1},
      {.r6 = qf_appell_F1}, {.c6 = qc_appell_F1},
      {"0.5", "0.7", "0.8", "2.5", "0.2", "0.3"}, 63, false},
+    {"appell_F2", 7,
+     {.n7 = num_appell_F2},
+     {.r7 = qf_appell_F2}, {.c7 = qc_appell_F2},
+     {"0.5", "0.7", "0.8", "2.5", "2.6", "0.125", "0.0625"}, 127, false},
+    {"appell_F3", 7,
+     {.n7 = num_appell_F3},
+     {.r7 = qf_appell_F3}, {.c7 = qc_appell_F3},
+     {"0.5", "0.6", "0.7", "0.8", "2.5", "0.2", "0.3"}, 127, false},
+    {"appell_F4", 6,
+     {.n6 = num_appell_F4},
+     {.r6 = qf_appell_F4}, {.c6 = qc_appell_F4},
+     {"0.5", "0.7", "2.5", "2.6", "0.025", "0.04"}, 63, false},
     {"arccovercos", 1,
      {.n1 = num_arccovercos},
      {.r1 = qf_arccovercos}, {.c1 = qc_arccovercos},
@@ -1016,5 +1028,6 @@ bool benchmark_operation_supported(const benchmark_operation_t *op, bool complex
     if (op->arity == 1) return complex_backend ? op->complex_fn.c1 != NULL : op->real.r1 != NULL;
     if (op->arity == 2) return complex_backend ? op->complex_fn.c2 != NULL : op->real.r2 != NULL;
     if (op->arity == 3) return complex_backend ? op->complex_fn.c3 != NULL : op->real.r3 != NULL;
-    return op->arity == 6 && (complex_backend ? op->complex_fn.c6 != NULL : op->real.r6 != NULL);
+    if (op->arity == 6) return complex_backend ? op->complex_fn.c6 != NULL : op->real.r6 != NULL;
+    return op->arity == 7 && (complex_backend ? op->complex_fn.c7 != NULL : op->real.r7 != NULL);
 }
