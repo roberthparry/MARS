@@ -55,6 +55,34 @@ static void test_lab_presentation_calculation_time(void)
     test_run_database_cases(__FILE__, __LINE__, "mars_lab.calculation_times", NULL, calculation_time_row);
 }
 
+static void history_preview_row(const void *data)
+{
+    const test_database_case_t *row = data;
+    unsigned status = 0;
+    json_t *input = test_lab_json(string_c_str(row->input));
+    json_t *expected = test_lab_json(string_c_str(row->expected));
+    json_t *result = lab_presentation_request(input, &status);
+    const json_t *preview = test_lab_member(result, "preview");
+    const char *TeX = test_lab_text(preview, "TeX"), *required = test_lab_text(expected, "contains");
+    const char *forbidden = test_lab_text(expected, "excludes");
+    bool ok = status == 200 && test_lab_ok(result, true) &&
+              !strcmp(test_lab_text(input, "text"), test_lab_text(preview, "source")) &&
+              !strcmp(test_lab_text(expected, "display"), test_lab_text(preview, "display")) &&
+              (!*required || strstr(TeX, required)) && (!*forbidden || !strstr(TeX, forbidden));
+    if (test_lab_member(expected, "literal")) ok = ok && !*TeX;
+    if (test_lab_member(expected, "fit")) ok = ok && !strcmp(test_lab_text(preview, "tail_TeX"), "\\ldots)");
+    if (!ok) printf("%s: display '%s'; TeX '%s'\n", string_c_str(row->name), test_lab_text(preview, "display"), TeX);
+    json_free(input);
+    json_free(expected);
+    json_free(result);
+    TEST_ASSERT_TRUE(ok, "history previews preserve authored operations and full input while shortening displayed numbers");
+}
+
+static void test_lab_presentation_history(void)
+{
+    test_run_database_cases(__FILE__, __LINE__, "mars_lab.history_previews", NULL, history_preview_row);
+}
+
 static void test_lab_presentation_matrix(void)
 {
     unsigned status = 0;
@@ -498,6 +526,7 @@ static void test_lab_presentation_integrator_text(void)
 void test_lab_presentation_cases(void)
 {
     TEST_RUN_IN_GROUP(test_lab_presentation_calculation_time, tests, NULL);
+    TEST_RUN_IN_GROUP(test_lab_presentation_history, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_presentation_matrix, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_presentation_metadata, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_presentation_calculus_cards, tests, NULL);

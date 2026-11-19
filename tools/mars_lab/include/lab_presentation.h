@@ -32,7 +32,7 @@ bool lab_presentation_adapt(json_t *fields);
  * @param payload Borrowed object with action and action-specific fields.
  * @param status Optional destination for HTTP 200, 400 or 500.
  * @return Owned response released with json_free, or NULL on allocation failure.
- * @details Actions are matrix (text), solver_text (text), editor (text, operation),
+ * @details Actions are history (text), matrix (text), solver_text (text), editor (text, operation),
  * and unset_constants (expression, names array). Text must be NUL-free and is
  * limited to 64 KiB, names to 256. The last
  * action removes standalone additive integration constants and their constant
@@ -43,6 +43,8 @@ bool lab_presentation_adapt(json_t *fields);
  * goal_seek, and calculus (name and calculus set to derivative or integral).
  * Calculus wraps the existing body while retaining bindings and conditions.
  * Binding records contain name, kind and an exact string value.
+ * History returns source-preserving preview metadata with exact source, abbreviated display and optional TeX;
+ * it performs no mathematical evaluation or SVG process launch.
  * Responses contain editor metadata with text, body, expression, display,
  * bindings, conditions, starts and goal_expression. Parsing does not evaluate
  * authored values; native identifier syntax is checked using the expression API.

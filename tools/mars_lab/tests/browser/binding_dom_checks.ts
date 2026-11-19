@@ -246,12 +246,13 @@ window.checkLabBindingDom = async function checkLabBindingDom() {
             const b = String(Reflect.get(Object(right), 'name') || right || '');
             return a.localeCompare(b, undefined, {numeric: true, sensitivity: 'base'}) || a.localeCompare(b);
         }
-        const expected = [bindings[1], bindings[3], ...bindings.filter(item => item.kind === 'constant').sort(compare)];
+        const expected = [...bindings.filter(item => item.kind !== 'constant').sort(compare),
+                          ...bindings.filter(item => item.kind === 'constant').sort(compare)];
         const rendered = labDOM.call<{values: [string,string][]; kinds: [string,string][]}>('lab_binding_render', root, bindings);
         const inputs = Array.from(root.querySelectorAll<HTMLInputElement>('.binding-value-input'));
         equal(
             inputs.map(input => input.dataset.bindingName).join('|'), expected.map(item => item.name).join('|'),
-            'variables retain discovery order and constants use stable browser collation');
+            'variables and constants use stable natural name order in their separate groups');
         equal(inputs[0].value, 'sin(π/7) + √2', 'exact symbolic value wins over abbreviated display');
         equal(inputs[0].title, inputs[0].value, 'full value remains the tooltip');
         equal(inputs[0].getAttribute('aria-label'), 'Value of μ', 'display brackets removed from accessible label');
@@ -362,6 +363,21 @@ window.checkLabBindingDom = async function checkLabBindingDom() {
         labDOM.call<{values: [string,string][]; kinds: [string,string][]}>('lab_binding_render', root, many);
         equal(root.children.length, many.length, 'rendering releases temporary handles for every card and merge');
         equal(root.querySelector<HTMLInputElement>('input')!.dataset.bindingName, 'c1', 'large constant group retains numeric ordering');
+
+        const unordered = [
+            {name: 'z', kind: 'variable', value: '?'}, {name: 'x10', kind: 'variable', value: '10'},
+            {name: 'x', kind: 'variable', value: '1'}, {name: 'y', kind: 'variable', value: '?'},
+            {name: 'x2', kind: 'variable', value: '?'}, {name: 'D', kind: 'constant', value: '2'},
+            {name: 'C', kind: 'constant', value: '?'}
+        ];
+        const sourceOrder = unordered.map(binding => binding.name).join(',');
+        for (const value of ['1', '?', '2']) {
+            unordered[2].value = value;
+            labDOM.call('lab_binding_render', root, unordered);
+            equal(Array.from(root.querySelectorAll<HTMLInputElement>('input')).map(input => input.dataset.bindingName).join(','),
+                  'x,x2,x10,y,z,C,D', 'assigning or clearing x preserves natural variable order before constants');
+        }
+        equal(unordered.map(binding => binding.name).join(','), sourceOrder, 'display sorting preserves source catalogue order');
 
         const rowData: WorksheetIntegratorRow[] = [{kind: 'bound', name: '[α]', lo: 'a+b', hi: 'a-b'}, {kind: 'free', name: 'μ', lo: '', hi: ''}];
         labDOM.call('lab_binding_integrator_render', rows, rowData);

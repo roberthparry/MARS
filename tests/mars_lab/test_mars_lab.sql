@@ -7,6 +7,42 @@ CREATE TABLE IF NOT EXISTS mars_lab_cases (
 CREATE INDEX IF NOT EXISTS mars_lab_cases_operation ON mars_lab_cases(operation, name);
 
 INSERT INTO test_case_runner(module, source, parent, table_name, operation) VALUES (
+    'mars_lab.equation_pairs', 'tools/mars_lab/tests/test_lab_evaluation_extra.c',
+    'tests.test_lab_extra_equation', 'mars_lab_cases', 'equation_pair')
+ON CONFLICT(module) DO UPDATE SET table_name=excluded.table_name, operation=excluded.operation;
+INSERT OR IGNORE INTO mars_lab_cases(name, operation, input, expected) VALUES
+    ('equation_pair_scaled_ellipsoid', 'equation_pair', '{"equation":"x^2/9+y^2/16+z^2/25=1","precision":40}', '{"pairs":"3"}'),
+    ('equation_pair_scaled_closed_root', 'equation_pair', '{"equation":"x^2/9=2","precision":40}', '{"pairs":"1"}'),
+    ('equation_pair_shifted_ellipse', 'equation_pair', '{"equation":"(x-2)^2/9+y^2/16=1","precision":40}', '{"pairs":"2"}'),
+    ('equation_pair_exact_roots', 'equation_pair', '{"equation":"x^2=4","precision":40}', '{"pairs":"1"}'),
+    ('equation_pair_decimal_tapered', 'equation_pair', '{"equation":"x^2/784+(y^2+z^2)/484*(1+0.01*x)=1","precision":101}', '{"pairs":"3","max_TeX":"1200","required":"\\sqrt{\\frac","forbidden":"0.008099173553719"}')
+ON CONFLICT(name) DO UPDATE SET expected=excluded.expected;
+
+INSERT INTO test_case_runner(module, source, parent, table_name, operation) VALUES (
+    'mars_lab.history_previews', 'tools/mars_lab/tests/test_lab_presentation.c',
+    'tests.test_lab_presentation_history', 'mars_lab_cases', 'history_preview')
+ON CONFLICT(module) DO UPDATE SET table_name=excluded.table_name, operation=excluded.operation;
+INSERT OR IGNORE INTO mars_lab_cases(name, operation, input, expected) VALUES
+    ('history_authored_addition', 'history_preview', '{"action":"history","text":"2+3"}', '{"display":"2+3","contains":"2 + 3","excludes":"5"}'),
+    ('history_equation', 'history_preview', '{"action":"history","text":"x^2=2"}', '{"display":"x^2=2","contains":"x^{2}"}'),
+    ('history_decimal_binding', 'history_preview', '{"action":"history","text":"{x*exp(x)=2 | x=0.852605501372345678901234567890123456789}"}', '{"display":"{x*exp(x)=2 | x=0.8526055013723456...}","contains":"\\ldots{}","excludes":"901234567890123456789"}'),
+    ('history_long_integer', 'history_preview', '{"action":"history","text":"123456789012345678901234567890+x"}', '{"display":"123456789012345678...+x","contains":"\\ldots{}","excludes":"123456789012345678901234567890"}'),
+    ('history_scientific', 'history_preview', '{"action":"history","text":"1.234567890123456789012345678901e-40*x"}', '{"display":"1.2345678901234567...e-40*x","contains":"10^{-40}"}'),
+    ('history_unset_binding', 'history_preview', '{"action":"history","text":"{x+C | x=?, C=3}"}', '{"display":"{x+C | x=?, C=3}","contains":"?"}'),
+    ('history_factorial', 'history_preview', '{"action":"history","text":"factorial(500)"}', '{"display":"factorial(500)","contains":"\\operatorname{factorial}(500)","excludes":"122013682599"}'),
+    ('history_calculus', 'history_preview', '{"action":"history","text":"integral(sin(x),x)"}', '{"display":"integral(sin(x),x)","contains":"\\int"}'),
+    ('history_factor_request', 'history_preview', '{"action":"history","text":"factors(2^512*3^256*5^128)"}', '{"display":"factor(2^512*3^256*5^128)","contains":"\\operatorname{factor}(2^{512}","excludes":"a_{0}"}'),
+    ('history_factor_bound', 'history_preview', '{"action":"history","text":"{ factors(n) | n=2^512*3^256*5^128 }"}', '{"display":"factor(n)","contains":"\\operatorname{factor}(n)","excludes":"a_{0}"}'),
+    ('history_factor_parentheses', 'history_preview', '{"action":"history","text":"(( factors (84) ))"}', '{"display":"factor(84)","contains":"\\operatorname{factor}(84)"}'),
+    ('history_factor_label', 'history_preview', '{"action":"history","text":"factor(84)"}', '{"display":"factor(84)","contains":"\\operatorname{factor}(84)"}'),
+    ('history_factor_digits', 'history_preview', '{"action":"history","text":"factors(123456789012345678901234567890123456789012345678901234567890)"}', '{"display":"factor(123456789012345678...)","contains":"\\operatorname{factor}(123456789012345678901234567890123456789012345678901234567890)","fit":true}'),
+    ('history_factor_nested', 'history_preview', '{"action":"history","text":"factors(84)+x"}', '{"display":"factors(84)+x","contains":"factors","excludes":"a_{0}"}'),
+    ('history_quoted_markup', 'history_preview', '{"action":"history","text":"<img src=x onerror=alert(1)>"}', '{"display":"<img src=x onerror=alert(1)>","literal":true}'),
+    ('history_incomplete', 'history_preview', '{"action":"history","text":"sin("}', '{"display":"sin(","literal":true}'),
+    ('history_long_identifier', 'history_preview', '{"action":"history","text":"x123456789012345678901234567890+1"}', '{"display":"x123456789012345678901234567890+1","contains":"x"}')
+ON CONFLICT(name) DO UPDATE SET operation=excluded.operation, input=excluded.input, expected=excluded.expected;
+
+INSERT INTO test_case_runner(module, source, parent, table_name, operation) VALUES (
     'mars_lab.calculation_times', 'tools/mars_lab/tests/test_lab_presentation.c',
     'tests.test_lab_presentation_calculation_time', 'mars_lab_cases', 'calculation_time')
 ON CONFLICT(module) DO UPDATE SET table_name=excluded.table_name, operation=excluded.operation;
@@ -171,6 +207,55 @@ INSERT OR IGNORE INTO mars_lab_cases(name, operation, input, expected) VALUES
     ('equation_unwrapped_inverse_plot', 'equation_parameters',
      '{"expression":"x=-(2*atanh(sqrt(C+2*exp(y))/sqrt(C)))/sqrt(C)+D","wrt":"x","action":"plot","plot_source_mode":"equation","precision":40}',
      '{"status":"200","parameters":{"C":"-1","D":"1"},"plot_marker":"data-series","bindings":{"x":"variable","y":"variable","C":"constant","D":"constant"}}');
+
+-- Fixing any coordinate, including the selected first one, changes the plot dimension without changing its role.
+INSERT OR IGNORE INTO mars_lab_cases(name, operation, input, expected) VALUES
+    ('equation_fixed_first_coordinate', 'equation_parameters',
+     '{"expression":"{x^2+y^2+z^2=4 | x=1, y=?, z=?}","wrt":"x","action":"plot","plot_source_mode":"equation","precision":32}',
+     '{"status":"200","parameters":{},"plot_marker":"data-series","plot_excludes":"data-surface","axes":["y","z"],"bindings":{"x":"variable","y":"variable","z":"variable"},"values":{"x":"1"}}'),
+    ('equation_fixed_second_coordinate', 'equation_parameters',
+     '{"expression":"{x^2+y^2+z^2=4 | x=?, y=1, z=?}","wrt":"y","action":"plot","plot_source_mode":"equation","precision":32}',
+     '{"status":"200","parameters":{},"plot_marker":"data-series","plot_excludes":"data-surface","axes":["x","z"],"bindings":{"x":"variable","y":"variable","z":"variable"},"values":{"y":"1"}}'),
+    ('equation_fixed_third_coordinate', 'equation_parameters',
+     '{"expression":"{x^2+y^2+z^2=4 | x=?, y=?, z=1}","wrt":"z","action":"plot","plot_source_mode":"equation","precision":32}',
+     '{"status":"200","parameters":{},"plot_marker":"data-series","plot_excludes":"data-surface","axes":["x","y"],"bindings":{"x":"variable","y":"variable","z":"variable"},"values":{"z":"1"}}'),
+    ('equation_fixed_coordinate_axis_choice', 'equation_parameters',
+     '{"expression":"{x^2+y^2+z^2=4 | x=1, y=?, z=?}","wrt":"z","action":"plot","plot_source_mode":"equation","precision":32}',
+     '{"status":"200","parameters":{},"plot_marker":"data-series","plot_excludes":"data-surface","axes":["z","y"]}'),
+    ('equation_fixed_named_coordinate', 'equation_parameters',
+     '{"expression":"{u^2+v^2+w^2=4 | u=1, v=?, w=?}","wrt":"u","action":"plot","plot_source_mode":"equation","precision":32}',
+     '{"status":"200","parameters":{},"plot_marker":"data-series","plot_excludes":"data-surface","axes":["v","w"]}'),
+    ('equation_fixed_tapered_ellipsoid', 'equation_parameters',
+     '{"expression":"{x^2/784+(y^2+z^2)/484*(1+0.01*x)=1 | x=1, y=?, z=?}","wrt":"x","action":"plot","plot_source_mode":"equation","precision":32}',
+     '{"status":"200","parameters":{},"plot_marker":"data-series","plot_excludes":"data-surface","axes":["y","z"],"values":{"x":"1"}}'),
+    ('equation_cleared_coordinate_surface', 'equation_parameters',
+     '{"expression":"{x^2+y^2+z^2=4 | x=?, y=?, z=?}","wrt":"x","action":"plot","plot_source_mode":"equation","plot_quality":"preview","precision":32}',
+     '{"status":"200","parameters":{},"plot_marker":"data-surface","axes":["x","y","z"]}');
+
+-- Captions describe the sampled slice, retaining exact values and the worksheet's binding roles.
+INSERT OR IGNORE INTO mars_lab_cases(name, operation, input, expected) VALUES
+    ('equation_caption_fixed_egg', 'equation_parameters',
+     '{"expression":"{x^2/784+(y^2+z^2)/484*(1+0.01*x)=1 | x=?, y=?, z=1}","wrt":"x","action":"plot","plot_source_mode":"equation","precision":32}',
+     '{"status":"200","parameters":{},"axes":["x","y"],"title_contains":"y² + 1","title_excludes":"z","title_TeX_contains":"y^{2} + 1","title_TeX_excludes":"z","bindings":{"x":"variable","y":"variable","z":"variable"},"values":{"z":"1"}}'),
+    ('equation_caption_exact_radical', 'equation_parameters',
+     '{"expression":"{x^2+y^2+z^2=4 | x=?, y=?, z=sqrt(2)}","wrt":"x","action":"plot","plot_source_mode":"equation","precision":32}',
+     '{"status":"200","parameters":{},"axes":["x","y"],"title_contains":"x² + y² + 2 = 4","title_excludes":"z","title_TeX_contains":"x^{2} + y^{2} + 2 &= 4","title_TeX_excludes":"z"}'),
+    ('equation_caption_exact_fraction', 'equation_parameters',
+     '{"expression":"{x^2+y^2+z^2=4 | x=?, y=?, z=1/3}","wrt":"x","action":"plot","plot_source_mode":"equation","precision":32}',
+     '{"status":"200","parameters":{},"axes":["x","y"],"title_excludes":"z","title_TeX_contains":"y^{2} + 1}{9}","title_TeX_excludes":"z"}'),
+    ('equation_caption_fixed_named', 'equation_parameters',
+     '{"expression":"{u^2+v^2+w^2=4 | u=1, v=?, w=?}","wrt":"u","action":"plot","plot_source_mode":"equation","precision":32}',
+     '{"status":"200","parameters":{},"axes":["v","w"],"title_contains":"v² + w² + 1 = 4","title_excludes":"u","title_TeX_contains":"v^{2} + w^{2} + 1 &= 4"}'),
+    ('equation_caption_mesh_parameter', 'equation_parameters',
+     '{"expression":"{x^2+y^2+z^2=r^2 | x=?, y=?, z=?; r=2}","wrt":"x","action":"plot","plot_source_mode":"equation","plot_quality":"preview","precision":32}',
+     '{"status":"200","parameters":{},"axes":["x","y","z"],"title_contains":"x² + y² + z² = 4","title_excludes":"r","title_TeX_contains":"z^{2} &= 4","bindings":{"r":"constant"},"values":{"r":"2"}}'),
+    ('equation_caption_curve_parameter', 'equation_parameters',
+     '{"expression":"{x^2+a=4 | x=?; a=1}","wrt":"x","action":"plot","plot_source_mode":"equation","precision":32}',
+     '{"status":"200","parameters":{},"axes":["x"],"title_contains":"x² + 1 = 4","title_excludes":"a","title_TeX_contains":"x^{2} + 1 &= 4","bindings":{"a":"constant"}}'),
+    ('equation_caption_selected_parameter', 'equation_parameters',
+     '{"expression":"{y=a*x+b | x=?, y=?; a=?, b=?}","wrt":"x","action":"plot","plot_source_mode":"equation","precision":32,"plot_slices":"a\t-2\t2\t1\t250\nb\t-2\t2\t1\t-1"}',
+     '{"status":"200","parameters":{"a":"-1","b":"1"},"title_contains":"y = 1 - x","title_excludes":"b - x","title_TeX_contains":"y &= 1 - x","bindings":{"a":"constant","b":"constant"}}')
+ON CONFLICT(name) DO UPDATE SET operation=excluded.operation, input=excluded.input, expected=excluded.expected;
 
 -- Weather failures retain actionable status without publishing raw provider or transport text.
 INSERT INTO test_case_runner(module, source, parent, table_name, operation) VALUES (

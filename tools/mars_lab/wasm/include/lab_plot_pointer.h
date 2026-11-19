@@ -32,6 +32,16 @@ void lab_plot_pointer_install(void);
 void lab_plot_pointer_prepare(jsref rendered);
 
 /**
+ * @brief Admit a pointer only inside a curve's plotting rectangle or a surface's projected coordinate volume.
+ * @param chart Borrowed scoped SVG chart with native viewport metadata and, for 3D, its current retained frame.
+ * @param event Borrowed scoped event supplying finite clientX/clientY screen coordinates in CSS pixels.
+ * @return True inside or on the viewport boundary; false for outside pointers, missing metadata or invalid transforms.
+ * @details Uses the actual SVG transform, including scaling and rotation. Runs synchronously without changing
+ * scene state or retaining handles. It never reads mathematical source or scans sampled vertices.
+ */
+bool lab_plot_pointer_inside(chart_jsref chart, event_jsref event);
+
+/**
  * @brief Project a hover guide, point marker and solution-curve focus, or clear them.
  * @param action LAB_PLOT_POINTER_INSPECT inspects movement; every other value, including unknown codes,
  * clears hover overlays and curve focus.

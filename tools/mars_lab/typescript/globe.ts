@@ -235,6 +235,7 @@ class MarsAlmanacGlobe {
     private readonly travelNotice = document.createElement('div');
     private photoLoading = 0;
     private flightSpeed = 0;
+    private flightRender = [1, 1000 / 60, 0];
     private historyZoom: number | null = null;
     private historyRedirect = false;
     private historyRestoring = false;
@@ -300,6 +301,7 @@ class MarsAlmanacGlobe {
             Number(globe.input('Latitude').value), Number(globe.input('Longitude').value), zoom) as number[];
         globe.observerSignature = globe.observerState();
         globe.flightTarget = target;
+        if (!redirect) globe.flightRender = [1, 1000 / 60, 0];
         labDOM.call('lab_globe_travel_notice', globe.travelNotice, start, target);
         globe.travelNotice.hidden = false;
         // Fetch the destination once, before zooming towards it, rather than chasing intermediate regions.
@@ -333,7 +335,7 @@ class MarsAlmanacGlobe {
             if (WorksheetWorkspace.mode.currentMode() !== 'almanac') { globe.cancelFlight(); return; }
             globe.flightFrame = 0;
             // A delayed paint or worker result is not elapsed travel time: never jump to catch up.
-            const elapsed = Math.max(0, Math.min(50, now - previous));
+            const interval = Math.max(0, now - previous), elapsed = Math.min(50, interval);
             previous = now;
             if (progress >= 1 || document.hidden || matchMedia('(prefers-reduced-motion: reduce)').matches) {
                 complete();
@@ -348,6 +350,7 @@ class MarsAlmanacGlobe {
             if (!ready) speed = 0;
             globe.flightSpeed = speed;
             if (ready && speed > 0) {
+                globe.flightRender = labDOM.call('lab_globe_flight_render', globe.flightRender, interval) as number[];
                 const advanced = labDOM.call('lab_globe_flight_advance', start, target, progress,
                     elapsed * speed, Math.max(1, globe.canvas.clientWidth), Number(redirect)) as number | null;
                 if (advanced === null) { complete(); return; }
@@ -374,6 +377,7 @@ class MarsAlmanacGlobe {
         this.photoAtlas?.prefetch(null);
         this.travelNotice.hidden = true;
         this.flightSpeed = 0;
+        this.flightRender = [1, 1000 / 60, 0];
         this.historyZoom = null;
         this.historyRedirect = false;
         this.historyRestoring = false;
@@ -752,7 +756,7 @@ class MarsAlmanacGlobe {
     }
 
     private async loadHighResolution(): Promise<void> {
-        if (this.highResolutionRequested || this.view[2] < 2 || !this.root.dataset.surface) return;
+        if (this.flightTarget || this.highResolutionRequested || this.view[2] < 2 || !this.root.dataset.surface) return;
         const gl = this.gl, limit = gl.getParameter(gl.MAX_TEXTURE_SIZE) as number;
         let width = 8192;
         while (width > limit) width /= 2;
@@ -764,12 +768,20 @@ class MarsAlmanacGlobe {
             image.src = '/earth_surface_detail.png';
             await image.decode();
             if (image.naturalWidth !== 8192 || image.naturalHeight !== 4096) throw new Error('Invalid Earth detail image');
+            // Navigation may have started during decoding. Keep the resident photograph until arrival;
+            // uploading a 128 MiB texture and rebuilding its palettes would stall the animation's GPU queue.
+            if (this.flightTarget) { this.highResolutionRequested = false; return; }
             while (width > 2048 && !gl.isContextLost()) {
                 let bitmap: ImageBitmap | null = null;
                 const texture = gl.createTexture();
                 if (!texture) break;
                 try {
                     if (width !== 8192) bitmap = await createImageBitmap(image, {resizeWidth: width, resizeHeight: width / 2});
+                    if (this.flightTarget) {
+                        gl.deleteTexture(texture);
+                        this.highResolutionRequested = false;
+                        return;
+                    }
                     gl.activeTexture(gl.TEXTURE0);
                     gl.bindTexture(gl.TEXTURE_2D, texture);
                     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
@@ -872,7 +884,7 @@ class MarsAlmanacGlobe {
     }
 
     private async loadPhoto(): Promise<void> {
-        if (this.photoAtlas) return;
+        if (this.photoAtlas || this.flightTarget) return;
         const target = this.flightTarget;
         if ((target?.[4] ?? this.view[2]) < 6 || this.shoreClosed) return;
         const latitude = target ? Number(this.input('Latitude').value) : this.view[0];
@@ -1267,7 +1279,8 @@ class MarsAlmanacGlobe {
             const mapReady = this.drawShore(size);
             this.surfacePending = this.usesShoreDetail() && !mapReady;
             this.root.dataset.surfacePending = String(this.surfacePending);
-            const pixels = Math.min(1536, Math.round(size * Math.min(devicePixelRatio, this.flightTarget ? 1 : 1.5)));
+            const sourcePixels = Math.min(1536, Math.round(size * Math.min(devicePixelRatio, this.flightTarget ? 1 : 1.5)));
+            const pixels = Math.max(1, Math.round(sourcePixels * (this.flightTarget ? this.flightRender[0] : 1)));
             if (this.canvas.width !== pixels || this.canvas.height !== pixels)
                 this.canvas.width = this.canvas.height = pixels;
             const gl = this.gl;
@@ -1280,7 +1293,7 @@ class MarsAlmanacGlobe {
                 this.photoAtlas.follow(prediction ?
                     labDOM.call('lab_globe_view', prediction, this.view[2], 1) as GlobeView : null);
             }
-            const photographic = this.photoAtlas?.bind(this.view.slice(3), pixels);
+            const photographic = this.photoAtlas?.bind(this.view.slice(3), sourcePixels);
             gl.uniform1i(this.uniform('photoAtlasEnabled'), Number(Boolean(this.photoAtlas)));
             gl.uniform1i(this.uniform('photoAtlasReady'), Number(Boolean(photographic)));
             if (photographic) {

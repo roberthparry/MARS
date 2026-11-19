@@ -9,6 +9,7 @@
  */
 #include "lab_dom.h"
 #include "lab_requests.h"
+#include "lab_plot_controls.h"
 #include "lab_plot_slices.h"
 #include "lab_layout.h"
 #include "lab_flow.h"
@@ -251,8 +252,12 @@ static jsref lab_flow_request_calculus_accept(struct lab_flow_request_calculus_c
                              ctx->plot ? flow_request_calculus_stage_plot_commit : flow_request_calculus_stage_done,
                              ctx->plot ? "plotError" : "fail", 0, 0, 1, error);
     }
-    if (ctx->plot)
+    if (ctx->plot) {
+        int axes = lab_dom_get(ctx->data, "plot_axis_names");
+        if (lab_dom_type(axes) == LAB_VALUE_ARRAY && lab_dom_count(axes))
+            lab_plot_controls_variables(axes, axes);
         return lab_flow_call(ctx->frame, flow_request_calculus_stage_plot_commit, "displayPlot", 0, 0, 1, ctx->result);
+    }
     int options = lab_dom_object(LAB_VALUE_OBJECT);
     lab_dom_set(options, "keepBindings", lab_dom_scalar(LAB_VALUE_BOOLEAN, 1));
     return lab_flow_call(ctx->frame, flow_request_calculus_stage_clear_error, "clearResultDetails", 0, 0, 1, options);

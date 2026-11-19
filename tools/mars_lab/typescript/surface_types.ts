@@ -65,6 +65,8 @@ interface MarsSurfaceSnapshot {
     orientation: MarsSurfaceQuaternion;
     angles: MarsSurfaceAngles;
     volume: MarsSurfaceVolumeState;
+    /** @brief Native-selected connected axis edges retained across compatible redraws. */
+    axisCorners?: number[];
     refining?: boolean;
 }
 
@@ -121,6 +123,8 @@ interface MarsSurfaceText {
     x: number;
     y: number;
     align: CanvasTextAlign;
+    size?: number;
+    bold?: boolean;
 }
 
 /** Axis tick metadata retained from the native SVG. */
@@ -128,6 +132,7 @@ interface MarsSurfaceTick {
     axis: number;
     fraction: number;
     label: string;
+    zero?: boolean;
 }
 
 /** Native projection plan shared by interactive drawing and SVG export. */
@@ -142,6 +147,26 @@ interface MarsSurfaceFrame {
     drawMesh: boolean;
     paths: number[][];
     texts: MarsSurfaceText[];
+    axisCorners?: number[];
+    distance?: number;
+    radius?: number;
+    centre?: number[];
+    axisPathCount?: number;
+    pathWidths?: number[];
+    solids?: MarsSurfaceAxisFace[];
+}
+
+/** One projected cylinder or cone face, shaded by native camera-space lighting. */
+interface MarsSurfaceAxisFace {
+    points: number[][];
+    shade: number;
+    axis: number;
+    cone: boolean;
+}
+
+/** Live SVG chart carrying only its currently displayed native camera frame for pointer admission. */
+interface MarsSurfaceChart extends SVGSVGElement {
+    marsSurfaceFrame?: MarsSurfaceFrame;
 }
 
 /** The small drawing protocol shared by Canvas and vector axis output. */
@@ -151,6 +176,7 @@ interface MarsSurfaceAxisContext {
     lineWidth: number;
     font: string;
     textAlign: CanvasTextAlign;
+    lineJoin: CanvasLineJoin;
 
     /** @brief Clear the requested drawing region; vector-only contexts may have no backing pixels to clear. */
     clearRect(x: number, y: number, width: number, height: number): void;
@@ -164,11 +190,20 @@ interface MarsSurfaceAxisContext {
     /** @brief Append a straight segment to the current projected path. */
     lineTo(x: number, y: number): void;
 
+    /** @brief Close the current solid-face polygon. */
+    closePath(): void;
+
+    /** @brief Fill a native solid-face polygon with the current presentation colour. */
+    fill(): void;
+
     /** @brief Draw the recorded path using the current stroke colour and width. */
     stroke(): void;
 
     /** @brief Draw an axis label using the current font, alignment and fill colour. */
     fillText(text: string, x: number, y: number): void;
+
+    /** @brief Outline an axis label before filling it to preserve contrast against the plot. */
+    strokeText(text: string, x: number, y: number): void;
 }
 
 /**
@@ -205,6 +240,8 @@ interface MarsSurfaceInitialView {
     settleTimer?: number;
     settled: SVGGElement | null;
     framePlan?: MarsSurfaceFrame;
+    /** @brief Native-selected connected axis edges retained until they become unsuitable. */
+    axisCorners?: number[];
 
     /** @brief Project a native three-dimensional point through the retained camera frame. */
     project?(point: MarsSurfacePoint3): MarsSurfacePoint2;

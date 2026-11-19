@@ -1,6 +1,6 @@
 /**
  * @file surface_mesh_checks.ts
- * @brief Native retained-mesh decoding and vertex-layout regressions.
+ * @brief Native retained-mesh decoding, exterior-axis layout and vertex-layout regressions.
  *
  * Supplies small SVG fixtures directly to WebAssembly, checking geometry admission,
  * fan triangulation, colour expansion and temporary-handle lifetime without a GPU.
@@ -8,6 +8,8 @@
 interface Window {
     /** @brief Validate native display-metadata decoding through the real browser bridge. */
     checkLabSurfaceMesh(): void;
+    /** @brief Validate connected exterior scales, rotation, zoom and bounded numeric label spacing. */
+    checkLabSurfaceAxes(): void;
 }
 
 /** @brief Exercise native mesh preparation using detached, fixture-owned SVG elements. */
@@ -75,4 +77,183 @@ window.checkLabSurfaceMesh = function checkLabSurfaceMesh(): void {
         check(many?.primitives.length === 2049 && many.vertices.length === 2049 * 27,
               'large repeated preparations release per-record handles');
     }
+    window.checkLabSurfaceAxes();
+};
+
+/** @brief Check axis geometry through the real WebAssembly camera and projection bridge. */
+window.checkLabSurfaceAxes = function checkLabSurfaceAxes(): void {
+    function check(condition: boolean, message: string): void {
+        if (!condition) throw new Error('Surface axes: ' + message);
+    }
+    const chart = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    const volume = {units: [1, 1, 1], exponent: 0, sampleExponent: 0, labelWidth: 30,
+                    bounds: [-1, 3, -3, 5, -4, 4],
+                    autoHeight: false, dirty: false};
+    const ticks: MarsSurfaceTick[] = [];
+    for (let axis = 0; axis < 3; ++axis) {
+        for (let i = 0; i <= 10; ++i)
+            ticks.push({axis, fraction: i / 10, label: String(i - 5), zero: i === 5});
+    }
+    const view = {chart, width: 560, height: 420, units: [1, 1, 1], names: ['x', 'y', 'z'],
+                  ticks, volume, orientation: [0, 0, 0, 1]};
+    function frame(): MarsSurfaceFrame {
+        return labDOM.call<MarsSurfaceFrame>('lab_surface_frame', view, null);
+    }
+    function checkFrame(plan: MarsSurfaceFrame): void {
+        const corners = plan.axisCorners;
+        check(!!corners && corners.length === 3, 'native frame identifies all three coordinate edges');
+        const screen = Array.from({length: 8}, (_, corner) => labDOM.call<number[]>('lab_surface_project', plan,
+            [Number(!!(corner & 1)), Number(!!(corner & 2)), Number(!!(corner & 4))]));
+        let joins = 0, supported = 0;
+        for (let axis = 0; axis < 3; ++axis) {
+            const corner = corners![axis], last = corner | 1 << axis;
+            check(corner >= 0 && corner < 8 && !(corner & 1 << axis), 'edge starts at its lower coordinate bound');
+            const path = plan.paths[axis * 2];
+            const length = Math.hypot(path[2] - path[0], path[3] - path[1]);
+            const dx = screen[last][0] - screen[corner][0], dy = screen[last][1] - screen[corner][1];
+            const edgeLength = Math.hypot(dx, dy), fraction = edgeLength / length;
+            check(Math.hypot(path[0] - screen[corner][0], path[1] - screen[corner][1]) < 1e-8 &&
+                  Math.hypot(path[0] + (path[2] - path[0]) * fraction - screen[last][0],
+                             path[1] + (path[3] - path[1]) * fraction - screen[last][1]) < 1e-8,
+                  'axis endpoints coincide with the actual projected frame corners');
+            const arrow = plan.paths[axis * 2 + 1];
+            check(Math.hypot(arrow[2] - path[2], arrow[3] - path[3]) < 1e-8 &&
+                  ((arrow[2] - screen[last][0]) * dx + (arrow[3] - screen[last][1]) * dy) / edgeLength > 0,
+                  'arrow tips continue towards increasing coordinate values, clear of shared frame corners');
+            const ticks = Array.from({length: 5}, (_, i) => {
+                const point = [Number(!!(corner & 1)), Number(!!(corner & 2)), Number(!!(corner & 4))];
+                point[axis] = i / 4;
+                return {screen: labDOM.call<number[]>('lab_surface_project', plan, point),
+                    depth: plan.rows.slice(6).reduce((sum, value, j) => sum + value * (point[j] - 0.5), 0)};
+            });
+            const gap = (i: number) => Math.hypot(ticks[i + 1].screen[0] - ticks[i].screen[0],
+                                                  ticks[i + 1].screen[1] - ticks[i].screen[1]);
+            const distance = plan.distance!;
+            const ratio = ((distance + ticks[3].depth) * (distance + ticks[4].depth)) /
+                          ((distance + ticks[0].depth) * (distance + ticks[1].depth));
+            check(Math.abs(gap(0) / gap(3) - ratio) < 1e-8,
+                  'equal coordinate tick intervals compress according to the pinhole distance formula');
+            for (const [i, tick] of ticks.entries()) {
+                const point = [(corner & 1) ? 0.5 : -0.5, (corner & 2) ? 0.5 : -0.5,
+                               (corner & 4) ? 0.5 : -0.5];
+                point[axis] = i / 4 - 0.5;
+                const clip = [0, 1, 2, 3].map(row => plan.matrix[12 + row] +
+                    point.reduce((sum, value, col) => sum + value * plan.matrix[col * 4 + row], 0));
+                check(Math.hypot((clip[0] / clip[3] + 1) * plan.width / 2 - tick.screen[0],
+                                  (1 - clip[1] / clip[3]) * plan.height / 2 - tick.screen[1]) < 1e-8,
+                      'WebGL homogeneous division and native SVG/Canvas projection agree');
+            }
+            const distances = screen.map(point => ((path[2] - path[0]) * (point[1] - path[1]) -
+                                                   (path[3] - path[1]) * (point[0] - path[0])) / length);
+            supported += Number(Math.min(...distances) >= -1e-8 || Math.max(...distances) <= 1e-8);
+            for (let other = 0; other < axis; ++other) {
+                const previous = corners![other] | 1 << other;
+                joins += Number(corner === corners![other] || corner === previous ||
+                                last === corners![other] || last === previous);
+            }
+        }
+        check(joins >= 2, 'three axes form one connected frame rather than floating independently');
+        check(supported >= 2, 'face-on perspective retains two silhouette scales and the short third joining scale');
+        check(!!plan.solids?.length && plan.solids.length <= 102 && plan.solids.every(face => face.points.length >= 3 &&
+              face.shade >= 0 && face.shade <= 1), 'axes are bounded opaque cylinder and cone meshes');
+        for (let axis = 0; axis < 3; ++axis)
+            check(plan.solids!.some(face => face.axis === axis && face.cone) &&
+                  plan.solids!.some(face => face.axis === axis && !face.cone),
+                  'every axis has a circular cylinder and a genuine three-dimensional cone');
+        const boxes: number[][] = [];
+        for (const label of plan.texts) {
+            const size = label.size ?? 13;
+            const width = label.text.length * size * 0.8;
+            const left = label.x - (label.align === 'right' ? width : label.align === 'center' ? width / 2 : 0);
+            const box = [left, label.y - size, left + width, label.y + size * 0.3];
+            for (const other of boxes)
+                check(box[2] + 3.99 <= other[0] || other[2] + 3.99 <= box[0] ||
+                      box[3] + 3.99 <= other[1] || other[3] + 3.99 <= box[1], 'labels have visible clearance');
+            boxes.push(box);
+        }
+        check(['x', 'y', 'z'].every(name => plan.texts.some(item => item.text === name)),
+              'positive axis directions retain their names');
+    }
+    for (const angles of [[315, 30, 0], [18, 80, 45], [145, 15, 135], [315, 30, 180], [85, 5, 3], [90, 30, 90]]) {
+        view.orientation = labDOM.call<number[]>('lab_surface_camera', 0, angles, null, null, null, 0);
+        checkFrame(frame());
+    }
+    for (const units of [[1, 1, 1], [1, 0.7935906173, 0.7935906173]]) {
+        view.units = units;
+        for (const angles of [[180, -10, 0], [180, 10, 0], [0, -10, 0], [0, 10, 0]]) {
+            view.orientation = labDOM.call<number[]>('lab_surface_camera', 0, angles, null, null, null, 0);
+            const plan = frame();
+            checkFrame(plan);
+            const points = Array.from({length: 8}, (_, corner) => labDOM.call<number[]>('lab_surface_project', plan,
+                [Number(!!(corner & 1)), Number(!!(corner & 2)), Number(!!(corner & 4))]));
+            const span = Math.max(Math.max(...points.map(point => point[0])) - Math.min(...points.map(point => point[0])),
+                                  Math.max(...points.map(point => point[1])) - Math.min(...points.map(point => point[1])));
+            for (let axis = 0; axis < 3; ++axis) {
+                const first = plan.axisCorners![axis], last = first | 1 << axis;
+                check(Math.hypot(points[last][0] - points[first][0], points[last][1] - points[first][1]) > span * 0.17,
+                      'nearly face-on views choose a useful depth edge instead of a short overlapping scale');
+                for (let other = 0; other < axis; ++other) {
+                    const low = plan.axisCorners![other], high = low | 1 << other;
+                    const join = first === low || first === high ? first : last === low || last === high ? last : -1;
+                    if (join < 0) continue;
+                    const a = points[join === first ? last : first], b = points[join === low ? high : low];
+                    const dx = a[0] - points[join][0], dy = a[1] - points[join][1];
+                    const ex = b[0] - points[join][0], ey = b[1] - points[join][1];
+                    check(Math.abs(dx * ey - dy * ex) / Math.max(Math.hypot(dx, dy), Math.hypot(ex, ey)) > span * 0.12,
+                          'adjoining axes have perpendicular clearance instead of appearing as one straight scale');
+                }
+            }
+        }
+    }
+    view.units = [1, 1, 1];
+    volume.exponent = 1;
+    volume.dirty = true;
+    volume.bounds = [0, 2, -1, 3, -2, 2];
+    checkFrame(frame());
+    volume.exponent = 2;
+    checkFrame(frame());
+    volume.exponent = 0;
+    volume.dirty = false;
+    checkFrame(frame());
+    check(frame().texts.every(item => item.size! >= 13), 'tick labels retain their readable native size');
+    view.units = [0.7935906173, 0.7935906173, 1];
+    for (const azimuth of [0, 90, 180, 270]) {
+        Reflect.deleteProperty(view, 'axisCorners');
+        view.orientation = labDOM.call<number[]>('lab_surface_camera', 0, [azimuth - 0.02, 30, 0], null, null, null, 0);
+        const reference = frame().axisCorners!.join(',');
+        for (let step = 0; step < 20; ++step) {
+            view.orientation = labDOM.call<number[]>('lab_surface_camera', 0,
+                [azimuth + (step % 2 ? -0.02 : 0.02), 30, 0], null, null, null, 0);
+            const plan = frame();
+            checkFrame(plan);
+            check(plan.axisCorners!.join(',') === reference,
+                  'small camera reversals retain readable reference edges instead of flipping the scales');
+        }
+    }
+    view.units = [1, 1, 1];
+    view.width = 800;
+    view.height = 650;
+    /** @brief Count interior strokes, excluding shared corner positions belonging to more than one axis. */
+    function intermediateTickCount(plan: MarsSurfaceFrame, axis: number): number {
+        const corner = plan.axisCorners![axis];
+        const expected = view.ticks.filter(tick => tick.axis === axis && tick.fraction > 0 && tick.fraction < 1).map(tick => {
+            const point = [Number(!!(corner & 1)), Number(!!(corner & 2)), Number(!!(corner & 4))];
+            point[axis] = tick.fraction;
+            return labDOM.call<number[]>('lab_surface_project', plan, point);
+        });
+        return plan.paths.slice(plan.axisPathCount).filter(path =>
+            expected.some(point => Math.hypot(path[0] - point[0], path[1] - point[1]) < 1e-7)).length;
+    }
+    view.orientation = labDOM.call<number[]>('lab_surface_camera', 0, [0, 0, 0], null, null, null, 0);
+    const shortCount = intermediateTickCount(frame(), 1);
+    view.orientation = labDOM.call<number[]>('lab_surface_camera', 0, [90, 0, 0], null, null, null, 0);
+    check(intermediateTickCount(frame(), 1) === 9 && shortCount < 9,
+          'rotating a short depth axis into a long scale restores every retained intermediate stroke');
+    view.width = 320;
+    view.height = 240;
+    frame();
+    view.width = 800;
+    view.height = 650;
+    check(intermediateTickCount(frame(), 1) === 9 && view.ticks.length === 33,
+          'resizing does not permanently prune the numerical tick catalogue');
 };

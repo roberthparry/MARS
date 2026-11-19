@@ -75,7 +75,7 @@ static char *number_precision_text_dup(number_t value, int precision)
 static char *expr_TeX_body_dup(const expr_t *expr)
 {
     /* MARS Lab's result card has room for a complete Cartesian solution family on each row. */
-    char *body = expr_to_TeX_body_wrapped(expr, 280u);
+    char *body = expr_to_TeX_body_wrapped(expr, LAB_WORKER_EQUATION_LINE_LIMIT_LATEX);
 
     return body ? body : expr_text_dup(expr, style_LATEX);
 }
@@ -130,7 +130,7 @@ static void print_aligned_equation_fragment(const char *lhs, const char *rhs)
 
 static char *equation_display_TeX_dup(const equation_t *equation)
 {
-    char *problem = equ_to_TeX_body_wrapped(equation, 110u);
+    char *problem = equ_to_TeX_body_wrapped(equation, LAB_WORKER_EQUATION_LINE_LIMIT_LATEX);
     const char *body = NULL;
     size_t body_length = 0u;
     const expr_t *sides[] = {equ_lhs(equation), equ_rhs(equation)};
@@ -567,28 +567,10 @@ static char *solution_symbolic_pair_text(const equation_solutions_t *solutions, 
     number_t other_literal = NUM_NAN;
     bool numeric_pair = first && second && expr_match_const_value(equ_rhs(first), &literal) &&
                         expr_match_const_value(equ_rhs(second), &other_literal);
+    bool exact_real_pair = numeric_pair && num_is_exact(literal) && num_is_real(literal) &&
+                           num_is_exact(other_literal) && num_is_real(other_literal);
     num_destroy(&other_literal);
-    if (first && second && !numeric_pair && expr_struct_eq(equ_lhs(first), equ_lhs(second))) {
-        const expr_t *base = NULL, *positive = NULL, *radicand = NULL;
-        if (expr_match_neg_expr(equ_rhs(first), &base) && expr_struct_eq(base, equ_rhs(second)))
-            positive = equ_rhs(second);
-        else if (expr_match_neg_expr(equ_rhs(second), &base) && expr_struct_eq(base, equ_rhs(first)))
-            positive = equ_rhs(first);
-        if (positive) {
-            char *body = use_TeX ? expr_to_TeX_body(positive) : expr_text_dup(positive, style_UNBOUND);
-            bool root = expr_match_sqrt_expr(positive, &radicand);
-            size_t size = body ? strlen(body) + 32 : 0;
-            text = size ? malloc(size) : NULL;
-            if (text)
-                snprintf(text, size, use_TeX ? (root ? "\\pm %s" : "\\pm\\left(%s\\right)") :
-                                             (root ? "±%s" : "±(%s)"), body);
-            free(body);
-            goto cleanup;
-        }
-    }
-    if (first && second && !numeric_pair &&
-        (expr_has_unbound_parameters(equ_rhs(first), 0u, NULL) ||
-         expr_has_unbound_parameters(equ_rhs(second), 0u, NULL))) {
+    if (first && second && (!numeric_pair || exact_real_pair)) {
         string_t *paired = equ_solution_pair_rhs_text(first, second, use_TeX ? style_LATEX : style_UNBOUND);
         if (paired) {
             text = dup_string(string_c_str(paired));
@@ -1147,7 +1129,7 @@ static void prepare_equation_plot(const equation_t *equation, const equation_sol
                                                    ? "No solutions." : "No explicit solutions found.");
     const char *keys[] = {input, axis, precision_text, "equation"};
     const expr_t *curves[] = {equ_lhs(equation), equ_rhs(equation)};
-    char *TeX = equ_to_TeX_body_wrapped(equation, 110);
+    char *TeX = equ_to_TeX_body_wrapped(equation, LAB_WORKER_EQUATION_LINE_LIMIT_LATEX);
     size_t root_count = 0;
     number_t *roots = solution_plot_roots(solutions, bindings, order, &root_count);
     expr_t *families[16] = {0};

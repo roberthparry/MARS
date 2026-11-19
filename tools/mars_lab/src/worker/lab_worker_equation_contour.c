@@ -160,7 +160,8 @@ static bool sample(contour_t *contour, const double bounds[4], size_t side)
 }
 
 /* Sample only a private worker equation; restore its binding values and numerical precision on every exit. */
-int lab_worker_equation_contour(equation_t *equation, expr_t *first, expr_t *second, char **argv)
+int lab_worker_equation_contour(equation_t *equation, expr_t *first, expr_t *second, char **argv,
+                                const char *title_text, const char *title_TeX)
 {
     size_t saved_precision = num_get_default_prec_bits();
     contour_t contour = {.capacity = 65536};
@@ -223,15 +224,13 @@ int lab_worker_equation_contour(equation_t *equation, expr_t *first, expr_t *sec
     ok = plot && plot_add_points(plot, contour.points, contour.count, argv[1], PLOT_LINES, 0x78d8cb) &&
          plot_set_bounds(plot, limits[0], limits[1], limits[2], limits[3]);
     string_t *svg = ok ? plot_to_svg(plot) : NULL;
-    char *title = equ_to_TeX_body_wrapped(equation, 110);
     if (svg)
         printf("input %s\nexpression %s\nplot_title %s\nplot_title_TeX %s\nplot_svg %s\ndifferentiable no\n",
-               argv[1], argv[1], argv[1], title ? title : "", string_c_str(svg));
+               argv[1], argv[1], title_text, title_TeX, string_c_str(svg));
     else
         printf("error %s\n", valid_bounds ? "No real contour found in the sampled region; try explicit coordinate bounds."
                                          : "Supply finite ordered coordinate bounds and bind remaining parameters.");
     int rc = svg ? 0 : 1;
-    free(title);
     string_free(svg);
     plot_free(plot);
     clear_points(&contour);

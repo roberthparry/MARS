@@ -75,6 +75,7 @@ static const field_t field_table[] = {
     {"operation_function", "operation_function", true},
     {"plot_amplitude", "plot_amplitude", true},
     {"plot_available", "plot_available", false},
+    {"plot_axis", "plot_axes", false},
     {"plot_complex_plane", "plot_complex_plane", true},
     {"plot_components", "plot_components", true},
     {"plot_notice", "plot_notice", true},
@@ -378,6 +379,8 @@ static void lab_eval_expression_fields(json_t *fields)
     lab_eval_display_pair(fields, "derivative_function", "derivative_function");
     lab_eval_display_pair(fields, "integral_function", "integral_function");
     lab_eval_alias(fields, "editor_expression", "input");
+    if (*lab_eval_text(fields, "plot_axes"))
+        lab_eval_put(fields, "plot_axis_names", lab_eval_line_array(fields, "plot_axes"));
     if (*lab_eval_text(fields, "root_value"))
         lab_eval_alias(fields, "value", "root_value");
     if (*lab_eval_text(fields, "derivative_values"))

@@ -30,6 +30,7 @@ typedef struct {
 
 typedef struct {
     double width, height, font_size;
+    bool sized; /**< Emit per-label sizes for depth-scaled 3D text; false preserves ordinary 2D SVG markup. */
     plot_label_box_t boxes[39];
     size_t count;
 } plot_tick_layout_t;

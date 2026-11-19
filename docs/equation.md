@@ -307,6 +307,15 @@ with structurally opposite terms also share a native `±` row: the common centre
 appears first, cancelling terms are simplified, and any shared denominator and
 integer branch condition are retained. The underlying branches remain separate;
 numerical evaluations do not establish a symbolic pairing.
+Opposite branches with the same expression and exactly opposite real coefficients
+also combine into one `±` row, including rational multiples of radicals. A zero
+centre is omitted in both plain and TeX output; the solver still retains each
+branch independently.
+Exact decimal coefficients remain rational throughout symbolic solving. Paired roots share common scalar
+denominators and retain useful factored centres. Plain paired output omits redundant
+parentheses around a positive integer denominator, retaining them for compound denominators.
+A quadratic with no linear term takes the square root of
+the coefficient quotient directly, avoiding a redundant discriminant and preserving both complex branches.
 
 The native search, family and interpretation notes are available through
 `equ_solutions_search_note`, `equ_solutions_family_note` and

@@ -25,6 +25,7 @@
 #define MARS_LAB_WORKER_INTERNAL_ACCESS
 #include "worker/lab_worker_internal.h"
 #include "test_harness.h"
+#include "test_database.h"
 #include "test_lab_support.h"
 #include "test_lab_math_support.h"
 
@@ -2374,6 +2375,30 @@ static void test_lab_extra_nested_root_equation(void)
     TEST_ASSERT_TRUE(ok, "nested exponential roots solve and draw both equation sides at worksheet precision");
 }
 
+static void equation_pair_row(const void *data)
+{
+    const test_database_case_t *row = data;
+    unsigned status = 0;
+    json_t *response = request("/equation-eval", string_c_str(row->input), &status);
+    json_t *expectation = test_lab_json(string_c_str(row->expected));
+    const char *TeX = test_lab_text(response, "solutions_TeX");
+    size_t signs = 0, rows = 0, expected = (size_t)strtoul(test_lab_text(expectation, "pairs"), NULL, 10);
+    for (const char *p = TeX; (p = strstr(p, "\\pm")); p += 3) ++signs;
+    for (const char *p = TeX; (p = strstr(p, "&=")); p += 2) ++rows;
+    bool ok = status == 200 && signs == expected && rows == expected &&
+              !strstr(TeX, "0 \\pm") && contains(response, "svg", "<svg") &&
+              !*test_lab_text(response, "render_error") && lab_presentation_adapt(response);
+    ok = ok && strstr(test_lab_text(test_lab_member(response, "presentation"), "equation_solution_text"), "±");
+    const char *maximum = test_lab_text(expectation, "max_TeX"), *required = test_lab_text(expectation, "required");
+    const char *forbidden = test_lab_text(expectation, "forbidden");
+    ok = ok && (!*maximum || strlen(TeX) <= strtoul(maximum, NULL, 10)) &&
+         (!*required || strstr(TeX, required)) && (!*forbidden || !strstr(TeX, forbidden));
+    if (!ok) show_failure(response);
+    json_free(expectation);
+    json_free(response);
+    TEST_ASSERT_TRUE(ok, "rendered TeX and solution summaries combine exact opposite roots into the same number of rows");
+}
+
 static void test_lab_extra_equation(void)
 {
     expect_response("/equation-eval", "{\"equation\":\"cos(z)-sin(pi-xy)=0\",\"precision\":78}",
@@ -2409,6 +2434,7 @@ static void test_lab_extra_equation(void)
         show_failure(sphere);
     json_free(sphere);
     TEST_ASSERT_TRUE(ok, "symbolic opposite branches use plus-minus without unavailable numerical rows");
+    test_run_database_cases(__FILE__, __LINE__, "mars_lab.equation_pairs", NULL, equation_pair_row);
 }
 
 static void test_lab_extra_complex_power_equation(void)

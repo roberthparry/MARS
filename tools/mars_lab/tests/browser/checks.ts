@@ -1922,12 +1922,9 @@
         check(!exported.querySelector('parsererror')! && exported.querySelectorAll('path').length > 1000 &&
               !exported.querySelector('canvas')! && exported.querySelector('text')!,
               'Copy exports current mesh and axes as standalone SVG');
-        const exportedBefore = WorksheetResults.clipboard.copyTextForTarget('plot');
-        retained.dispatchEvent(new WheelEvent('wheel', {deltaY: -100, altKey: true, bubbles: true, cancelable: true}));
-        await LabTestBrowser.wait(450);
-        check(retained.isConnected && retained.dataset.localRenderer && WorksheetRequests.labRequests.latestMain() === generation &&
-              exportedBefore !== WorksheetResults.clipboard.copyTextForTarget('plot'),
-              'Wheel rotation stays local and SVG export follows the latest camera');
+        await window.checkLabPlotWheel(retained);
+        check(retained.isConnected && retained.dataset.localRenderer && WorksheetRequests.labRequests.latestMain() === generation,
+              'Wheel admission checks preserve the retained surface and request generation');
         const chart = rendered.querySelector<SVGSVGElement>('[data-surface]')!;
         const angles: MarsSurfaceAngles = [
             Number(chart.dataset.azimuth), Number(chart.dataset.elevation), Number(chart.dataset.roll)
@@ -2308,12 +2305,20 @@
             check(chart() && chart() !== previous, 'Viewport zoom requests a newly sampled plot');
             await settle();
         }
+        const cardId = WorksheetContext.resultCardIds.get(card)!;
+        const cardZoom = labWire.exports().lab_view_card_zoom(cardId);
+        for (const modifier of [{}, {shiftKey: true}, {altKey: true}, {ctrlKey: true}]) {
+            const outside = new WheelEvent('wheel', {clientX: matrix.e, clientY: matrix.f,
+                deltaY: -100, bubbles: true, cancelable: true, ...modifier});
+            check(before.dispatchEvent(outside) && labWire.exports().lab_view_card_zoom(cardId) === cardZoom,
+                  'Curve headings and margins retain scrolling without falling through to card zoom');
+        }
         const zoomEvent = new WheelEvent('wheel',
-              {clientX, clientY, deltaY: -100, ctrlKey: true, bubbles: true, cancelable: true});
+              {clientX, clientY, deltaY: -100, bubbles: true, cancelable: true});
         const wheelFraction = (zoomEvent.clientX - left) / plotWidth;
         const wheelAnchor = x0 * (1 - wheelFraction) + x1 * wheelFraction;
         check(!before.dispatchEvent(zoomEvent),
-              'Ctrl+wheel viewport zoom prevents page scrolling');
+              'Plain wheel inside the curve viewport zooms and prevents page scrolling');
         await waitChart(before);
         const after = chart();
         check((document.getElementById('plotLower')! as HTMLInputElement).value.length < 10 &&
@@ -2406,6 +2411,7 @@
         const original = controls.map(id => (document.getElementById(id)! as LabTestPlotInput).value);
         const before = chart();
         const view = labSurfacePreview.prepare(before)!;
+        await window.checkLabPlotWheel(before);
         const initial = labSurfacePreview.snapshot()!;
         const frame = view.framePlan!;
         // Native geometry units describe the sampled chart, not a retained cropped display volume.
@@ -2495,8 +2501,15 @@
         initial.volume.autoHeight = false;
         const axisPoints: MarsSurfacePoint3[] = [[0, 0, 0], [1, 0, 0], [0, 1, 0], [0, 0, 1]];
         const axes = axisPoints.map(view.project!);
-        const wheel = (deltaY: number) => chart().dispatchEvent(new WheelEvent('wheel',
-            {deltaY, ctrlKey: true, bubbles: true, cancelable: true}));
+        const wheel = (deltaY: number) => {
+            const drawing = chart(), matrix = drawing.getScreenCTM()!;
+            const frame = labSurfacePreview.prepare(drawing)!.framePlan!;
+            return drawing.dispatchEvent(new WheelEvent('wheel', {
+                deltaY, ctrlKey: true, bubbles: true, cancelable: true,
+                clientX: matrix.a * frame.width / 2 + matrix.c * frame.height / 2 + matrix.e,
+                clientY: matrix.b * frame.width / 2 + matrix.d * frame.height / 2 + matrix.f
+            }));
+        };
         check(!wheel(-100), 'Volume wheel zoom prevents page scrolling');
         await settle();
         const zoomed = labSurfacePreview.snapshot()!;
@@ -3788,6 +3801,12 @@
                 await report('PASS: calendar Back/Forward, selection menus, 5000-town selection and globe busy-state interactions');
                 return;
             }
+            if (new URLSearchParams(location.search).get('flight-check') === '1') {
+                await runBrowserGroup('checkLabGlobeFlights', window.checkLabGlobeFlights, 600000);
+                await report('PASS: bounded camera pacing, exact arrivals and real animated journeys; ' +
+                    (document.getElementById('almanacGlobe')!.dataset.flightTestTiming || ''));
+                return;
+            }
             if (new URLSearchParams(location.search).get('atlas-check') === '1') {
                 await runBrowserGroup('checkLabPhotoAtlas', window.checkLabPhotoAtlas, 180000);
                 await report('PASS: fixed photographic cells, source-cache pressure, persistent blocks and GPU upload');
@@ -3836,6 +3855,7 @@
             await runBrowserGroup('checkSurfaceProjectionPlan', checkSurfaceProjectionPlan);
             await runBrowserGroup('checkLabSurfaceMesh', window.checkLabSurfaceMesh);
             await runBrowserGroup('checkLabSurfaceSVG', window.checkLabSurfaceSVG);
+            await runBrowserGroup('checkLabPlotWheelGeometry', window.checkLabPlotWheelGeometry);
             await runBrowserGroup('checkLabSurfaceHover', window.checkLabSurfaceHover);
             await runBrowserGroup('checkLabTransportFlows', window.checkLabTransportFlows);
             window.checkLabEditor();
@@ -4571,10 +4591,13 @@
                   'A complex constant has no applicable plot card');
             check(!document.getElementById('plotRendered')!.textContent.includes('Select a variable'),
                   'Constants do not request a plot without an axis');
-            for (const [mode, source, series, surface] of [
+            for (const [mode, source, series, surface, axes] of [
                 ['equation', 'x^2=1', 2, false],
                 ['equation', 'x^2+y^2=1', 1, false],
                 ['equation', 'x^2+y^2+z^2=1', 1, true],
+                ['equation', '{x^2+y^2+z^2=4 | x=1, y=?, z=?}', 1, false, ['y', 'z']],
+                ['equation', '{x^2+y^2+z^2=4 | x=?, y=1, z=?}', 1, false, ['x', 'z']],
+                ['equation', '{x^2+y^2+z^2=4 | x=?, y=?, z=1}', 1, false, ['x', 'y']],
                 ['equation', 'cos(z)-sin(2-xy)=0', 1, true],
                 ['equation', 'cos(z)-sin(pi-xy)=0', 1, true],
                 ['equation', 'x^4-x^3-26x^2+4x+8=0', 2, false],
@@ -4584,7 +4607,7 @@
                 ['diffequation', "y''+6y*y'+4y^3=0", 9, false],
                 ['diffequation', 'Dx(y)=y', 5, false],
                 ['diffequation', '{2*Dx(u)+Dy(u)=0 | x=?, y=?; ; u(x,0)=x^2}', 1, true]
-            ] as Array<[WorksheetMode, string, number, boolean]>) {
+            ] as Array<[WorksheetMode, string, number, boolean, string[]?]>) {
                 WorksheetWorkspace.mode.setMode(mode);
                 WorksheetWorkspace.presentation.syncModeUI();
                 WorksheetBindings.controller.setExpressionEditor(source);
@@ -4607,6 +4630,13 @@
                       JSON.stringify({source, variables: WorksheetBindings.panel.currentVariables, status: WorksheetContext.statusEl.textContent,
                                       error: plotRendered.textContent.slice(0, 400)}));
                 check(!!plotRendered.querySelector<SVGSVGElement>('[data-surface]')! === surface, mode + ' selects native dimensionality');
+                if (axes) {
+                    check((document.getElementById('plotFirst') as HTMLInputElement).value === axes[0],
+                          'A fixed selected coordinate is replaced by an unset plotting axis');
+                    const choices = Array.from(document.querySelectorAll<HTMLInputElement>('#plotFirstChoices input'));
+                    check(choices.map(input => input.value).join(',') === axes.join(','),
+                          'Native plot controls expose only the remaining coordinate axes');
+                }
                 if (source === 'cos(z)-sin(2-xy)=0') {
                     (document.getElementById('plotScale')! as HTMLInputElement).value = 'manual';
                     for (const id of ['plotLower', 'plotSecondLower', 'plotYLower'])
@@ -4640,14 +4670,9 @@
                           WorksheetRequests.labRequests.latestMain() === initialRequest && !plotRendered.marsPlotDrag.busy &&
                           !plotRendered.querySelector<HTMLElement>('[data-preview-notice]')!,
                           'Releasing an implicit-equation axis keeps the full retained mesh without sampling');
-                    const orientation = labSurfacePreview.snapshot()!.orientation;
-                    initialChart.dispatchEvent(new WheelEvent('wheel', {
-                        deltaY: 100, altKey: true, bubbles: true, cancelable: true
-                    }));
-                    await LabTestBrowser.wait(450);
-                    check(WorksheetRequests.labRequests.latestMain() === initialRequest &&
-                          labSurfacePreview.snapshot()!.orientation.some((v, i) => Math.abs(v - orientation[i]) > 0.001),
-                          'Equation-mode wheel rotation uses the same persistent camera as expression mode');
+                    await window.checkLabPlotWheel(initialChart);
+                    check(WorksheetRequests.labRequests.latestMain() === initialRequest,
+                          'Equation-mode wheel checks preserve the current sampling request');
                 }
                 if (source === 'x^2+y^2+z^2=1') {
                     const card = plotRendered.closest<HTMLElement>('.result-card')!;

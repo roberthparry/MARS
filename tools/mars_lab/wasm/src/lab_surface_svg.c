@@ -21,7 +21,7 @@ static int coordinate(jsref value, double *number)
     return isfinite(*number);
 }
 
-static jsref commands(jsref points, int flat, int close)
+static jsref commands(jsref points, int flat, int close, unsigned maximum)
 {
     if (lab_dom_type(points) != LAB_VALUE_ARRAY)
         return 0;
@@ -31,7 +31,7 @@ static jsref commands(jsref points, int flat, int close)
             return 0;
         count /= 2;
     }
-    if (count < 2 || (!flat && count > 12))
+    if (count < 2 || (!flat && count > maximum))
         return 0;
     int pieces = lab_dom_object(LAB_VALUE_ARRAY);
     unsigned mark = lab_dom_mark();
@@ -65,7 +65,7 @@ static void collect(jsref polygons, jsref groups, lab_surface_primitive_t kind)
         int polygon = lab_dom_item(polygons, i);
         int colour = lab_dom_get(polygon, "colour");
         int path = lab_dom_type(colour) == LAB_VALUE_STRING
-                       ? commands(lab_dom_get(polygon, "points"), 0, kind == LAB_SURFACE_POLYGONS) : 0;
+                       ? commands(lab_dom_get(polygon, "points"), 0, kind == LAB_SURFACE_POLYGONS, 12) : 0;
         if (!path) {
             interrupted = 1;
             lab_dom_release(mark);
@@ -87,7 +87,7 @@ static void collect(jsref polygons, jsref groups, lab_surface_primitive_t kind)
 }
 
 /* Return browser-owned path strings; no SVG nodes or host handles are retained natively. */
-void lab_surface_svg_plan(jsref polygons, jsref paths, lab_surface_primitive_t kind)
+void lab_surface_svg_plan(jsref polygons, jsref paths, lab_surface_primitive_t kind, jsref solids)
 {
     int result = lab_dom_object(LAB_VALUE_OBJECT), series = lab_dom_object(LAB_VALUE_ARRAY),
         axes = lab_dom_object(LAB_VALUE_ARRAY);
@@ -104,12 +104,28 @@ void lab_surface_svg_plan(jsref polygons, jsref paths, lab_surface_primitive_t k
     }
     count = lab_dom_type(paths) == LAB_VALUE_ARRAY ? lab_dom_count(paths) : 0;
     for (unsigned i = 0; i < count; ++i) {
-        int path = commands(lab_dom_item(paths, i), 1, 0);
+        int path = commands(lab_dom_item(paths, i), 1, 0, 0);
         if (path)
             lab_dom_push(axes, path);
         lab_dom_release(mark);
     }
     lab_dom_set(result, "series", series);
     lab_dom_set(result, "axes", axes);
+    int solid_paths = lab_dom_object(LAB_VALUE_ARRAY);
+    mark = lab_dom_mark();
+    count = lab_dom_count(solids);
+    for (unsigned i = 0; i < count; ++i) {
+        int face = lab_dom_item(solids, i), entry = lab_dom_object(LAB_VALUE_OBJECT);
+        int path = commands(lab_dom_get(face, "points"), 0, 1, 16);
+        if (path) {
+            lab_dom_set(entry, "path", path);
+            lab_dom_set(entry, "shade", lab_dom_get(face, "shade"));
+            lab_dom_set(entry, "axis", lab_dom_get(face, "axis"));
+            lab_dom_set(entry, "cone", lab_dom_get(face, "cone"));
+            lab_dom_push(solid_paths, entry);
+        }
+        lab_dom_release(mark);
+    }
+    lab_dom_set(result, "solids", solid_paths);
     lab_dom_return(result);
 }

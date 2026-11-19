@@ -28,7 +28,7 @@ typedef enum {
     LAB_PLOT_DRAG_RELEASE = 2,        /**< Release a tracked pointer and finish the gesture. */
     LAB_PLOT_DRAG_CANCEL = 3,         /**< Cancel on focus, page or visibility loss. */
     LAB_PLOT_DRAG_ESCAPE = 4,         /**< Cancel only when the keyboard event is Escape. */
-    LAB_PLOT_DRAG_CAMERA_WHEEL = 5,   /**< Change an angle using a modified wheel gesture. */
+    LAB_PLOT_DRAG_CAMERA_WHEEL = 5,   /**< Zoom inside the projected volume, independently of wheel modifiers. */
     LAB_PLOT_DRAG_WHEEL_IDLE = 6,     /**< Finish the current wheel revision after inactivity. */
     LAB_PLOT_DRAG_POINTER_CANCEL = 7 /**< Cancel only if the cancelled pointer belongs to the gesture. */
 } lab_plot_drag_action_t;

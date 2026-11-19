@@ -37,12 +37,12 @@
 #include <stdatomic.h>
 #include <stdlib.h>
 
+#include "number-t.h"
+#include "expression-t.h"
 #define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_bindings.h"
-#include "number-t.h"
 #define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_internal.h"
-#include "expression-t.h"
 
 /* Pointer to the variable being differentiated with respect to.
  * NULL = single-variable / "all variables" mode (original behaviour of
@@ -328,6 +328,19 @@ bool expr_copy_binding_value(expr_t *destination, const expr_t *source)
     destination->binding_expr = binding;
     num_destroy(&value);
     return true;
+}
+
+/* Capture a supplied value as algebra rather than rounding its authored binding expression. */
+expr_t *expr_binding_value_expression(const expr_t *binding)
+{
+    if (!binding)
+        return NULL;
+    if (binding->binding_expr)
+        return expr_binding_expr_eval_expr(binding->binding_expr);
+    number_t value = expr_get_val(binding);
+    expr_t *result = num_is_finite(value) ? expr_new_const(value) : NULL;
+    num_destroy(&value);
+    return result;
 }
 
 void expr_set_name(expr_t *expr, const char *name)

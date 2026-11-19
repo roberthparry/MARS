@@ -8,6 +8,34 @@
  */
 async function checkGlobeAtlas(check: (condition: boolean, message: string) => void): Promise<void> {
     await checkImageModule(check);
+    const stalled = globeHTTPFixture(async bytes => {
+        const view = labWire.decode(bytes) as {west: number};
+        return new Response(labWire.encode({ok: true, key: `stalled-cache:${view.west}`, photos: [{
+            url: view.west < -2.795 ? '/earth_regions/123.png' : '/earth_regions/4095.png',
+            sha256: 'c'.repeat(64), width: 1800, source: [0, 0, 512, 512], target: [0, 0, 512, 512]
+        }]}));
+    }, {endpoint: '/almanac-rivers', script: '/js/globe_photo_worker.js', nativeShore: false,
+        alphaProbe: true, storageStalled: true});
+    const stalledWorker = new stalled.Worker('/js/globe_photo_worker.js');
+    try {
+        for (const [index, bounds, level] of [
+            [0, [-2.8, 52.6, -2.7, 52.7], 8], [1, [-2.79, 52.61, -2.785, 52.615], 11]
+        ] as const) {
+            const pixels = await new Promise<ArrayBuffer>((resolve, reject) => {
+                const timer = setTimeout(() => reject(new Error('Stalled map cache prevented imagery delivery')), 12000);
+                stalledWorker.onmessage = event => {
+                    if (event.data.partial) return;
+                    clearTimeout(timer);
+                    event.data.error ? reject(new Error(event.data.error)) : resolve(event.data.pixels);
+                };
+                stalledWorker.onerror = event => { clearTimeout(timer); reject(new Error(event.message)); };
+                stalledWorker.postMessage({key: `stalled-view-${index}`, bounds, level});
+            });
+            const centre = new Uint8Array(pixels, (256 * 512 + 256) * 4, 4);
+            check(centre[3] === 255 && (index ? centre[2] === 180 : centre[0] === 180),
+                  'first entry and a subsequent zoom receive photographic pixels even when IndexedDB never responds');
+        }
+    } finally { stalledWorker.terminate(); stalled.dispose(); }
     for (const boundary of [4, 12, 60, 240, 1200]) {
         const before = labDOM.call('lab_globe_grid_spacing', boundary * .999, 800) as number[];
         const after = labDOM.call('lab_globe_grid_spacing', boundary * 1.001, 800) as number[];
@@ -320,14 +348,14 @@ async function checkGlobeAtlas(check: (condition: boolean, message: string) => v
         check(!travelling.journey(view, 400, arrival, 400, ahead, '', false, arrivalJob)!.replace,
               'current arrival preparation survives route redraws even when the destination is off screen');
         let plan = travelling.journey(view, 400, arrival, 400, ahead, '', true)!;
-        check(plan.pace === .3 && plan.next!.bounds[0] < 0,
-              'native travel planning first fills missing visible coverage and reduces its display-clock pace');
+        check(plan.pace === .8 && plan.next!.bounds[0] < 0,
+              'native travel planning prioritises visible coverage without losing more than a fifth of its pace');
         for (let i = 0; i < 8 && plan.coverage < 1; ++i) {
             const next = plan.next!;
             travelling.put(next.key, 1, 512 * 512 * 4, next.bounds, next.level, plan.protect);
             plan = travelling.journey(view, 400, arrival, 400, ahead, '', true)!;
         }
-        check(Math.abs(plan.coverage - 1) < 1e-9 && plan.pace > .3 && plan.pace < 1 &&
+        check(Math.abs(plan.coverage - 1) < 1e-9 && plan.pace > .8 && plan.pace < 1 &&
               plan.next!.bounds[0] >= -1.5 && plan.next!.bounds[2] > 0,
               'broad coverage improves pace while awaiting fine pixels and schedules the route before distant detail');
         for (let i = 0; i < 12 && plan.next!.coverage; ++i) {
@@ -565,6 +593,7 @@ async function checkGlobeAtlas(check: (condition: boolean, message: string) => v
         document.head.appendChild(script);
     });
     const cancellableCache = new GlobeSurfaceCache(512);
+    await checkGlobeCacheDeadlines(check);
     await cancellableCache.put('atlas-cancelled-read',
         new Blob([new Uint8Array(512 * 512 * 4)], {type: 'application/octet-stream'}));
     const cacheAbort = new AbortController();

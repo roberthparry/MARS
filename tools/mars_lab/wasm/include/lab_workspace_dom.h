@@ -50,6 +50,26 @@ void lab_workspace_dom_history_row(jsref list, jsref snapshot, unsigned position
  */
 void lab_workspace_dom_history_country(node_jsref button, jsref metadata);
 
+/**
+ * @brief Install a native mathematical history preview only when its exact source still matches the button.
+ * @param button Borrowed history-open button created by lab_workspace_dom_history_row().
+ * @param metadata Borrowed server response with source, display and optional restricted-renderer SVG/TeX.
+ * Native integer glyphs and an optional rendered ending support width-dependent truncation without changing saved text.
+ * @return No value. Mismatched or malformed metadata is ignored. Copied text and SVG belong to the browser DOM;
+ * no host handle is retained. Call synchronously on the browser thread after checking asynchronous ownership.
+ * The exact saved source, worksheet state, full-source tooltip and history ordering are unchanged.
+ */
+void lab_workspace_dom_history_formula(node_jsref button, jsref metadata);
+
+/**
+ * @brief Fit a native TeX integer preview to its current button width at a complete glyph boundary.
+ * @param button Borrowed history-open button; absent or ordinary previews are ignored.
+ * @return No value. Updates only clipping width and visibility of the native TeX ellipsis and closing parenthesis.
+ * SVG glyphs must be in ascending horizontal order, as supplied by the native integer-call renderer. No mathematical
+ * text is inspected or rewritten. Call synchronously on the browser thread after layout or a resize; no handle is retained.
+ */
+void lab_workspace_dom_history_fit(node_jsref button);
+
 /** @brief Requested help/result pane visibility transition. */
 typedef enum {
     LAB_WORKSPACE_SHOW_RESULTS = 0, /**< Show results without updating status text. */

@@ -13,6 +13,8 @@ interface Window {
     checkLabSurfaceTiles(): Promise<void>;
     /** @brief Check fixed photographic cells, persistent source blocks and atlas uploads independently. */
     checkLabPhotoAtlas(): Promise<void>;
+    /** @brief Check bounded camera pacing and real animated journeys with photographic loading. */
+    checkLabGlobeFlights(): Promise<void>;
     /** @brief Check country aggregation independently of the GPU and travel assertions. */
     checkLabCountryTowns(): void;
 }
@@ -1069,68 +1071,7 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
         check(seen && stayedVisible,
               `once the destination enters the viewport it never leaves: ${fromLat},${fromLon} to ${toLat},${toLon}`);
     }
-    {
-        const start = [...labDOM.call('lab_globe_centre', 0, 0) as number[], 1];
-        let previousStep = Infinity;
-        for (const longitude of [10, 60, 120, 179]) {
-            const target = [...labDOM.call('lab_globe_centre', 0, longitude) as number[], 1];
-            const advance = (elapsed: number): number =>
-                labDOM.call('lab_globe_flight_advance', start, target, .4, elapsed, 800) as number;
-            const step = advance(16) - .4;
-            check(step > 0 && step < previousStep, 'longer journeys advance more slowly at the same zoom');
-            previousStep = step;
-            check(advance(5000) === advance(50), 'stalled animation frames cannot cause a catch-up jump');
-            check(advance(0) === .4, 'waiting for imagery does not advance the travel clock');
-            check(labDOM.call('lab_globe_flight_advance', start, target, .4, -1, 800) === null,
-                  'negative animation time is rejected');
-            const departure = labDOM.call('lab_globe_flight_advance', start, target, 0, 16, 800) as number;
-            check(Math.abs(departure - .016 / (1.2 / .125)) < 1e-12,
-                  'departure heading has a fixed short duration, independent of the route length');
-        }
-        const maxStart = [...labDOM.call('lab_globe_centre', 55.9533, -3.1883) as number[], 4096];
-        const maxEnd = [...labDOM.call('lab_globe_centre', 58.3019, -134.4197) as number[], 4096];
-        for (const redirect of [0, 1]) {
-            for (const progress of [.02, .12, .13, .2, .4, .5, .6, .8, .86, .88, .98]) {
-                const next = labDOM.call('lab_globe_flight_advance', maxStart, maxEnd, progress, 50, 800, redirect) as number;
-                const a = labDOM.call('lab_globe_flight', maxStart, maxEnd, progress, redirect) as number[];
-                const b = labDOM.call('lab_globe_flight', maxStart, maxEnd, next, redirect) as number[];
-                const centre = labDOM.call('lab_globe_pick', 0, 0, a.slice(0, 4)) as number[];
-                const shifted = labDOM.call('lab_globe_project', centre[0], centre[1], b.slice(0, 4)) as number[];
-                const pixels = Math.hypot(shifted[0], shifted[1]) * b[4] * 800 / 2.24;
-                const scale = Math.abs(Math.log(b[4] / a[4])) * 400;
-                check(next > progress && pixels + scale <= 18.001,
-                      'ordinary and redirected flights bound motion to 18 pixels even after a slow frame');
-            }
-        }
-        const durations: number[] = [];
-        for (const rate of [60, 30, 20]) {
-            let progress = 0, frames = 0;
-            while (progress < 1 && frames < rate * 120) {
-                progress = labDOM.call('lab_globe_flight_advance', maxStart, maxEnd, progress, 1000 / rate, 800) as number;
-                ++frames;
-            }
-            check(progress === 1, `close-view travel completes at ${rate} Hz`);
-            durations.push(frames / rate);
-        }
-        check(Math.max(...durations) - Math.min(...durations) < 1,
-              `render rate does not multiply the journey time: ${durations.join(', ')}`);
-        for (const [name, fromLat, fromLon, toLat, toLon] of globeFlightRoutes) {
-            for (const [fromZoom, toZoom] of [[1, 150], [150, 20], [150, 512]]) {
-                const a = [...labDOM.call('lab_globe_centre', fromLat, fromLon) as number[], fromZoom];
-                const b = [...labDOM.call('lab_globe_centre', toLat, toLon) as number[], toZoom];
-                let progress = 0, frames = 0;
-                while (progress < 1 && frames < 1800) {
-                    progress = labDOM.call('lab_globe_flight_advance', a, b, progress, 1000 / 60, 800) as number;
-                    ++frames;
-                }
-                check(progress === 1 && frames / 60 < 30,
-                      `${name}: bounded 60 Hz travel completes within 30 display seconds (${fromZoom} to ${toZoom}: ${frames / 60})`);
-                const arrived = labDOM.call('lab_globe_flight', a, b, progress) as number[];
-                check(arrived.every((value, i) => value === b[i]),
-                      `${name}: faster travel reaches the exact saved camera without dropping its zoom`);
-            }
-        }
-    }
+    checkGlobeFlightClock(check);
     for (const [lat, lon, zoom, expected] of [[60, 15, 1, 3], [61, 16, 1, 0],
         [-60, -30, 1, 3], [0.25, 0.25, 100, 3], [0, 180, 1, 3]]) {
         const grid = labDOM.call('lab_globe_grid', lat, lon, zoom, 800) as number[];

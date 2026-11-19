@@ -664,6 +664,14 @@ html[data-almanac-jurisdiction-flag] .almanac-summary .almanac-location-flag:has
 .history-drop-after::after { bottom: -2px; }
 .history-entry[aria-current] { background: rgba(233, 181, 77, .12); border-radius: 8px; }
 .history-entry-open { flex: 1 1 16rem; min-width: 0; text-align: left; white-space: pre-wrap; overflow-wrap: anywhere; }
+.history-entry-math { white-space: normal; overflow: hidden; }
+.history-entry-formula { --history-formula-scale: 1.25; display: block; max-width: 100%; overflow: hidden; color: var(--ink); }
+.history-entry-formula svg { display: block; max-width: 100%; width: auto; height: auto; fill: currentColor; }
+.history-entry-fit { display: flex; align-items: center; gap: .1em; width: 100%; min-width: 0; }
+.history-entry-crop { flex: 0 1 auto; min-width: 0; }
+.history-entry-tail { flex: 0 0 auto; }
+.history-entry-tail[hidden] { display: none; }
+:is(.history-entry-crop, .history-entry-tail) svg { max-width: none; }
 .history-entry-location { display: flex; align-items: center; gap: .65rem; white-space: normal; }
 .history-entry-flag { width: 2rem; height: 1.4rem; object-fit: contain; flex: 0 0 2rem; }
 .history-entry-place { display: flex; flex-direction: column; gap: .3rem; min-width: 0; }
@@ -692,7 +700,7 @@ html[data-almanac-jurisdiction-flag] .almanac-summary .almanac-location-flag:has
   .history-editor-heading h2 { font-size: .9rem; letter-spacing: .08em; }
   .history-editor-heading button { min-height: 44px; box-sizing: border-box; }
   .history-editor-intro, .history-editor-help { display: none; }
-  .history-editor ol { margin-top: .25rem; scrollbar-gutter: stable; }
+  .history-editor ol { margin-top: .25rem; scrollbar-gutter: stable; padding-inline-end: .4rem; }
   .history-entry {
     display: grid;
     grid-template-columns: 44px minmax(0, 1fr);
@@ -709,7 +717,13 @@ html[data-almanac-jurisdiction-flag] .almanac-summary .almanac-location-flag:has
     border-radius: 10px;
     font-size: .85rem;
   }
-  .history-entry-open:not(.history-entry-location) {
+  .history-entry-formula { --history-formula-scale: 1.5; }
+  .history-entry-formula:not(.history-entry-crop):not(.history-entry-tail) {
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+  }
+  .history-entry-formula svg { max-width: none; }
+  .history-entry-open:not(.history-entry-location):not(.history-entry-math) {
     display: -webkit-box;
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 3;

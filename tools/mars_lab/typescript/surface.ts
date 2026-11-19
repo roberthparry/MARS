@@ -261,6 +261,7 @@ class MarsSurfacePreview {
         this.current.observer.disconnect();
         this.current.resizeObserver?.disconnect();
         this.current.overlay.remove();
+        delete (this.current.chart as MarsSurfaceChart).marsSurfaceFrame;
         this.current = null;
     }
 
@@ -285,6 +286,7 @@ class MarsSurfacePreview {
         const view = this.current;
         return view ? {key: this.signature(view.chart), identity: this.identity(view.chart), camera: {...view.camera},
             orientation: [...view.orientation], angles: [...view.angles],
+            axisCorners: view.axisCorners ? [...view.axisCorners] : undefined,
             volume: this.host.volume.clone(view.volume)} : null;
     }
 
@@ -411,10 +413,12 @@ class MarsSurfacePreview {
         const {host, overlay, holder, vertices, width, height, gpu, context, ink} = resources;
         const names: string[] = [];
         for (let axis = 0; axis < 3; ++axis) {
-            names.push(chart.querySelector(`[data-axis-name="${axis}"]`)?.textContent || '');
+            names.push(chart.querySelector(`[data-axis-name="${axis}"]`)?.textContent?.trim() || '');
         }
         return {
             frame: 0, settled: null, orientation: [0, 0, 0, 1],
+            axisCorners: saved?.axisCorners && (saved.key === this.signature(chart) || saved.refining) ?
+                [...saved.axisCorners] : undefined,
             chart, host, holder, primitives: mesh.primitives, vertices, units: mesh.units,
             width, height, overlay, gpu, context, ink, ticks: this.readTicks(chart), names,
             observer: new MutationObserver(this.chartMutated.bind(this, chart)), hidden: [],
@@ -429,7 +433,9 @@ class MarsSurfacePreview {
         for (const node of chart.querySelectorAll('[data-tick-fraction]')) {
             if (!marsTransportIsDOM(node, 'SVGElement')) continue;
             ticks.push({axis: Number(node.dataset.plotTick), fraction: Number(node.dataset.tickFraction),
-                label: node.nextElementSibling?.tagName === 'text' ? (node.nextElementSibling.textContent ?? '') : ''});
+                zero: node.dataset.tickZero === 'true',
+                label: node.dataset.tickLabel ??
+                    (node.nextElementSibling?.tagName === 'text' ? (node.nextElementSibling.textContent ?? '') : '')});
         }
         return ticks;
     }
@@ -570,6 +576,7 @@ class MarsSurfacePreview {
         const frame = this.host.native.call('lab_surface_frame', view, bounds) as MarsSurfaceFrame | null;
         if (!frame) return false;
         view.framePlan = frame;
+        (chart as MarsSurfaceChart).marsSurfaceFrame = frame;
         view.project = this.projectPoint.bind(this, frame);
         view.drawing = undefined;
         view.polygons = this.projectedPolygons.bind(this, view, frame);
@@ -624,10 +631,22 @@ class MarsSurfacePreview {
 
     private paintAxes(frame: MarsSurfaceFrame, ctx: MarsSurfaceAxisContext): void {
         ctx.clearRect(0, 0, frame.width, frame.height);
+        ctx.lineWidth = 0.35; ctx.lineJoin = 'round';
+        for (const face of frame.solids ?? []) {
+            ctx.fillStyle = ctx.strokeStyle = WorksheetPlotPalette.axis_shade(face.shade);
+            ctx.beginPath();
+            face.points.forEach((point, i) => {
+                if (i) ctx.lineTo(point[0], point[1]);
+                else ctx.moveTo(point[0], point[1]);
+            });
+            ctx.closePath(); ctx.fill(); ctx.stroke();
+        }
         ctx.strokeStyle = WorksheetPlotPalette.colour('#94b8b1');
-        ctx.fillStyle = WorksheetPlotPalette.colour('#b8ccc5'); ctx.lineWidth = 1.2;
-        ctx.font = '11px sans-serif'; ctx.textAlign = 'center';
-        for (const path of frame.paths) {
+        ctx.fillStyle = WorksheetPlotPalette.colour('#b8ccc5'); ctx.lineWidth = 1.4;
+        ctx.font = '13px sans-serif'; ctx.textAlign = 'center'; ctx.lineJoin = 'round';
+        for (const [index, path] of frame.paths.entries()) {
+            if (index < (frame.axisPathCount ?? 0)) continue;
+            ctx.lineWidth = frame.pathWidths?.[index] ?? 1.4;
             ctx.beginPath();
             ctx.moveTo(path[0], path[1]);
             for (let i = 2; i < path.length; i += 2) ctx.lineTo(path[i], path[i + 1]);
@@ -635,6 +654,9 @@ class MarsSurfacePreview {
         }
         for (const text of frame.texts) {
             ctx.textAlign = text.align;
+            ctx.font = `${text.bold ? '600 ' : ''}${text.size ?? 13}px sans-serif`;
+            ctx.strokeStyle = WorksheetPlotPalette.colour('#10161d'); ctx.lineWidth = 2.8;
+            ctx.strokeText(text.text, text.x, text.y);
             ctx.fillText(text.text, text.x, text.y);
         }
     }

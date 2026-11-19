@@ -4,7 +4,9 @@
  *
  * Surface dragging supplies pointer anchors to the retained quaternion camera.
  * Shift-drag requests screen-plane roll. Angle sliders explicitly set orientation.
- * Shift+wheel adjusts elevation and Alt+wheel adjusts azimuth in the same direction.
+ * Inside the projected volume, wheel zooms with or without Shift, Alt or Ctrl,
+ * matching the Almanac globe's current wheel behaviour.
+ * Pointers over labels, headings and card margins retain ordinary page scrolling.
  * Surface cameras remain local on release; curve-range gestures refine natively.
  * Sliders and degree readouts update together. Only one frame or native curve
  * request runs at a time; further movements replace the pending position.
@@ -263,20 +265,6 @@ static int start(event_jsref event, gesture_jsref state, jsref calls)
     return 1;
 }
 
-static double wrapped(double value)
-{
-    /* Reduce turns without an integer conversion; keep the non-negative angle and positive-zero convention. */
-    value = fmod(value, 360);
-    if (value < 0)
-        value += 360;
-    return value == 0 ? 0 : value;
-}
-
-static double limited(lab_plot_angle_t axis, double value)
-{
-    return axis == LAB_PLOT_ANGLE_ELEVATION ? (value < -90 ? -90 : value > 90 ? 90 : value) : wrapped(value);
-}
-
 static void schedule_wheel_end(gesture_jsref state, jsref calls)
 {
     double revision = lab_dom_truth(lab_dom_get(state, "wheelRevision")) ? read_number(state, "wheelRevision") : 0;
@@ -326,39 +314,21 @@ static int wheel(event_jsref event, gesture_jsref state, jsref calls)
     int panel = lab_dom_closest(target, ".complex-panel");
     if (panel && !lab_dom_node_contains(panel, surface))
         return 0;
-    int shift = lab_dom_truth(lab_dom_get(event, "shiftKey"));
-    int alt = lab_dom_truth(lab_dom_get(event, "altKey"));
     double delta = read_number(event, "deltaY");
     if ((lab_workspace_mode() > LAB_MODE_DIFFERENTIAL_EQUATION && lab_workspace_mode() != LAB_MODE_INTEGRATOR) ||
-        !surface || shift == alt ||
-        lab_dom_truth(lab_dom_get(event, "ctrlKey")) ||
-        lab_dom_truth(lab_dom_get(event, "metaKey")) || lab_dom_truth(lab_dom_get(state, "active")) ||
+        !surface || lab_dom_truth(lab_dom_get(state, "active")) ||
         !isfinite(delta) || delta == 0 || !lab_dom_closest(target, "svg") ||
-        !lab_dom_node_contains(rendered, target))
+        !lab_dom_node_contains(rendered, target) || !lab_plot_pointer_inside(surface, event))
         return 0;
-    if ((lab_dom_truth(lab_dom_get(state, "busy")) || lab_dom_truth(lab_dom_get(state, "wheel"))) && !current(state))
-        return 0;
-    lab_plot_angle_t axis = shift ? LAB_PLOT_ANGLE_ELEVATION : LAB_PLOT_ANGLE_AZIMUTH;
-    double initial = lab_dom_to_number(lab_dom_read(lab_dom_query(0, controls[axis]), LAB_DOM_VALUE, ""));
-    /* Use a bounded angular step independent of pixel, line or page wheel units. */
-    double value = limited(axis, initial + (delta > 0 ? 5 : -5));
-    if (value == initial)
-        return 1;
-    if (!lab_dom_truth(lab_dom_get(state, "wheel"))) {
-        for (unsigned i = 0; i < 3; ++i)
-            lab_dom_set(state, angles[i], lab_dom_read(lab_dom_query(0, controls[i]), LAB_DOM_VALUE, ""));
-        lab_dom_set(state, "redrawn", lab_dom_scalar(LAB_VALUE_BOOLEAN, 0));
-    }
-    lab_dom_set(state, "surface", surface);
-    lab_dom_set(state, "variable", lab_dom_read(lab_dom_id("plotFirst"), LAB_DOM_VALUE, ""));
-    lab_dom_set(state, "mode", lab_dom_numeric(lab_workspace_mode()));
-    lab_dom_set(state, "wheel", lab_dom_scalar(LAB_VALUE_BOOLEAN, 1));
-    lab_dom_class(rendered, "plot-dragging", 1);
-    lab_dom_set(state, "trackball", lab_dom_scalar(LAB_VALUE_BOOLEAN, 0));
-    set_angle(axis, value);
-    lab_dom_set(state, "dirty", lab_dom_scalar(LAB_VALUE_BOOLEAN, 1));
-    queue(state, calls);
-    schedule_wheel_end(state, calls);
+    int call = lab_dom_object(LAB_VALUE_OBJECT), args = lab_dom_object(LAB_VALUE_ARRAY);
+    lab_dom_push(args, surface);
+    lab_dom_push(args, event);
+    lab_dom_push(args, lab_dom_numeric(0));
+    lab_dom_push(args, lab_dom_numeric(delta < 0 ? 1 : -1));
+    lab_dom_push(args, lab_dom_numeric(1));
+    lab_dom_set(call, "service", lab_dom_string("zoomSurface"));
+    lab_dom_set(call, "args", args);
+    lab_dom_push(calls, call);
     return 1;
 }
 

@@ -31,6 +31,20 @@ expr_binding_expr_t *expr_binding_simplify_unary_op(expr_binding_expr_t *expr);
 expr_binding_expr_t *expr_binding_simplify_binary_op(expr_binding_expr_t *expr);
 
 /* Numeric and constant-shape helpers. */
+/**
+ * @brief Read a shared expression or binding literal with exact finite real decimal coefficients.
+ * @param text Borrowed immutable literal, or NULL for an unavailable value; it is neither modified nor retained.
+ * @return Owned number released with num_destroy(); NaN for invalid text or allocation failure. Exponents beyond
+ * 1048576 use ordinary number parsing instead of constructing an unbounded exact integer or denominator.
+ */
+number_t expr_number_from_literal_text(const string_t *text);
+
+/**
+ * @brief Parse a numeric literal, retaining bounded finite decimal spellings as exact rational values.
+ * @param text Borrowed NUL-terminated literal, or NULL for an unavailable value.
+ * @return Owned number released with num_destroy(); NaN on invalid text or allocation failure. Decimal exponents
+ * beyond 1048576 use ordinary number parsing to avoid unbounded integer padding. The input is neither changed nor retained.
+ */
 number_t binding_number_from_text(const char *text);
 long binding_gcd_long(long a, long b);
 bool binding_number_text_eq_long(const expr_binding_expr_t *expr, long expected_long);

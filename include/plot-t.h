@@ -5,8 +5,9 @@
  * plot_t copies sampled or measured number_t coordinates, labels and styles.
  * Linear bottom/left axes with open top/right edges, automatic or explicit bounds, ticks, a grid and a legend
  * are rendered in C, with independent RGB colours for curves, axes, grid and labels.
- * Rectangular height grids have azimuth, elevation and roll controls, named positive-end
- * axis arrows, automatic or manual height limits, coloured facets and holes at missing values; they cannot be mixed
+ * Rectangular height grids have azimuth, elevation and roll controls, connected exterior axes with named positive-end
+ * cone arrows, a pinhole camera, depth-scaled labels, automatic or manual height limits, coloured facets and
+ * holes at missing values; they cannot be mixed
  * with curve series in the same scene. Endpoint names stay upright during rotation.
  * Independent triangle meshes also represent implicit surfaces with multiple
  * heights per horizontal point. Curve intervals can carry signed shading to zero.
@@ -97,7 +98,8 @@ bool plot_shade_interval(plot_t *plot, number_t lower, number_t upper);
  * z contains rows*columns heights in row-major order; non-real/non-finite heights
  * leave holes. Limits count all vertices. Inputs remain caller-owned. A scene owns
  * at most one surface; explicit 2-D bounds cannot be applied to it.
- * Rendering uses a configurable oblique view and a blue/teal/gold
+ * Rendering uses a configurable pinhole perspective view, cylindrical axes with
+ * positive cone arrowheads, depth-scaled labels and a blue/teal/gold
  * height palette. Heights fit all finite data unless smart_y or manual height bounds are selected.
  */
 bool plot_set_surface(plot_t *plot, const number_t *x, size_t columns, const number_t *y, size_t rows,

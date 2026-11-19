@@ -772,6 +772,7 @@ bool TeX_cartesian_sum(TeX_builder_t *builder);
 /**
  * @brief Replace centre, offset and a denominator list by a symmetric pair.
  * @param builder Borrowed builder; push centre, offset, then an empty or one-member denominator list.
+ * An empty centre denotes opposite values and produces a leading plus-minus sign without a zero term.
  * @param group_offset Whether the offset requires visible parentheses.
  * @return True on success; false saves an error and preserves every operand.
  */

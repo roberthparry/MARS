@@ -678,6 +678,7 @@ static bool binding_number_string_is_exact_decimal(const string_t *text)
     bool have_decimal_marker = false;
     bool have_digit = false;
     int exp_digits = 0;
+    unsigned long exponent = 0;
 
     if (!text)
         return false;
@@ -708,6 +709,13 @@ static bool binding_number_string_is_exact_decimal(const string_t *text)
         if (rune_is_equal(string_cursor_peek(cursor), '+') || rune_is_equal(string_cursor_peek(cursor), '-'))
             (void)string_cursor_next(cursor);
         while (binding_cursor_peek_ascii_digit(cursor, NULL)) {
+            unsigned long digit = (unsigned long)(rune_value(string_cursor_peek(cursor)) - '0');
+            /* Very large scales retain the number module's range handling without allocating zero padding. */
+            if (exponent > (1048576ul - digit) / 10ul) {
+                string_cursor_free(cursor);
+                return false;
+            }
+            exponent = exponent * 10ul + digit;
             exp_digits++;
             (void)string_cursor_next(cursor);
         }
@@ -825,7 +833,8 @@ static number_t binding_number_from_exact_decimal_string(const string_t *text)
     return value;
 }
 
-static number_t binding_number_from_string(const string_t *text)
+/* Share lossless literal values between the expression and binding parsers. */
+number_t expr_number_from_literal_text(const string_t *text)
 {
     if (text && (string_view_equals_literal(string_view_all(text), "∞") ||
                  string_view_equals_literal(string_view_all(text), "@inf")))
@@ -833,8 +842,24 @@ static number_t binding_number_from_string(const string_t *text)
     if (text && (string_view_equals_literal(string_view_all(text), "-∞") ||
                  string_view_equals_literal(string_view_all(text), "-@inf")))
         return num_clone(NUM_NINF);
+    const char *literal = text ? string_c_str(text) : NULL;
+    if (!literal || !strpbrk(literal, ".eE"))
+        return num_create_from_text(text);
     if (binding_number_string_is_exact_decimal(text))
         return binding_number_from_exact_decimal_string(text);
+    const char *slash = strchr(literal, '/');
+    if (slash && !strchr(slash + 1, '/')) {
+        string_t *top = string_new(), *bottom = string_new_with(slash + 1);
+        bool ok = top && bottom && !string_append_bytes(top, literal, (size_t)(slash - literal));
+        number_t numerator = ok ? expr_number_from_literal_text(top) : num_clone(NUM_NAN);
+        number_t denominator = ok ? expr_number_from_literal_text(bottom) : num_clone(NUM_NAN);
+        number_t value = num_div(numerator, denominator);
+        num_destroy(&denominator);
+        num_destroy(&numerator);
+        string_free(bottom);
+        string_free(top);
+        return value;
+    }
 
     return num_create_from_text(text);
 }
@@ -847,7 +872,7 @@ number_t binding_number_from_text(const char *text)
     if (!string)
         return num_clone(NUM_NAN);
 
-    value = binding_number_from_string(string);
+    value = expr_number_from_literal_text(string);
     string_free(string);
     return value;
 }
@@ -1537,7 +1562,7 @@ static bool binding_number_string_exact_complex(const string_t *text, binding_ex
             else if (binding_string_is_single_ascii(coeff_text, '-'))
                 value = num_clone(NUM_NEG_ONE);
             else
-                value = binding_number_from_string(coeff_text);
+                value = expr_number_from_literal_text(coeff_text);
             string_free(coeff_text);
         }
         if (!num_is_exact(value) || !num_is_real(value)) {
@@ -1550,7 +1575,7 @@ static bool binding_number_string_exact_complex(const string_t *text, binding_ex
         return true;
     }
 
-    value = binding_number_from_string(text);
+    value = expr_number_from_literal_text(text);
     if (!num_is_exact(value) || !num_is_real(value)) {
         binding_num_destroy_detached(&value);
         string_cursor_free(cursor);

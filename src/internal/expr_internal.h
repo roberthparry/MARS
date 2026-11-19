@@ -1096,6 +1096,17 @@ bool expr_set_binding_value_text(expr_t *expr, const string_t *text);
 bool expr_copy_binding_value(expr_t *destination, const expr_t *source);
 
 /**
+ * @brief Capture a supplied scalar binding as an independently owned value expression.
+ * @param binding Borrowed binding node; its identity, value and authored metadata remain unchanged.
+ * @return Owned expression retaining exact authored algebra when available, otherwise a finite numeric constant;
+ * NULL for a missing binding, an unset value without authored metadata, or allocation failure.
+ * Release the returned graph with expr_free(). An authored unset or non-finite value remains represented
+ * in its graph, so callers requiring finite values must check the binding before requesting this snapshot.
+ * The result retains no references to the source binding; concurrent mutation of that binding is unsupported.
+ */
+expr_t *expr_binding_value_expression(const expr_t *binding);
+
+/**
  * @brief Return an owning Function-style binding value, retaining exact algebra, or NULL on failure.
  * @param expr Borrowed source expression to inspect or transform without transferring ownership.
  * @return Owned C string released with free, or NULL when no representation is available or allocation fails.
@@ -1681,6 +1692,16 @@ void expr_real_sample_free(expr_real_sample_t *sample);
  * @return Owned notation released with TeX_free, or NULL when input is unsupported or rendering fails.
  */
 TeX_t *expr_notation_from_text(const string_t *text);
+
+/**
+ * @brief Parse authored scalar operations without evaluating or combining them.
+ * @param text Borrowed native input, including optional bindings; neither modified nor retained.
+ * @param formal Accept formal differential syntax and undeclared symbolic function calls.
+ * @return Owned expression released with expr_free(), or NULL for invalid input or allocation failure.
+ * @note Parsing modes are restored before returning. Use the public expression parser for ordinary evaluation;
+ * presentation adapters may pair this operation tree with expr_to_TeX_operation_body().
+ */
+expr_t *expr_from_notation_text_internal(const string_t *text, bool formal);
 
 /**
  * @brief Parse scalar input into owned notation; formal mode preserves unevaluated calculus.

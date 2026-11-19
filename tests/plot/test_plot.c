@@ -8,13 +8,18 @@
 #include <errno.h>
 #include <math.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "string-t.h"
 #include "computation-t.h"
 #include "xml-t.h"
+#include "json-t.h"
 #include "plot-t.h"
+#define MARS_SHARED_PLOT_INTERNAL_ACCESS
+#include "internal/plot_internal.h"
 #include "test_harness.h"
+#include "test_database.h"
 
 TEST_SUITE_CONFIG(TEST_CONFIG_GLOBAL);
 
@@ -55,8 +60,11 @@ static void segment_camera_point(const plot_options_t *options, const double uni
     double z = (point[2] - 0.5) * units[2];
     double x = cos(a) * u - sin(a) * v;
     double y = -sin(e) * (sin(a) * u + cos(a) * v) - cos(e) * z;
-    out[0] = options->width * 0.5 + fit * (cos(r) * x - sin(r) * y);
-    out[1] = options->height * 0.5 + fit * (sin(r) * x + cos(r) * y);
+    double radius = hypot(hypot(units[0], units[1]), units[2]) / 2;
+    double depth = cos(e) * (sin(a) * u + cos(a) * v) - sin(e) * z;
+    double scale = 4 * radius / (4 * radius + depth);
+    out[0] = options->width * 0.5 + fit * (cos(r) * x - sin(r) * y) * scale;
+    out[1] = options->height * 0.5 + fit * (sin(r) * x + cos(r) * y) * scale;
 }
 
 static void test_plot_segment_camera_baseline(void)
@@ -81,9 +89,10 @@ static void test_plot_segment_camera_baseline(void)
         ok = metadata && label && sscanf(metadata, "data-units=\"%lf %lf %lf", units, units + 1, units + 2) == 3 &&
              sscanf(label, "data-label-width=\"%lf", &label_width) == 1;
         if (ok) {
-            double margin = fmin(fmax(45, label_width + 25), (options.width - 80) / 2.0);
-            double fit = fmin(options.width - 2 * margin, options.height - 100) /
-                         sqrt(units[0] * units[0] + units[1] * units[1] + units[2] * units[2]);
+            double margin = fmin(fmax(48, label_width * 5 / 3 + 16), (options.width - 80) / 2.0);
+            double radius = hypot(hypot(units[0], units[1]), units[2]) / 2;
+            double diameter = 8 * radius / sqrt(15);
+            double fit = fmin(options.width - 2 * margin, options.height - 96) / diameter;
             unsigned segments = 0, ticks = 0;
             for (const char *path = strstr(text, "d=\"M "); ok && path; path = strstr(path + 1, "d=\"M ")) {
                 double drawn[4], points[6];
@@ -108,9 +117,12 @@ static void test_plot_segment_camera_baseline(void)
                      axis < 3 && path && sscanf(path, "<path d=\"M %lf %lf", drawn, drawn + 1) == 2;
                 if (!ok)
                     break;
-                double a = angles[rotation][0] * acos(-1) / 180;
-                double point[] = {sin(a) < 0, cos(a) < 0, 0};
-                if (axis == 2) { point[0] = cos(a) < 0; point[1] = sin(a) >= 0; }
+                const char *frame = strstr(text, "data-axis-corners=\"");
+                unsigned corners[3];
+                ok = frame && sscanf(frame, "data-axis-corners=\"%u %u %u", corners, corners + 1, corners + 2) == 3;
+                if (!ok) break;
+                double point[3];
+                for (unsigned j = 0; j < 3; ++j) point[j] = !!(corners[axis] & (1u << j));
                 point[axis] = fraction;
                 segment_camera_point(&options, units, fit, angles[rotation], point, expected);
                 ok = fabs(drawn[0] - expected[0]) < 0.001 && fabs(drawn[1] - expected[1]) < 0.001;
@@ -800,11 +812,12 @@ static bool height_ticks_between(const string_t *svg, double minimum, double max
 {
     const char *p = svg ? string_c_str(svg) : "";
     size_t count = 0;
-    while ((p = strstr(p, "<text data-plot-label=\"2\""))) {
-        p = strchr(p, '>');
+    while ((p = strstr(p, "<g data-plot-tick=\"2\""))) {
+        p = strstr(p, "data-tick-label=\"");
         double value;
-        if (!p || sscanf(++p, "%lf", &value) != 1 || value < minimum || value > maximum)
+        if (!p || sscanf(p, "data-tick-label=\"%lf", &value) != 1 || value < minimum || value > maximum)
             return false;
+        ++p;
         ++count;
     }
     return count >= 2;
@@ -941,15 +954,19 @@ static bool separated_tick_labels(const string_t *svg, double font_size, size_t 
         const char *begin = strchr(p, '>'), *end = begin ? strchr(begin, '<') : NULL;
         if (!end)
             return false;
+        const char *size = strstr(p, "font-size=\"");
+        double rendered_size = font_size;
+        if (size && size < begin && sscanf(size, "font-size=\"%lf", &rendered_size) != 1)
+            return false;
         size_t characters = 0;
         for (const unsigned char *s = (const unsigned char *)begin + 1; s < (const unsigned char *)end; ++s)
             characters += (*s & 0xc0) != 0x80;
-        double width = characters * font_size * 0.8;
+        double width = characters * rendered_size * 0.8;
         double left = x - (!strcmp(anchor, "end") ? width : !strcmp(anchor, "middle") ? width / 2 : 0);
         boxes[count][0] = left;
-        boxes[count][1] = y - font_size;
+        boxes[count][1] = y - rendered_size;
         boxes[count][2] = left + width;
-        boxes[count][3] = y + font_size * 0.3;
+        boxes[count][3] = y + rendered_size * 0.3;
         for (size_t i = 0; i < count; ++i)
             if (!(boxes[count][2] + 3.99 <= boxes[i][0] || boxes[i][2] + 3.99 <= boxes[count][0] ||
                   boxes[count][3] + 3.99 <= boxes[i][1] || boxes[i][3] + 3.99 <= boxes[count][1]))
@@ -959,6 +976,309 @@ static bool separated_tick_labels(const string_t *svg, double font_size, size_t 
     }
     *visible = count;
     return count > 0;
+}
+
+/* Read the renderer's camera metadata, never approximate mathematical endpoints. */
+static bool surface_projection(const char *svg, plot_projection_t *projection)
+{
+    const char *distance = strstr(svg, "data-camera-distance=\""), *fit = strstr(svg, "data-camera-fit=\"");
+    const char *centre = strstr(svg, "data-camera-centre=\""), *rows = strstr(svg, "data-camera-rows=\"");
+    plot_projection_t out = {0};
+    if (!distance || !fit || !centre || !rows ||
+        sscanf(distance, "data-camera-distance=\"%lf", &out.distance) != 1 ||
+        sscanf(fit, "data-camera-fit=\"%lf", &out.fit) != 1 ||
+        sscanf(centre, "data-camera-centre=\"%lf %lf", out.centre, out.centre + 1) != 2 ||
+        sscanf(rows, "data-camera-rows=\"%lf %lf %lf %lf %lf %lf %lf %lf %lf", out.rows, out.rows + 1,
+            out.rows + 2, out.rows + 3, out.rows + 4, out.rows + 5, out.rows + 6, out.rows + 7, out.rows + 8) != 9)
+        return false;
+    out.radius = out.distance / 4;
+    *projection = out;
+    return true;
+}
+
+/* Check solid positive arrows, projective ticks and connected exterior scales through rotated views. */
+static void surface_origin_row(const void *data)
+{
+    const test_database_case_t *row = data;
+    size_t saved_precision = num_get_default_prec_bits();
+    num_set_default_prec_digits(row->precision);
+    json_t *input = json_from_text(row->input);
+    number_t bounds[6] = {0};
+    bool ok = input && json_array_size(input) == 6 && !strcmp(string_c_str(row->expected), "outside_connected");
+    for (unsigned i = 0; ok && i < 6; ++i) {
+        const string_t *value = json_string_value(json_array_get(input, i));
+        bounds[i] = value ? num_create_from_text(value) : NUM_NAN;
+        ok = num_is_real(bounds[i]) && num_is_finite(bounds[i]);
+    }
+    plot_t *plot = plot_new(NULL);
+    ok = ok && plot && plot_set_mesh(plot, NULL, NULL, NULL, 0) &&
+         plot_set_bounds(plot, bounds[0], bounds[1], bounds[2], bounds[3]) &&
+         plot_set_height_bounds(plot, bounds[4], bounds[5]);
+    const double angles[][3] = {{315, 30, 0}, {18, 80, 45}, {145, 15, 135}, {315, 30, 180}, {270, 45, 270}};
+    for (unsigned view = 0; ok && view < sizeof angles / sizeof *angles; ++view) {
+        ok = plot_set_view(plot, angles[view][0], angles[view][1]) && plot_set_roll(plot, angles[view][2]);
+        string_t *svg = ok ? plot_to_svg(plot) : NULL;
+        const char *text = svg ? string_c_str(svg) : "", *frame = strstr(text, "data-axis-corners=\"");
+        unsigned corners[3];
+        plot_projection_t projection;
+        ok = frame && sscanf(frame, "data-axis-corners=\"%u %u %u", corners, corners + 1, corners + 2) == 3 &&
+             surface_projection(text, &projection);
+        double screen[8][3];
+        for (unsigned corner = 0; ok && corner < 8; ++corner) {
+            double point[] = {!!(corner & 1), !!(corner & 2), !!(corner & 4)}, camera[3];
+            plot_projection_camera(&projection, point, camera);
+            plot_projection_point(&projection, camera, screen[corner]);
+        }
+        unsigned joins = 0, supported = 0;
+        for (unsigned axis = 0; ok && axis < 3; ++axis) {
+            unsigned first = corners[axis], last = first | (1u << axis);
+            if (first >= 8 || (first & (1u << axis))) { ok = false; break; }
+            char key[32];
+            snprintf(key, sizeof key, "data-axis-line=\"%u\"", axis);
+            const char *line = strstr(text, key), *path = line ? strstr(line, "d=\"M ") : NULL;
+            double centreline[4];
+            ok = path && sscanf(path, "d=\"M %lf %lf L %lf %lf", centreline, centreline + 1,
+                                centreline + 2, centreline + 3) == 4;
+            if (!ok) break;
+            double dx = screen[last][0] - screen[first][0], dy = screen[last][1] - screen[first][1];
+            double length = hypot(dx, dy);
+            ok &= hypot(centreline[0] - screen[first][0], centreline[1] - screen[first][1]) < 0.002 &&
+                  (centreline[2] - screen[last][0]) * dx + (centreline[3] - screen[last][1]) * dy > 0;
+            double low = 0, high = 0;
+            for (unsigned i = 0; i < 8; ++i) {
+                double side = (dx * (screen[i][1] - screen[first][1]) - dy * (screen[i][0] - screen[first][0])) / length;
+                low = fmin(low, side); high = fmax(high, side);
+            }
+            supported += low >= -1e-8 || high <= 1e-8;
+            for (unsigned other = 0; other < axis; ++other) {
+                unsigned previous = corners[other] | (1u << other);
+                joins += first == corners[other] || first == previous || last == corners[other] || last == previous;
+            }
+            snprintf(key, sizeof key, "data-plot-tick=\"%u\"", axis);
+            for (const char *tick = strstr(text, key); ok && tick; tick = strstr(tick + 1, key)) {
+                double fraction, drawn[2], point[] = {!!(first & 1), !!(first & 2), !!(first & 4)}, camera[3], at[3];
+                const char *value = strstr(tick, "data-tick-fraction=\""), *mark = strstr(tick, "d=\"M ");
+                ok = value && mark && sscanf(value, "data-tick-fraction=\"%lf", &fraction) == 1 &&
+                     sscanf(mark, "d=\"M %lf %lf", drawn, drawn + 1) == 2;
+                if (!ok) break;
+                point[axis] = fraction;
+                plot_projection_camera(&projection, point, camera); plot_projection_point(&projection, camera, at);
+                ok &= hypot(drawn[0] - at[0], drawn[1] - at[1]) < 0.002;
+            }
+            snprintf(key, sizeof key, "data-axis-cylinder=\"%u\"", axis); ok &= strstr(text, key) != NULL;
+            snprintf(key, sizeof key, "data-axis-cone=\"%u\"", axis); ok &= strstr(text, key) != NULL;
+        }
+        size_t visible = 0;
+        /* A face-on pinhole view can hide the third box-edge direction behind its front face. */
+        ok = ok && joins >= 2 && supported >= 2 && separated_tick_labels(svg, 13, &visible);
+        if (!ok) fprintf(stderr, "Surface frame case %s, view %u\n", string_c_str(row->name), view);
+        string_free(svg);
+    }
+    plot_free(plot);
+    for (unsigned i = 0; i < 6; ++i) num_destroy(&bounds[i]);
+    json_free(input); num_set_default_prec_bits(saved_precision);
+    TEST_ASSERT_TRUE(ok, "solid axes retain positive cones, projective tick positions and connected exterior scales");
+}
+
+/* Independent pinhole reference values are stored in the shared database. */
+static void perspective_row(const void *data)
+{
+    const test_database_case_t *row = data;
+    json_t *input = json_from_text(row->input), *expected = json_from_text(row->expected);
+    plot_projection_t p = {.fit = 100, .distance = 4, .radius = 1};
+    double camera[3], reference[3], screen[3];
+    bool ok = input && expected && json_array_size(input) == 3 && json_array_size(expected) == 3;
+    for (unsigned i = 0; ok && i < 3; ++i) {
+        const string_t *a = json_number_text(json_array_get(input, i)), *b = json_number_text(json_array_get(expected, i));
+        ok = a && b;
+        if (ok) { camera[i] = strtod(string_c_str(a), NULL); reference[i] = strtod(string_c_str(b), NULL); }
+    }
+    if (ok) {
+        plot_projection_point(&p, camera, screen);
+        ok = fabs(screen[0] - reference[0]) < 1e-9 && fabs(screen[1] - reference[1]) < 1e-9 &&
+             fabs(plot_projection_size(&p, camera[2]) - reference[2]) < 1e-9;
+    }
+    json_free(expected); json_free(input);
+    TEST_ASSERT_TRUE(ok, "pinhole positions, widths and labels share the reciprocal eye-distance formula");
+}
+
+static void test_plot_perspective(void)
+{
+    test_run_database_cases(__FILE__, __LINE__, "plot.perspective", NULL, perspective_row);
+}
+
+/* Independent projected-box fixtures catch short scales that fold back over a neighbouring axis. */
+static void axis_legibility_row(const void *data)
+{
+    const test_database_case_t *row = data;
+    json_t *input = json_from_text(row->input), *expected = json_from_text(row->expected);
+    double corners[8][2], minimum[2];
+    bool ok = input && expected && json_array_size(input) == 8 && json_array_size(expected) == 2;
+    for (unsigned i = 0; ok && i < 8; ++i) {
+        const json_t *point = json_array_get(input, i);
+        ok = json_array_size(point) == 2;
+        for (unsigned j = 0; ok && j < 2; ++j) {
+            const string_t *value = json_number_text(json_array_get(point, j));
+            ok = value != NULL;
+            if (ok) corners[i][j] = strtod(string_c_str(value), NULL);
+        }
+    }
+    for (unsigned i = 0; ok && i < 2; ++i) {
+        const string_t *value = json_number_text(json_array_get(expected, i));
+        ok = value != NULL;
+        if (ok) minimum[i] = strtod(string_c_str(value), NULL);
+    }
+    plot_axis_frame_t frame;
+    ok = ok && plot_axis_frame(corners, NULL, &frame);
+    unsigned joins = 0;
+    for (unsigned axis = 0; ok && axis < 3; ++axis) {
+        unsigned first = frame.corner[axis], last = first | (1u << axis);
+        double length = hypot(corners[last][0] - corners[first][0], corners[last][1] - corners[first][1]);
+        ok = length >= minimum[0];
+        for (unsigned other = 0; ok && other < axis; ++other) {
+            unsigned low = frame.corner[other], high = low | (1u << other), join = 8;
+            if (first == low || first == high) join = first;
+            else if (last == low || last == high) join = last;
+            if (join == 8) continue;
+            ++joins;
+            unsigned a = join == first ? last : first, b = join == low ? high : low;
+            double dx = corners[a][0] - corners[join][0], dy = corners[a][1] - corners[join][1];
+            double ex = corners[b][0] - corners[join][0], ey = corners[b][1] - corners[join][1];
+            double span = fmin(hypot(dx, dy), hypot(ex, ey));
+            /* Perpendicular clearance also rejects collinear rays pointing in opposite directions. */
+            double distance = fabs(dx * ey - dy * ex) / fmax(hypot(dx, dy), hypot(ex, ey));
+            ok = distance >= minimum[1] && span > 0;
+        }
+    }
+    json_free(expected); json_free(input);
+    TEST_ASSERT_TRUE(ok && joins == 2, "connected outside axes have useful projected lengths and separated joins");
+}
+
+static void test_plot_axis_legibility(void)
+{
+    test_run_database_cases(__FILE__, __LINE__, "plot.axis_legibility", NULL, axis_legibility_row);
+}
+
+/* Small reversals must not repeatedly exchange equally usable reference edges. */
+static void axis_stability_row(const void *data)
+{
+    const test_database_case_t *row = data;
+    json_t *input = json_from_text(row->input);
+    double angles[3] = {0}, units[] = {0.7935906173, 0.7935906173, 1};
+    bool ok = input && json_array_size(input) == 3;
+    for (unsigned i = 0; ok && i < 3; ++i) {
+        const string_t *number = json_number_text(json_array_get(input, i));
+        ok = number && sscanf(string_c_str(number), "%lf", angles + i) == 1;
+    }
+    unsigned changes = 0, expected = (unsigned)strtoul(string_c_str(row->expected), NULL, 10);
+    plot_axis_frame_t previous = {0};
+    for (unsigned step = 0; ok && step < 21; ++step) {
+        double radians = acos(-1) / 180, a = (angles[0] + (step % 2 ? 0.02 : -0.02)) * radians;
+        double e = angles[1] * radians, r = angles[2] * radians, rows[9], corners[8][2];
+        double x[] = {cos(a), -sin(a), 0}, y[] = {-sin(e) * sin(a), -sin(e) * cos(a), -cos(e)};
+        for (unsigned axis = 0; axis < 3; ++axis) {
+            rows[axis] = (cos(r) * x[axis] - sin(r) * y[axis]) * units[axis];
+            rows[axis + 3] = (sin(r) * x[axis] + cos(r) * y[axis]) * units[axis];
+        }
+        rows[6] = cos(e) * sin(a) * units[0]; rows[7] = cos(e) * cos(a) * units[1];
+        rows[8] = -sin(e) * units[2];
+        plot_projection_t projection;
+        ok = plot_projection_init(rows, 800, 650, 31.2, false, &projection);
+        for (unsigned i = 0; ok && i < 8; ++i) {
+            double point[] = {!!(i & 1), !!(i & 2), !!(i & 4)}, camera[3], screen[3];
+            plot_projection_camera(&projection, point, camera);
+            plot_projection_point(&projection, camera, screen);
+            corners[i][0] = screen[0]; corners[i][1] = screen[1];
+        }
+        plot_axis_frame_t frame;
+        ok = ok && plot_axis_frame(corners, step ? &previous : NULL, &frame);
+        if (ok && step)
+            changes += frame.corner[0] != previous.corner[0] || frame.corner[1] != previous.corner[1] ||
+                       frame.corner[2] != previous.corner[2];
+        if (ok) previous = frame;
+    }
+    if (!ok || changes != expected)
+        fprintf(stderr, "%s: %u reference-edge changes, expected %u\n", string_c_str(row->name), changes, expected);
+    json_free(input);
+    TEST_ASSERT_TRUE(ok && changes == expected, "readable exterior reference edges survive small camera reversals");
+}
+
+static void test_plot_axis_stability(void)
+{
+    test_run_database_cases(__FILE__, __LINE__, "plot.axis_stability", NULL, axis_stability_row);
+}
+
+/* Store independent screen-space examples, including a short scale with room for all five marks. */
+static void tick_density_row(const void *data)
+{
+    const test_database_case_t *row = data;
+    json_t *input = json_from_text(row->input);
+    const json_t *ticks = json_array_get(input, 1);
+    const string_t *index = json_number_text(json_array_get(input, 0));
+    size_t count = json_array_size(ticks);
+    bool ok = input && json_array_size(input) == 2 && index && count && count <= PLOT_AXIS_MAX_TICKS;
+    double positions[PLOT_AXIS_MAX_TICKS][2], scales[PLOT_AXIS_MAX_TICKS];
+    for (size_t i = 0; ok && i < count; ++i) {
+        const json_t *tick = json_array_get(ticks, i);
+        ok = json_array_size(tick) == 3;
+        for (unsigned j = 0; ok && j < 3; ++j) {
+            const string_t *value = json_number_text(json_array_get(tick, j));
+            ok = value != NULL;
+            if (ok) {
+                double coordinate = strtod(string_c_str(value), NULL);
+                if (j == 2) scales[i] = coordinate;
+                else positions[i][j] = coordinate;
+            }
+        }
+    }
+    unsigned zero = ok ? (unsigned)strtoul(string_c_str(index), NULL, 10) : 0;
+    unsigned expected = (unsigned)strtoul(string_c_str(row->expected), NULL, 10);
+    ok = ok && plot_axis_tick_mask(positions, scales, (unsigned)count, zero) == expected;
+    json_free(input);
+    TEST_ASSERT_TRUE(ok, "tick strokes follow current projected separation and perspective size, retaining zero");
+}
+
+static void test_plot_tick_density(void)
+{
+    const double positions[][2] = {{0, 0}}, scales[] = {1}, invalid[] = {NAN};
+    TEST_ASSERT_TRUE(!plot_axis_tick_mask(NULL, scales, 1, 0) &&
+                     !plot_axis_tick_mask(positions, NULL, 1, 0) &&
+                     !plot_axis_tick_mask(positions, scales, 0, 0) &&
+                     !plot_axis_tick_mask(positions, scales, PLOT_AXIS_MAX_TICKS + 1, 0) &&
+                     !plot_axis_tick_mask(positions, invalid, 1, 0), "invalid tick catalogues are rejected");
+    test_run_database_cases(__FILE__, __LINE__, "plot.tick_density", NULL, tick_density_row);
+}
+
+/* A later rotation needs intermediate metadata even when its first projection is almost end-on. */
+static void test_plot_surface_tick_catalogue(void)
+{
+    plot_t *plot = plot_new(NULL);
+    number_t axis[] = {num_create_from_long(-10), num_create_from_long(10)};
+    number_t low = num_create_from_double(-0.1), high = num_create_from_double(0.1);
+    number_t heights[] = {low, high, high, low};
+    bool ok = plot && plot_set_surface(plot, axis, 2, axis, 2, heights) && plot_set_view(plot, 315, 30);
+    string_t *svg = ok ? plot_to_svg(plot) : NULL;
+    const char *text = svg ? string_c_str(svg) : "";
+    ok = svg && strstr(text, "data-tick-visible=\"false\"");
+    for (unsigned i = 0; ok && i < 3; ++i) {
+        char key[32];
+        snprintf(key, sizeof key, "data-plot-tick=\"%u\"", i);
+        unsigned count = 0, zeros = 0;
+        for (const char *tick = strstr(text, key); tick; tick = strstr(tick + 1, key)) {
+            ++count;
+            const char *end = strchr(tick, '>'), *zero = strstr(tick, "data-tick-zero=\"true\"");
+            zeros += zero && end && zero < end;
+        }
+        ok = count == 5 && zeros == 1;
+    }
+    string_free(svg); plot_free(plot);
+    num_destroy(&axis[0]); num_destroy(&axis[1]); num_destroy(&low); num_destroy(&high);
+    TEST_ASSERT_TRUE(ok, "short axes retain all five catalogue entries, including zero, for later rotations");
+}
+
+static void test_plot_surface_origin(void)
+{
+    test_run_database_cases(__FILE__, __LINE__, "plot.surface_origin", NULL, surface_origin_row);
 }
 
 static void test_plot_label_spacing(void)
@@ -980,7 +1300,7 @@ static void test_plot_label_spacing(void)
                     bool set = plot_set_view(plot, a, elevations[e]) && plot_set_roll(plot, roll);
                     string_t *svg = set ? plot_to_svg(plot) : NULL;
                     size_t visible = 0;
-                    bool fits = separated_tick_labels(svg, 11, &visible) && visible >= 6 &&
+                    bool fits = separated_tick_labels(svg, 13, &visible) && visible >= 6 &&
                          strstr(string_c_str(svg), "data-plot-label=\"3\"") &&
                          strstr(string_c_str(svg), "data-plot-label=\"4\"") &&
                          strstr(string_c_str(svg), "data-plot-label=\"5\"");
@@ -1035,7 +1355,7 @@ static void test_plot_surface_view(void)
              strstr(string_c_str(svg), ">x</text>") && strstr(string_c_str(svg), ">y</text>") &&
              strstr(string_c_str(svg), ">f</text>") &&
              !strstr(string_c_str(svg), "nan") && !strstr(string_c_str(svg), "inf");
-        /* Every tick is a six-pixel stroke, including cardinal and almost edge-on views. */
+        /* Perspective scales the six-pixel reference marks according to their eye distance. */
         const char *p = svg ? string_c_str(svg) : "";
         size_t ticks = 0;
         while ((p = strstr(p, "data-plot-tick="))) {
@@ -1046,7 +1366,7 @@ static void test_plot_surface_view(void)
                 break;
             }
             double length = hypot(end_x - x, end_y - y);
-            ok = ok && length > 5.99 && length < 6.01 && x > 0 && x < 800 && y > 0 && y < 500;
+            ok = ok && length > 5.99 && length < 10.01 && x > 0 && x < 800 && y > 0 && y < 500;
             ++ticks;
             ++p;
         }
@@ -1060,23 +1380,22 @@ static void test_plot_surface_view(void)
          errno == EINVAL && !plot_set_roll(plot, INFINITY) && !plot_set_roll(NULL, 0);
     string_t *wrapped = plot_to_svg(plot);
     ok = ok && original && wrapped && !strcmp(string_c_str(original), string_c_str(wrapped));
-    /* A quarter-turn rolls the projected axis clockwise, not around another world axis. */
-    const char *axes = original ? strstr(string_c_str(original), "data-plot-axes=") : NULL;
-    const char *line = axes ? strstr(axes, "<path d=\"M ") : NULL;
-    double x0, y0, x1, y1;
-    bool measured = line && sscanf(line, "<path d=\"M %lf %lf L %lf %lf", &x0, &y0, &x1, &y1) == 4;
+    /* Camera roll rotates the image-plane basis, including when the exterior frame changes corners. */
+    plot_projection_t initial;
+    bool measured = original && surface_projection(string_c_str(original), &initial);
     for (unsigned roll = 90; measured && roll < 360; roll += 90) {
         bool set = plot_set_roll(plot, roll);
         string_t *svg = set ? plot_to_svg(plot) : NULL;
-        axes = svg ? strstr(string_c_str(svg), "data-plot-axes=") : NULL;
-        line = axes ? strstr(axes, "<path d=\"M ") : NULL;
-        double a0, b0, a1, b1;
-        bool found = line && sscanf(line, "<path d=\"M %lf %lf L %lf %lf", &a0, &b0, &a1, &b1) == 4;
+        plot_projection_t current;
+        bool found = svg && surface_projection(string_c_str(svg), &current);
         if (found) {
-            double dx = x1 - x0, dy = y1 - y0, rx = a1 - a0, ry = b1 - b0;
-            double lengths = hypot(dx, dy) * hypot(rx, ry), radians = roll * acos(-1) / 180;
-            found = fabs((dx * rx + dy * ry) / lengths - cos(radians)) < 0.0001 &&
-                    fabs((dx * ry - dy * rx) / lengths - sin(radians)) < 0.0001;
+            double radians = roll * acos(-1) / 180;
+            for (unsigned axis = 0; axis < 3; ++axis) {
+                double x = initial.rows[axis], y = initial.rows[3 + axis];
+                found &= fabs(current.rows[axis] - (cos(radians) * x - sin(radians) * y)) < 1e-10 &&
+                         fabs(current.rows[3 + axis] - (sin(radians) * x + cos(radians) * y)) < 1e-10 &&
+                         fabs(current.rows[6 + axis] - initial.rows[6 + axis]) < 1e-10;
+            }
         }
         ok = ok && found;
         string_free(svg);
@@ -1162,6 +1481,12 @@ int tests_main(void)
     TEST_RUN_CASE(test_plot_surface, NULL);
     TEST_RUN_CASE(test_plot_surface_height, NULL);
     TEST_RUN_CASE(test_plot_surface_view, NULL);
+    TEST_RUN_CASE(test_plot_surface_origin, NULL);
+    TEST_RUN_CASE(test_plot_perspective, NULL);
+    TEST_RUN_CASE(test_plot_axis_legibility, NULL);
+    TEST_RUN_CASE(test_plot_axis_stability, NULL);
+    TEST_RUN_CASE(test_plot_tick_density, NULL);
+    TEST_RUN_CASE(test_plot_surface_tick_catalogue, NULL);
     TEST_RUN_CASE(test_plot_label_spacing, NULL);
     TEST_SECTION("README examples");
     TEST_RUN_OUTPUT(example_plot_svg);

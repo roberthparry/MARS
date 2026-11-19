@@ -7,6 +7,8 @@
  * labels that still cannot fit are omitted, while their tick strokes remain.
  * Three endpoint names and at most twelve ticks per axis bound the collision scan.
  */
+#include <math.h>
+
 #define MARS_PLOT_INTERNAL_ACCESS
 #include "plot_internal.h"
 
@@ -44,6 +46,11 @@ bool plot_tick_text(string_t *out, plot_tick_layout_t *layout, const string_t *l
         double offset = (attempt % 4) * layout->font_size * 1.5;
         double side = attempt < 4 ? 0 : attempt < 8 ? layout->font_size * 2 : -layout->font_size * 2;
         double at_x = x + dx * offset - dy * side, at_y = y + dy * offset + dx * side;
+        if (axis >= 3) {
+            double before = anchor < 0 ? width : anchor == 0 ? width / 2 : 0;
+            at_x = fmax(2 + before, fmin(layout->width - 2 - width + before, at_x));
+            at_y = fmax(layout->font_size + 2, fmin(layout->height - layout->font_size * 0.3 - 2, at_y));
+        }
         double left = at_x - (anchor < 0 ? width : anchor == 0 ? width / 2 : 0);
         plot_label_box_t box = {left, at_y - layout->font_size, left + width, at_y + layout->font_size * 0.3};
         bool fits = box.left >= 2 && box.top >= 2 && box.right <= layout->width - 2 &&
@@ -56,9 +63,12 @@ bool plot_tick_text(string_t *out, plot_tick_layout_t *layout, const string_t *l
         }
         if (fits) {
             layout->boxes[layout->count++] = box;
-            return string_append_format(out, "<text data-plot-label=\"%u\" x=\"%.3f\" y=\"%.3f\" "
-                        "text-anchor=\"%s\">", axis, at_x, at_y,
-                        anchor < 0 ? "end" : anchor > 0 ? "start" : "middle") >= 0 &&
+            bool ok = string_append_format(out, "<text data-plot-label=\"%u\" x=\"%.3f\" y=\"%.3f\" "
+                        "text-anchor=\"%s\"", axis, at_x, at_y,
+                        anchor < 0 ? "end" : anchor > 0 ? "start" : "middle") >= 0;
+            if (ok && layout->sized)
+                ok = string_append_format(out, " font-size=\"%.6f\"", layout->font_size) >= 0;
+            return ok && string_append_cstr(out, ">") == 0 &&
                    plot_escape(out, label) && string_append_cstr(out, "</text>\n") == 0;
         }
         if (!dx && !dy)

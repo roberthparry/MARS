@@ -680,7 +680,8 @@ static jsref photo_journey(texture_cache_t *cache, jsref request)
     bool replace = lab_dom_truth(job) && !photo_job_useful(job, display ? &visible : NULL) &&
                    !photo_job_useful(job, predicted ? &ahead : NULL) &&
                    !photo_job_useful(job, destination ? &arrival : NULL);
-    return photo_result(cache, display ? &visible : NULL, next, pinned, display ? .3 + .7 * visible.detail : 1, replace);
+    /* Fine imagery refines the resident world photograph without making a journey wait for optional storage or I/O. */
+    return photo_result(cache, display ? &visible : NULL, next, pinned, display ? .8 + .2 * visible.detail : 1, replace);
 }
 
 typedef struct _photo_sources_t { texture_cache_t *resident, *buffered; dictionary_t *stored; } photo_sources_t;

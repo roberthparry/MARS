@@ -104,7 +104,7 @@ static bool lab_browser_prepare(const char *directory)
                                           "image_checks.js", "globe_atlas_checks.js",
                                           "surface_math_checks.js", "history_checks.js",
                                           "memory_checks.js", "protobuf_wire_checks.js", "appearance_checks.js",
-                                          "plot_palette_checks.js"};
+                                          "plot_palette_checks.js", "plot_wheel_checks.js"};
     for (size_t i = 0; script && i < sizeof modules / sizeof *modules; ++i) {
         file_t *module = lab_browser_file("tools/mars_lab/build/typescript_checks/tests/browser", modules[i]);
         string_t *text = module ? file_read_all_text(module) : NULL;
@@ -178,6 +178,7 @@ static bool lab_browser_run(const char *directory)
     bool globe_check = getenv("MARS_LAB_GLOBE_CHECKS") && !strcmp(getenv("MARS_LAB_GLOBE_CHECKS"), "1");
     bool surface_check = getenv("MARS_LAB_SURFACE_CHECKS") && !strcmp(getenv("MARS_LAB_SURFACE_CHECKS"), "1");
     bool atlas_check = getenv("MARS_LAB_ATLAS_CHECKS") && !strcmp(getenv("MARS_LAB_ATLAS_CHECKS"), "1");
+    bool flight_check = getenv("MARS_LAB_FLIGHT_CHECKS") && !strcmp(getenv("MARS_LAB_FLIGHT_CHECKS"), "1");
     bool select_check = getenv("MARS_LAB_SELECT_CHECKS") && !strcmp(getenv("MARS_LAB_SELECT_CHECKS"), "1");
     bool country_check = getenv("MARS_LAB_COUNTRY_CHECKS") && !strcmp(getenv("MARS_LAB_COUNTRY_CHECKS"), "1");
     bool history_check = getenv("MARS_LAB_HISTORY_CHECKS") && !strcmp(getenv("MARS_LAB_HISTORY_CHECKS"), "1");
@@ -191,7 +192,8 @@ static bool lab_browser_run(const char *directory)
                                 evaluation_check ? "?evaluation-check=1" :
                                 history_check ? "?history-check=1" :
                                 country_check ? "?country-check=1" : select_check ? "?select-check=1" :
-                                atlas_check ? "?atlas-check=1" : surface_check ? "?surface-check=1" :
+                                flight_check ? "?flight-check=1" : atlas_check ? "?atlas-check=1" :
+                                surface_check ? "?surface-check=1" :
                                 globe_check ? "?globe-check=1" :
                                 catalogue_check ? "?catalogue-check=success" :
                                 profiling ? "?profile=1" : "") : NULL;

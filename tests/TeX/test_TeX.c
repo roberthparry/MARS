@@ -224,10 +224,10 @@ static void test_TeX_from_expression(void)
     TEST_ASSERT_TRUE(input && strcmp(string_c_str(input),
                      "1/2(x^2 - 4)/(x-1)*sin(x)/x*log(1/x)") == 0, "mathematical input is borrowed unchanged");
     string_free(input);
-    const char *expected = "\\frac{1}{2}\\mkern-2mu \\frac{\\left(x^{2} - 4\\right)\\mkern-2mu \\sin(x)\\mkern-2mu "
-                           "\\lg(\\frac{1}{x})}{x\\mkern-2mu \\left(x - 1\\right)}";
+    const char *expected = "\\frac{\\left(x^{2} - 4\\right)\\mkern-2mu \\sin(x)\\mkern-2mu "
+                           "\\lg(\\frac{1}{x})}{2\\mkern-2mu x\\mkern-2mu \\left(x - 1\\right)}";
     TEST_ASSERT_TRUE(notation && strcmp(TeX_source(notation), expected) == 0,
-                     "native beautification keeps the rational coefficient before the remaining quotient");
+                     "native beautification combines the rational scale with the algebraic denominator");
     TeX_free(notation);
 
     input = string_new_with("(1/2)*(x^2-4)/(x-1)*sin(x)/x*log(1/x)");
@@ -1104,14 +1104,14 @@ static void test_TeX_rational_quotient_coefficients(void)
     static const struct {
         long numerator, denominator;
         bool negative;
-        const char *prefix;
+        const char *expected;
     } cases[] = {
-        { 1, 2, false, "\\frac{1}{2}" },
-        {-1, 2, false, "-\\frac{1}{2}"},
-        { 2, 3, false, "\\frac{2}{3}" },
-        {-2, 3, false, "-\\frac{2}{3}"},
-        { 1, 2, true,  "-\\frac{1}{2}"},
-        {-1, 2, true,  "\\frac{1}{2}" },
+        { 1, 2, false, "\\frac{\\left(a + b\\right)\\mkern-2mu u}{2\\mkern-2mu d}" },
+        {-1, 2, false, "-\\frac{\\left(a + b\\right)\\mkern-2mu u}{2\\mkern-2mu d}"},
+        { 2, 3, false, "\\frac{2\\mkern-2mu \\left(a + b\\right)\\mkern-2mu u}{3\\mkern-2mu d}" },
+        {-2, 3, false, "-\\frac{2\\mkern-2mu \\left(a + b\\right)\\mkern-2mu u}{3\\mkern-2mu d}"},
+        { 1, 2, true,  "-\\frac{\\left(a + b\\right)\\mkern-2mu u}{2\\mkern-2mu d}"},
+        {-1, 2, true,  "\\frac{\\left(a + b\\right)\\mkern-2mu u}{2\\mkern-2mu d}" },
     };
     for (size_t i = 0; i < sizeof cases / sizeof *cases; ++i) {
         number_t scale = num_create_from_frac(cases[i].numerator, cases[i].denominator);
@@ -1121,11 +1121,10 @@ static void test_TeX_rational_quotient_coefficients(void)
         expr_t *numerator = cases[i].negative ? expr_neg(product) : expr_clone(product);
         expr_t *quotient = numerator && denominator ? expr_div(numerator, denominator) : NULL;
         char *text = quotient ? expr_to_TeX_body(quotient) : NULL;
-        bool ok = text && !strncmp(text, cases[i].prefix, strlen(cases[i].prefix)) &&
-                  !strstr(text, "\\frac{\\frac") && strstr(text, "}{d}");
+        bool ok = text && !strcmp(text, cases[i].expected);
         if (!ok)
             fprintf(stderr, "Rational coefficient %zu: %s\n", i, text ? text : "NULL");
-        TEST_ASSERT_TRUE(ok, "either sign and an outer negation retain the rational coefficient first");
+        TEST_ASSERT_TRUE(ok, "one fraction bar preserves rational magnitudes, either sign and an outer negation");
         free(text); expr_free(quotient); expr_free(numerator); expr_free(product);
         expr_free(denominator); expr_free(body); expr_free(coefficient); num_destroy(&scale);
     }

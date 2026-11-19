@@ -2725,6 +2725,60 @@ static const char *equation_case_text(const json_t *object, const char *name)
     return value ? string_c_str(value) : "";
 }
 
+static void even_quadratic_row(const void *data)
+{
+    const test_database_case_t *row = data;
+    size_t saved_precision = num_get_default_prec_bits();
+    num_set_default_prec_digits(row->precision);
+    json_t *expected = json_from_text(row->expected);
+    equation_t *problem = equ_from_text(row->input);
+    equation_solutions_t *solutions = problem ? equ_derive_solutions(problem) : NULL;
+    expr_t *coordinate = equ_binding(problem, equation_case_text(expected, "coordinate"));
+    const json_t *samples = equation_case_member(expected, "samples");
+    number_t tolerance = num_create_from_string("1e-24");
+    bool ok = solutions && coordinate && json_array_size(samples) > 0;
+    for (size_t i = 0; ok && i < json_array_size(samples); ++i) {
+        const json_t *values = json_array_get(samples, i);
+        for (size_t j = 0; ok && j < json_object_size(values); ++j) {
+            const char *name = string_c_str(json_object_key_at(values, j));
+            expr_t *literal = expr_from_string(equation_case_text(values, name), NULL);
+            number_t value = literal ? expr_eval(literal) : NUM_NAN;
+            expr_t *binding = equ_binding(problem, name);
+            ok = binding && num_is_finite(value);
+            if (ok) expr_set_val(binding, value);
+            num_destroy(&value);
+            expr_free(literal);
+        }
+        size_t checked = 0;
+        for (size_t j = 0; ok && j < equ_solutions_count(solutions); ++j) {
+            const equation_t *solution = equ_solutions_at(solutions, j);
+            if (!equ_is_solved_for(solution, coordinate)) continue;
+            expr_set_val(coordinate, NUM_NAN);
+            number_t root = expr_eval(equ_rhs(solution));
+            expr_set_val(coordinate, root);
+            number_t left = expr_eval(equ_lhs(problem)), right = expr_eval(equ_rhs(problem));
+            number_t difference = num_sub(left, right), magnitude = num_abs(difference);
+            ok = num_is_finite(root) && num_is_finite(magnitude) && num_le(magnitude, tolerance);
+            num_destroy(&magnitude); num_destroy(&difference);
+            num_destroy(&right); num_destroy(&left); num_destroy(&root);
+            ++checked;
+        }
+        ok = ok && checked == 2;
+    }
+    if (!ok) printf("Even quadratic: %s\n", string_c_str(row->name));
+    num_destroy(&tolerance);
+    equ_solutions_free(solutions);
+    equ_free(problem);
+    json_free(expected);
+    num_set_default_prec_bits(saved_precision);
+    TEST_ASSERT_TRUE(ok, "both square-root branches satisfy the equation for positive, negative and complex coefficients");
+}
+
+static void test_equation_even_quadratic(void)
+{
+    test_run_database_cases(__FILE__, __LINE__, "equation.even_quadratic", NULL, even_quadratic_row);
+}
+
 static void test_equation_guarded_inverse_row(const void *data)
 {
     const test_database_case_t *row = data;
@@ -2957,6 +3011,39 @@ static void test_equation_future_solver_cases(void)
     TEST_RUN_SUBTEST(test_equation_future_keeps_tan_sqrt_three_family_symbolic, "future,periodic");
 }
 
+static void test_equation_solution_pair_row(const void *data)
+{
+    const test_database_case_t *row = data;
+    equation_t *equation = equ_from_text(row->input);
+    equation_solutions_t *solutions = equation ? equ_derive_solutions(equation) : NULL;
+    size_t count = equ_solutions_count(solutions), paired = 0;
+    size_t expected = (size_t)strtoul(string_c_str(row->expected), NULL, 10);
+    bool ok = solutions && count > 0;
+    for (size_t i = 0; ok && i + 1 < count; i += 2) {
+        const equation_t *first = equ_solutions_at(solutions, i), *second = equ_solutions_at(solutions, i + 1);
+        string_t *TeX = equ_solution_pair_rhs_text(first, second, style_LATEX);
+        string_t *plain = equ_solution_pair_rhs_text(first, second, style_UNBOUND);
+        ok = (TeX != NULL) == (plain != NULL);
+        if (TeX) {
+            ++paired;
+            ok = ok && string_find(TeX, "\\pm") >= 0 && string_find(plain, "±") >= 0 &&
+                 string_find(TeX, "0 \\pm") < 0 && string_find(plain, "0 ±") < 0;
+        }
+        string_free(plain);
+        string_free(TeX);
+    }
+    ok = ok && paired == expected && equ_solutions_count(solutions) == count;
+    if (!ok) printf("%s: %zu pairs, expected %zu; %zu original rows\n", string_c_str(row->name), paired, expected, count);
+    equ_solutions_free(solutions);
+    equ_free(equation);
+    TEST_ASSERT_TRUE(ok, "exact opposite roots share native and TeX signs without merging unrelated coordinates or values");
+}
+
+static void test_equation_solution_pairs(void)
+{
+    test_run_database_cases(__FILE__, __LINE__, "equation.solution_pairs", NULL, test_equation_solution_pair_row);
+}
+
 static void test_equation_database_row(const void *data)
 {
     const test_database_case_t *row = data;
@@ -2984,6 +3071,8 @@ int tests_main(void)
 {
     TEST_SECTION("Equation Basics");
     TEST_RUN_IN_GROUP(test_equation_database_cases, tests, "equation,database-cases");
+    TEST_RUN_IN_GROUP(test_equation_solution_pairs, tests, NULL);
+    TEST_RUN_IN_GROUP(test_equation_even_quadratic, tests, NULL);
     TEST_RUN_IN_GROUP(test_equation_complex_power_families, tests, NULL);
     TEST_RUN_IN_GROUP(test_equation_inverts_roots_and_constant_powers, tests, NULL);
     TEST_RUN_IN_GROUP(test_equation_preserves_principal_root_domain, tests, NULL);

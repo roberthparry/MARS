@@ -43,7 +43,7 @@ void lab_surface_hover(view_jsref view, frame_jsref frame, jsref screen,
         return;
     }
     int scaling = lab_dom_get(frame, "scaling"), offset = lab_dom_get(frame, "offset");
-    double rotation[6], scale[3], shift[3], transform[6];
+    double rotation[9], scale[3], shift[3], transform[6];
     static const char *const matrix_keys[] = {"a", "b", "c", "d", "e", "f"};
     for (unsigned i = 0; i < 6; ++i) {
         rotation[i] = item(rows, i);
@@ -54,10 +54,17 @@ void lab_surface_hover(view_jsref view, frame_jsref frame, jsref screen,
         }
     }
     for (unsigned i = 0; i < 3; ++i) {
+        rotation[6 + i] = item(rows, 6 + i);
         scale[i] = item(scaling, i);
         shift[i] = item(offset, i);
     }
     double width = number(frame, "width"), height = number(frame, "height"), fit = number(frame, "fit");
+    double camera_distance = number(frame, "distance"), centre[] = {width / 2, height / 2};
+    if (!isfinite(camera_distance) || camera_distance <= 0) camera_distance = 0;
+    if (camera_distance) {
+        centre[0] = item(lab_dom_get(frame, "centre"), 0);
+        centre[1] = item(lab_dom_get(frame, "centre"), 1);
+    }
     double determinant = transform[0] * transform[3] - transform[1] * transform[2];
     if (!isfinite(determinant) || !determinant ||
         !isfinite(width) || !isfinite(height) || width <= 0 || height <= 0 ||
@@ -107,14 +114,15 @@ void lab_surface_hover(view_jsref view, frame_jsref frame, jsref screen,
         lab_dom_release(mark);
         if (!valid || start > end)
             continue;
-        double pixel[2][2];
+        double pixel[2][2], weights[2];
         for (unsigned j = 0; j < 2; ++j) {
-            double q[2] = {0, 0}, t = j ? end : start;
-            for (unsigned row = 0; row < 2; ++row)
+            double q[3] = {0, 0, 0}, t = j ? end : start;
+            for (unsigned row = 0; row < 3; ++row)
                 for (unsigned axis = 0; axis < 3; ++axis)
                     q[row] += rotation[row * 3 + axis] * (p[0][axis] + t * (p[1][axis] - p[0][axis]) - 0.5);
-            double x = width / 2 + fit * q[0];
-            double y = height / 2 + fit * q[1];
+            weights[j] = camera_distance ? 1 + q[2] / camera_distance : 1;
+            double x = centre[0] + fit * q[0] / weights[j];
+            double y = centre[1] + fit * q[1] / weights[j];
             pixel[j][0] = transform[0] * x + transform[2] * y + transform[4];
             pixel[j][1] = transform[1] * x + transform[3] * y + transform[5];
         }
@@ -132,7 +140,8 @@ void lab_surface_hover(view_jsref view, frame_jsref frame, jsref screen,
         if (!inside_chart(transform, determinant, width, height, x, y))
             continue;
         best = distance;
-        double fraction = start + t * (end - start);
+        double perspective_t = t * weights[0] / ((1 - t) * weights[1] + t * weights[0]);
+        double fraction = start + perspective_t * (end - start);
         for (unsigned axis = 0; axis < 3; ++axis)
             chosen[axis] = raw[0][axis] + fraction * (raw[1][axis] - raw[0][axis]);
         chosen_x = x;

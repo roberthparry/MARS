@@ -3,7 +3,8 @@
  * @brief Structural presentation of paired exact solution rows.
  *
  * Extracts shared reciprocal integer factors and recognises additive centres with opposite displacements,
- * including square-root radicands. Operates on borrowed trees and retains the existing temporary-binding plan;
+ * including square-root radicands and identical expressions with exactly opposite real scalar coefficients.
+ * Operates on borrowed trees and retains the existing temporary-binding plan;
  * neither the solver's algebra nor the numerical values are changed by presentation.
  * The equation module owns these structural decisions. TeX constructors supply
  * radicals, symmetric pairs and fractions without exposing their command syntax.
@@ -67,11 +68,24 @@ static bool equ_pair_collect(const expr_t *expr, bool subtract, equ_pair_sum_t *
 
 static bool equ_pair_opposites(equ_pair_term_t a, equ_pair_term_t b)
 {
-    if (a.subtract != b.subtract)
-        return expr_struct_eq(a.expr, b.expr);
-    expr_t *negative = expr_simplify_owned(expr_neg(a.expr));
-    bool equal = negative && expr_struct_eq(negative, b.expr);
+    expr_t *negative = a.subtract == b.subtract ? expr_simplify_owned(expr_neg(a.expr)) : NULL;
+    bool equal = a.subtract != b.subtract ? expr_struct_eq(a.expr, b.expr) :
+                                           negative && expr_struct_eq(negative, b.expr);
     expr_free(negative);
+    if (!equal) {
+        const expr_t *a_base = NULL, *b_base = NULL;
+        number_t a_scale = num_new(), b_scale = num_new();
+        if (expr_match_scaled_expr(a.expr, &a_scale, &a_base) &&
+            expr_match_scaled_expr(b.expr, &b_scale, &b_base) && expr_struct_eq(a_base, b_base) &&
+            num_is_exact(a_scale) && num_is_exact(b_scale) && num_is_real(a_scale) && num_is_real(b_scale) &&
+            num_is_finite(a_scale) && num_is_finite(b_scale)) {
+            number_t expected = a.subtract == b.subtract ? num_neg(a_scale) : num_clone(a_scale);
+            equal = num_cmp(expected, b_scale) == 0;
+            num_destroy(&expected);
+        }
+        num_destroy(&b_scale);
+        num_destroy(&a_scale);
+    }
     return equal;
 }
 
@@ -198,6 +212,55 @@ static long equ_pair_denominator(const expr_t **centre, const expr_t **offset)
     return denominator;
 }
 
+/* Move shared exact scalar denominators into one fraction without altering either solution branch. */
+static expr_t *equ_pair_common_denominator(expr_t **centre, expr_t **offset, const expr_t *denominator)
+{
+    const expr_t *centre_base = NULL, *offset_base = NULL;
+    number_t centre_scale = num_new(), offset_scale = num_new();
+    number_t centre_top = NUM_NAN, centre_bottom = NUM_NAN, offset_top = NUM_NAN, offset_bottom = NUM_NAN;
+    expr_t *result = denominator ? expr_clone(denominator) : NULL;
+    if (expr_match_scaled_expr(*centre, &centre_scale, &centre_base) &&
+        expr_match_scaled_expr(*offset, &offset_scale, &offset_base) &&
+        num_is_exact(centre_scale) && num_is_exact(offset_scale) && num_is_real(centre_scale) && num_is_real(offset_scale) &&
+        num_get_fraction_parts(centre_scale, &centre_top, &centre_bottom) &&
+        num_get_fraction_parts(offset_scale, &offset_top, &offset_bottom) &&
+        !num_is_one(centre_bottom) && !num_is_one(offset_bottom)) {
+        number_t common = num_lcm(centre_bottom, offset_bottom);
+        expr_t *scaled_centre = expr_simplify_owned(expr_mul_num(*centre, &common));
+        expr_t *scaled_offset = expr_simplify_owned(expr_mul_num(*offset, &common));
+        expr_t *scaled_denominator = denominator ? expr_simplify_owned(expr_mul_num(denominator, &common)) :
+                                                   expr_new_const(common);
+        if (scaled_centre && scaled_offset && scaled_denominator) {
+            expr_free(*centre);
+            expr_free(*offset);
+            expr_free(result);
+            *centre = scaled_centre;
+            *offset = scaled_offset;
+            result = scaled_denominator;
+        } else {
+            expr_free(scaled_denominator);
+            expr_free(scaled_offset);
+            expr_free(scaled_centre);
+        }
+        num_destroy(&common);
+    }
+    num_destroy(&offset_bottom); num_destroy(&offset_top);
+    num_destroy(&centre_bottom); num_destroy(&centre_top);
+    num_destroy(&offset_scale); num_destroy(&centre_scale);
+    return result;
+}
+
+/* A variable or positive integer is already an unambiguous denominator atom. */
+static bool equ_pair_denominator_needs_grouping(const expr_t *denominator)
+{
+    number_t value = NUM_NAN;
+    bool atom = expr_is_variable(denominator) ||
+                (expr_match_const_value(denominator, &value) && num_is_real(value) && num_is_finite(value) &&
+                 num_is_integer(value) && num_gt(value, NUM_ZERO));
+    num_destroy(&value);
+    return !atom;
+}
+
 /* Compact symbolic families without changing their branch parameters or underlying solution trees. */
 string_t *equ_solution_pair_rhs_text(const equation_t *first, const equation_t *second, style_t style)
 {
@@ -265,21 +328,42 @@ string_t *equ_solution_pair_rhs_text(const equation_t *first, const equation_t *
             expr_free(pretty_offset);
             pretty_offset = expanded_offset;
         }
+        expr_t *factored_centre = expr_factor_common_post_calculus(pretty_centre);
+        if (factored_centre) {
+            expr_free(pretty_centre);
+            pretty_centre = factored_centre;
+        }
+        expr_t *common_denominator = equ_pair_common_denominator(&pretty_centre, &pretty_offset, denominator);
         char *centre_text = pretty_centre ? (style == style_LATEX ? expr_to_TeX_body(pretty_centre) :
                                                                   expr_to_string(pretty_centre, style)) : NULL;
         char *offset_text = pretty_offset ? (style == style_LATEX ? expr_to_TeX_body(pretty_offset) :
                                                                   expr_to_string(pretty_offset, style)) : NULL;
-        char *denominator_text = denominator ? (style == style_LATEX ? expr_to_TeX_body(denominator) :
-                                                                      expr_to_string(denominator, style)) : NULL;
-        if (centre_text && offset_text && (!denominator || denominator_text)) {
+        char *denominator_text = common_denominator ? (style == style_LATEX ? expr_to_TeX_body(common_denominator) :
+                                                                      expr_to_string(common_denominator, style)) : NULL;
+        number_t centre_value = NUM_NAN;
+        bool zero_centre = pretty_centre && expr_match_const_value(pretty_centre, &centre_value) &&
+                           num_is_zero(centre_value);
+        const expr_t *offset_left = NULL, *offset_right = NULL;
+        bool offset_subtract = false;
+        bool group_offset = expr_match_add_sub_expr(pretty_offset, &offset_left, &offset_right, &offset_subtract);
+        bool group_denominator = common_denominator && equ_pair_denominator_needs_grouping(common_denominator);
+        if (centre_text && offset_text && (!denominator || common_denominator) &&
+            (!common_denominator || denominator_text)) {
             if (style == style_LATEX)
-                out = equ_pair_TeX(centre_text, offset_text, denominator_text, true);
-            else if (denominator)
-                out = string_sprintf(expr_is_variable(denominator) ? "(%s ± (%s))/%s" : "(%s ± (%s))/(%s)",
+                out = equ_pair_TeX(zero_centre ? "" : centre_text, offset_text, denominator_text, group_offset);
+            else if (zero_centre) {
+                if (common_denominator)
+                    out = string_sprintf(group_denominator ? "±(%s)/(%s)" : "±(%s)/%s", offset_text, denominator_text);
+                else
+                    out = string_sprintf(group_offset ? "±(%s)" : "±%s", offset_text);
+            } else if (common_denominator)
+                out = string_sprintf(group_denominator ? "(%s ± (%s))/(%s)" : "(%s ± (%s))/%s",
                                      centre_text, offset_text, denominator_text);
             else
                 out = string_sprintf("%s ± (%s)", centre_text, offset_text);
         }
+        num_destroy(&centre_value);
+        expr_free(common_denominator);
         free(denominator_text);
         free(offset_text);
         free(centre_text);

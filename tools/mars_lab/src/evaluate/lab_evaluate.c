@@ -33,6 +33,7 @@ static const route_t routes[] = {
     {"/eval", "expression", "mars_lab", "expression", 30000u},
     {"/function-run", "source", "ophelia", "function", 30000u},
     {"/goal_seek", "expression", "mars_lab", "goal_seek", 10000u},
+    {"/history-preview", "text", NULL, "history", 10000u},
     {"/integrator-eval", "expression", "integrator_lab", "integrator", 10000u},
     {"/matrix-eval", "matrix", "matrix_lab", "matrix", 10000u},
     {"/render_TeX", "tex", NULL, "render", 10000u},
@@ -388,6 +389,7 @@ json_t *lab_eval_request(const string_t *route, const json_t *payload, unsigned 
     if (!lab_eval_valid_text(input, true))
         return lab_eval_failure(status, 400u, "Input must be a non-empty string of at most 64 KiB without NUL bytes");
     if (!entry->worker) {
+        if (!strcmp(entry->mode, "history")) return lab_eval_history_preview(input, status);
         diagnostic_t *error = NULL;
         string_t *svg = lab_eval_render(input, &error);
         string_t *description = error ? diagnostic_to_string(error) : NULL;

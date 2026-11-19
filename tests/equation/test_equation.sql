@@ -7,6 +7,29 @@ CREATE TABLE IF NOT EXISTS equation_cases (
 CREATE INDEX IF NOT EXISTS equation_cases_operation ON equation_cases(operation, name);
 
 INSERT INTO test_case_runner(module, source, parent, table_name, operation) VALUES (
+    'equation.even_quadratic', 'tests/equation/test_equation.c',
+    'tests.test_equation_even_quadratic', 'equation_cases', 'even_quadratic')
+ON CONFLICT(module) DO UPDATE SET table_name=excluded.table_name, operation=excluded.operation;
+INSERT OR IGNORE INTO equation_cases(name, operation, input, expected, precision) VALUES
+    ('even_quadratic_tapered', 'even_quadratic', 'x^2/784+(y^2+z^2)/484*(1+0.01*x)=1',
+     '{"coordinate":"y","samples":[{"x":"10","z":"3"},{"x":"-101","z":"0"},{"x":"1","z":"100"}]}', 64),
+    ('even_quadratic_complex_coefficient', 'even_quadratic', '(a+1)*y^2+b=0',
+     '{"coordinate":"y","samples":[{"a":"2","b":"-12"},{"a":"-3","b":"8"},{"a":"i","b":"2"}]}', 64);
+
+INSERT INTO test_case_runner(module, source, parent, table_name, operation) VALUES (
+    'equation.solution_pairs', 'tests/equation/test_equation.c',
+    'tests.test_equation_solution_pairs', 'equation_cases', 'solution_pair')
+ON CONFLICT(module) DO UPDATE SET table_name=excluded.table_name, operation=excluded.operation;
+INSERT OR IGNORE INTO equation_cases(name, operation, input, expected) VALUES
+    ('solution_pair_scaled_ellipsoid', 'solution_pair', 'x^2/9+y^2/16+z^2/25=1', '3'),
+    ('solution_pair_scaled_closed_root', 'solution_pair', 'x^2/9=2', '1'),
+    ('solution_pair_shifted_ellipse', 'solution_pair', '(x-2)^2/9+y^2/16=1', '2'),
+    ('solution_pair_sphere', 'solution_pair', 'x^2+y^2+z^2=1', '3'),
+    ('solution_pair_exact_roots', 'solution_pair', 'x^2=4', '1'),
+    ('solution_pair_different_roots', 'solution_pair', '(x-2)*(x-3)=0', '0'),
+    ('solution_pair_different_coordinates', 'solution_pair', 'x+y=0', '0');
+
+INSERT INTO test_case_runner(module, source, parent, table_name, operation) VALUES (
     'equation.complex_power_families', 'tests/equation/test_equation.c',
     'tests.test_equation_complex_power_families', 'equation_cases', 'complex_power_family')
 ON CONFLICT(module) DO UPDATE SET table_name=excluded.table_name, operation=excluded.operation;

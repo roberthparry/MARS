@@ -272,7 +272,8 @@ static bool sample_bounded(equation_mesh_t *mesh, const double bounds[6], unsign
 }
 
 /* Render an implicit three-coordinate residual without choosing a height-function branch. */
-int lab_worker_equation_mesh(equation_t *equation, expr_t *first, expr_t *second, expr_t *third, char **argv)
+int lab_worker_equation_mesh(equation_t *equation, expr_t *first, expr_t *second, expr_t *third, char **argv,
+                             const char *title_text, const char *title_TeX)
 {
     double view[3];
     for (unsigned i = 0; i < 3; ++i) {
@@ -386,16 +387,14 @@ int lab_worker_equation_mesh(equation_t *equation, expr_t *first, expr_t *second
         string_free(svg);
         svg = NULL;
     }
-    char *title = equ_to_TeX_body_wrapped(equation, 110);
     if (svg)
         printf("input %s\nexpression %s\nplot_title %s\nplot_title_TeX %s\nplot_svg %s\ndifferentiable no\n",
-               argv[1], argv[1], argv[1], title ? title : "", string_c_str(svg));
+               argv[1], argv[1], title_text, title_TeX, string_c_str(svg));
     else if (mesh.excessive_levels || excessive_output)
         printf("error Too many surface sheets in this view; zoom in or narrow the coordinate bounds.\n");
     else
         printf("error No real isosurface found in the sampled volume; supply finite ordered coordinate bounds.\n");
     int rc = svg ? 0 : 1;
-    free(title);
     string_free(svg);
     plot_free(plot);
     lab_worker_implicit_free(mesh.sampling);

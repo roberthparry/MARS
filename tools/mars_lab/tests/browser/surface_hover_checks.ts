@@ -430,6 +430,18 @@ window.checkLabSurfaceHover = async function checkLabSurfaceHover(): Promise<boo
     const frame = {width: 100, height: 100, fit: 100, rows: [1, 0, 0, 0, 1, 0],
         scaling: [1, 1, 1], offset: [0, 0, 0], drawMesh: true};
     const screen = {a: 1, b: 0, c: 0, d: 1, e: 0, f: 0};
+    const perspectiveChart = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    Object.assign(perspectiveChart.dataset, {xMin: '0', xMax: '1', yMin: '0', yMax: '1', zMin: '0', zMax: '1'});
+    const perspectiveFrame = {width: 400, height: 300, fit: 100, distance: 4, radius: 1, centre: [200, 150],
+        rows: [1, 0, 0, 0, 1, 0, 0, 0, 1], scaling: [1, 1, 1], offset: [0, 0, 0], drawMesh: true};
+    const near: MarsSurfacePoint3 = [0, 0.5, 0], far: MarsSurfacePoint3 = [1, 0.5, 1];
+    const a = labDOM.call<number[]>('lab_surface_project', perspectiveFrame, near);
+    const b = labDOM.call<number[]>('lab_surface_project', perspectiveFrame, far);
+    const perspectiveHit = labDOM.call<MarsSurfaceHoverHit>('lab_surface_hover',
+        {chart: perspectiveChart, primitives: [{points: [near, far]}]}, perspectiveFrame, screen,
+        (a[0] + b[0]) / 2, 150, null);
+    check(perspectiveHit?.text.includes('x ≈ 0.4375'),
+          'screen-midpoint picking uses perspective-correct interpolation rather than the world midpoint');
     /** @brief Keep each independent endpoint pair in its own primitive. */
     function segment(a: MarsSurfacePoint3, b: MarsSurfacePoint3): SurfaceHoverFixturePrimitive {
         return {points: [a, b]};

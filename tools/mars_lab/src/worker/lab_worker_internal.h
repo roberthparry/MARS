@@ -23,6 +23,11 @@
 #include "sampler-t.h"
 #include "plot-t.h"
 
+/** @brief Shared soft source-width budget for complete equation captions and solution rows. */
+enum {
+    LAB_WORKER_EQUATION_LINE_LIMIT_LATEX = 280 /**< Keep compact equations together before native TeX wrapping. */
+};
+
 /** @brief Optional guarded double evaluator over a private plotting graph. */
 typedef struct _lab_worker_sample_t lab_worker_sample_t;
 
@@ -79,11 +84,49 @@ void lab_worker_implicit_free(lab_worker_implicit_t *sample);
 /** @brief Plot equation sides, two-coordinate contours or explicit differential-equation curves and surfaces. */
 int lab_worker_solver_plot(int argc, char **argv);
 
-/** @brief Render a bounded real zero contour for an equation with two selected coordinates. */
-int lab_worker_equation_contour(equation_t *equation, expr_t *first, expr_t *second, char **argv);
+/**
+ * @brief Render a bounded real zero contour with a caption specialised to its fixed bindings.
+ * @param equation Borrowed private worker equation; worksheet bindings remain unchanged.
+ * @param first Borrowed horizontal coordinate node.
+ * @param second Borrowed vertical coordinate node, distinct from first.
+ * @param argv Borrowed validated worker arguments containing source, bounds, camera and quality options.
+ * @param title_text Borrowed native plain equation caption with non-coordinate values substituted.
+ * @param title_TeX Borrowed native TeX caption for the same specialised equation.
+ * @return Zero after emitting the plot protocol, or one after emitting a sampling or range diagnostic.
+ * No input ownership transfers. Run only in the isolated calculation worker.
+ */
+int lab_worker_equation_contour(equation_t *equation, expr_t *first, expr_t *second, char **argv,
+                                const char *title_text, const char *title_TeX);
 
-/** @brief Render a bounded isosurface for three free real equation coordinates. */
-int lab_worker_equation_mesh(equation_t *equation, expr_t *first, expr_t *second, expr_t *third, char **argv);
+/**
+ * @brief Render a bounded isosurface with a caption specialised to its fixed bindings.
+ * @param equation Borrowed private worker equation; worksheet bindings remain unchanged.
+ * @param first Borrowed first coordinate node.
+ * @param second Borrowed distinct second coordinate node.
+ * @param third Borrowed distinct third coordinate node.
+ * @param argv Borrowed validated worker arguments containing source, bounds, camera and quality options.
+ * @param title_text Borrowed native plain equation caption with non-coordinate values substituted.
+ * @param title_TeX Borrowed native TeX caption for the same specialised equation.
+ * @return Zero after emitting the plot protocol, or one after emitting a sampling or range diagnostic.
+ * No input ownership transfers. Run only in the isolated calculation worker.
+ */
+int lab_worker_equation_mesh(equation_t *equation, expr_t *first, expr_t *second, expr_t *third, char **argv,
+                             const char *title_text, const char *title_TeX);
+
+/**
+ * @brief Format an equation plot after substituting finite bindings outside its plotting coordinates.
+ * @param equation Borrowed private worker equation, never modified.
+ * @param first Borrowed first plotting coordinate, retained symbolically even when supplied.
+ * @param second Optional borrowed second plotting coordinate, or NULL for a curve.
+ * @param third Optional borrowed third plotting coordinate, or NULL for a curve or contour.
+ * @param[out] plain Required destination for an owned unbound equation caption, released with string_free().
+ * @param[out] TeX Required destination for an owned wrapped TeX caption, released with free().
+ * @return True with both captions on success; false with both outputs NULL on invalid input or failure.
+ * Exact binding expressions are preserved and simplified by the expression library. Bindings and their
+ * variable or constant roles remain unchanged. Run only in the isolated calculation worker.
+ */
+bool lab_worker_equation_plot_titles(const equation_t *equation, const expr_t *first, const expr_t *second,
+                                      const expr_t *third, string_t **plain, char **TeX);
 
 /** @brief Plot a one-variable integrand, shading the supplied definite integration interval. */
 int lab_worker_integrand_plot(int argc, char **argv);

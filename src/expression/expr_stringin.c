@@ -4,6 +4,7 @@
  *
  * Parses native mathematical notation, bindings and generated function bodies into expression graphs. Shared
  * scanner and symbol-table helpers keep Unicode aliases and variable identity consistent.
+ * Numeric literals share the binding reader so finite real decimals retain exact symbolic coefficients.
  *
  * This is part of the expr_t implementation. Preserve expression ownership, symbol identity and mathematical
  * domain restrictions when extending these operations.
@@ -73,6 +74,8 @@
 
 #define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_bindings.h"
+#define MARS_EXPR_INTERNAL_ACCESS
+#include "expr_binding_simplify.h"
 #define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_maths.h"
 #define MARS_EXPR_INTERNAL_ACCESS
@@ -1254,7 +1257,7 @@ static int parse_number_view(string_view_t text, number_t *out)
     if (!literal)
         return 0;
 
-    *out = num_create_from_text(literal);
+    *out = expr_number_from_literal_text(literal);
     string_free(literal);
 
     roundtrip = num_to_string(*out);
@@ -4054,7 +4057,8 @@ static expr_t *parse_atom_body(expr_parse_state_t *p, bool allow_ascii_rational_
                     result = fe->ops->inverse_unary(arg);
                     expr_free(arg);
                     inverse_applied = true;
-                } else if (fe->ops == &ops_factors || fe->ops == &ops_arbitrary_function) {
+                } else if ((fe->ops == &ops_factors && !preserve_notation_operations) ||
+                           fe->ops == &ops_arbitrary_function) {
                     result = fe->ufn(arg);
                     expr_free(arg);
                 } else {

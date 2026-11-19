@@ -86,11 +86,22 @@ namespace WorksheetPlotPalette {
         return result;
     }
 
+    /** @brief Shade a themed opaque axis colour using native diffuse illumination. */
+    export function axis_shade(shade: number, original = '#94b8b1'): string {
+        const channels = rgb(colour(original));
+        return '#' + channels.map(value => Math.round(value * shade * 255).toString(16).padStart(2, '0')).join('');
+    }
+
     /** @brief Apply exportable inline presentation while retaining original native SVG attributes. */
     export function apply(root: Element): void {
         for (const node of [root, ...root.querySelectorAll('[fill], [stroke], [color]')]) {
             if (!(node instanceof SVGElement) || node.closest('defs')) continue;
             for (const attribute of attributes) {
+                const base = node.getAttribute('data-axis-colour');
+                if (base && (attribute === 'fill' || attribute === 'stroke')) {
+                    node.style.setProperty(attribute, axis_shade(Number(node.getAttribute('data-axis-shade')), base));
+                    continue;
+                }
                 const original = node.getAttribute(attribute);
                 if (original && /^#[0-9a-f]{6}(?:[0-9a-f]{2})?$/i.test(original)) {
                     const graded = colour(original);

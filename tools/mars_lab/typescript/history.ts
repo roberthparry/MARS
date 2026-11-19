@@ -5,7 +5,8 @@
  * Native WASM owns live history and atomic replacement. This adapter transports
  * opaque Protobuf snapshots, retaining one bounded IndexedDB recovery record per
  * mode. Optimistic revisions protect independent tabs; random browser identifiers
- * separate profiles but are not authentication credentials.
+ * separate profiles but are not authentication credentials. Local cache opens and
+ * transactions have deadlines so unavailable browser storage cannot hide the workspace indefinitely.
  */
 interface SavedWorksheetHistory {
     version: number;
@@ -36,6 +37,9 @@ class WorksheetHistoryPersistence {
     private readonly revisions = new Map<number, number>();
     private readonly dirty = new Set<number>();
     private readonly blocked = new Set<number>();
+    /** @brief Bound optional browser-cache I/O independently of server history requests. */
+    public constructor(private readonly cacheTimeoutMs = 2000) {}
+
     private readonly names = ['expression', 'equation', 'diffequation', 'matrix', 'integrator', 'datetime', 'almanac'] as const;
     private readonly mark = (): void => {
         if (!this.started || this.restoring) return;
@@ -64,29 +68,64 @@ class WorksheetHistoryPersistence {
         try {
             this.database = await new Promise<IDBDatabase>((resolve, reject) => {
                 const request = indexedDB.open('mars.history.v1', 1);
-                request.onupgradeneeded = () => request.result.createObjectStore('modes', {keyPath: 'mode'});
-                request.onsuccess = () => resolve(request.result);
-                request.onerror = () => reject(request.error);
-                request.onblocked = () => reject(new Error('History cache blocked'));
+                let settled = false;
+                const fail = (error: unknown): void => {
+                    if (settled) return;
+                    settled = true;
+                    clearTimeout(timer);
+                    reject(error);
+                };
+                const timer = window.setTimeout(() => fail(new Error('History cache timed out')), this.cacheTimeoutMs);
+                request.onupgradeneeded = () => {
+                    if (settled) {
+                        request.transaction?.abort();
+                        return;
+                    }
+                    request.result.createObjectStore('modes', {keyPath: 'mode'});
+                };
+                request.onsuccess = () => {
+                    if (settled) { request.result.close(); return; }
+                    settled = true;
+                    clearTimeout(timer);
+                    resolve(request.result);
+                };
+                request.onerror = () => fail(request.error);
+                request.onblocked = () => fail(new Error('History cache blocked'));
             });
-        } catch { this.warn('Offline history recovery is unavailable; server saves remain enabled.'); }
+        } catch { /* The server remains available when the optional recovery cache cannot open. */ }
     }
 
     private async cache(record?: SavedHistoryRecord): Promise<SavedHistoryRecord[]> {
         if (!this.database) return [];
+        const database = this.database;
         return new Promise(resolve => {
+            let settled = false, timer = 0;
+            const finish = (records: SavedHistoryRecord[]): void => {
+                if (settled) return;
+                settled = true;
+                clearTimeout(timer);
+                resolve(records);
+            };
+            const fail = (): void => {
+                if (settled) return;
+                finish([]);
+            };
             try {
-                const transaction = this.database!.transaction('modes', record ? 'readwrite' : 'readonly');
+                const transaction = database.transaction('modes', record ? 'readwrite' : 'readonly');
+                timer = window.setTimeout(() => {
+                    if (settled) return;
+                    if (this.database === database) this.database = null;
+                    database.close();
+                    try { transaction.abort(); } catch { /* A completed or failed transaction is already inactive. */ }
+                    fail();
+                }, this.cacheTimeoutMs);
                 const store = transaction.objectStore('modes');
                 const request = record ? store.put({...record, client: this.client}) : store.getAll();
                 let values: SavedHistoryRecord[] = [];
                 request.onsuccess = () => { values = record ? [record] : request.result as SavedHistoryRecord[]; };
-                transaction.oncomplete = () => resolve(values);
-                transaction.onerror = transaction.onabort = () => {
-                    this.warn('Offline history recovery could not be saved; existing server history is unchanged.');
-                    resolve([]);
-                };
-            } catch { resolve([]); }
+                transaction.oncomplete = () => finish(values);
+                transaction.onerror = transaction.onabort = fail;
+            } catch { finish([]); }
         });
     }
 
@@ -121,7 +160,7 @@ class WorksheetHistoryPersistence {
                 if (!result.response.ok || !Array.isArray(result.data.records)) throw new Error('History unavailable');
                 saved = result.data.records;
                 online = true;
-            } catch { this.warn('History server unavailable; using this browser’s saved recovery copy.'); }
+            } catch { /* Recover locally while the server is unavailable. */ }
             const byMode = new Map(saved.map(record => [record.mode, record]));
             for (const local of cached) {
                 const server = byMode.get(local.mode);
@@ -281,8 +320,8 @@ class WorksheetHistoryPersistence {
                 await this.cache(record);
             } catch {
                 this.dirty.add(mode);
-                this.warn(cached ? 'History is saved in this browser; server synchronisation will retry.' :
-                    'History could not be saved locally or on the server; this session will retry.');
+                if (!cached)
+                    this.warn('History could not be saved locally or on the server; this session will retry.');
             }
         }
     }
@@ -314,6 +353,9 @@ class WorksheetHistoryEditor {
     private revision = -1;
     private editing = false;
     private drag: WorksheetHistoryDrag | null = null;
+    private formulaObserver: IntersectionObserver | null = null;
+    private formulaResize: ResizeObserver | null = null;
+    private readonly formulae = new Map<string, unknown>();
 
     /** Hold persistence while a native timeline edit is still restoring its browser worksheet. */
     public get pending(): boolean { return this.editing || Boolean(this.drag?.active); }
@@ -392,12 +434,72 @@ class WorksheetHistoryEditor {
         list.scrollTop = scroll;
         this.artwork = new AbortController();
         void this.loadArtwork(list, this.artwork.signal);
+        this.loadFormulae(list, this.artwork.signal);
     }
 
     private readonly cancelArtwork = (): void => {
+        this.formulaObserver?.disconnect();
+        this.formulaObserver = null;
+        this.formulaResize?.disconnect();
+        this.formulaResize = null;
         this.artwork?.abort();
         this.artwork = null;
     };
+
+    /** Load only visible native formula previews, with bounded concurrency and disposable exact-source reuse. */
+    private loadFormulae(list: HTMLElement, signal: AbortSignal): void {
+        if (typeof ResizeObserver !== 'undefined') this.formulaResize = new ResizeObserver(entries => {
+            for (const entry of entries) labDOM.call('lab_workspace_dom_history_fit', entry.target);
+        });
+        const install = (button: HTMLButtonElement, metadata: unknown): void => {
+            labDOM.call('lab_workspace_dom_history_formula', button, metadata);
+            if (button.querySelector('.history-entry-fit')) this.formulaResize?.observe(button);
+        };
+        const buttons = [...list.querySelectorAll<HTMLButtonElement>('[data-history-formula-source]')];
+        const queue: HTMLButtonElement[] = [];
+        let next = 0, busy = 0;
+        const load = async (button: HTMLButtonElement): Promise<void> => {
+            const source = button.dataset.historyFormulaSource!;
+            const request = new AbortController(), cancel = (): void => request.abort();
+            signal.addEventListener('abort', cancel, {once: true});
+            const timer = window.setTimeout(cancel, 10000);
+            try {
+                const response = await labHttp.fetch('/history-preview', {method: 'POST', signal: request.signal,
+                    body: labWire.encode({text: source})});
+                if (!response.ok) return;
+                const metadata = await response.labData();
+                if (signal.aborted || request.signal.aborted || !button.isConnected) return;
+                install(button, metadata);
+                this.formulae.set(source, metadata);
+                if (this.formulae.size > 64) this.formulae.delete(this.formulae.keys().next().value!);
+            } catch { /* A readable literal label remains available when preview rendering is unavailable. */ }
+            finally {
+                window.clearTimeout(timer);
+                signal.removeEventListener('abort', cancel);
+            }
+        };
+        const pump = (): void => {
+            while (!signal.aborted && busy < 2 && next < queue.length) {
+                const button = queue[next++];
+                ++busy;
+                void load(button).finally(() => { --busy; pump(); });
+            }
+        };
+        const enqueue = (button: HTMLButtonElement): void => {
+            if (signal.aborted) return;
+            const cached = this.formulae.get(button.dataset.historyFormulaSource!);
+            if (cached) install(button, cached);
+            else { queue.push(button); pump(); }
+        };
+        if (typeof IntersectionObserver === 'undefined') { buttons.forEach(enqueue); return; }
+        const observer = this.formulaObserver = new IntersectionObserver(entries => {
+            for (const entry of entries) if (entry.isIntersecting) {
+                observer.unobserve(entry.target);
+                enqueue(entry.target as HTMLButtonElement);
+            }
+        }, {root: list, rootMargin: '120px'});
+        buttons.forEach(button => observer.observe(button));
+    }
 
     /** Transfer country metadata asynchronously; native code owns labels, artwork validation and DOM projection. */
     private async loadArtwork(list: HTMLElement, signal: AbortSignal): Promise<void> {
@@ -494,6 +596,7 @@ class WorksheetHistoryEditor {
     public dispose(): void {
         this.closed();
         this.drag = null;
+        this.formulae.clear();
         this.lifetime?.abort();
         this.lifetime = null;
         (document.getElementById('historyEditor') as HTMLDialogElement | null)?.close();

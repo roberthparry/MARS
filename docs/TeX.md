@@ -765,7 +765,9 @@ values. Parsing, evaluation and solving remain native mathematical operations.
 `TeX_bound` composes a braced body with optional bindings, `TeX_scaled`
 places a scalar factor beside a body, and `TeX_cartesian_sum` aligns real
 and imaginary components. `TeX_symmetric_pair` composes a common centre plus or minus an offset,
-with optional offset grouping and a common denominator. These are RPN operations:
+with optional offset grouping and a common denominator. An empty centre produces
+a leading plus-minus sign, placed before the fraction when there is a denominator.
+These are RPN operations:
 they consume stack operands, leave their result owned by the builder and return
 success or failure. Only `TeX_builder_finish` transfers that result to the caller.
 
@@ -3148,13 +3150,13 @@ int main(void)
 Output:
 
 ```text
-\frac{1}{2}\mkern-2mu \frac{\left(x^{2} - 4\right)\mkern-2mu \sin(x)\mkern-2mu \lg(\frac{1}{x})}{x\mkern-2mu \left(x - 1\right)}
+\frac{\left(x^{2} - 4\right)\mkern-2mu \sin(x)\mkern-2mu \lg(\frac{1}{x})}{2\mkern-2mu x\mkern-2mu \left(x - 1\right)}
 ```
 
 Rendered mathematics:
 
 
-$\quad\begin{array}{l}\displaystyle \frac{1}{2}\mkern-2mu \frac{\left(x^{2} - 4\right)\mkern-2mu \sin(x)\mkern-2mu \lg(\frac{1}{x})}{x\mkern-2mu \left(x - 1\right)}\end{array}$
+$\quad\begin{array}{l}\displaystyle \frac{\left(x^{2} - 4\right)\mkern-2mu \sin(x)\mkern-2mu \lg(\frac{1}{x})}{2\mkern-2mu x\mkern-2mu \left(x - 1\right)}\end{array}$
 
 
 Push the result with `TeX_notation` to use it in a matrix, sequence or any

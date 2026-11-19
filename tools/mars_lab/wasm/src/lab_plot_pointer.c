@@ -471,6 +471,8 @@ bool lab_plot_pointer_zoom(jsref card, event_jsref event, jsref calls, bool rese
     int chart = lab_dom_query(panel ? panel : card, "[data-plot-chart][data-x-min], [data-surface][data-x-min]");
     if (!chart)
         return false;
+    if (wheel && !lab_plot_pointer_inside(chart, event))
+        return false;
     if (wheel && panel && !lab_dom_node_contains(panel, chart))
         return false;
     if (!wheel)

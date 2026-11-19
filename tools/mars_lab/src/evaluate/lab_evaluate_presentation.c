@@ -573,7 +573,11 @@ json_t *lab_presentation_request(const json_t *payload, unsigned *status)
     if (!text)
         goto allocation_failure;
     bool ok = true, valid = true;
-    if (!strcmp(action, "editor")) {
+    if (!strcmp(action, "history")) {
+        json_t *preview = lab_pres_history_metadata(text);
+        valid = preview != NULL;
+        if (preview) ok = lab_eval_put(result, "preview", preview);
+    } else if (!strcmp(action, "editor")) {
         json_t *editor = lab_pres_editor_action(payload, text);
         valid = editor != NULL;
         if (editor)

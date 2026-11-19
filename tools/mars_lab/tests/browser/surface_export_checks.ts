@@ -66,6 +66,14 @@ window.checkLabSurfaceSVG = function checkLabSurfaceSVG(): void {
         check(large.series.length === 1 && large.series[0].path.split('M').length === 2050 &&
               large.axes.length === 2049, 'large repeated plans retain every path without exhausting handles');
     }
+    const cap = Array.from({length: 16}, (_, i) => [Math.cos(i * Math.PI / 8), Math.sin(i * Math.PI / 8)]);
+    const solids = [{points: [[0, 0], [1, 0], [0.5, 1]], shade: 0.7, axis: 0, cone: true},
+                    {points: cap, shade: 0.4, axis: 1, cone: false}];
+    const solid_plan = labDOM.call<MarsSurfaceSVGPlan>('lab_surface_svg_plan', [], [], 0, solids);
+    check(solid_plan.solids.length === 2 && solid_plan.solids.every(face => face.path.endsWith('Z')) &&
+          solid_plan.solids[0].shade === 0.7 && solid_plan.solids[1].axis === 1 &&
+          solid_plan.solids[1].path.split('L').length === 16,
+          'multiple opaque faces retain their handle ownership, shading and sixteen-point circular caps');
     const parent = document.createElementNS('http://www.w3.org/2000/svg', 'g');
     const label = '<tspan>not markup</tspan> & "quoted"';
     const text = MarsSurfaceSVGWriter.node(parent, 'text', {'aria-label': label}, label);

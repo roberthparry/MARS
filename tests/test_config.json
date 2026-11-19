@@ -994,6 +994,11 @@
         "linear_root": true,
         "quadratic_roots": true
       },
+      "test_equation_even_quadratic": {
+        "enabled": true,
+        "even_quadratic_complex_coefficient": true,
+        "even_quadratic_tapered": true
+      },
       "test_equation_future_solver_cases": {
         "enabled": true,
         "test_equation_future_inverts_exp": true,
@@ -1043,6 +1048,16 @@
         "case_f1e6f77299552e8c": true,
         "case_fe12d02060885c2a": true,
         "enabled": true
+      },
+      "test_equation_solution_pairs": {
+        "enabled": true,
+        "solution_pair_different_coordinates": true,
+        "solution_pair_different_roots": true,
+        "solution_pair_exact_roots": true,
+        "solution_pair_scaled_closed_root": true,
+        "solution_pair_scaled_ellipsoid": true,
+        "solution_pair_shifted_ellipse": true,
+        "solution_pair_sphere": true
       }
     }
   },
@@ -1332,6 +1347,16 @@
           "enabled": true
         },
         "test_from_string_errors": true,
+        "test_from_string_exact_decimal_literals": {
+          "enabled": true,
+          "exact_decimal_binding": true,
+          "exact_decimal_coefficient": true,
+          "exact_decimal_extreme_exponent": true,
+          "exact_decimal_integer": true,
+          "exact_decimal_leading_point": true,
+          "exact_decimal_power": true,
+          "exact_decimal_scientific": true
+        },
         "test_from_string_exact_value_functions": {
           "AND(13, 11)": true,
           "NOT(8)": true,
@@ -4652,6 +4677,15 @@
   "tests/plot/test_plot.c": {
     "example_plot_surface": true,
     "example_plot_svg": true,
+    "test_plot_axis_legibility": {
+      "axis_legibility_0": true,
+      "axis_legibility_1": true,
+      "axis_legibility_2": true,
+      "axis_legibility_3": true,
+      "axis_legibility_4": true,
+      "axis_legibility_5": true,
+      "enabled": true
+    },
     "test_plot_axis_title_space": true,
     "test_plot_control": true,
     "test_plot_decimal_ticks": true,
@@ -4664,6 +4698,14 @@
     "test_plot_label_notation": true,
     "test_plot_label_spacing": true,
     "test_plot_limits": true,
+    "test_plot_perspective": {
+      "enabled": true,
+      "perspective_centre": true,
+      "perspective_far": true,
+      "perspective_near": true,
+      "perspective_tick_first": true,
+      "perspective_tick_last": true
+    },
     "test_plot_precision_and_clip": true,
     "test_plot_sampler_ownership": true,
     "test_plot_segment_camera_baseline": true,
@@ -4672,8 +4714,35 @@
     "test_plot_stationary_range": true,
     "test_plot_surface": true,
     "test_plot_surface_height": true,
+    "test_plot_surface_origin": {
+      "enabled": true,
+      "surface_origin_asymmetric": true,
+      "surface_origin_extreme": true,
+      "surface_origin_mixed": true,
+      "surface_origin_negative": true,
+      "surface_origin_positive": true,
+      "surface_origin_symmetric": true
+    },
+    "test_plot_surface_tick_catalogue": true,
     "test_plot_surface_view": true,
-    "test_plot_svg": true
+    "test_plot_svg": true,
+    "test_plot_tick_density": {
+      "enabled": true,
+      "tick_density_collapsed": true,
+      "tick_density_crowded": true,
+      "tick_density_long": true,
+      "tick_density_perspective": true,
+      "tick_density_reverse": true,
+      "tick_density_short_readable": true,
+      "tick_density_without_zero": true
+    },
+    "test_plot_axis_stability": {
+      "enabled": true,
+      "axis_stability_north": true,
+      "axis_stability_east": true,
+      "axis_stability_south": true,
+      "axis_stability_west": true
+    }
   },
   "tests/protobuf/test_protobuf.c": {
     "readme_examples": {
@@ -5994,7 +6063,21 @@
         "equation_parameter_slider_position": true,
         "equation_three_coordinate_parameter": true,
         "equation_unwrapped_inverse_display": true,
-        "equation_unwrapped_inverse_plot": true
+        "equation_unwrapped_inverse_plot": true,
+        "equation_fixed_first_coordinate": true,
+        "equation_fixed_second_coordinate": true,
+        "equation_fixed_third_coordinate": true,
+        "equation_fixed_coordinate_axis_choice": true,
+        "equation_fixed_named_coordinate": true,
+        "equation_fixed_tapered_ellipsoid": true,
+        "equation_cleared_coordinate_surface": true,
+        "equation_caption_fixed_egg": true,
+        "equation_caption_exact_radical": true,
+        "equation_caption_exact_fraction": true,
+        "equation_caption_fixed_named": true,
+        "equation_caption_mesh_parameter": true,
+        "equation_caption_curve_parameter": true,
+        "equation_caption_selected_parameter": true
       }
     }
   },
@@ -6005,6 +6088,7 @@
       "test_lab_evaluation_validation": true,
       "test_lab_expression_contract": true,
       "test_lab_function_input": true,
+      "test_lab_history_preview_render": true,
       "test_lab_integrator_deadline_policy": true,
       "test_lab_integrator_error_text": true,
       "test_lab_integrator_error_visibility": true,
@@ -6046,7 +6130,14 @@
       "test_lab_extra_distribution_plot": true,
       "test_lab_extra_editor_and_cards": true,
       "test_lab_extra_emden_quadratures": true,
-      "test_lab_extra_equation": true,
+      "test_lab_extra_equation": {
+        "enabled": true,
+        "equation_pair_decimal_tapered": true,
+        "equation_pair_exact_roots": true,
+        "equation_pair_scaled_closed_root": true,
+        "equation_pair_scaled_ellipsoid": true,
+        "equation_pair_shifted_ellipse": true
+      },
       "test_lab_extra_equation_decimal_notation": true,
       "test_lab_extra_equation_explicit_bindings": true,
       "test_lab_extra_equation_frame": true,
@@ -6801,6 +6892,26 @@
       "test_lab_presentation_embedded_nul": true,
       "test_lab_presentation_empty_constants_roundtrip": true,
       "test_lab_presentation_equation_solution_text": true,
+      "test_lab_presentation_history": {
+        "enabled": true,
+        "history_authored_addition": true,
+        "history_calculus": true,
+        "history_decimal_binding": true,
+        "history_equation": true,
+        "history_factor_bound": true,
+        "history_factor_digits": true,
+        "history_factor_label": true,
+        "history_factor_nested": true,
+        "history_factor_parentheses": true,
+        "history_factor_request": true,
+        "history_factorial": true,
+        "history_incomplete": true,
+        "history_long_identifier": true,
+        "history_long_integer": true,
+        "history_quoted_markup": true,
+        "history_scientific": true,
+        "history_unset_binding": true
+      },
       "test_lab_presentation_integrator_text": true,
       "test_lab_presentation_matrix": true,
       "test_lab_presentation_metadata": true,

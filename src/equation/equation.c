@@ -1945,11 +1945,21 @@ static int equ_try_solve_symbolic_quadratic(const expr_t *residual, const expr_t
     if (rc <= 0)
         goto cleanup;
 
-    discriminant = equ_symbolic_quadratic_discriminant(constant, linear, quadratic);
-    sqrt_discriminant = discriminant ? expr_sqrt(discriminant) : NULL;
-    sqrt_discriminant = expr_simplify_owned(sqrt_discriminant);
-    root_plus = sqrt_discriminant ? equ_symbolic_quadratic_root(linear, quadratic, sqrt_discriminant, true) : NULL;
-    root_minus = sqrt_discriminant ? equ_symbolic_quadratic_root(linear, quadratic, sqrt_discriminant, false) : NULL;
+    if (expr_is_exact_zero(linear)) {
+        /* A root of the quotient preserves complex branches without cancelling a square root of its coefficient. */
+        expr_t *negative = expr_neg(constant);
+        expr_t *quotient = negative ? expr_simplify_owned(expr_div(negative, quadratic)) : NULL;
+        root_plus = quotient ? expr_simplify_owned(expr_sqrt(quotient)) : NULL;
+        root_minus = root_plus ? expr_simplify_owned(expr_neg(root_plus)) : NULL;
+        expr_free(quotient);
+        expr_free(negative);
+    } else {
+        discriminant = equ_symbolic_quadratic_discriminant(constant, linear, quadratic);
+        sqrt_discriminant = discriminant ? expr_sqrt(discriminant) : NULL;
+        sqrt_discriminant = expr_simplify_owned(sqrt_discriminant);
+        root_plus = sqrt_discriminant ? equ_symbolic_quadratic_root(linear, quadratic, sqrt_discriminant, true) : NULL;
+        root_minus = sqrt_discriminant ? equ_symbolic_quadratic_root(linear, quadratic, sqrt_discriminant, false) : NULL;
+    }
 
     if (!root_plus || !root_minus)
         goto cleanup;

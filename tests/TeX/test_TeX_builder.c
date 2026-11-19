@@ -452,6 +452,21 @@ static void test_TeX_builder_layout(void)
     TeX_list(builder);
     TeX_symmetric_pair(builder, true);
     finish_matches(builder, "\\frac{x \\pm \\left(y\\right)}{2}");
+    builder = TeX_builder_new();
+    TeX_raw(builder, "");
+    TeX_symbol(builder, "x");
+    TeX_integer(builder, 0);
+    TeX_list(builder);
+    TeX_symmetric_pair(builder, false);
+    finish_matches(builder, "\\pm x");
+    builder = TeX_builder_new();
+    TeX_raw(builder, "");
+    TeX_symbol(builder, "x");
+    TeX_integer(builder, 2);
+    TeX_integer(builder, 1);
+    TeX_list(builder);
+    TeX_symmetric_pair(builder, true);
+    finish_matches(builder, "\\pm \\frac{x}{2}");
 }
 
 static void test_TeX_builder_calculus_and_tensors(void)

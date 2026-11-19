@@ -1841,6 +1841,31 @@ static void test_from_string_special_functions(void)
     check_parse_val("hypot(3,4) = 5", "{ hypot(x, y) | x = 3, y = 4 }", 5.0, __LINE__);
 }
 
+static void exact_decimal_literal_row(const void *data)
+{
+    const test_database_case_t *row = data;
+    expr_t *expression = expr_from_text(row->input, NULL);
+    number_t value = expression ? expr_eval(expression) : NUM_NAN;
+    number_t expected = num_create_from_text(row->expected);
+    bool same = num_is_inf(expected) ? num_is_inf(value) && num_get_sign(value) == num_get_sign(expected) :
+                                     num_eq(value, expected) && num_is_exact(value);
+    bool ok = expression && same;
+    if (!ok) {
+        string_t *actual = num_to_string(value);
+        string_printf("Exact decimal %S: %S; wanted %S\n", row->input, actual, row->expected);
+        string_free(actual);
+    }
+    num_destroy(&expected);
+    num_destroy(&value);
+    expr_free(expression);
+    TEST_ASSERT_TRUE(ok, "finite decimal coefficients retain exact arithmetic and extreme exponents stay bounded");
+}
+
+static void test_from_string_exact_decimal_literals(void)
+{
+    test_run_database_cases(__FILE__, __LINE__, "expression.exact_decimal_literals", NULL, exact_decimal_literal_row);
+}
+
 static void test_from_string_exact_value_functions(void)
 {
     expr_bindings_t *bindings = NULL;
@@ -4307,6 +4332,7 @@ void test_expr_t_from_string(void)
     TEST_RUN_SUBTEST(test_from_text_api, NULL);
     TEST_RUN_SUBTEST(test_from_string_special_functions, NULL);
     TEST_RUN_SUBTEST(test_from_string_exact_value_functions, NULL);
+    TEST_RUN_SUBTEST(test_from_string_exact_decimal_literals, NULL);
     TEST_RUN_SUBTEST(test_from_string_named_consts, NULL);
     TEST_RUN_SUBTEST(test_from_string_array_bindings, NULL);
     TEST_RUN_SUBTEST(test_from_string_bracketed_names, NULL);

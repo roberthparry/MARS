@@ -6,6 +6,20 @@ CREATE TABLE IF NOT EXISTS expression_cases (
 ) WITHOUT ROWID;
 CREATE INDEX IF NOT EXISTS expression_cases_operation ON expression_cases(operation, name);
 
+INSERT INTO test_case_runner(module, source, parent, table_name, operation) VALUES (
+    'expression.exact_decimal_literals', 'tests/expression/test_expr_from_string.c',
+    'tests.test_expr_t_from_string.test_from_string_exact_decimal_literals', 'expression_cases', 'exact_decimal_literal')
+ON CONFLICT(module) DO UPDATE SET table_name=excluded.table_name, operation=excluded.operation;
+INSERT OR IGNORE INTO expression_cases(name, operation, input, expected) VALUES
+    ('exact_decimal_coefficient', 'exact_decimal_literal', '0.01/484', '1/48400'),
+    ('exact_decimal_power', 'exact_decimal_literal', '(0.01)^2', '1/10000'),
+    ('exact_decimal_scientific', 'exact_decimal_literal', '7.25e-3', '29/4000'),
+    ('exact_decimal_integer', 'exact_decimal_literal', '1.2e3', '1200'),
+    ('exact_decimal_leading_point', 'exact_decimal_literal', '.5', '1/2'),
+    ('exact_decimal_binding', 'exact_decimal_literal', '{0.01*x | x=8}', '2/25'),
+    ('exact_decimal_extreme_exponent', 'exact_decimal_literal', '1e99999999999999999999', 'inf')
+ON CONFLICT(name) DO UPDATE SET expected=excluded.expected;
+
 -- Mathematical letter case is significant in the canonical special-function names.
 INSERT INTO expression_cases(name, operation, input, expected) VALUES
     ('named_appell_F1_direct', 'numeric_callable', 'appell_F1(1,1,1,2,0,0)', '1'),
@@ -819,6 +833,9 @@ INSERT OR IGNORE INTO expression_cases(name, operation, input, expected) VALUES
     ('reciprocal_root_multiple_factors', 'reciprocal_product_TeX', '2*(a*cos(t)+b*sin(t))*abs(t)^(-1/2)', '}{\sqrt{\left| t \right|}}'),
     ('reciprocal_multiple_powers', 'reciprocal_product_TeX', 'a*x^(-1/2)*y^(-1/3)', '}{\sqrt{x}\mkern-2mu \sqrt[3]{y}}'),
     ('reciprocal_unit_power', 'reciprocal_product_TeX', 'a*x^(-1)', '\frac{a}{x}');
+INSERT OR IGNORE INTO expression_cases(name, operation, input, expected) VALUES
+    ('rational_scaled_quotient', 'reciprocal_product_TeX', '(3/5*x)/y', '\frac{3\mkern-2mu x}{5\mkern-2mu y}'),
+    ('rational_scaled_root_quotient', 'reciprocal_product_TeX', 'sqrt((1/49)*(a-b)/(x+100))', '\sqrt{\frac{a - b}{49\mkern-2mu \left(x + 100\right)}}');
 WITH modes(operation) AS (VALUES('appell_value'),('appell_dx'),('appell_dy'),('appell_primitive'),
     ('appell_reverse'),('appell_roundtrip'),('appell_parse_reject'))
 INSERT INTO test_case_runner(module,source,parent,table_name,operation)

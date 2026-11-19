@@ -3,6 +3,8 @@
  * @brief Compose native curve SVG with its source formula rendered by the restricted TeX renderer.
  *
  * Small XML trees keep the title and curve in a single scalable, copyable image.
+ * Rotating three-dimensional charts receive a separate heading band so exterior
+ * scales cannot overlap their formula, even when they move to the top of the view.
  * Native chart bodies are stream-validated and copied verbatim, avoiding large
  * retained trees and repeated triangle cloning during title composition. No
  * mathematics is interpreted here. The existing bounded TeX service owns its
@@ -195,7 +197,11 @@ static void compose_plot_title(json_t *fields, const char *key)
         xml_free(title);
         title = NULL;
     }
-    unsigned shift = title_height > 20 ? title_height - 20 : 0;
+    string_t *surface_key = string_new_with("data-surface");
+    const string_t *surface_value = surface_key ? xml_get_attribute(chart, surface_key) : NULL;
+    bool surface = surface_value && !strcmp(string_c_str(surface_value), "true");
+    string_free(surface_key);
+    unsigned shift = surface ? (title ? title_height + 16 : 40) : title_height > 20 ? title_height - 20 : 0;
     string_t *view = string_sprintf("0 0 %u %u", width, height + shift);
     const string_t *plain = json_string_value(lab_eval_get(fields, "plot_title"));
     ok = ok && view && attribute(root, "xmlns", "http://www.w3.org/2000/svg") && attribute(root, "role", "img") &&

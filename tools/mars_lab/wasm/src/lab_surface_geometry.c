@@ -2,7 +2,8 @@
  * @file lab_surface_geometry.c
  * @brief C projection, six-plane clipping and axis geometry for retained surfaces.
  *
- * Inputs are normalised vertices and a quaternion; no absolute plot coordinate
+ * Inputs are normalised vertices and a quaternion; a shared pinhole camera divides
+ * every projected position by its homogeneous eye-distance denominator. No absolute plot coordinate
  * is converted here. Frame plans drive WebGL uniforms, Canvas and vector export.
  * Surface projected-box fitting preserves coordinate units; space curves use a
  * fixed coordinate box and enclosing-sphere fit for stable rotation and input-only
@@ -14,14 +15,18 @@
  */
 #include <math.h>
 
+#define MARS_SHARED_PLOT_INTERNAL_ACCESS
+#include "internal/plot_internal.h"
 #include "lab_dom.h"
 #include "lab_plot_pointer.h"
 #include "lab_surface_math.h"
 #include "lab_surface_volume.h"
+#include "lab_surface_axes.h"
 #include "lab_surface_geometry.h"
 
 typedef struct {
     double rows[9], scale[3], offset[3], width, height, fit, radius;
+    plot_projection_t projection;
 } frame_t;
 
 static double numeric(jsref object, const char *key)
@@ -45,13 +50,9 @@ static jsref vector(const double *values, unsigned count)
 
 static void project(const frame_t *f, const double p[3], double out[3])
 {
-    double q[3] = {0};
-    for (unsigned row = 0; row < 3; ++row)
-        for (unsigned axis = 0; axis < 3; ++axis)
-            q[row] += f->rows[row * 3 + axis] * (p[axis] - 0.5);
-    out[0] = f->width / 2 + f->fit * q[0];
-    out[1] = f->height / 2 + f->fit * q[1];
-    out[2] = q[2];
+    double camera[3];
+    plot_projection_camera(&f->projection, p, camera);
+    plot_projection_point(&f->projection, camera, out);
 }
 
 static void read_frame(jsref handle, frame_t *frame)
@@ -62,6 +63,24 @@ static void read_frame(jsref handle, frame_t *frame)
     read_vector(lab_dom_get(handle, "rows"), frame->rows, 9);
     read_vector(lab_dom_get(handle, "scaling"), frame->scale, 3);
     read_vector(lab_dom_get(handle, "offset"), frame->offset, 3);
+    frame->projection = (plot_projection_t){.fit = frame->fit, .centre = {frame->width / 2, frame->height / 2}};
+    for (unsigned i = 0; i < 9; ++i) frame->projection.rows[i] = frame->rows[i];
+    double distance = numeric(handle, "distance");
+    if (isfinite(distance) && distance > 0) {
+        frame->projection.distance = distance;
+        frame->projection.radius = numeric(handle, "radius");
+        read_vector(lab_dom_get(handle, "centre"), frame->projection.centre, 2);
+    }
+}
+
+/* A camera ray intersects the actual coordinate box, including perspective corners. */
+bool lab_surface_contains(frame_jsref frame, double x, double y)
+{
+    if (!frame || !isfinite(x) || !isfinite(y))
+        return false;
+    frame_t f;
+    read_frame(frame, &f);
+    return plot_projection_contains(&f.projection, x, y);
 }
 
 static unsigned clip(double polygon[12][3], unsigned count)
@@ -239,86 +258,6 @@ void lab_surface_polygons(frame_jsref frame, jsref primitives, lab_surface_primi
     lab_dom_return(depth_order(result));
 }
 
-static void axis_point(const frame_t *f, unsigned axis, double fraction, double ca, double sa, double p[3])
-{
-    double point[] = {sa < 0, ca < 0, 0};
-    if (axis == 2) {
-        point[0] = ca < 0;
-        point[1] = sa >= 0;
-    }
-    point[axis] = fraction;
-    project(f, point, p);
-}
-
-static void line(jsref paths, const double *values, unsigned count)
-{
-    lab_dom_push(paths, vector(values, count));
-}
-
-static void text(jsref texts, jsref label, double x, double y, const char *align)
-{
-    int item = lab_dom_object(LAB_VALUE_OBJECT);
-    lab_dom_set(item, "text", label);
-    lab_dom_set(item, "x", lab_dom_numeric(x));
-    lab_dom_set(item, "y", lab_dom_numeric(y));
-    lab_dom_set(item, "align", lab_dom_string(align));
-    lab_dom_push(texts, item);
-}
-
-static void axes(const frame_t *f, view_jsref view, jsref out)
-{
-    int paths = lab_dom_object(LAB_VALUE_ARRAY), texts = lab_dom_object(LAB_VALUE_ARRAY),
-        ticks = lab_dom_get(view, "ticks");
-    int angles = lab_dom_get(view, "angles"), volume = lab_dom_get(view, "volume");
-    double a = lab_dom_to_number(lab_dom_item(angles, 0)) * 0.017453292519943295;
-    double r = lab_dom_to_number(lab_dom_item(angles, 2)) * 0.017453292519943295;
-    double ca = cos(a), sa = sin(a), cr = cos(r), sr = sin(r);
-    double centre[3], centre_point[] = {0.5, 0.5, 0};
-    project(f, centre_point, centre);
-    for (unsigned axis = 0; axis < 3; ++axis) {
-        double start[3], end[3];
-        axis_point(f, axis, 0, ca, sa, start);
-        axis_point(f, axis, 1, ca, sa, end);
-        double dx = end[0] - start[0], dy = end[1] - start[1], length = hypot(dx, dy);
-        if (length < 1e-7)
-            continue;
-        dx /= length;
-        dy /= length;
-        double shaft[] = {start[0], start[1], end[0] + dx * 12, end[1] + dy * 12};
-        double arrow[] = {end[0] + dx * 5 - dy * 3.5, end[1] + dy * 5 + dx * 3.5, end[0] + dx * 12, end[1] + dy * 12,
-                          end[0] + dx * 5 + dy * 3.5, end[1] + dy * 5 - dx * 3.5};
-        line(paths, shaft, 4);
-        line(paths, arrow, 6);
-        text(texts, lab_dom_item(lab_dom_get(view, "names"), axis), end[0] + dx * 26, end[1] + dy * 26 + 4,
-             dx < -0.1 ? "right" : dx > 0.1 ? "left" : "center");
-        double nx = dy, ny = -dx;
-        if (nx * ((start[0] + end[0]) / 2 - centre[0]) + ny * ((start[1] + end[1]) / 2 - centre[1]) < 0) {
-            nx = -nx;
-            ny = -ny;
-        }
-        if (axis == 2) {
-            nx = -cr;
-            ny = -sr;
-        }
-        int side = __builtin_fabs(nx) < 1e-9 ? 0 : nx < 0 ? -1 : 1;
-        for (unsigned i = 0; i < lab_dom_count(ticks); ++i) {
-            int tick = lab_dom_item(ticks, i);
-            if ((unsigned)numeric(tick, "axis") != axis || !lab_dom_truth(lab_dom_get(tick, "label")))
-                continue;
-            double p[3];
-            axis_point(f, axis, numeric(tick, "fraction"), ca, sa, p);
-            double mark[] = {p[0], p[1], p[0] + nx * 6, p[1] + ny * 6};
-            line(paths, mark, 4);
-            text(texts, lab_surface_tick_label(volume, tick), p[0] + nx * 13 + side * 3, p[1] + ny * 13 + 4,
-                 side < 0 ? "right" : side > 0 ? "left" : "center");
-        }
-    }
-    if (lab_dom_truth(lab_dom_get(volume, "dirty")))
-        text(texts, lab_dom_string("Preview — refining the selected volume"), f->width / 2, f->height - 12, "center");
-    lab_dom_set(out, "paths", paths);
-    lab_dom_set(out, "texts", texts);
-}
-
 /* Finite segments need not reach the requested endpoints, particularly beside singularities or domain gaps. */
 static void curve_input_transform(jsref volume, double *scale, double *offset)
 {
@@ -388,31 +327,21 @@ void lab_surface_frame(view_jsref view, jsref override_bounds)
         }
     }
     f.radius = __builtin_sqrt(f.radius) / 2;
-    double margin = numeric(volume, "labelWidth") + 25;
-    if (margin < 45)
-        margin = 45;
-    if (margin > (f.width - 80) / 2)
-        margin = (f.width - 80) / 2;
-    /* Fit the projected box, not its enclosing sphere, without stretching any axis. */
-    double projected_width = 0, projected_height = 0;
-    for (unsigned i = 0; i < 3; ++i) {
-        projected_width += __builtin_fabs(f.rows[i]);
-        projected_height += __builtin_fabs(f.rows[3 + i]);
+    if (!plot_projection_init(f.rows, f.width, f.height, numeric(volume, "labelWidth"), segments, &f.projection)) {
+        lab_dom_return(lab_dom_scalar(LAB_VALUE_NULL, 0));
+        return;
     }
-    double fit_width = (f.width - 2 * margin) / projected_width;
-    double fit_height = (f.height - 100) / projected_height;
-    f.fit = fit_width < fit_height ? fit_width : fit_height;
-    if (segments) {
-        /* A fixed enclosing sphere prevents automatic fitting from pumping during rotation. */
-        double available_width = f.width - 2 * margin, available_height = f.height - 100;
-        f.fit = (available_width < available_height ? available_width : available_height) / (2 * f.radius);
-    }
+    f.fit = f.projection.fit;
     double matrix[16] = {0};
+    double shift_x = 2 * f.projection.centre[0] / f.width - 1;
+    double shift_y = 1 - 2 * f.projection.centre[1] / f.height;
     for (unsigned i = 0; i < 3; ++i) {
-        matrix[i * 4] = 2 * f.fit * f.rows[i] / f.width;
-        matrix[i * 4 + 1] = -2 * f.fit * f.rows[3 + i] / f.height;
+        matrix[i * 4] = 2 * f.fit * f.rows[i] / f.width + shift_x * f.rows[6 + i] / f.projection.distance;
+        matrix[i * 4 + 1] = -2 * f.fit * f.rows[3 + i] / f.height + shift_y * f.rows[6 + i] / f.projection.distance;
         matrix[i * 4 + 2] = f.rows[6 + i] / (2 * f.radius);
+        matrix[i * 4 + 3] = f.rows[6 + i] / f.projection.distance;
     }
+    matrix[12] = shift_x; matrix[13] = shift_y;
     matrix[15] = 1;
     lab_dom_set(out, "matrix", vector(matrix, 16));
     lab_dom_set(out, "rows", vector(f.rows, 9));
@@ -421,6 +350,9 @@ void lab_surface_frame(view_jsref view, jsref override_bounds)
     lab_dom_set(out, "width", lab_dom_numeric(f.width));
     lab_dom_set(out, "height", lab_dom_numeric(f.height));
     lab_dom_set(out, "fit", lab_dom_numeric(f.fit));
-    axes(&f, view, out);
+    lab_dom_set(out, "distance", lab_dom_numeric(f.projection.distance));
+    lab_dom_set(out, "radius", lab_dom_numeric(f.projection.radius));
+    lab_dom_set(out, "centre", vector(f.projection.centre, 2));
+    lab_surface_axes(view, out);
     lab_dom_return(out);
 }

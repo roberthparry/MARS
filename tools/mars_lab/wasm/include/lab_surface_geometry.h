@@ -10,6 +10,8 @@
 #ifndef MARS_LAB_SURFACE_GEOMETRY_H
 #define MARS_LAB_SURFACE_GEOMETRY_H
 
+#include <stdbool.h>
+
 #include "lab_handle.h"
 
 /** @brief Primitive topology shared by projection and SVG export; values retain the browser ABI. */
@@ -28,12 +30,23 @@ typedef enum {
 void lab_surface_frame(view_jsref view, jsref override_bounds);
 
 /**
- * @brief Project a normalised point using a previously returned frame.
+ * @brief Project a normalised point through the frame's pinhole camera.
  * @param frame Scoped projection record returned by lab_surface_frame.
  * @param point Scoped three-number unit-volume coordinate array; no clipping or volume transform is applied.
  * @details Publishes a two-number [x, y] array in the frame's SVG coordinate system through lab_dom_return.
  */
 void lab_surface_project(frame_jsref frame, jsref point);
+
+/**
+ * @brief Test whether an SVG-coordinate pointer lies inside the projected coordinate volume.
+ * @param frame Borrowed scoped frame returned by lab_surface_frame; no sampled geometry or mathematical bounds are read.
+ * @param x Finite horizontal pointer coordinate in the frame's SVG coordinate system.
+ * @param y Finite vertical pointer coordinate in the same coordinate system.
+ * @return True inside or on the projected box outline; false outside, for a missing frame, or invalid geometry.
+ * @details Intersects the camera eye ray with three coordinate-box slabs. Cost and scratch storage are constant,
+ * independently of mesh size. No handles are retained and no scene state is changed.
+ */
+bool lab_surface_contains(frame_jsref frame, double x, double y);
 
 /**
  * @brief Transform, clip and project one segment or triangle.

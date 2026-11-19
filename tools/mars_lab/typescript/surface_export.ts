@@ -22,6 +22,7 @@ interface MarsSurfaceSVGPath {
 interface MarsSurfaceSVGPlan {
     series: MarsSurfaceSVGPath[];
     axes: string[];
+    solids: {path: string; shade: number; axis: number; cone: boolean}[];
 }
 
 /** Native capability used to construct a vector drawing plan. */
@@ -65,10 +66,18 @@ class MarsSurfaceExporter {
         if (!view.polygons || !view.framePlan) return null; // View is not fully prepared.
         const segments = view.chart.dataset.segments === 'true';
         const plan = this.native.call('lab_surface_svg_plan', view.polygons(),
-                                      view.framePlan.paths, Number(segments)) as MarsSurfaceSVGPlan;
+            view.framePlan.paths.slice(view.framePlan.axisPathCount ?? 0), Number(segments),
+            view.framePlan.solids ?? []) as MarsSurfaceSVGPlan;
         const drawing = document.createElementNS(MarsSurfaceSVGWriter.namespace, 'g');
         this.appendSeries(drawing, plan.series, segments);
-        this.appendAxes(drawing, plan.axes, view.framePlan.texts);
+        for (const face of plan.solids) {
+            MarsSurfaceSVGWriter.node(drawing, 'path', {
+                d: face.path, fill: '#94b8b1', stroke: '#94b8b1', 'stroke-width': 0.35,
+                'stroke-linejoin': 'round', 'data-axis-colour': '#94b8b1', 'data-axis-shade': face.shade
+            });
+        }
+        this.appendAxes(drawing, plan.axes, view.framePlan.texts,
+            view.framePlan.pathWidths?.slice(view.framePlan.axisPathCount ?? 0) ?? []);
         WorksheetPlotPalette.apply(drawing);
         return drawing;
     }
@@ -90,17 +99,19 @@ class MarsSurfaceExporter {
         }
     }
 
-    private appendAxes(drawing: SVGGElement, paths: string[], texts: MarsSurfaceText[]): void {
+    private appendAxes(drawing: SVGGElement, paths: string[], texts: MarsSurfaceText[], widths: number[]): void {
         const axes = MarsSurfaceSVGWriter.node(drawing, 'g', {});
-        for (const path of paths) {
+        for (const [index, path] of paths.entries()) {
             MarsSurfaceSVGWriter.node(axes, 'path', {
-                d: path, fill: 'none', stroke: '#94b8b1', 'stroke-width': 1.2
+                d: path, fill: 'none', stroke: '#94b8b1', 'stroke-width': widths[index] ?? 1.4
             });
         }
         for (const text of texts) {
             const anchor = text.align === 'left' ? 'start' : text.align === 'right' ? 'end' : 'middle';
             MarsSurfaceSVGWriter.node(axes, 'text', {
-                x: text.x, y: text.y, fill: '#b8ccc5', 'font-size': 11,
+                x: text.x, y: text.y, fill: '#b8ccc5', 'font-size': text.size ?? 13,
+                'font-weight': text.bold ? 600 : 400, stroke: '#10161d', 'stroke-width': 2.8,
+                'stroke-linejoin': 'round', 'paint-order': 'stroke',
                 'font-family': 'sans-serif', 'text-anchor': anchor
             }, text.text);
         }

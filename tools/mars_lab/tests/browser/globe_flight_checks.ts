@@ -12,6 +12,169 @@ const globeFlightRoutes: [string, number, number, number, number][] = [
     ['Sydney–Santiago', -33.8688, 151.2093, -33.4489, -70.6693]
 ];
 
+/** @brief Measure the displayed displacement of centre and edge landmarks independently of the pacing metric. */
+function globeFlightStepPixels(a: number[], b: number[], viewport: number): number {
+    let maximum = 0;
+    for (const [x, y] of [[0, 0], [.75, 0], [-.75, 0], [0, .75], [0, -.75]]) {
+        const point = labDOM.call('lab_globe_pick', x * 1.12 / a[4], y * 1.12 / a[4], a.slice(0, 4)) as number[];
+        const moved = labDOM.call('lab_globe_project', point[0], point[1], b.slice(0, 4)) as number[];
+        maximum = Math.max(maximum, Math.hypot(moved[0] * b[4] / 2.24 - x / 2,
+            moved[1] * b[4] / 2.24 - y / 2) * viewport);
+    }
+    return maximum;
+}
+
+/** @brief Check elapsed-time pacing, bounded motion and exact arrival through native camera exports. */
+function checkGlobeFlightClock(check: (condition: boolean, message: string) => void): void {
+    const start = [...labDOM.call('lab_globe_centre', 0, 0) as number[], 1];
+    let previousStep = Infinity;
+    for (const longitude of [10, 60, 120, 179]) {
+        const target = [...labDOM.call('lab_globe_centre', 0, longitude) as number[], 1];
+        const advance = (elapsed: number): number =>
+            labDOM.call('lab_globe_flight_advance', start, target, .4, elapsed, 800) as number;
+        const step = advance(16) - .4;
+        check(step > 0 && step < previousStep, 'longer journeys advance more slowly at the same zoom');
+        previousStep = step;
+        check(advance(5000) === advance(50), 'stalled animation frames cannot cause a catch-up jump');
+        check(advance(0) === .4, 'waiting for imagery does not advance the travel clock');
+        check(labDOM.call('lab_globe_flight_advance', start, target, .4, -1, 800) === null,
+              'negative animation time is rejected');
+        const departure = labDOM.call('lab_globe_flight_advance', start, target, 0, 16, 800) as number;
+        check(Math.abs(departure - .016 / (.5 / .125)) < 1e-12,
+              'departure heading has a fixed short duration, independent of the route length');
+    }
+    const maxStart = [...labDOM.call('lab_globe_centre', 55.9533, -3.1883) as number[], 4096];
+    const maxEnd = [...labDOM.call('lab_globe_centre', 58.3019, -134.4197) as number[], 4096];
+    const boundaryEnd = [...maxEnd.slice(0, 4), 512];
+    for (const redirect of [0, 1]) {
+        for (const boundary of [.125, .875, 1]) {
+            for (const offset of [0, 1e-2, 1e-4, 1e-6, 1e-8, 1e-10, 1e-12, 1e-14, 1e-16]) {
+                for (const direction of [-1, 1]) {
+                    const progress = Math.max(0, Math.min(1, boundary + direction * offset));
+                    const frame = labDOM.call('lab_globe_flight', maxStart, boundaryEnd, progress, redirect) as number[] | null;
+                    check(Boolean(frame) && frame!.every(Number.isFinite) && Math.abs(Math.hypot(...frame!.slice(0, 4)) - 1) < 1e-12,
+                          'ordinary and redirected easing remain valid around every heading, travel and arrival boundary');
+                }
+            }
+        }
+        const progress = .9986663513816029;
+        check(typeof labDOM.call('lab_globe_flight_advance', maxStart, boundaryEnd, progress, 1000 / 60 * .8, 800, redirect) === 'number',
+              'rounding near the final easing endpoint cannot force an otherwise valid journey to snap to its destination');
+    }
+    for (const redirect of [0, 1]) {
+        for (const progress of [.02, .12, .13, .2, .4, .5, .6, .8, .86, .88, .98]) {
+            const next = labDOM.call('lab_globe_flight_advance', maxStart, maxEnd, progress, 50, 800, redirect) as number;
+            const a = labDOM.call('lab_globe_flight', maxStart, maxEnd, progress, redirect) as number[];
+            const b = labDOM.call('lab_globe_flight', maxStart, maxEnd, next, redirect) as number[];
+            check(next > progress && globeFlightStepPixels(a, b, 800) <= 18.05,
+                  'centre and edge landmarks move at most eighteen pixels after a delayed frame, including arrival roll');
+        }
+    }
+    const durations: number[] = [];
+    for (const rate of [120, 60, 30, 20]) {
+        let progress = 0, frames = 0;
+        while (progress < 1 && frames < rate * 120) {
+            const next = labDOM.call('lab_globe_flight_advance', maxStart, maxEnd, progress, 1000 / rate, 800) as number;
+            check(typeof next === 'number' && next > progress && next <= 1, 'valid flight clocks advance monotonically to arrival');
+            progress = next;
+            ++frames;
+        }
+        check(progress === 1, `close-view travel completes at ${rate} Hz`);
+        durations.push(frames / rate);
+    }
+    check(Math.abs(durations[0] - durations[1]) < 1,
+          `healthy refresh rates retain elapsed-time pacing: ${durations.join(', ')}`);
+    check(durations[3] >= durations[2] && durations[2] >= durations[1],
+          'slow rendering favours bounded visible steps instead of larger catch-up jumps');
+    for (const [name, fromLat, fromLon, toLat, toLon] of globeFlightRoutes) {
+        for (const [fromZoom, toZoom] of [[1, 150], [150, 20], [150, 150], [150, 512]]) {
+            const a = [...labDOM.call('lab_globe_centre', fromLat, fromLon) as number[], fromZoom];
+            const b = [...labDOM.call('lab_globe_centre', toLat, toLon) as number[], toZoom];
+            let progress = 0, frames = 0;
+            while (progress < 1 && frames < 960) {
+                const next = labDOM.call('lab_globe_flight_advance', a, b, progress, 1000 / 60 * .8, 800) as number;
+                check(typeof next === 'number' && next > progress && next <= 1,
+                      `${name}: valid near-arrival frames cannot fail or restart the clock (${progress} to ${next})`);
+                progress = next;
+                ++frames;
+            }
+            check(progress === 1 && frames / 60 < 16,
+                  `${name}: smooth steps and missing optional detail still allow arrival within 16 display seconds ` +
+                  `(${fromZoom} to ${toZoom}: ${frames / 60})`);
+            const arrived = labDOM.call('lab_globe_flight', a, b, progress) as number[];
+            check(arrived.every((value, i) => value === b[i]),
+                  `${name}: faster travel reaches the exact saved camera without dropping its zoom`);
+        }
+    }
+    const render = (state: number[], elapsed: number): number[] => labDOM.call('lab_globe_flight_render', state, elapsed);
+    const initial = [1, 1000 / 60, 0];
+    check(JSON.stringify(render(initial, 0)) === JSON.stringify(initial), 'waiting for the surface does not change render quality');
+    for (const state of [[], [0, 16, 0], [1, Infinity, 0], [1, 16, -1]])
+        check(labDOM.call('lab_globe_flight_render', state, 16) === null, 'malformed render states are rejected');
+    check(labDOM.call('lab_globe_flight_render', initial, -1) === null, 'negative render intervals are rejected');
+    let quality = initial;
+    for (let i = 0; i < 180; ++i) quality = render(quality, 1000 / 60);
+    check(quality[0] === 1, 'healthy animation frames keep the full moving framebuffer');
+    quality = render(initial, 5000);
+    for (let i = 0; i < 180; ++i) quality = render(quality, 1000 / 60);
+    check(quality[0] === 1, 'one isolated long pause does not reduce subsequent healthy drawing quality');
+    quality = initial;
+    let previousScale = 1, adjustedAt = 0, changes = 0;
+    for (let elapsed = 40; elapsed <= 4000; elapsed += 40) {
+        quality = render(quality, 40);
+        if (quality[0] !== previousScale) {
+            check(elapsed - adjustedAt >= 500 && previousScale - quality[0] === .125,
+                  'sustained slow rendering reduces GPU work without resizing every frame');
+            adjustedAt = elapsed; previousScale = quality[0]; ++changes;
+        }
+    }
+    check(quality[0] === .5 && changes === 4, 'slow frames reach a bounded half-resolution framebuffer');
+    for (let i = 0; i < 600; ++i) quality = render(quality, 1000 / 60);
+    check(quality[0] === 1, 'sustained fast rendering restores quality with recovery hysteresis');
+}
+
+/** @brief Run native pacing and actual animation independently of the wider maths and texture suites. */
+window.checkLabGlobeFlights = async function checkLabGlobeFlights(): Promise<void> {
+    const check = (condition: boolean, message: string): void => {
+        if (!condition) throw new Error('Globe flight: ' + message);
+    };
+    checkGlobeFlightClock(check);
+    const originalWorker = globalThis.Worker;
+    const fixture = globeHTTPFixture(async body => {
+        const response = await labHttp.fetch('/almanac-globe', {method: 'POST', body});
+        const data = await response.labData() as {ok?: boolean; vectors?: string | Uint8Array<ArrayBuffer>};
+        if (typeof data.vectors === 'string') data.vectors = globeFixtureBytes(data.vectors);
+        return new Response(labWire.encode(data), {status: response.status,
+            headers: {'Content-Type': 'application/x-protobuf'}});
+    });
+    const globe = Reflect.get(MarsAlmanacGlobe, 'instance') as {
+        worldLoading: boolean; palettesReady: boolean; stopShoreWorker(error: Error): void;
+    };
+    const savedMode = WorksheetWorkspace.mode.currentMode();
+    const evaluate = WorksheetLocations.calendarActions.triggerAlmanacAutoEvaluation;
+    globalThis.Worker = fixture.Worker;
+    globe.stopShoreWorker(new Error('Flight fixture transport changed'));
+    WorksheetLocations.calendarActions.triggerAlmanacAutoEvaluation = async () => {};
+    try {
+        WorksheetWorkspace.mode.setMode('almanac');
+        WorksheetWorkspace.presentation.syncModeUI();
+        document.getElementById('almanacGlobeCanvas')!.scrollIntoView({block: 'center'});
+        const root = document.getElementById('almanacGlobe')!;
+        for (let i = 0; i < 200 && (root.dataset.surface !== 'blue-marble' || globe.worldLoading || !globe.palettesReady); ++i)
+            await new Promise(resolve => setTimeout(resolve, 50));
+        check(root.dataset.surface === 'blue-marble' && !globe.worldLoading && globe.palettesReady,
+              'the resident world photograph and its palettes finish loading before testing camera travel');
+        await checkGlobeFlights(check);
+    } finally {
+        WorksheetWorkspace.mode.setMode(savedMode);
+        WorksheetWorkspace.presentation.syncModeUI();
+        WorksheetLocations.calendarActions.triggerAlmanacAutoEvaluation = evaluate;
+        globalThis.Worker = originalWorker;
+        globe.stopShoreWorker(new Error('Flight fixture transport restored'));
+        fixture.dispose();
+    }
+};
+
 async function checkGlobeFlights(check: (condition: boolean, message: string) => void): Promise<void> {
     const globe = Reflect.get(MarsAlmanacGlobe, 'instance') as {
         orientation: number[]; view: number[]; flightTarget: number[] | null; gl: WebGLRenderingContext;
@@ -130,12 +293,17 @@ async function checkGlobeFlights(check: (condition: boolean, message: string) =>
             longitude.value = String(toLon);
             const frameTimes: number[] = [], submissionTimes: number[] = [];
             let arrivalRollFrames = 0, deferredFrames = 0, destinationSeen = false, destinationLost = false;
+            let previousCamera = from, maximumStep = 0, minimumScale = 1;
             globe.applyCamera = camera => {
                 const start = performance.now(), before = submissions;
                 applyCamera.call(globe, camera);
                 if (submissions === before) ++deferredFrames;
                 submissionTimes.push(performance.now() - start);
                 frameTimes.push(start);
+                const viewport = document.getElementById('almanacGlobeCanvas')!.clientWidth;
+                maximumStep = Math.max(maximumStep, globeFlightStepPixels(previousCamera, camera, viewport));
+                minimumScale = Math.min(minimumScale, (Reflect.get(globe, 'flightRender') as number[])[0]);
+                previousCamera = camera.slice();
                 if (frameTimes.length % 120 === 1) {
                     const program = globe.gl.getParameter(globe.gl.CURRENT_PROGRAM) as WebGLProgram;
                     check(Boolean(globe.gl.getUniform(program, globe.gl.getUniformLocation(program, 'naturalStyle')!)) &&
@@ -202,12 +370,18 @@ async function checkGlobeFlights(check: (condition: boolean, message: string) =>
             check(gpuBorders > previousBorders, `${name}: enabled borders draw on the GPU during travel`);
             check(projectionsDuringFlight === 0, `${name}: large coastline masks wait until arrival`);
             check(destinationSeen && !destinationLost, `${name}: the destination remains visible once approached`);
+            check(maximumStep <= 18.05, `${name}: delayed real frames cannot jump centre or edge landmarks (${maximumStep})`);
+            await new Promise(requestAnimationFrame);
+            const canvas = document.getElementById('almanacGlobeCanvas') as HTMLCanvasElement;
+            check(canvas.width === Math.min(1536, Math.round(canvas.clientWidth * Math.min(devicePixelRatio, 1.5))),
+                  `${name}: arrival restores the normal framebuffer resolution`);
             const gaps = frameTimes.slice(1).map((time, i) => time - frameTimes[i]).sort((a, b) => a - b);
             submissionTimes.sort((a, b) => a - b);
             timings.push(`${name}: ${((performance.now() - began) / 1000).toFixed(1)} s, ${frameTimes.length} frames; median/p95 interval ` +
                 `${gaps[Math.floor(gaps.length / 2)].toFixed(1)}/${gaps[Math.floor(gaps.length * .95)].toFixed(1)} ms; ` +
                 `median/p95 submit ${submissionTimes[Math.floor(submissionTimes.length / 2)].toFixed(1)}/` +
-                `${submissionTimes[Math.floor(submissionTimes.length * .95)].toFixed(1)} ms`);
+                `${submissionTimes[Math.floor(submissionTimes.length * .95)].toFixed(1)} ms; ` +
+                `largest step ${maximumStep.toFixed(1)} px, minimum render scale ${minimumScale}`);
         }
         check(geometryDuringFlight > 0, 'shoreline detail can refresh during travel instead of waiting until arrival');
         check(worldBorderRequests === 1, 'world travel borders are reused across journeys');

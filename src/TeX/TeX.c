@@ -605,6 +605,11 @@ TeX_t *TeX_compose_symmetric_pair(const TeX_t *centre, const TeX_t *offset,
 {
     if (!centre || !offset)
         return TeX_invalid();
+    if (!*TeX_source(centre)) {
+        if (denominator)
+            return TeX_adopt(string_sprintf("\\pm \\frac{%s}{%s}", TeX_source(offset), TeX_source(denominator)));
+        return TeX_adopt(string_sprintf(group_offset ? "\\pm \\left(%s\\right)" : "\\pm %s", TeX_source(offset)));
+    }
     string_t *body = string_sprintf(group_offset ? "%s \\pm \\left(%s\\right)" : "%s \\pm %s",
                                     TeX_source(centre), TeX_source(offset));
     if (!body || !denominator)

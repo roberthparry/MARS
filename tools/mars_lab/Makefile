@@ -172,6 +172,8 @@ LAB_WASM_OBJS += $(LAB_BUILD_DIR)/wasm/marslib/webgl_mask.o
 LAB_WASM_OBJS += $(LAB_BUILD_DIR)/wasm/marslib/webgl_renderer.o
 LAB_WASM_OBJS += $(LAB_BUILD_DIR)/wasm/marslib/globe_view.o
 LAB_WASM_OBJS += $(LAB_BUILD_DIR)/wasm/marslib/quaternion.o
+LAB_WASM_OBJS += $(LAB_BUILD_DIR)/wasm/marslib/plot_axis_frame.o
+LAB_WASM_OBJS += $(LAB_BUILD_DIR)/wasm/marslib/plot_projection.o
 LAB_WASM_OBJS += $(IMAGE_WASM_OBJS)
 LAB_WASM_ASM := $(LAB_WASM_OBJS:.o=.s)
 # Debian/Ubuntu's wasi-libc keeps musl maths in libc.a; libm.a is an empty compatibility archive.
@@ -199,7 +201,26 @@ $(IMAGE_WASM): $(IMAGE_WASM_OBJS) $(LAB_BUILD_DIR)/wasm/marslib/array.o $(LAB_WA
 	"$(LAB_WASM_LD)" --no-entry --export-memory $(IMAGE_WASM_EXPORTS) \
 	    --initial-memory=2097152 --max-memory=100663296 $(filter %.o,$^) "$(LAB_WASM_LIBC)" -o $@
 
-# Link generic containers separately; do not pull in the native libmars archive.
+# Link lightweight shared components separately; do not pull in the native libmars archive.
+$(LAB_BUILD_DIR)/wasm/marslib/plot_axis_frame.o: src/plot/plot_axis_frame.c tools/mars_lab/Makefile | check-lab-wasm-deps
+	@mkdir -p $(dir $@)
+	"$(LAB_WASM_CC)" $(LAB_WASM_CFLAGS) --target=wasm32-wasi -fvisibility=hidden -MMD -MP -MF $(@:.o=.d) -c $< -o $@
+
+$(LAB_BUILD_DIR)/wasm/marslib/plot_axis_frame.s: src/plot/plot_axis_frame.c tools/mars_lab/Makefile | check-lab-wasm-deps
+	@mkdir -p $(dir $@)
+	"$(LAB_WASM_CC)" $(LAB_WASM_CFLAGS) --target=wasm32-wasi -fvisibility=hidden -MMD -MP -MF $@.d -MT $@ -S $< -o $@
+
+$(LAB_BUILD_DIR)/wasm/src/lab_surface_axes.o: LAB_WASM_CFLAGS += -Isrc
+$(LAB_BUILD_DIR)/wasm/src/lab_surface_geometry.o: LAB_WASM_CFLAGS += -Isrc
+
+$(LAB_BUILD_DIR)/wasm/marslib/plot_projection.o: src/plot/plot_projection.c tools/mars_lab/Makefile | check-lab-wasm-deps
+	@mkdir -p $(dir $@)
+	"$(LAB_WASM_CC)" $(LAB_WASM_CFLAGS) -MMD -MP -MF $(@:.o=.d) -c $< -o $@
+
+$(LAB_BUILD_DIR)/wasm/marslib/plot_projection.s: src/plot/plot_projection.c tools/mars_lab/Makefile | check-lab-wasm-deps
+	@mkdir -p $(dir $@)
+	"$(LAB_WASM_CC)" $(LAB_WASM_CFLAGS) -MMD -MP -MF $@.d -MT $@ -S $< -o $@
+
 $(LAB_BUILD_DIR)/wasm/marslib/quaternion.o: src/quaternion/quaternion.c tools/mars_lab/Makefile | check-lab-wasm-deps
 	@mkdir -p $(dir $@)
 	"$(LAB_WASM_CC)" $(LAB_WASM_CFLAGS) --target=wasm32-wasi -fvisibility=hidden -MMD -MP -MF $(@:.o=.d) -c $< -o $@

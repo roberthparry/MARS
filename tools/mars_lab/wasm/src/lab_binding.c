@@ -2,7 +2,7 @@
  * @file lab_binding.c
  * @brief Binding and integrator control presentation for the MARS Lab browser.
  *
- * Builds accessible controls from native metadata, orders constants, selects
+ * Builds accessible controls from native metadata, orders variables and constants, selects
  * opaque authored values and dispatches browser interactions. Structured row
  * policy lives in lab_binding_rows.c; editor selection and goal-start precedence
  * live in lab_binding_editor.c. No mathematical text is parsed or rewritten.
@@ -11,7 +11,7 @@
  * the existing string and locale semantics. Handles are scoped to one call;
  * control metadata retains actual browser values, never integer handles.
  * Rendering and metadata copying visit every entry with bounded temporary
- * storage. Constant ordering uses a stable merge sort rather than repeated scans.
+ * storage. Each name-ordered group uses a stable merge sort rather than repeated scans.
  * Binding cards and workspace calculus controls share the scoped identifier-label formatter.
  */
 #include "lab_dom.h"
@@ -412,7 +412,7 @@ void lab_binding_clear(jsref root)
     lab_dom_set(root, "labBindingIndex", lab_dom_object(LAB_VALUE_OBJECT));
 }
 
-/* Build variable cards in discovery order, followed by stably collated constants. */
+/* Sort each name group independently of supplied values, retaining variables before constants. */
 void lab_binding_render(jsref root, jsref bindings)
 {
     lab_binding_clear(root);
@@ -433,6 +433,7 @@ void lab_binding_render(jsref root, jsref bindings)
         }
         lab_dom_release(mark);
     }
+    variables = lab_binding_sort(variables);
     constants = lab_binding_sort(constants);
     mark = lab_dom_mark();
     for (unsigned group = 0; group < 2; ++group) {

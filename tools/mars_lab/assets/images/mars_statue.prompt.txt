@@ -1,0 +1,7 @@
+Mode: built-in imagegen, transparent-background edit.
+Input: user-supplied photograph of the standing Mars statue.
+Output: mars_statue.png, resized to 293 by 512 pixels using the native MARS image API.
+Display: CSS applies the selected theme's accent colours while retaining the stone shading.
+
+Final imagegen prompt:
+Use case: background-extraction. Asset type: transparent PNG artwork for the MARS Lab application header. Edit target: the user's attached photograph of the standing armoured Mars statue. Remove the entire black background, including black areas between the raised arm and body and between the legs, with clean accurate alpha edges. Preserve the exact statue, its face, helmet crest, raised arm and hand, armour relief details, drapery, legs and plinth; preserve the original pose, proportions, silhouette and photographic stone texture. Do not invent or replace any parts. Keep the whole statue including its base visible, tightly framed with a small transparent margin. Use neutral monochrome silver-grey stone tones, retaining the light and shadow detail so the app can apply theme colouring. This is a faithful cutout, not a redesign or illustration. Genuine transparent background and transparent internal gaps; no black, white, checkerboard, vignette, glow, cast backdrop, text, logo, frame or additional objects. A portrait image about 640 pixels wide is sufficient for a compact header decoration.

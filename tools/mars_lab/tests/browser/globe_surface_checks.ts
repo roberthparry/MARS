@@ -5,6 +5,94 @@
  * Uses actual local photographs, OffscreenCanvas, ImageBitmap and IndexedDB in the disposable browser profile.
  * Only river HTTP responses are controlled, so codecs and rasterisation remain the production implementation.
  */
+/** @brief Unresponsive optional storage must not retain imagery requests or accept late cache writes. */
+async function checkGlobeCacheDeadlines(check: (condition: boolean, message: string) => void): Promise<void> {
+    const name = 'mars.globe.deadline-test.v1';
+    const descriptor = Object.getOwnPropertyDescriptor(IDBFactory.prototype, 'open')!;
+    const raw = new Blob([new Uint8Array(512 * 512 * 4)], {type: 'application/octet-stream'});
+    const within = async <T>(pending: Promise<T>): Promise<T> => {
+        let timer = 0;
+        try {
+            return await Promise.race([pending, new Promise<T>((_, reject) => {
+                timer = window.setTimeout(() => reject(new Error('Map cache request did not settle')), 1000);
+            })]);
+        } finally { clearTimeout(timer); }
+    };
+    let opening: IDBOpenDBRequest, opens = 0;
+    Object.defineProperty(IDBFactory.prototype, 'open', {...descriptor, value: function(database: string, version?: number) {
+        if (database !== name) return Reflect.apply(descriptor.value, this, [database, version]);
+        ++opens;
+        return opening = {} as IDBOpenDBRequest;
+    }});
+    try {
+        for (const blocked of [false, true]) {
+            const cache = new GlobeSurfaceCache(512, 512, name, 25), before = opens;
+            const pending = Promise.all([cache.available(), cache.keys('tile'), cache.get('tile'), cache.put('tile', raw)]);
+            let closed = 0, modified = 0, aborted = 0;
+            Object.defineProperty(opening!, 'result', {value: {
+                close() { closed++; },
+                objectStoreNames: {contains() { modified++; return false; }},
+                createObjectStore() { modified++; return {createIndex() {}}; }
+            }});
+            Object.defineProperty(opening!, 'transaction', {value: {abort() { aborted++; }}});
+            if (blocked) opening!.onblocked?.call(opening!, new Event('blocked') as IDBVersionChangeEvent);
+            const [available, keys, pixels] = await within(pending);
+            check(!available && !keys.length && !pixels && opens === before + 1,
+                  'one stalled or blocked cache open releases all waiting map operations as cache misses');
+            opening!.onupgradeneeded?.call(opening!, new Event('upgradeneeded') as IDBVersionChangeEvent);
+            opening!.onsuccess?.call(opening!, new Event('success'));
+            check(!await cache.available() && closed === 1 && modified === 0 && aborted > 0,
+                  'abandoned map-cache opens close late handles without modifying stored imagery');
+        }
+    } finally { Object.defineProperty(IDBFactory.prototype, 'open', descriptor); }
+    for (const operation of ['keys', 'get', 'put', 'touch'] as const) {
+        const cache = new GlobeSurfaceCache(512, 512, name, 25);
+        let aborted = 0, closed = 0, writes = 0, transactions = 0;
+        const request = {result: {key: 'tile', blob: raw, size: raw.size, used: 0}} as unknown as IDBRequest;
+        const budget = {result: {key: 'budget', bytes: raw.size, count: 1}} as unknown as IDBRequest;
+        const transaction = {
+            objectStore() { return {
+                get(key: string) { return key === 'budget' ? budget : request; },
+                getAllKeys() { return request; }, put() { writes++; }, delete() { writes++; }
+            }; },
+            abort() { aborted++; }
+        } as unknown as IDBTransaction;
+        const database = {transaction() { transactions++; return transaction; }, close() { closed++; }} as unknown as IDBDatabase;
+        Reflect.set(cache, 'database', Promise.resolve(database));
+        if (operation === 'touch') {
+            Reflect.get(cache, 'touch').call(cache, database, 'tile', true);
+            await new Promise(resolve => setTimeout(resolve, 60));
+        } else {
+            const result = await within<unknown>(operation === 'keys' ? cache.keys('tile') :
+                operation === 'get' ? cache.get('tile') : cache.put('tile', raw));
+            check(operation === 'put' || result === null || (Array.isArray(result) && !result.length),
+                  'stalled map-cache reads become misses and a stalled write settles');
+        }
+        request.onsuccess?.call(request, new Event('success'));
+        budget.onsuccess?.call(budget, new Event('success'));
+        transaction.oncomplete?.call(transaction, new Event('complete'));
+        check(!await cache.available() && aborted === 1 && closed === 1 && writes === 0,
+              'timed-out reads, writes and recency updates abort without accepting late pixels or deleting old data');
+        await cache.get('another-view');
+        check(transactions === 1, 'subsequent pan or zoom requests bypass a failed cache');
+    }
+    for (const operation of ['keys', 'get'] as const) {
+        const cache = new GlobeSurfaceCache(512, 512, name, 25), controller = new AbortController();
+        let closed = 0;
+        const request = {} as IDBRequest;
+        const transaction = {objectStore() { return {get() { return request; }, getAllKeys() { return request; }}; },
+            abort() {}} as unknown as IDBTransaction;
+        const database = {transaction() { return transaction; }, close() { closed++; }} as unknown as IDBDatabase;
+        Reflect.set(cache, 'database', Promise.resolve(database));
+        const pending = operation === 'keys' ? cache.keys('tile', controller.signal) : cache.get('tile', controller.signal);
+        await Promise.resolve();
+        controller.abort();
+        await within<unknown>(pending);
+        await new Promise(resolve => setTimeout(resolve, 60));
+        check(await cache.available() && closed === 0, 'cancelling an obsolete view clears its timer and preserves a healthy cache');
+    }
+}
+
 async function checkGlobeCachePolicy(check: (condition: boolean, message: string) => void): Promise<void> {
     const databaseName = 'mars.globe.surface.policy-test.v1';
     const cache = new GlobeSurfaceCache(2048, 2048, databaseName);
@@ -51,6 +139,7 @@ async function checkGlobeSurface(check: (condition: boolean, message: string) =>
         script.onerror = () => reject(new Error('Surface cache script unavailable'));
         document.head.appendChild(script);
     });
+    await checkGlobeCacheDeadlines(check);
     // Live globe workers must not compete with the deterministic eviction-policy fixture.
     await checkGlobeCachePolicy(check);
     const cache = new GlobeSurfaceCache();

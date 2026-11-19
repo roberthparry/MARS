@@ -2,7 +2,7 @@
  * @file lab_binding.h
  * @brief Application API for binding and integrator control presentation in the MARS Lab browser.
  *
- * Builds accessible controls from native metadata, orders constants, selects
+ * Builds accessible controls from native metadata, orders variables and constants, selects
  * opaque authored values and dispatches browser interactions. Structured row
  * policy lives in lab_binding_rows.c; editor selection and goal-start precedence
  * live in lab_binding_editor.c. No mathematical text is parsed or rewritten.
@@ -11,7 +11,7 @@
  * the existing string and locale semantics. Handles are scoped to one call;
  * control metadata retains actual browser values, never integer handles.
  * Rendering and metadata copying visit every entry with bounded temporary
- * storage. Constant ordering uses a stable merge sort rather than repeated scans.
+ * storage. Each name-ordered group uses a stable merge sort rather than repeated scans.
  * Binding cards and workspace calculus controls share the scoped identifier-label formatter.
  * Shared implementation helpers belong to lab_binding_internal.h; other modules use this API.
  *
@@ -138,7 +138,7 @@ void lab_binding_toggle(jsref binding);
 void lab_binding_clear(jsref root);
 
 /**
- * @brief Build variable cards in discovery order, followed by stably collated constants.
+ * @brief Build name-sorted variables followed by name-sorted constants, independently of supplied values.
  * @param root Scoped destination binding-card container node.
  * @param bindings Scoped array of native binding records with names, kinds and authored values.
  * @post Publishes values and kinds arrays of installed controls through lab_dom_return.

@@ -650,7 +650,7 @@ TeX_t *TeX_compose_cartesian_sum(const TeX_t *real, const TeX_t *imaginary);
 
 /**
  * @brief Compose a symmetric pair with an optional common denominator.
- * @param centre Borrowed common centre; must not be NULL.
+ * @param centre Borrowed common centre; must not be NULL. Empty notation omits the centre and starts with plus-minus.
  * @param offset Borrowed displacement; must not be NULL.
  * @param denominator Borrowed common denominator, or NULL for none.
  * @param group_offset Whether to enclose the displacement in parentheses.

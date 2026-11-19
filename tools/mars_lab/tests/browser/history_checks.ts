@@ -8,7 +8,110 @@
 interface Window {
     /** @brief Verify history persistence, reopening, concurrency and bounds. */
     checkLabHistoryPersistence(): Promise<void>;
+    /** @brief Check stalled local-cache requests, late callbacks and ordinary successful recovery. */
+    checkLabHistoryCacheDeadlines(): Promise<void>;
 }
+
+window.checkLabHistoryCacheDeadlines = async (): Promise<void> => {
+    const check = (condition: unknown, message: string): void => {
+        if (!condition) throw new Error('History cache deadline: ' + message);
+    };
+    const within = async <T>(pending: Promise<T>): Promise<T> => {
+        let timer = 0;
+        try {
+            return await Promise.race([pending, new Promise<T>((_, reject) => {
+                timer = window.setTimeout(() => reject(new Error('History cache did not settle')), 1000);
+            })]);
+        } finally { clearTimeout(timer); }
+    };
+    type CacheAccess = {
+        database: IDBDatabase | null;
+        openCache(): Promise<void>;
+        cache(record?: SavedHistoryRecord): Promise<SavedHistoryRecord[]>;
+    };
+    const owners: WorksheetHistoryPersistence[] = [];
+    const create = (): CacheAccess => {
+        const owner = new WorksheetHistoryPersistence(25);
+        owners.push(owner);
+        return owner as unknown as CacheAccess;
+    };
+    const descriptor = Object.getOwnPropertyDescriptor(IDBFactory.prototype, 'open')!;
+    const priorNotice = document.getElementById('historyPersistenceStatus')?.textContent;
+    let opening: IDBOpenDBRequest;
+    Object.defineProperty(IDBFactory.prototype, 'open', {...descriptor, value: () => {
+        opening = {} as IDBOpenDBRequest;
+        return opening;
+    }});
+    const record: SavedHistoryRecord = {mode: 0, epoch: '', revision: 0,
+        history: {version: 1, current: labWire.encode({state: {mode: 'expression', text: '2+3'}}), back: [], forward: []}};
+    try {
+        for (const blocked of [false, true]) {
+            const owner = create(), pending = owner.openCache();
+            let closed = 0, upgraded = 0, aborted = 0;
+            Object.defineProperty(opening!, 'result', {value: {
+                close() { closed++; }, createObjectStore() { upgraded++; }
+            }});
+            Object.defineProperty(opening!, 'transaction', {value: {abort() { aborted++; }}});
+            if (blocked) opening!.onblocked?.call(opening!, new Event('blocked') as IDBVersionChangeEvent);
+            await within(pending);
+            check(owner.database === null, 'an unavailable cache does not prevent startup from continuing');
+            opening!.onupgradeneeded?.call(opening!, new Event('upgradeneeded') as IDBVersionChangeEvent);
+            opening!.onsuccess?.call(opening!, new Event('success'));
+            check(owner.database === null && closed === 1 && aborted === 1 && upgraded === 0,
+                  'late cache success is closed and an abandoned upgrade cannot modify stored recovery');
+        }
+        {
+            const owner = create(), pending = owner.openCache();
+            let closed = 0;
+            const database = {close() { closed++; }} as unknown as IDBDatabase;
+            Object.defineProperty(opening!, 'result', {value: database});
+            opening!.onsuccess?.call(opening!, new Event('success'));
+            await within(pending);
+            check(owner.database === database, 'an ordinary cache open retains its handle');
+            owners[owners.length - 1].dispose();
+            check(closed === 1, 'successful cache ownership is released normally');
+        }
+        for (const write of [false, true]) {
+            const owner = create();
+            const request = {result: [record]} as unknown as IDBRequest;
+            let closed = 0, aborted = 0, saved: SavedHistoryRecord | undefined;
+            const transaction = {
+                objectStore() { return {
+                    getAll() { return request; },
+                    put(value: SavedHistoryRecord) { saved = value; return request; }
+                }; },
+                abort() { aborted++; }
+            } as unknown as IDBTransaction;
+            owner.database = {transaction() { return transaction; }, close() { closed++; }} as unknown as IDBDatabase;
+            const result = await within(owner.cache(write ? record : undefined));
+            check(!result.length && owner.database === null && aborted === 1 && closed === 1,
+                  'a stalled read or write is aborted and releases the unusable cache');
+            if (write) check(saved?.history === record.history, 'a timed-out write did not alter the retained snapshot');
+            request.onsuccess?.call(request, new Event('success'));
+            transaction.oncomplete?.call(transaction, new Event('complete'));
+            check(!result.length && owner.database === null, 'late transaction callbacks cannot install stale recovery');
+        }
+        {
+            const owner = create();
+            const request = {result: [record]} as unknown as IDBRequest;
+            const transaction = {objectStore() { return {getAll() { return request; }}; }} as unknown as IDBTransaction;
+            const database = {transaction() { return transaction; }, close() {}} as unknown as IDBDatabase;
+            owner.database = database;
+            const pending = owner.cache();
+            request.onsuccess?.call(request, new Event('success'));
+            transaction.oncomplete?.call(transaction, new Event('complete'));
+            const result = await within(pending);
+            check(result.length === 1 && result[0] === record && owner.database === database,
+                  'a successful read retains the recovery record and its connection');
+        }
+    } finally {
+        Object.defineProperty(IDBFactory.prototype, 'open', descriptor);
+        owners.forEach(owner => owner.dispose());
+        const notice = document.getElementById('historyPersistenceStatus');
+        if (notice && priorNotice === undefined) notice.remove();
+        else if (notice) notice.textContent = priorNotice ?? '';
+    }
+};
 
 window.checkLabHistoryPersistence = async (): Promise<void> => {
     const check = (condition: unknown, message: string): void => { if (!condition) throw new Error('History: ' + message); };
@@ -45,6 +148,7 @@ window.checkLabHistoryPersistence = async (): Promise<void> => {
     let reopened: WorksheetHistoryPersistence | null = null;
     const originalFetch = labHttp.fetch;
     try {
+        await window.checkLabHistoryCacheDeadlines();
         for (const record of records) {
             const saved = await call({action: 'save', ...record});
             check(saved.status === 200, `save ${names[record.mode]}`);
@@ -141,6 +245,11 @@ window.checkLabHistoryPersistence = async (): Promise<void> => {
             }
             check(document.querySelector('#historyEditorEntries [aria-current="step"] .history-current')?.innerHTML === 'Current',
                 'the current worksheet has a visible marker');
+            for (let i = 0; i < 200 && !historyButton(0, 'open').querySelector('svg'); ++i)
+                await new Promise(resolve => setTimeout(resolve, 25));
+            check(Boolean(historyButton(0, 'open').querySelector('svg')) &&
+                historyButton(0, 'open').dataset.historyPreviewTeX === '2 + 3' && historyText(0) === '2+3',
+                'visible history formulae use real native TeX without replacing authored arithmetic by its result');
             const preview = document.createElement('ol');
             labDOM.call('lab_workspace_dom_history_row', preview, {text: ''}, 0, 0, 1);
             check(preview.querySelector('.history-entry-open')?.innerHTML === 'Empty worksheet' &&
@@ -151,6 +260,65 @@ window.checkLabHistoryPersistence = async (): Promise<void> => {
             labDOM.call('lab_workspace_dom_history_row', preview, {text: authored}, 0, 0, 1);
             check(preview.querySelector('.history-entry-open')?.textContent === authored.replace(/\s+/g, ' ') &&
                 !preview.querySelector('img'), 'authored worksheet text stays literal and cannot insert markup');
+            const longSource = '{x*exp(x)=2 | x=0.852605501372345678901234567890123456789}';
+            const longSnapshot = {mode: 'equation', text: longSource}, savedSnapshot = JSON.stringify(longSnapshot);
+            preview.replaceChildren();
+            labDOM.call('lab_workspace_dom_history_row', preview, longSnapshot, 0, 0, 1);
+            const formula = preview.querySelector<HTMLButtonElement>('.history-entry-open')!;
+            const response = await labHttp.fetch('/history-preview', {method: 'POST', body: labWire.encode({text: longSource})});
+            const metadata = await response.labData();
+            labDOM.call('lab_workspace_dom_history_formula', formula, metadata);
+            check(response.ok && Boolean(formula.querySelector('svg')) && formula.classList.contains('history-entry-math') &&
+                formula.getAttribute('aria-label')?.includes('0.8526055013723456...') &&
+                formula.dataset.historyFormulaSource === longSource && JSON.stringify(longSnapshot) === savedSnapshot,
+                'rendered history truncates long numerical bindings with dots while keeping the full worksheet unchanged');
+            const formulaHTML = formula.innerHTML;
+            labDOM.call('lab_workspace_dom_history_formula', formula, {source: 'old input', display: 'stale', svg: '<svg/>'});
+            check(formula.innerHTML === formulaHTML, 'a late preview for another source cannot replace this history entry');
+            labDOM.call('lab_workspace_dom_history_formula', formula, {source: longSource, display: '0.8526055013723456...'});
+            check(formula.textContent === '0.8526055013723456...' && !formula.querySelector('svg'),
+                'unavailable TeX retains an abbreviated readable literal preview');
+            const factorArgument = '1234567890'.repeat(80), factorSource = `factors(${factorArgument})`;
+            preview.replaceChildren();
+            labDOM.call('lab_workspace_dom_history_row', preview, {mode: 'expression', text: factorSource}, 0, 0, 1);
+            const factorButton = preview.querySelector<HTMLButtonElement>('.history-entry-open')!;
+            const factorResponse = await labHttp.fetch('/history-preview', {method: 'POST', body: labWire.encode({text: factorSource})});
+            const factorMetadata = await factorResponse.labData();
+            labDOM.call('lab_workspace_dom_history_formula', factorButton, factorMetadata);
+            check(factorResponse.ok && factorButton.querySelectorAll('svg').length === 2 &&
+                factorButton.dataset.historyPreviewTeX === `\\operatorname{factor}(${factorArgument})` &&
+                factorButton.dataset.historyFormulaSource === factorSource,
+                'factorisation uses native TeX for its number and overflow ending without expanding factors');
+            const factorLayout = document.createElement('div');
+            Object.assign(factorLayout.style, {position: 'fixed', left: '0', top: '0', width: '240px',
+                display: 'flex', visibility: 'hidden'});
+            factorLayout.append(factorButton);
+            document.getElementById('historyEditor')!.append(factorLayout);
+            try {
+                labDOM.call('lab_workspace_dom_history_fit', factorButton);
+                const argument = factorButton.querySelector<HTMLElement>('.history-entry-crop')!;
+                const ending = factorButton.querySelector<HTMLElement>('.history-entry-tail')!;
+                const narrow = argument.clientWidth;
+                factorLayout.style.width = '440px';
+                labDOM.call('lab_workspace_dom_history_fit', factorButton);
+                check(argument.clientWidth > narrow + 150 && argument.scrollWidth > argument.clientWidth &&
+                    !ending.hidden && ending.querySelector('svg') &&
+                    ending.getBoundingClientRect().right <= factorButton.getBoundingClientRect().right &&
+                    factorButton.dataset.historyFormulaSource === factorSource,
+                    'wider history buttons reveal more TeX digits while retaining the rendered ellipsis and closing parenthesis');
+                const edge = argument.getBoundingClientRect().right;
+                const glyphs = [...argument.querySelectorAll('g > use')];
+                check(glyphs.some(glyph => Math.abs(glyph.getBoundingClientRect().right - edge) < .6),
+                    'truncation ends at a complete native glyph instead of cutting through a digit');
+                factorLayout.style.width = '9000px';
+                labDOM.call('lab_workspace_dom_history_fit', factorButton);
+                check(ending.hidden, 'a fully fitting number hides the overflow ending and keeps the original TeX parenthesis');
+            } finally { factorLayout.remove(); }
+            const odeSource = 'Dxx(y)+(3*x+sin(x))*Dx(y)+(x^2+exp(x))*y=sin(x)+cos(2*x)';
+            const odeResponse = await labHttp.fetch('/history-preview', {method: 'POST',
+                body: labWire.encode({text: odeSource})});
+            check(odeResponse.ok, 'the differential-equation history preview is available');
+            const odeMetadata = await odeResponse.labData();
             const place = {mode: 'almanac', text: 'Raw navigation worksheet summary', almanac: {
                 date: '2026-10-30', time: '10:22:22', jurisdiction: 'GB-ENG',
                 town: 'Shrewsbury (GeoNames 2637891)|52.7077|-2.7541|75', latitude: '52.7077', longitude: '-2.7541'
@@ -298,6 +466,12 @@ window.checkLabHistoryPersistence = async (): Promise<void> => {
                 labDOM.call('lab_workspace_dom_history_row', entries, place, 46, 46, 48);
                 labDOM.call('lab_workspace_dom_history_row', entries, {...place, almanac: {...place.almanac,
                     jurisdiction: 'AU-NSW', town: 'Sydney|0|0|0'}}, 47, 46, 48);
+                labDOM.call('lab_workspace_dom_history_row', entries, {mode: 'expression', text: factorSource}, 48, 46, 49);
+                const phoneFactor = entries.lastElementChild!.querySelector<HTMLButtonElement>('.history-entry-open')!;
+                labDOM.call('lab_workspace_dom_history_formula', phoneFactor, factorMetadata);
+                labDOM.call('lab_workspace_dom_history_row', entries, {mode: 'diffequation', text: odeSource}, 49, 46, 50);
+                const phoneOde = entries.lastElementChild!.querySelector<HTMLButtonElement>('.history-entry-open')!;
+                labDOM.call('lab_workspace_dom_history_formula', phoneOde, odeMetadata);
                 copy.querySelector<HTMLElement>('#historyEditorStatus')!.textContent = '';
                 copy.showModal();
                 await doc.fonts.ready;
@@ -310,6 +484,24 @@ window.checkLabHistoryPersistence = async (): Promise<void> => {
                         `${width}x${height}: History fills the phone viewport`);
                     check(listBox.height > height * .5 && entries.scrollWidth <= entries.clientWidth && copy.scrollTop === 0,
                         `${width}x${height}: the entry list gets most of the screen without horizontal overflow`);
+                    labDOM.call('lab_workspace_dom_history_fit', phoneFactor);
+                    const phoneArgument = phoneFactor.querySelector<HTMLElement>('.history-entry-crop')!;
+                    const phoneEnding = phoneFactor.querySelector<HTMLElement>('.history-entry-tail')!;
+                    check(phoneArgument.clientWidth > 70 && phoneArgument.scrollWidth > phoneArgument.clientWidth &&
+                        !phoneEnding.hidden && phoneEnding.querySelector('svg') &&
+                        phoneEnding.getBoundingClientRect().right <= phoneFactor.getBoundingClientRect().right,
+                        `${width}x${height}: factorisation fills the available width with native TeX and retains its ending`);
+                    const odeFormula = phoneOde.querySelector<HTMLElement>('.history-entry-formula')!;
+                    const odeDrawing = odeFormula.querySelector<SVGSVGElement>('svg')!;
+                    check(odeDrawing && odeDrawing.getBoundingClientRect().width / odeDrawing.viewBox.baseVal.width >= 1.95 &&
+                        odeFormula.scrollWidth > odeFormula.clientWidth &&
+                        view.getComputedStyle(odeFormula).overflowX === 'auto' &&
+                        phoneOde.dataset.historyFormulaSource === odeSource,
+                        `${width}x${height}: long differential equations keep a readable TeX scale inside a scrolling preview`);
+                    odeFormula.scrollLeft = odeFormula.scrollWidth;
+                    check(odeFormula.scrollLeft > 0 && entries.scrollWidth <= entries.clientWidth,
+                        `${width}x${height}: the end of a wide equation is reachable without widening the history list`);
+                    odeFormula.scrollLeft = 0;
                     check(view.getComputedStyle(copy.querySelector('#historyEditorStatus')!).display === 'none',
                         'an empty live status does not reserve a blank paragraph');
                     const help = copy.querySelector<HTMLDetailsElement>('.history-editor-help')!;

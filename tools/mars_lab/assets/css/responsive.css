@@ -38,6 +38,17 @@
     justify-self: end;
   }
 
+  header > div:first-child {
+    max-width: calc(50vw - 2rem);
+  }
+
+  .header-statue {
+    inset: 0.4rem auto auto 50%;
+    width: 1.75rem;
+    height: 3rem;
+    max-height: calc(100% - 0.8rem);
+  }
+
   .header-side {
     grid-column: 1 / -1;
     grid-row: 2;

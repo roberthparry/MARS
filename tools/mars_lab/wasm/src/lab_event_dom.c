@@ -195,9 +195,14 @@ static void lab_event_zoom(lab_event_action_t action, event_jsref event, jsref p
     if (action == LAB_EVENT_ZOOM_WHEEL) {
         int area = lab_dom_closest(lab_dom_get(event, "target"), ".rendered");
         int card = lab_dom_closest(lab_dom_get(event, "currentTarget"), ".result-card");
-        int plot = lab_dom_query(card, ".rendered svg [data-series]");
-        /* Plots reserve Ctrl+wheel inside the image; other result cards retain Ctrl/Command zoom. */
-        if (plot ? (!area || !lab_dom_truth(lab_dom_get(event, "ctrlKey"))) : !lab_event_modifier(event))
+        int panel = lab_dom_closest(lab_dom_get(event, "target"), ".complex-panel");
+        if (!panel) panel = lab_dom_query(card, ".complex-expanded");
+        int chart = lab_dom_query(panel ? panel : card,
+                                   "[data-plot-chart][data-x-min], [data-surface][data-x-min]");
+        /* The retained 3D gesture owner handles every wheel modifier. Curves zoom only in their data rectangle. */
+        if (chart && (lab_dom_has(chart, "data-surface") || !area || !lab_plot_pointer_inside(chart, event)))
+            return;
+        if (!chart && !lab_event_modifier(event))
             return;
         delta = lab_dom_to_number(lab_dom_get(event, "deltaY"));
         if (!(delta < 0 || delta > 0))

@@ -187,7 +187,7 @@ static bool product_factors(const expr_t *expression, expr_t **factors, size_t *
     return true;
 }
 
-/* Keep an exact rational coefficient first, consistently for both signs of an algebraic quotient. */
+/* Combine rational scales with an algebraic quotient while keeping calculus factors outside fractions. */
 const TeX_model_node_t *expr_notation_scalar_quotient(notation_build_t *build, const expr_t *expression)
 {
     if (contains_calculus(expression->a, 0u) || contains_calculus(expression->b, 0u))
@@ -214,7 +214,7 @@ const TeX_model_node_t *expr_notation_scalar_quotient(notation_build_t *build, c
         goto no_match;
     negative ^= num_get_sign(numerator) < 0;
     number_t positive = num_abs(numerator);
-    const TeX_model_node_t *top = count == 1u ? notation_build_number(build, positive) : NULL;
+    const TeX_model_node_t *top = count == 1u || !num_is_one(positive) ? notation_build_number(build, positive) : NULL;
     num_destroy(&positive);
     for (size_t i = 0u; i < count; ++i) {
         if (i == rational_index)
@@ -229,19 +229,11 @@ const TeX_model_node_t *expr_notation_scalar_quotient(notation_build_t *build, c
     if (!top)
         top = notation_build_literal(build, TeX_NODE_NUMBER, "1");
     const TeX_model_node_t *bottom = notation_build_expr(build, expression->b);
-    if (count == 1u) {
-        const TeX_model_node_t *parts[] = {notation_build_number(build, denominator), bottom};
-        bottom = notation_build_node(build, (TeX_node_view_t){.kind = TeX_NODE_PRODUCT, .child_count = 2u}, parts);
-    }
+    const TeX_model_node_t *parts[] = {notation_build_number(build, denominator), bottom};
+    bottom = notation_build_node(build, (TeX_node_view_t){.kind = TeX_NODE_PRODUCT, .child_count = 2u}, parts);
     const TeX_model_node_t *fraction_parts[] = {top, bottom};
     const TeX_model_node_t *result = notation_build_node(build,
         (TeX_node_view_t){.kind = TeX_NODE_FRACTION, .child_count = 2u}, fraction_parts);
-    if (count > 1u) {
-        number_t scale = num_abs(factors[rational_index]->c);
-        const TeX_model_node_t *parts[] = {notation_build_number(build, scale), result};
-        result = notation_build_node(build, (TeX_node_view_t){.kind = TeX_NODE_PRODUCT, .child_count = 2u}, parts);
-        num_destroy(&scale);
-    }
     if (negative)
         result = notation_build_node(build, (TeX_node_view_t){.kind = TeX_NODE_NEGATIVE, .child_count = 1u}, &result);
     num_destroy(&numerator); num_destroy(&denominator);

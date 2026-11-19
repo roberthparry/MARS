@@ -143,6 +143,10 @@ typesets it as a product with a power of ten and preserves the grouping of any e
 Every decimal digit is exact: display selection neither rounds the rational nor changes the stored value,
 and a long numerical coefficient is never approximated by a nearby simple fraction. Rational exponents
 still retain their mathematical role when root notation is appropriate.
+Finite real decimal literals use the same exact reader as binding values, including scientific notation,
+so symbolic coefficient arithmetic does not introduce repeating floating-point approximations. Extremely
+large decimal exponents retain the number module's range handling instead of allocating unbounded integer padding.
+Rational scales on algebraic quotients share one fraction bar; derivatives and integrals retain their separate notation.
 Taylor equations retain exact fractional coefficients throughout their presentation,
 so that `17/10` stays fractional in that series context even though an ordinary expression may display `1.7`.
 

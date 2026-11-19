@@ -74,6 +74,16 @@ void lab_eval_adapt(json_t *fields, const char *mode);
  */
 string_t *lab_eval_render(const string_t *TeX, diagnostic_t **error);
 
+/**
+ * @brief Render a bounded mathematical history preview with literal fallback and shortened number tokens.
+ * @param source Borrowed validated worksheet input, neither modified nor retained.
+ * @param status Optional destination for HTTP 200 on a readable preview or 500 on allocation failure.
+ * @return Owned response released with json_free(), or NULL on allocation failure. Exact source accompanies the
+ * abbreviated display and optional native SVG, including a separate TeX ending for width-dependent integer previews.
+ * Rendering uses the existing restricted process service and cancellation.
+ */
+json_t *lab_eval_history_preview(const string_t *source, unsigned *status);
+
 /** @brief One immutable source/destination/error mapping, resolved on the request thread only. */
 typedef struct {
     const char *source;

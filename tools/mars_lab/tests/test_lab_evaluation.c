@@ -146,6 +146,22 @@ static void test_lab_evaluation_validation(void)
     TEST_ASSERT_TRUE(ok, "invalid inputs, native parse errors, unsafe TeX and unknown routes have distinct contracts");
 }
 
+static void test_lab_history_preview_render(void)
+{
+    unsigned status = 0;
+    json_t *response = evaluate("/history-preview", "{\"text\":\"2+3\"}", &status);
+    const char *svg = test_lab_text(response, "svg");
+    bool ok = status == 200 && test_lab_ok(response, true) &&
+              !strcmp(test_lab_text(response, "source"), "2+3") && !strcmp(test_lab_text(response, "TeX"), "2 + 3") &&
+              (!*svg || strstr(svg, "<svg"));
+    json_free(response);
+    response = evaluate("/history-preview", "{\"text\":\"sin(\"}", &status);
+    ok = ok && status == 200 && test_lab_ok(response, true) &&
+         !strcmp(test_lab_text(response, "display"), "sin(") && !*test_lab_text(response, "svg");
+    json_free(response);
+    TEST_ASSERT_TRUE(ok, "native history rendering preserves operations and unfinished input retains a literal label");
+}
+
 static void calendar_validation_checks(void)
 {
     const char *routes[] = {"/datetime-eval", "/datetime-weather", "/datetime-jurisdiction-location", "/almanac-eval", "/almanac-weather",
@@ -934,6 +950,7 @@ void test_lab_evaluation_cases(void)
     TEST_RUN_IN_GROUP(test_lab_expression_contract, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_function_input, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_evaluation_validation, tests, NULL);
+    TEST_RUN_IN_GROUP(test_lab_history_preview_render, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_calendar_validation, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_observing_conditions, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_weather_recent_estimate, tests, NULL);

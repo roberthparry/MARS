@@ -6,6 +6,7 @@
  * browser arrays; geographic classification and imagery remain in the native shoreline module.
  * Great-circle camera interpolation and bounded display-clock advancement keep travel distance-aware,
  * retain destination visibility and limit screen motion independently of browser frame delays.
+ * Moving-frame quality adaptation bounds GPU work without changing photographic source requests.
  */
 #ifndef LAB_GLOBE_H
 #define LAB_GLOBE_H
@@ -176,19 +177,38 @@ void lab_globe_travel_notice(node_jsref notice, jsref current, jsref target);
 
 /**
  * @brief Advance the display clock at a distance-dependent, screen-motion-limited rate.
- * @param start Departure camera: unit quaternion x,y,z,w and zoom in 1..4096.
- * @param target Destination camera in the same format.
+ * @param start Borrowed departure camera: unit quaternion x,y,z,w and zoom in 1..4096, valid during this call.
+ * @param target Borrowed destination camera in the same format, valid during this call.
  * @param progress Current display-clock fraction in 0..1.
  * @param elapsed_ms Available animation time, non-negative and capped internally at 50 milliseconds.
  * @param viewport Positive viewport width in CSS pixels.
  * @param redirect Whether the interrupted route skips departure-heading alignment.
- * @details Heading and arrival turns take nominally 1.2 and four seconds. The travel phase takes two
- * seconds plus six seconds per radian, so longer arcs take longer without lengthening local turns.
- * Translation, rotation and magnification share
- * a 360 CSS-pixel-per-second motion budget, capped at six pixels per frame even under load.
+ * @details Heading and arrival turns take nominally 0.5 and 1.25 seconds. The travel phase takes one
+ * second plus two seconds per radian, so longer arcs take longer without lengthening local turns.
+ * Translation, rotation and magnification share a 900 CSS-pixel-per-second motion budget,
+ * capped at eighteen CSS pixels per frame even under load. Slow rendering extends travel rather than
+ * enlarging visible steps; ordinary refresh rates retain elapsed-time pacing.
  * A fixed-iteration search limits progress without retaining
  * state. Callers may withhold elapsed time while imagery loads; delayed frames never cause catch-up.
- * @return Via the bridge, the next progress fraction, or null for malformed input.
+ * @return No C value; the bridge receives the next progress fraction, or null for malformed input.
+ * No host reference or native allocation is retained; the result needs no explicit native release.
+ * @note Call synchronously on the browser animation thread.
  */
 void lab_globe_flight_advance(jsref start, jsref target, double progress, double elapsed_ms, double viewport, bool redirect);
+
+/**
+ * @brief Adjust a moving globe's framebuffer scale from observed browser frame intervals.
+ * @param state Borrowed three-number array [scale, mean interval in milliseconds, time since adjustment].
+ * Scale must be finite and in 0.5..1; the other fields must be finite and non-negative. Start with [1,1000/60,0].
+ * @param elapsed_ms Non-negative observed frame interval, capped internally at 250 milliseconds for adaptation.
+ * Zero leaves the state unchanged; callers omit samples whilst waiting for the initial world surface.
+ * @return No C value; the bridge receives an independently copied three-number state, or null for malformed input.
+ * No host references or native allocations are retained, and the returned array needs no explicit native release.
+ * @details Sustained slow frames reduce scale in eighths, at most once per half-second, down to half resolution.
+ * Recovery requires two seconds of faster frames per increment, preventing repeated framebuffer reallocations.
+ * The caller applies this scale only whilst travelling and restores normal resolution at arrival or cancellation.
+ * Photographic source requests, camera orientation, observer values and history are unchanged.
+ * Call synchronously on the browser animation thread.
+ */
+void lab_globe_flight_render(jsref state, double elapsed_ms);
 #endif

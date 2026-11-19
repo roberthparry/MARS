@@ -136,7 +136,7 @@ int lab_worker_equation_pages(int argc, char **argv)
     ok = ok && (!count || notation) && numeric;
     string_t *unbound = equation ? equ_to_text(equation, style_UNBOUND) : NULL;
     string_t *function = equation ? equ_to_text(equation, style_FUNCTION) : NULL;
-    char *title = equation ? equ_to_TeX_body_wrapped(equation, 110) : NULL;
+    char *title = equation ? equ_to_TeX_body_wrapped(equation, LAB_WORKER_EQUATION_LINE_LIMIT_LATEX) : NULL;
     if (ok) {
         printf("input %s\nequation %s\nunbound %s\nfunction %s\nstatus solved\n"
                "solutions_TeX %s\nsolutions_after %.17g\nsolutions_precision %d\nsolutions_more %s\n"

@@ -251,6 +251,8 @@ string_t *equ_solutions_compact_text(const equation_solutions_t *solutions, cons
 
 /**
  * @brief Render structurally opposite displacements about a shared centre, retaining any common denominator.
+ * Exactly opposite real scalar coefficients on the same expression qualify even when their product trees differ.
+ * A zero centre is omitted. Pairing never samples unbound parameters or changes the supplied equations.
  * @param first Borrowed solution equation in the structurally paired result set.
  * @param second Borrowed solution equation in the structurally paired result set.
  * @param style Presentation style selecting the requested native or TeX representation.

@@ -9,6 +9,7 @@
 /** @brief Serve controlled HTTP responses inside real drawing workers; other worker types are unchanged. */
 function globeHTTPFixture(handler: (body: Uint8Array<ArrayBuffer>) => Promise<Response>,
                           options: {endpoint: string; script: string; nativeShore: boolean; storageDenied?: boolean;
+                                    storageStalled?: boolean;
                                     surfaceProbe?: boolean; regionalAliases?: boolean; holdPhotograph?: boolean;
                                     denyPhotographs?: boolean; decodeProbe?: boolean; persistProbe?: boolean;
                                     alphaProbe?: boolean; globalAliases?: boolean; blockProbe?: boolean} =
@@ -114,6 +115,9 @@ function globeHTTPFixture(handler: (body: Uint8Array<ArrayBuffer>) => Promise<Re
         };
         if (${Boolean(options.storageDenied)}) Object.defineProperty(globalThis, 'indexedDB', {
             value: {open() { throw new Error('Fixture storage denied'); }}
+        });
+        if (${Boolean(options.storageStalled)}) Object.defineProperty(globalThis, 'indexedDB', {
+            value: {open() { return {}; }}
         });
         if (${Boolean(options.decodeProbe)}) {
             const decode = globalThis.createImageBitmap.bind(globalThis);

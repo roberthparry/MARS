@@ -128,7 +128,8 @@ void lab_workspace_dom_history_row(jsref list, jsref snapshot, unsigned position
     if (!lab_dom_truth(text)) text = lab_dom_string("Empty worksheet");
     lab_dom_write(label, LAB_DOM_TEXT, "", text);
     lab_dom_write(label, LAB_DOM_ATTRIBUTE, "aria-label", lab_dom_join(lab_dom_string("Open worksheet: "), text, ""));
-    history_location(label, snapshot);
+    if (!history_location(label, snapshot) && lab_dom_length(source))
+        lab_dom_write(label, LAB_DOM_DATASET, "historyFormulaSource", source);
     lab_dom_append(row, label);
     lab_dom_write(actions, LAB_DOM_ATTRIBUTE, "class", lab_dom_string("history-entry-actions"));
     if (position == current) {
@@ -155,4 +156,78 @@ void lab_workspace_dom_history_row(jsref list, jsref snapshot, unsigned position
     }
     lab_dom_append(row, actions);
     lab_dom_append(list, row);
+}
+
+/* Install native SVG at the shared history scale without reinterpreting its mathematical content. */
+static node_jsref history_drawing(jsref parent, jsref svg, const char *class_name)
+{
+    int formula = lab_dom_create("span");
+    lab_dom_write(formula, LAB_DOM_ATTRIBUTE, "class", lab_dom_string(class_name));
+    lab_dom_write(formula, LAB_DOM_ATTRIBUTE, "aria-hidden", lab_dom_string("true"));
+    lab_dom_write(formula, LAB_DOM_HTML, "", svg);
+    int drawing = lab_dom_query(formula, "svg"), width = lab_dom_read(drawing, LAB_DOM_ATTRIBUTE, "width");
+    if (drawing && lab_dom_length(width))
+        lab_dom_write(drawing, LAB_DOM_STYLE, "width",
+            lab_dom_join(lab_dom_string("calc("), width, " * var(--history-formula-scale))"));
+    lab_dom_append(parent, formula);
+    return formula;
+}
+
+/* Fit native integer glyphs at an actual SVG boundary, keeping the TeX overflow ending visible. */
+void lab_workspace_dom_history_fit(node_jsref button)
+{
+    int stage = lab_dom_query(button, ".history-entry-fit");
+    if (!stage || lab_dom_measure(stage, LAB_DOM_MEASURE_CLIENT_WIDTH) <= 0) return;
+    int formula = lab_dom_query(stage, ".history-entry-crop"), tail = lab_dom_query(stage, ".history-entry-tail");
+    int drawing = lab_dom_query(formula, "svg");
+    lab_dom_write(formula, LAB_DOM_STYLE, "maxWidth", lab_dom_string(""));
+    bool overflow = lab_dom_measure(drawing, LAB_DOM_MEASURE_RECT_WIDTH) >
+                    lab_dom_measure(stage, LAB_DOM_MEASURE_CLIENT_WIDTH) + .5;
+    if (overflow) lab_dom_remove(tail, "hidden");
+    else { lab_dom_write(tail, LAB_DOM_ATTRIBUTE, "hidden", lab_dom_string("")); return; }
+    double left = lab_dom_measure(drawing, LAB_DOM_MEASURE_RECT_LEFT);
+    double available = lab_dom_measure(formula, LAB_DOM_MEASURE_CLIENT_WIDTH), right = left;
+    int glyphs = lab_dom_all(drawing, "g > use");
+    unsigned low = 0, high = lab_dom_count(glyphs);
+    while (low < high) {
+        unsigned middle = low + (high - low) / 2, mark = lab_dom_mark();
+        int glyph = lab_dom_item(glyphs, middle);
+        double edge = lab_dom_measure(glyph, LAB_DOM_MEASURE_RECT_LEFT) +
+                      lab_dom_measure(glyph, LAB_DOM_MEASURE_RECT_WIDTH);
+        if (edge <= left + available) { right = edge; low = middle + 1; }
+        else high = middle;
+        lab_dom_release(mark);
+    }
+    if (right > left) lab_dom_write(formula, LAB_DOM_STYLE, "maxWidth", lab_dom_format(right - left, "", "px"));
+}
+
+/* Install only matching native previews; authored text and snapshots never become browser mathematics. */
+void lab_workspace_dom_history_formula(node_jsref button, jsref metadata)
+{
+    int source = lab_dom_read(button, LAB_DOM_DATASET, "historyFormulaSource");
+    if (!lab_dom_length(source) || !lab_dom_equal(source, lab_dom_get(metadata, "source"))) return;
+    int display = lab_dom_get(metadata, "display"), svg = lab_dom_get(metadata, "svg");
+    if (lab_dom_type(display) != LAB_VALUE_STRING) return;
+    int summary = lab_dom_clean(lab_dom_slice(display, 0, 240), LAB_DOM_CLEAN_COLLAPSE);
+    if (lab_dom_length(display) > 240) summary = lab_dom_join(summary, lab_dom_string("..."), "");
+    lab_dom_class(button, "history-entry-math", false);
+    lab_dom_write(button, LAB_DOM_TEXT, "", summary);
+    lab_dom_write(button, LAB_DOM_ATTRIBUTE, "aria-label", lab_dom_join(lab_dom_string("Open worksheet: "), summary, ""));
+    if (lab_dom_type(svg) == LAB_VALUE_STRING && lab_dom_length(svg) && lab_dom_length(svg) <= 262144) {
+        lab_dom_write(button, LAB_DOM_TEXT, "", lab_dom_string(""));
+        int tail = lab_dom_get(metadata, "tail_svg");
+        if (lab_dom_type(tail) == LAB_VALUE_STRING && lab_dom_length(tail) && lab_dom_length(tail) <= 262144) {
+            int stage = lab_dom_create("span");
+            lab_dom_write(stage, LAB_DOM_ATTRIBUTE, "class", lab_dom_string("history-entry-fit"));
+            history_drawing(stage, svg, "history-entry-formula history-entry-crop");
+            int ending = history_drawing(stage, tail, "history-entry-formula history-entry-tail");
+            lab_dom_write(ending, LAB_DOM_ATTRIBUTE, "hidden", lab_dom_string(""));
+            lab_dom_append(button, stage);
+            lab_workspace_dom_history_fit(button);
+        } else {
+            history_drawing(button, svg, "history-entry-formula");
+        }
+        lab_dom_class(button, "history-entry-math", true);
+    }
+    lab_dom_write(button, LAB_DOM_DATASET, "historyPreviewTeX", lab_dom_get(metadata, "TeX"));
 }

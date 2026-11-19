@@ -8,6 +8,7 @@
  * projections refresh the exact geometry; it never alters the geographic source data.
  * Great-circle travel transports the camera heading and interpolates visible span; its distance-aware
  * display clock bounds projected translation, roll and magnification even when rendering is delayed.
+ * A hysteretic framebuffer policy reduces moving-frame GPU work independently of photographic source detail.
  */
 #include <math.h>
 
@@ -254,7 +255,19 @@ void lab_globe_history_camera(jsref camera, double latitude, double longitude, d
 static double globe_ease(double t)
 {
     t = fmax(0, fmin(1, t));
+    /* Evaluating the expanded quintic near one can overshoot, invalidating a slerp frame. */
+    if (t > .5) {
+        double u = 1 - t;
+        return 1 - u * u * u * (10 + u * (-15 + 6 * u));
+    }
     return t * t * t * (10 + t * (-15 + 6 * t));
+}
+
+static double globe_redirect_ease(double t)
+{
+    t = fmax(0, fmin(1, t));
+    double u = 1 - t;
+    return t <= .5 ? t + t * t * t * (4 + t * (-7 + 3 * t)) : 1 - u * u * u * (6 + u * (-8 + 3 * u));
 }
 
 static double globe_flight_zoom(double from, double to, double fraction)
@@ -322,8 +335,7 @@ static bool globe_flight_frame(const double a[5], const double b[5], double prog
     double travel = fmax(0, fmin(1, (progress - departure) / (0.875 - departure)));
     /* Redirects retain a non-zero initial route speed rather than restarting a
      * stationary easing curve. Both curves finish with zero speed and acceleration. */
-    double turn = redirect ? travel + travel * travel * travel * (4 + travel * (-7 + 3 * travel))
-                           : globe_ease(travel);
+    double turn = redirect ? globe_redirect_ease(travel) : globe_ease(travel);
     /* A redirected route transports the visible orientation, without another stationary departure spin. */
     if (!globe_flight_rotation(result, a, b, from, to, !redirect && align_heading ? globe_ease(progress / 0.125) : 0, turn,
                                globe_ease((progress - 0.875) / 0.125))) return false;
@@ -440,12 +452,12 @@ void lab_globe_flight_advance(jsref start, jsref target, double progress, double
     double dot = am[6] * bm[6] + am[7] * bm[7] + am[8] * bm[8];
     double angle = acos(fmax(-1, fmin(1, dot)));
     double seconds = fmin(elapsed_ms, 50) / 1000;
-    /* Keep the same travel speed at 20, 30 and 60 Hz. The elapsed-time clamp
-     * still bounds a stalled frame to 18 pixels, without halving speed at 30 Hz. */
-    double budget = 360 * seconds;
+    /* A delayed paint must not turn a fast journey into a large visible jump.
+     * Healthy refresh rates retain elapsed-time pacing; slow frames favour smaller steps. */
+    double budget = fmin(18, 900 * seconds);
     /* Heading and arrival roll are short local operations, not fractions of a long route. */
-    double duration = !redirect && progress < .125 ? 1.2 / .125 :
-                      progress >= .875 ? 4.0 / .125 : (2 + 6 * angle) / (redirect ? .875 : .75);
+    double duration = !redirect && progress < .125 ? .5 / .125 :
+                      progress >= .875 ? 1.25 / .125 : (1 + 2 * angle) / (redirect ? .875 : .75);
     double low = progress, high = fmin(1, progress + seconds / duration);
     if (!globe_flight_frame(a, b, high, redirect, after)) { lab_dom_return(0); return; }
     if (globe_flight_motion(before, after, viewport) > budget) {
@@ -459,4 +471,24 @@ void lab_globe_flight_advance(jsref start, jsref target, double progress, double
         high = low;
     }
     lab_dom_return(lab_dom_numeric(high));
+}
+
+/* Adapt only the moving framebuffer; photographic source detail and the camera path remain independent. */
+void lab_globe_flight_render(jsref state, double elapsed_ms)
+{
+    if (lab_dom_count(state) != 3 || !isfinite(elapsed_ms) || elapsed_ms < 0) { lab_dom_return(0); return; }
+    double scale = lab_dom_to_number(lab_dom_item(state, 0));
+    double average = lab_dom_to_number(lab_dom_item(state, 1));
+    double age = lab_dom_to_number(lab_dom_item(state, 2));
+    if (!isfinite(scale) || scale < .5 || scale > 1 || !isfinite(average) || average < 0 ||
+        !isfinite(age) || age < 0) { lab_dom_return(0); return; }
+    if (elapsed_ms > 0) {
+        double elapsed = fmin(elapsed_ms, 250);
+        average += .2 * (elapsed - average);
+        age = fmin(2000, age + elapsed);
+        if (age >= 500 && average > 22 && scale > .5) { scale = fmax(.5, scale - .125); age = 0; }
+        else if (age >= 2000 && average < 17.5 && scale < 1) { scale = fmin(1, scale + .125); age = 0; }
+    }
+    double result[] = {scale, average, age};
+    globe_result(result, 3);
 }

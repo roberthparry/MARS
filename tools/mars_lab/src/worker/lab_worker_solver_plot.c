@@ -6,7 +6,9 @@
  * share one viewport; explicit ODE solution branches are sampled independently.
  * Two-variable algebraic equations use real zero contours; PDE solutions use the
  * shared surface renderer. Unset authored parameters use labelled, plot-local slider choices before solving;
- * supplied values remain fixed. Implicit ODE solutions and unsupported dimensions are reported.
+ * supplied values remain fixed, including a supplied coordinate selected as the first axis.
+ * Native replies identify the remaining plotting coordinates for the controls.
+ * Implicit ODE solutions and unsupported dimensions are reported.
  * Existing guarded sampling and clipping
  * policies apply to every curve in the isolated calculation process.
  */
@@ -219,6 +221,64 @@ static bool equation_parameters(equation_t *equ, const char *first, const expr_t
     return ok;
 }
 
+/* All algebraic plot paths share the caption specialised to the selected coordinates. */
+static int equation_plot(equation_t *equ, expr_t *variable, expr_t *second, expr_t *third, int argc, char **argv,
+                          const char *title_text, const char *title_TeX)
+{
+    if (third)
+        return lab_worker_equation_mesh(equ, variable, second, third, argv, title_text, title_TeX);
+    if (second)
+        return lab_worker_equation_contour(equ, variable, second, argv, title_text, title_TeX);
+    const char *axis = expr_symbol_name(variable);
+    const expr_t *curves[] = {equ_lhs(equ), equ_rhs(equ)};
+    lab_plot_prepared_t *prepared = lab_worker_plot_prepared_read(argc, argv);
+    if (prepared && prepared->family) {
+        int rc = lab_worker_plot_integer_families((const expr_t *const *)prepared->curves, prepared->labels,
+                                                  prepared->count, axis, title_text, title_TeX, argv);
+        if (!rc)
+            fputs(string_c_str(prepared->numeric), stdout);
+        lab_worker_plot_prepared_free(prepared);
+        return rc;
+    }
+    if (prepared && prepared->count == 2 && !prepared->family) {
+        int rc = prepared->root_count
+            ? lab_worker_plot_roots(prepared->roots, prepared->root_count, equ, axis, title_text, title_TeX, argv)
+            : plot_curves(argv[1], title_text, title_TeX, axis, (const expr_t *const *)prepared->curves,
+                            NULL, 2, true, false, argv, NULL);
+        if (!rc)
+            fputs(string_c_str(prepared->numeric), stdout);
+        lab_worker_plot_prepared_free(prepared);
+        return rc;
+    }
+    lab_worker_plot_prepared_free(prepared);
+    size_t root_count = 0, family_count = 0;
+    number_t *roots = NULL;
+    expr_t *families[16] = {0};
+    string_t *parameters[16] = {0};
+    string_t *numeric = lab_worker_equation_plot_solutions(equ, atoi(argv[3]), &roots, &root_count,
+                                                           families, parameters, &family_count);
+    int rc = family_count
+                 ? lab_worker_plot_integer_families((const expr_t *const *)families, parameters, family_count,
+                                                     axis, title_text, title_TeX, argv)
+                 : root_count ? lab_worker_plot_roots(roots, root_count, equ, axis, title_text, title_TeX, argv)
+                       : plot_curves(argv[1], title_text, title_TeX, axis, curves, NULL, 2, true, false, argv, NULL);
+    if (!rc && numeric) {
+        fputs(string_c_str(numeric), stdout);
+        lab_worker_plot_prepared_write(argc, argv, title_text, title_TeX,
+            family_count ? (const expr_t *const *)families : curves, family_count ? parameters : NULL,
+            family_count ? family_count : 2, family_count != 0, numeric, roots, family_count ? 0 : root_count);
+    }
+    string_free(numeric);
+    for (size_t i = 0; i < root_count; ++i)
+        num_destroy(&roots[i]);
+    free(roots);
+    for (size_t i = 0; i < family_count; ++i) {
+        expr_free(families[i]);
+        string_free(parameters[i]);
+    }
+    return rc;
+}
+
 /* Select native equation sides or explicit differential-equation graphs, preserving the worksheet source. */
 int lab_worker_solver_plot(int argc, char **argv)
 {
@@ -242,109 +302,62 @@ int lab_worker_solver_plot(int argc, char **argv)
             printf("error Select an equation variable to plot.\n");
             return 1;
         }
-        const expr_t *curves[] = {equ_lhs(equ), equ_rhs(equ)};
-        lab_worker_equation_bindings(equ);
-        expr_t *second = NULL, *third = NULL;
-        bool unresolved = false;
+        expr_t *coordinates[3] = {NULL, NULL, NULL};
+        size_t free_count = 0, preferred = 0;
         /* The parsed binding catalogue is bounded by the authored expression; inspect each parameter once. */
         for (size_t i = 0; i < expr_bindings_count(bindings); ++i) {
             expr_t *node = expr_bindings_get(bindings, expr_bindings_name_at(bindings, i));
-            if (node == variable || expr_bindings_is_constant_at(bindings, i))
+            if (expr_bindings_is_constant_at(bindings, i))
                 continue;
             number_t value = expr_eval(node);
             bool fixed = num_is_real(value) && num_is_finite(value);
             num_destroy(&value);
             if (fixed)
                 continue;
-            if (third)
-                unresolved = true;
-            else if (second)
-                third = node;
-            else
-                second = node;
+            if (free_count < 3) {
+                coordinates[free_count] = node;
+                if (node == variable) preferred = free_count;
+            }
+            ++free_count;
         }
-        if (unresolved) {
+        if (free_count > 3) {
             equ_free(equ);
             printf("error An equation plot supports at most three free coordinates; bind extra coordinates "
                    "or mark them as constant parameters.\n");
             return 1;
         }
+        /* A supplied coordinate is fixed even when it was the selected first axis. */
+        if (free_count) {
+            expr_t *chosen = coordinates[preferred];
+            for (size_t i = preferred; i; --i) coordinates[i] = coordinates[i - 1];
+            coordinates[0] = chosen;
+            variable = coordinates[0];
+            axis = expr_symbol_name(variable);
+        }
+        expr_t *second = coordinates[1], *third = coordinates[2];
+        if (third && *argv[11] && !strcmp(argv[11], expr_symbol_name(third))) {
+            expr_t *swap = second;
+            second = third;
+            third = swap;
+        }
+        lab_worker_equation_bindings(equ);
+        printf("plot_axis %s\n", axis);
+        if (second) printf("plot_axis %s\n", expr_symbol_name(second));
+        if (third) printf("plot_axis %s\n", expr_symbol_name(third));
         const char *request = argc > 19 && strcmp(argv[19], "--plot-cache") ? argv[19] : NULL;
         if (!equation_parameters(equ, axis, second, third, request)) {
             equ_free(equ);
             return 1;
         }
-        if (third) {
-            if (*argv[11] && !strcmp(argv[11], expr_symbol_name(third))) {
-                expr_t *swap = second;
-                second = third;
-                third = swap;
-            }
-            int rc = lab_worker_equation_mesh(equ, variable, second, third, argv);
-            equ_free(equ);
-            return rc;
-        }
-        if (second) {
-            int rc = lab_worker_equation_contour(equ, variable, second, argv);
-            equ_free(equ);
-            return rc;
-        }
-        lab_plot_prepared_t *prepared = lab_worker_plot_prepared_read(argc, argv);
-        if (prepared && prepared->family) {
-            int rc = lab_worker_plot_integer_families((const expr_t *const *)prepared->curves, prepared->labels,
-                                                      prepared->count, axis, string_c_str(prepared->title),
-                                                      string_c_str(prepared->TeX), argv);
-            if (!rc)
-                fputs(string_c_str(prepared->numeric), stdout);
-            lab_worker_plot_prepared_free(prepared);
-            equ_free(equ);
-            return rc;
-        }
-        if (prepared && prepared->count == 2 && !prepared->family) {
-            int rc = prepared->root_count
-                ? lab_worker_plot_roots(prepared->roots, prepared->root_count, equ, axis,
-                                         string_c_str(prepared->title), string_c_str(prepared->TeX), argv)
-                : plot_curves(argv[1], string_c_str(prepared->title), string_c_str(prepared->TeX), axis,
-                                (const expr_t *const *)prepared->curves, NULL, 2, true, false, argv, NULL);
-            if (!rc)
-                fputs(string_c_str(prepared->numeric), stdout);
-            lab_worker_plot_prepared_free(prepared);
-            equ_free(equ);
-            return rc;
-        }
-        lab_worker_plot_prepared_free(prepared);
-        char *title = equ_to_TeX_body_wrapped(equ, 110);
-        size_t root_count = 0, family_count = 0;
-        number_t *roots = NULL;
-        expr_t *families[16] = {0};
-        string_t *parameters[16] = {0};
-        string_t *numeric = lab_worker_equation_plot_solutions(equ, atoi(argv[3]), &roots, &root_count,
-                                                               families, parameters, &family_count);
-        int rc = family_count
-                     ? lab_worker_plot_integer_families((const expr_t *const *)families, parameters, family_count,
-                                                         axis, argv[1], title, argv)
-                     : root_count ? lab_worker_plot_roots(roots, root_count, equ, axis, argv[1], title, argv)
-                           : plot_curves(argv[1], argv[1], title, axis, curves, NULL, 2, true, false, argv, NULL);
-        if (!rc) {
-            if (numeric) {
-                fputs(string_c_str(numeric), stdout);
-                if (family_count)
-                    lab_worker_plot_prepared_write(argc, argv, argv[1], title, (const expr_t *const *)families,
-                                                   parameters, family_count, true, numeric, NULL, 0);
-                else
-                    lab_worker_plot_prepared_write(argc, argv, argv[1], title, curves, NULL, 2, false,
-                                                   numeric, roots, root_count);
-            }
-        }
-        string_free(numeric);
-        for (size_t i = 0; i < root_count; ++i)
-            num_destroy(&roots[i]);
-        free(roots);
-        for (size_t i = 0; i < family_count; ++i) {
-            expr_free(families[i]);
-            string_free(parameters[i]);
-        }
-        free(title);
+        string_t *title_text = NULL;
+        char *title_TeX = NULL;
+        bool titled = lab_worker_equation_plot_titles(equ, variable, second, third, &title_text, &title_TeX);
+        int rc = titled ? equation_plot(equ, variable, second, third, argc, argv,
+                                         string_c_str(title_text), title_TeX) : 1;
+        if (!titled)
+            printf("error Unable to format the selected equation slice.\n");
+        string_free(title_text);
+        free(title_TeX);
         equ_free(equ);
         return rc;
     }
@@ -425,7 +438,7 @@ int lab_worker_solver_plot(int argc, char **argv)
         for (size_t i = 0; titled && !parameter_title && i < count; ++i) {
             const equation_t *solution = de_solve_result_at(solutions, i);
             string_t *text = equ_to_text(solution, style_UNBOUND);
-            char *TeX = equ_to_TeX_body_wrapped(solution, 110);
+            char *TeX = equ_to_TeX_body_wrapped(solution, LAB_WORKER_EQUATION_LINE_LIMIT_LATEX);
             titled = text && TeX &&
                      string_append_format(title_text, "%s%s", i ? "; " : "", string_c_str(text)) >= 0 &&
                      string_append_format(title_TeX, "%s%s", i ? "\\\\ " : "", TeX) >= 0;

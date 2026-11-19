@@ -58,6 +58,15 @@ string_t *lab_pres_unset_one(const string_t *source, const string_t *name);
 /** @brief Return owned exact-source editor metadata or NULL for malformed input/allocation failure. */
 json_t *lab_pres_editor_metadata(const string_t *source);
 
+/**
+ * @brief Prepare source-preserving history notation and abbreviated numeric display text without evaluation.
+ * @param source Borrowed NUL-free worksheet input, already bounded to 64 KiB by its request adapter.
+ * @return Owned metadata with source, display, optional TeX and an optional TeX overflow ending, released with
+ * json_free(); NULL on allocation failure. Long integer calls retain a bounded rendered prefix for responsive fitting.
+ * Unsupported or unfinished mathematics retains literal display text. Saved source is never modified or retained.
+ */
+json_t *lab_pres_history_metadata(const string_t *source);
+
 /** @brief Apply a validated structured editor action and return owned metadata. */
 json_t *lab_pres_editor_action(const json_t *payload, const string_t *text);
 

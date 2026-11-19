@@ -13,6 +13,10 @@ Expression is not painted or evaluated as an intermediate mode when Almanac,
 Datetime or another mode was last used. The existing native restoration policy
 continues to resolve persisted state and browser-local recovery. Startup failures
 reveal the error rather than leaving the worksheet hidden.
+Offline history-cache opens and transactions have a two-second deadline. If browser
+storage stalls, startup continues with server history; existing recovery records
+are retained. Late open callbacks close their connection, and stalled transactions
+are aborted so they cannot install delayed recovery state.
 Once saved controls are restored, camera restoration and town loading proceed
 independently of the initial calculation, including weather and eclipse work.
 The globe also retains its camera orientation and zoom in browser-local storage,
@@ -566,6 +570,9 @@ Open the **Settings** cog at the top-right corner of the page header, then choos
 Only the cog appears in the header. Close Settings with its close button, Escape,
 or a click outside the panel. **0. Earth (Default)** is the existing green design.
 The other choices use their own palette and static SVG background artwork.
+The header includes a compact Mars statue cutout with a transparent background.
+Its stone shading is retained while the selected theme's accent colours tint it;
+it fits the existing header on desktop and mobile without intercepting controls.
 The skin menu uses MARS's accessible C/WASM selection control after startup, so
 its selected, hovered and keyboard-focused options use the current skin's accent
 colour consistently. Arrow keys navigate it; Enter selects and Escape closes it.
@@ -860,8 +867,31 @@ the current entry: for example, evaluating D while viewing B in A → B → C
 produces A → B → D → C. Forward still reaches C. Re-evaluating an unchanged
 worksheet does not add another entry, and Clear also retains later entries.
 
-In the history editor, each row shows its worksheet input, with **Current** marking
-the active worksheet. Select the input to open it. Drag its grip to reorder it
+In the history editor, mathematical rows use native TeX formula previews, with
+**Current** marking the active worksheet. Authored arithmetic and calculus stay
+unevaluated in previews. Long
+number tokens show an eighteen-character prefix followed by `...`, including
+bound values, while opening the entry restores the full original input. An
+unavailable renderer or unfinished formula retains a readable literal preview.
+On phones, TeX previews use a larger fixed scale. Long formulae, including
+differential equations, can be scrolled horizontally within their row rather
+than shrinking the notation to fit the screen.
+Factorisation requests also use native TeX, retaining the requested operation instead
+of displaying internal factor names. Long integer arguments show as many complete
+TeX digits as fit, with a TeX ellipsis and closing parenthesis when needed. Resizing
+reveals more or fewer digits; opening the entry retains its full input. The disposable
+rendered prefix is bounded to 1024 characters to keep very large integers inexpensive.
+Previews load as rows enter the scrolling viewport, with at most two requests
+at once and a disposable cache of 64 exact-source previews. Closing or changing
+the list cancels obsolete requests; stale responses cannot replace another input.
+The native `POST /history-preview` adapter accepts bounded worksheet text and
+returns exact source, abbreviated display, optional TeX and optional SVG. It
+does not evaluate a worksheet or change saved history. Restricted TeX rendering
+uses the existing process deadlines; previews are limited to 4096 TeX bytes and
+256 KiB of SVG. `POST /presentation` with action `history` supplies the same
+notation metadata without launching the SVG renderer.
+
+Select the formula to open it. Drag its grip to reorder it
 with a mouse, touch or pen; the insertion line shows where it will land, and the
 list scrolls when held near an edge. Release to save the move, or press Escape
 to cancel. **↑ Earlier** and **↓ Later** remain available for keyboard use.
@@ -903,7 +933,9 @@ Persistent history has these fixed limits:
 
 These persistence bounds do not pop entries from a running worksheet's native
 history, which retains its existing independent memory limits. Browser storage
-quotas or server I/O failures are reported without preventing normal navigation.
+failures use the available local or server copy silently, with synchronisation retried
+in the background. A warning is shown if neither copy can be saved, or if a
+conflicting or damaged history needs attention; normal navigation remains available.
 
 The object-store key is retained in encrypted `mars.db`. First-run key creation uses
 an immediate SQLite transaction and never replaces an existing non-empty key.
@@ -1377,8 +1409,9 @@ for source, credit, reuse terms and checksum.
 At 2× zoom, Natural Earth asynchronously loads the bundled 8192 × 4096 version
 as PNG, replacing the overview only after a successful GPU upload.
 That provides four times the linear resolution and sixteen times the pixels.
-The upgrade is requested once per globe instance, on closer zoom or before a
-history journey. Graphics limits or allocation failure select 4096 × 2048 where
+The upgrade is requested on closer zoom, with large uploads deferred until a
+history journey has finished. A successful upgrade is retained for the globe instance.
+Graphics limits or allocation failure select 4096 × 2048 where
 possible, otherwise the existing overview remains available. The full texture uses
 128 MiB of GPU storage, plus temporary image decoding memory; no extra WASM memory
 or build-time image-processing dependency is introduced. This is still global
@@ -1727,7 +1760,11 @@ per-browser, per-Lab-origin IndexedDB cache limited to **512 MiB and 512 entries
 Small metadata records maintain byte totals and recency; eviction never reads image
 blobs. Cache hits use read-only transactions and update recency asynchronously.
 Database identities and source digests invalidate stale data. Older disposable cache
-formats are rebuilt automatically. Storage denial still permits uncached drawing;
+formats are rebuilt automatically. Cache opens, reads and writes have a two-second
+deadline. If browser storage rejects or silently stalls a request, that cache owner
+bypasses persistence and fetches imagery normally, including on first entry and zoom.
+Late callbacks cannot publish stale results or keep writing to a disabled cache.
+Storage denial still permits uncached drawing;
 unavailable worker or graphics support retains the global photograph and independent
 river overlay. These caches do not reduce the source river database's storage.
 Photographic storage is independent of the native town cache. Active-country pins
@@ -1817,9 +1854,10 @@ evaluation. Almanac history retains five camera numbers (quaternion and zoom), n
 textures or geographical data. **Back** and **Forward** follow the shortest great
 circle between the saved view centres at a distance-dependent pace: longer routes
 take longer, with separate departure-heading, travel and arrival-roll phases. The
-departure and arrival turns have nominal durations of 1.2 and 4 seconds, independent
-of route length. Travel takes two seconds plus six seconds per radian;
-screen-motion limits and loading can extend these durations.
+departure and arrival turns have nominal durations of 0.5 and 1.25 seconds, independent
+of route length. Travel takes one second plus two seconds per radian;
+screen-motion limits and loading can extend these durations. Missing optional detail
+reduces pace by at most 20%, rather than holding the camera back until fine imagery arrives.
 The travelling notice includes the total great-circle distance for the camera
 route, rounded to kilometres (metres for routes shorter than one kilometre).
 Redirecting a journey measures the new route from the camera's current position.
@@ -1849,6 +1887,9 @@ stencil stair-steps at harbour edges without altering the mapped geometry.
 Reciprocal magnification
 interpolation follows angular progress rather than a separate zoom clock, preventing
 zoom-in overtaking the approach. Quintic easing brings ordinary phase boundaries to rest.
+Native easing evaluates the complementary polynomial near arrival, keeping interpolation
+fractions within their valid range despite floating-point rounding. A near-endpoint frame
+therefore cannot fail and trigger an abrupt jump to the destination.
 Redirected travel starts with a non-zero route slope and eases to rest on arrival,
 rather than restarting the stationary departure easing. Antipodal centres have multiple
 equally short routes; the quaternion module chooses one deterministically.
@@ -1895,19 +1936,27 @@ surface is hidden whenever WebGL supplies the full surface, avoiding compositor
 repaints beneath its alpha canvas. Native reprojection rejects a retained coastline
 mask when its spherical depth error can exceed one CSS pixel, keeping the photograph
 visible until a suitable replacement is available. Travel waits for
-only the base photographic texture before departure, then accelerates gently. Higher-resolution
-global textures, regional photographs and border downloads continue without holding departure. Local vector
+only the base photographic texture before departure, then accelerates gently. Regional
+photographs and border downloads continue without holding departure. Large global-texture
+uploads and their colour-palette rebuilds wait until arrival; if navigation starts during
+image decoding, the resident photograph stays in use and the upgrade retries afterwards. Local vector
 requests do not brake and restart the camera: photographic coverage remains visible
 while they refine it. Slow rendering still limits the display clock and frame steps.
 Town requests and local SVG border projection wait until arrival; enabled
 world borders rotate on the GPU throughout travel, alongside the selected marker.
 The first border buffer appears as soon as it is prepared, and later journeys reuse it.
 Flight camera updates render in the same animation frame at up to one drawing pixel
-per CSS pixel; stationary views restore up to 1.5 pixels per CSS pixel. Photographic
-source resolution is unchanged by this reduction in moving-frame GPU work.
+per CSS pixel. Sustained slow frames reduce the moving framebuffer in eighths, at most
+once per half-second, down to half that resolution. Recovery requires two seconds of
+faster frames per increment, preventing repeated framebuffer reallocations. Arrival and
+manual cancellation restore the normal stationary resolution of up to 1.5 pixels per CSS
+pixel. Photographic source requests retain their original pixel demand independently of
+the moving framebuffer, so adapting GPU work does not reduce requested image detail.
 The native pacing bridge limits combined translation, roll and scale motion to
-360 CSS pixels per second, allowing six pixels at 60 Hz, twelve at 30 Hz and at
-most eighteen at 20 Hz. This avoids multiplying journey time on slower displays.
+900 CSS pixels per second, with a separate limit of eighteen CSS pixels per frame.
+Healthy refresh rates retain elapsed-time pacing. On slower displays the journey takes
+longer rather than making larger visible jumps; adaptive rendering reduces the GPU work
+needed to recover smoother frame intervals.
 It caps elapsed time at 50 milliseconds per frame;
 slow rendering never creates catch-up jumps. The base global photograph is ready
 before departure, and source-imaged polar ice is preserved
@@ -1916,7 +1965,9 @@ New navigation or manual globe input
 cancels the previous flight. Reduced-motion preferences skip the animation, and
 older history entries without camera data centre the observer at the current zoom.
 The native `lab_globe_flight()` bridge validates the five-number camera records and
-interpolates zoom and quaternion orientation. `lab_globe_flight_advance()` supplies
+interpolates zoom and quaternion orientation. `lab_globe_flight_render()` owns the
+framebuffer adaptation state without changing the camera or photographic source requests.
+`lab_globe_flight_advance()` supplies
 the bounded display clock; the browser schedules frames and reports loading readiness.
 Saving an unchanged observer does not reset a rotated view.
 
@@ -3053,6 +3104,8 @@ Each mode retains its most recent editor text, binding values and controls
 between sessions. Input events save an in-progress edit as well as a submitted
 calculation, so moving between modes or restarting the Lab does not restore an
 older expression or equation.
+Binding cards list variables first, followed by constants; each group uses natural
+name order, with `x2` before `x10`. Assigning or clearing a value does not move its row.
 The precision toolbar is hidden in Datetime and Almanac modes, where it does not
 apply. Returning to a mathematical mode restores it without changing saved precision.
 The precision slider changes the working precision used by the mathematical
@@ -3323,6 +3376,20 @@ curves and three-coordinate meshes use those selected parameter values. Exact
 supplied constants are re-evaluated from the original source at the precision
 needed by the viewport, including deep zooms.
 
+Supplied finite real coordinate values select a cross-section. Fixing `x` leaves
+a two-dimensional contour in `y` and `z`, including when `x` was the selected first
+plotting variable. The native worker chooses an unset coordinate and updates the
+axis choices. Clearing that value restores the three-dimensional surface. The
+coordinate's variable/constant role is preserved.
+Plot replies expose the ordered coordinates in `plot_axis_names`; these drive
+the browser's axis choices without reinterpreting the equation.
+The native plot caption substitutes supplied coordinate and parameter values,
+leaving only the active plotting coordinates symbolic. Exact fractions and radicals
+are retained and simplified in both the plain and TeX captions. Thus fixing `z = 1`
+removes `z` from the equation above its two-dimensional cross-section. Clearing
+the binding restores it to the surface caption. This also applies to cached
+plots and exported headings; the worksheet and its symbolic solution remain unchanged.
+
 Up to eight additional unset parameters share a compact vertical slider panel
 to the right of the chart, keeping the curve or surface visible while adjusting a slice.
 For a 2-D expression curve, unset constant bindings receive these controls too:
@@ -3461,6 +3528,35 @@ The projected volume is fitted uniformly to the available chart space during rot
 Height grids and implicit meshes preserve equal coordinate units on all three axes;
 shorter numerical ranges occupy proportionately shorter edges, without axis stretching.
 
+The three scales lie on adjoining edges of the outer plotting frame, meeting at
+their actual viewport corners rather than crossing through the surface. The same
+native frame selector keeps the initial SVG, interactive view and copied
+drawing consistent as the camera rotates. It considers the projected length of
+each scale and separation at adjoining corners, avoiding a short depth scale
+folding back over another axis. At least two edges remain on the silhouette;
+equally readable arrangements favour the lower-left outline.
+During rotation, the selected edges remain fixed until their exterior placement
+or projected clearance becomes unsuitable. Compatible refinements and saved
+views retain that arrangement, so small reversals do not flip the scales back and forth.
+The formula occupies a separate heading band above a 3D chart, clear of its rotating scales.
+Labels use larger type, emphasised axis
+names and a dark outline; crowded numbers are omitted while tick strokes remain.
+Tick strokes are thinned only when their current projected spacing is too small,
+prioritising zero and the outer values. The full tick catalogue is retained, so
+rotating or resizing an axis restores intermediate marks as soon as space permits.
+Mathematical bounds and scale values remain unchanged.
+
+Only 3-D plots use shaded cylindrical axes with solid cone arrowheads. Their
+surface, axes and tick positions share a pinhole projection: camera coordinates
+\((X,Y,Z)\), with depth increasing away from the eye, become
+\((c_x+fX/(D+Z),c_y+fY/(D+Z))\). The eye distance is four enclosing-sphere
+radii. Equal coordinate intervals appear closer together farther away, and
+end-on surfaces are foreshortened. Axis thickness follows the projection of
+constant-radius cylinders. Label sizes follow the same reciprocal-distance law,
+referenced to a readable size at the far sphere plane. A face-on view keeps the
+depth scale joined at a box corner when that edge direction is hidden by the
+front face. Two-dimensional plots retain their existing axes and projection.
+
 The HTML plot container reserves touch gestures before movement starts, including
 touches near an axis. Page scrolling remains available outside the plot.
 The complete native mesh stays in a persistent WebGL viewport, with depth testing.
@@ -3479,6 +3575,9 @@ starting orientation; a superseding plot invalidates an unfinished gesture.
 
 Sampling and camera presentation are separate. Native MARS still supplies the
 normalised coordinates, colours, tick labels, precision checks and domain gaps.
+Axis arrowheads always point towards increasing coordinate values, independently
+of camera rotation or the exterior frame's traversal order. They extend past the
+upper coordinate endpoint so their direction remains clear at shared corners.
 No expressions are evaluated or algebra rewritten in the client. Initial and
 replacement geometry currently arrive in the native SVG transport; the client
 does not request new SVG for camera movement. Editing coordinate bounds requests
@@ -3538,21 +3637,22 @@ rather than a GPU depth buffer, so intersecting triangles can have different
 occlusion in the vector export.
 
 This also works when expanded. Right-click keeps its normal behaviour.
-Two-dimensional plots retain SVG rendering; dragging pans and Ctrl+wheel zooms
+Two-dimensional plots retain SVG rendering; dragging pans and wheel zooms
 their sampled ranges. A second finger on a 3-D plot starts pinch zoom; further
 fingers are ignored. Touch and pen gestures do not change page scrolling outside
 the plot.
 
-Over a 3-D plot, **Shift+wheel** adjusts elevation and **Alt+wheel** adjusts azimuth.
-Wheel down increases the angle; wheel up decreases it in 5° steps.
-Wheel rotation uses the same persistent viewport and does not request new samples
-when the wheel stops. Ctrl takes precedence for zoom; Shift+Alt together does
-not rotate. Wheel rotation is inactive during a drag.
+Wheel zoom is captured only inside the projected coordinate volume. Plain wheel,
+**Shift+wheel**, **Alt+wheel** and **Ctrl+wheel** all zoom, matching the Almanac
+globe's wheel behaviour. Up zooms in and down zooms out; the camera does not rotate.
+Labels, headings, margins and empty corners outside the projected box leave the
+wheel available for page scrolling. Drag to rotate, or Shift-drag to roll;
+the camera sliders also remain available. Wheel zoom is inactive during a drag.
 Axis numbers are spaced to avoid collisions at shared corners and during
 rotation; crowded numbers may be omitted while their tick marks remain visible.
 
 Surfaces start with 70×70 uniformly sampled vertices (9,522 triangles for a complete grid)
-and an adjustable oblique view, with
+and an adjustable perspective view, with
 blue/teal/gold height shading. Automatic height scaling crops extreme spikes near
 poles so they do not flatten the rest of the surface. **Height range** in the Plot
 card offers **Fit all** or **Manual limits**; enter a finite **Minimum** and
@@ -3656,10 +3756,8 @@ headings and its separate plot card rather than carrying a plotting heading into
 
 #### Curve navigation and inspection
 
-Hold **Ctrl** and use the mouse wheel over a plot to zoom in (up)
-or out (down). Shift+wheel and Alt+wheel rotate 3-D plots as described above;
-otherwise, without Ctrl, wheel events retain their normal browser behaviour
-and do not change plot zoom. For 2-D plots, Ctrl+wheel changes both axis ranges
+Use the mouse wheel inside a plot's data area to zoom in (up)
+or out (down), with or without Shift, Alt or Ctrl. For 2-D plots, wheel changes both axis ranges
 around the pointer and requests fresh native samples. Surface controls instead use
 the [coordinate-volume zoom described above](#3-d-surface-interaction).
 For 2-D plots, **−** and **+** change the sampled ranges, and **Reset** restores the
@@ -3710,7 +3808,8 @@ returns an incompatible curve selection to **Auto**.
 Curve range fields use interval-aware formatting without trailing zeroes.
 Sampling retains the unrounded gesture coordinates until a bound is edited;
 manually entered bounds keep their authored precision.
-Scrolling outside the plot image, including over its controls, behaves normally;
+Scrolling outside a 2-D plot's data rectangle or a 3-D plot's projected volume,
+including over labels, headings, margins and controls, behaves normally;
 other result cards still require Ctrl or Command with the wheel to zoom.
 
 #### Native sampling and precision

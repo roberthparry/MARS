@@ -202,8 +202,10 @@ strictly increasing, with at least two elements. Heights are row-major:
 cells touching a missing vertex are not drawn. Finite steep facets are retained;
 the renderer does not infer discontinuities from their relative height changes.
 Callers with a function evaluator must sample domain gaps before supplying heights.
-Surface SVGs include approximate independent-axis bounds and per-facet affine
-coordinate maps for pointer-centred domain zoom. These describe the rendered
+Surface SVGs include approximate independent-axis bounds and perspective-correct
+per-facet coordinate maps for inspection. The nine `data-uv` coefficients are
+affine numerators; divide each by the shared three-coefficient
+`data-uv-denominator` evaluated at the same screen point. These describe the rendered
 mesh, not the exact function between samples; nearly edge-on facets may omit the
 map. Consumers can resample a narrower domain without enlarging the SVG artwork.
 A surface counts as one series
@@ -214,12 +216,30 @@ height. Set `options.smart_y = true` before creating the scene to crop extreme
 height tails automatically, using the same padded 5th–95th percentile policy
 as curves, with equal weight for each finite grid sample. This is a viewing
 heuristic, not a determination of where the function diverges. Constant heights receive a padded vertical
-range. Normalisation retains `number_t` precision before the configurable oblique
+range. Normalisation retains `number_t` precision before the configurable perspective
 projection. Faces are depth-ordered and shaded blue, teal and gold by height.
-Three open axes have tick strokes, decimal labels and no enclosing box. Native
+Three adjoining edges of the outer coordinate frame carry the positive-direction
+arrows, tick strokes and decimal scales, without an enclosing box. The edges form
+one connected chain at their actual viewport corners. A shared native selector
+retains two silhouette edges and chooses adjoining scales with useful projected
+length and separation at their joins. This avoids folding a short depth scale back
+over another axis; equally readable arrangements favour the lower-left outline.
+Interactive views retain a readable exterior arrangement across small camera
+movements, changing edges only when their placement or clearance becomes unsuitable.
+When a face-on view hides a box-edge direction, its depth scale retains a connected joining edge.
+Tick labels retain their true mathematical values;
+the shared corners represent viewport bounds rather than a translated origin.
+Labels use larger type, emphasised axis names and a dark outline for contrast. Native
 label layout reserves clearance between numbers, including shared corners.
-Surface labels may move slightly outwards; labels that still cannot fit are
-omitted without removing their tick marks. Curves also thin crowded tick labels.
+Every native surface retains its complete numerical tick catalogue. Each view
+selects tick strokes from their projected spacing and perspective size, prioritising
+zero and the outer values when crowded. Rotation and resizing can restore all
+intermediate marks without resampling the surface.
+Surface labels sit close to the tick tips, with a four-pixel gap at the reference
+font size; ascent, descent and perspective scaling determine their anchors.
+The camera reserves a compact border while allowing for long scientific labels.
+Labels may move slightly outwards along their tick's normal; labels that
+still cannot fit are omitted without removing their tick marks. Curves also thin crowded tick labels.
 The camera fits the visible facets and coordinate axes with space for the heading
 and labels, rather than reserving empty projected bounding-box corners. This fit
 scales both screen directions uniformly and preserves mesh proportions.
@@ -247,7 +267,7 @@ surface and 30° above it, with both horizontal axes increasing from left to rig
 and the height axis increasing from bottom to top. Finite azimuths wrap into
 [0,360); elevation accepts 5° to 85°, keeping the axes readable. Invalid arguments give `EINVAL` without
 changing the previous view. Call `plot_to_svg()` again to obtain the rotated
-image. Projection, depth ordering, exposed axes and tick positions all follow
+image. Projection, depth ordering, exterior axes and tick positions all follow
 the camera. `plot_set_roll(plot, roll)` adds clockwise screen-plane rotation,
 defaulting to 0°. Finite rolls wrap into [0,360); invalid rolls leave the camera
 unchanged and give `EINVAL`. The rotated surface is fitted into the viewport,
@@ -274,6 +294,24 @@ its origin, consistently for curves and surfaces.
 
 Each surface axis ends in an arrow pointing towards increasing values, labelled
 with the copied `x_label`, `y_label` or `z_label` option (defaults `x`, `y`, `f`).
+Arrowheads extend clear of shared frame corners at the upper coordinate bound,
+including inverted camera views and ranges containing only negative values.
+In 3D plots, the axes are opaque, shaded circular cylinders ending in cones.
+Two-dimensional plots retain their existing line axes.
+
+The surface, axes and tick positions use the same pinhole camera. With camera
+depth \(Z\) increasing away from the viewer, eye distance \(D=4R\) for enclosing
+radius \(R\), and focal length \(f\), the image coordinates are
+\(x=c_x+fX/(D+Z)\) and \(y=c_y+fY/(D+Z)\). Consequently, equal coordinate
+intervals compress with distance, and a surface viewed end-on is foreshortened.
+Cylinder radii are constant in physical display coordinates before projection.
+Tick and name sizes use \(s(Z)=s_{\mathrm{far}}(D+R)/(D+Z)\), with the numeric
+tick reference set to 13 pixels at the far enclosing-sphere plane. This preserves
+readability without clamping individual label sizes or using linear depth scaling.
+Closed cylinder/cone meshes discard rear-facing polygons before bounded depth
+sorting. Native SVG and the retained WebGL, Canvas and SVG renderers share the
+projection; WebGL performs the corresponding homogeneous divide.
+
 An empty label suppresses its name, not its arrow. Endpoint names take priority
 over nearby tick numbers in the collision layout. The example below uses
 120° azimuth, 40° elevation and 20° roll, with manual heights from 0 to 1.
