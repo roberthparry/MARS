@@ -8,6 +8,7 @@
  */
 #include <errno.h>
 #include <math.h>
+#include <mpfr.h>
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -1450,6 +1451,9 @@ static void *surface_small_stack(void *result)
         string_free(svg);
     }
     plot_free(plot);
+    num_scope_leave(&scope);
+    /* The fixture owns this thread; release MPFR's local caches before its TLS disappears. */
+    mpfr_free_cache2(MPFR_FREE_LOCAL_CACHE);
     return NULL;
 }
 
