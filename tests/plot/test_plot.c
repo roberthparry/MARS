@@ -2,11 +2,13 @@
  * @file test_plot.c
  * @brief SVG plot ownership, escaping, clipping, numerical precision and cancellation tests.
  *
- * Exercises the public scene API and parses generated SVG with MARS XML. The
+ * Exercises the public scene API, including solid 3D axes on a bounded thread stack,
+ * and parses generated SVG with MARS XML. The
  * README example runs last and leaves its dynamically generated image in memory.
  */
 #include <errno.h>
 #include <math.h>
+#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -64,7 +66,8 @@ static void segment_camera_point(const plot_options_t *options, const double uni
     double depth = cos(e) * (sin(a) * u + cos(a) * v) - sin(e) * z;
     double scale = 4 * radius / (4 * radius + depth);
     out[0] = options->width * 0.5 + fit * (cos(r) * x - sin(r) * y) * scale;
-    out[1] = options->height * 0.5 + fit * (sin(r) * x + cos(r) * y) * scale;
+    double heading = fmin(48, fmax(0, options->height - 240.0) / 4);
+    out[1] = (options->height + heading) * 0.5 + fit * (sin(r) * x + cos(r) * y) * scale;
 }
 
 static void test_plot_segment_camera_baseline(void)
@@ -92,7 +95,8 @@ static void test_plot_segment_camera_baseline(void)
             double margin = fmin(fmax(48, label_width * 5 / 3 + 16), (options.width - 80) / 2.0);
             double radius = hypot(hypot(units[0], units[1]), units[2]) / 2;
             double diameter = 8 * radius / sqrt(15);
-            double fit = fmin(options.width - 2 * margin, options.height - 96) / diameter;
+            double heading = fmin(48, fmax(0, options.height - 240.0) / 4);
+            double fit = fmin(options.width - 2 * margin, options.height - 96 - heading) / diameter;
             unsigned segments = 0, ticks = 0;
             for (const char *path = strstr(text, "d=\"M "); ok && path; path = strstr(path + 1, "d=\"M ")) {
                 double drawn[4], points[6];
@@ -1004,17 +1008,23 @@ static void surface_origin_row(const void *data)
     num_set_default_prec_digits(row->precision);
     json_t *input = json_from_text(row->input);
     number_t bounds[6] = {0};
-    bool ok = input && json_array_size(input) == 6 && !strcmp(string_c_str(row->expected), "outside_connected");
+    double origin[3];
+    bool at_origin = sscanf(string_c_str(row->expected), "origin %lf %lf %lf", origin, origin + 1, origin + 2) == 3;
+    bool ok = input && json_array_size(input) == 6 &&
+              (at_origin || !strcmp(string_c_str(row->expected), "outside_connected"));
     for (unsigned i = 0; ok && i < 6; ++i) {
         const string_t *value = json_string_value(json_array_get(input, i));
         bounds[i] = value ? num_create_from_text(value) : NUM_NAN;
         ok = num_is_real(bounds[i]) && num_is_finite(bounds[i]);
     }
-    plot_t *plot = plot_new(NULL);
+    plot_options_t options = plot_options_default();
+    options.axes_at_origin = at_origin;
+    plot_t *plot = plot_new(&options);
     ok = ok && plot && plot_set_mesh(plot, NULL, NULL, NULL, 0) &&
          plot_set_bounds(plot, bounds[0], bounds[1], bounds[2], bounds[3]) &&
          plot_set_height_bounds(plot, bounds[4], bounds[5]);
-    const double angles[][3] = {{315, 30, 0}, {18, 80, 45}, {145, 15, 135}, {315, 30, 180}, {270, 45, 270}};
+    const double angles[][3] = {{315, 30, 0}, {18, 80, 45}, {145, 15, 135}, {315, 30, 180},
+                               {270, 45, 270}, {0, 5, 0}, {90, 5, 0}};
     for (unsigned view = 0; ok && view < sizeof angles / sizeof *angles; ++view) {
         ok = plot_set_view(plot, angles[view][0], angles[view][1]) && plot_set_roll(plot, angles[view][2]);
         string_t *svg = ok ? plot_to_svg(plot) : NULL;
@@ -1023,6 +1033,45 @@ static void surface_origin_row(const void *data)
         plot_projection_t projection;
         ok = frame && sscanf(frame, "data-axis-corners=\"%u %u %u", corners, corners + 1, corners + 2) == 3 &&
              surface_projection(text, &projection);
+        if (at_origin) {
+            const char *metadata = strstr(text, "data-axis-origin=\"");
+            double actual[3], zero_camera[3], zero_screen[3];
+            ok = ok && metadata && sscanf(metadata, "data-axis-origin=\"%lf %lf %lf", actual, actual + 1,
+                                          actual + 2) == 3;
+            plot_projection_camera(&projection, origin, zero_camera);
+            plot_projection_point(&projection, zero_camera, zero_screen);
+            for (unsigned axis = 0; ok && axis < 3; ++axis) {
+                ok = fabs(actual[axis] - origin[axis]) < 1e-12;
+                double point[3], camera[3], lower[3], upper[3], line[4];
+                for (unsigned i = 0; i < 3; ++i) point[i] = origin[i];
+                point[axis] = -0.08;
+                plot_projection_camera(&projection, point, camera);
+                plot_projection_point(&projection, camera, lower);
+                point[axis] = 1.08;
+                plot_projection_camera(&projection, point, camera);
+                plot_projection_point(&projection, camera, upper);
+                char key[32];
+                snprintf(key, sizeof key, "data-axis-line=\"%u\"", axis);
+                const char *entry = strstr(text, key), *path = entry ? strstr(entry, "d=\"M ") : NULL;
+                ok = ok && path && sscanf(path, "d=\"M %lf %lf L %lf %lf", line, line + 1, line + 2, line + 3) == 4;
+                if (!ok) break;
+                double dx = line[2] - line[0], dy = line[3] - line[1];
+                ok = hypot(line[0] - lower[0], line[1] - lower[1]) < 0.002 &&
+                     (line[2] - upper[0]) * (upper[0] - lower[0]) +
+                     (line[3] - upper[1]) * (upper[1] - lower[1]) > 0 &&
+                     fabs(dx * (zero_screen[1] - line[1]) - dy * (zero_screen[0] - line[0])) /
+                         hypot(dx, dy) < 0.003;
+                for (unsigned endpoint = 0; ok && endpoint < 2; ++endpoint)
+                    ok = line[endpoint * 2] >= 15.99 && line[endpoint * 2] <= options.width - 15.99 &&
+                         line[endpoint * 2 + 1] >= 15.99 && line[endpoint * 2 + 1] <= options.height - 15.99;
+                snprintf(key, sizeof key, "data-axis-cylinder=\"%u\"", axis);
+                ok = ok && strstr(text, key);
+                snprintf(key, sizeof key, "data-axis-cone=\"%u\"", axis);
+                ok = ok && strstr(text, key);
+            }
+            string_free(svg);
+            continue;
+        }
         double screen[8][3];
         for (unsigned corner = 0; ok && corner < 8; ++corner) {
             double point[] = {!!(corner & 1), !!(corner & 2), !!(corner & 4)}, camera[3];
@@ -1077,7 +1126,7 @@ static void surface_origin_row(const void *data)
     plot_free(plot);
     for (unsigned i = 0; i < 6; ++i) num_destroy(&bounds[i]);
     json_free(input); num_set_default_prec_bits(saved_precision);
-    TEST_ASSERT_TRUE(ok, "solid axes retain positive cones, projective tick positions and connected exterior scales");
+    TEST_ASSERT_TRUE(ok, "solid axes preserve the selected exterior or mathematical-origin placement under rotation");
 }
 
 /* Independent pinhole reference values are stored in the shared database. */
@@ -1281,6 +1330,58 @@ static void test_plot_surface_origin(void)
     test_run_database_cases(__FILE__, __LINE__, "plot.surface_origin", NULL, surface_origin_row);
 }
 
+static bool occlusion_area(const plot_occlusion_polygon_t *polygon, void *context)
+{
+    double area = 0;
+    for (unsigned i = 0; i < polygon->count; ++i) {
+        const double *a = polygon->point[i], *b = polygon->point[(i + 1) % polygon->count];
+        area += a[0] * b[1] - a[1] * b[0];
+    }
+    *(double *)context += fabs(area) / 2;
+    return true;
+}
+
+static bool occlusion_points(const json_t *input, plot_occlusion_polygon_t *polygon)
+{
+    polygon->count = (unsigned)json_array_size(input);
+    if (polygon->count < 3 || polygon->count > PLOT_OCCLUSION_POINTS) return false;
+    for (unsigned i = 0; i < polygon->count; ++i)
+        for (unsigned j = 0; j < 3; ++j) {
+            const string_t *text = json_number_text(json_array_get(json_array_get(input, i), j));
+            if (!text) return false;
+            polygon->point[i][j] = strtod(string_c_str(text), NULL);
+        }
+    return true;
+}
+
+static void occlusion_row(const void *data)
+{
+    const test_database_case_t *row = data;
+    json_t *input = json_from_text(row->input);
+    plot_occlusion_t *index = plot_occlusion_new();
+    plot_occlusion_polygon_t face;
+    bool ok = input && index && occlusion_points(json_array_get(input, 0), &face);
+    const json_t *triangles = json_array_get(input, 1);
+    for (size_t i = 0; ok && i < json_array_size(triangles); ++i) {
+        plot_occlusion_polygon_t triangle;
+        ok = occlusion_points(json_array_get(triangles, i), &triangle) && triangle.count == 3 &&
+             plot_occlusion_add(index, triangle.point);
+    }
+    double area = 0;
+    ok = ok && plot_occlusion_build(index) && plot_occlusion_visible(index, &face, occlusion_area, &area) &&
+         fabs(area - strtod(string_c_str(row->expected), NULL)) < 1e-7;
+    if (!ok) printf("%s: visible area %.12g, expected %s\n", string_c_str(row->name), area,
+                    string_c_str(row->expected));
+    plot_occlusion_free(index);
+    json_free(input);
+    TEST_ASSERT_TRUE(ok, "projective occlusion preserves front faces, overlapping covers and holes");
+}
+
+static void test_plot_occlusion(void)
+{
+    test_run_database_cases(__FILE__, __LINE__, "plot.occlusion", NULL, occlusion_row);
+}
+
 static void test_plot_label_spacing(void)
 {
     bool ok = true;
@@ -1330,6 +1431,40 @@ static void test_plot_label_spacing(void)
     TEST_ASSERT_TRUE(ok, "tick labels have clearance at shared corners, narrow sizes and rotated views");
 }
 
+/* Exercise the real renderer with a stack smaller than its former mesh scratch arrays. */
+static void *surface_small_stack(void *result)
+{
+    bool *ok = result;
+    NUM_SCOPE(scope);
+    if (!scope) return NULL;
+    plot_t *plot = plot_new(NULL);
+    number_t axis[] = {NUM_ZERO, NUM_ONE}, heights[] = {NUM_ZERO, NUM_ONE, NUM_ONE, NUM_ZERO};
+    *ok = plot && plot_set_surface(plot, axis, 2, axis, 2, heights);
+    for (unsigned view = 0; *ok && view < 3; ++view) {
+        *ok = plot_set_view(plot, 35 + view * 90, 30);
+        string_t *svg = *ok ? plot_to_svg(plot) : NULL;
+        *ok = svg && strstr(string_c_str(svg), "data-axis-solids=\"true\"") &&
+              strstr(string_c_str(svg), "data-axis-arrow=\"0\"") &&
+              strstr(string_c_str(svg), "data-axis-arrow=\"1\"") &&
+              strstr(string_c_str(svg), "data-axis-arrow=\"2\"");
+        string_free(svg);
+    }
+    plot_free(plot);
+    return NULL;
+}
+
+static void test_plot_surface_small_stack(void)
+{
+    pthread_attr_t attributes;
+    pthread_t thread;
+    bool rendered = false, initialised = pthread_attr_init(&attributes) == 0;
+    bool started = initialised && pthread_attr_setstacksize(&attributes, 96u * 1024u) == 0 &&
+                   pthread_create(&thread, &attributes, surface_small_stack, &rendered) == 0;
+    if (initialised) pthread_attr_destroy(&attributes);
+    bool joined = started && pthread_join(thread, NULL) == 0;
+    TEST_ASSERT_TRUE(joined && rendered, "solid 3D axes render repeatedly on a bounded 96 KiB calculation stack");
+}
+
 static void test_plot_surface_view(void)
 {
     plot_t *plot = plot_new(NULL);
@@ -1355,7 +1490,7 @@ static void test_plot_surface_view(void)
              strstr(string_c_str(svg), ">x</text>") && strstr(string_c_str(svg), ">y</text>") &&
              strstr(string_c_str(svg), ">f</text>") &&
              !strstr(string_c_str(svg), "nan") && !strstr(string_c_str(svg), "inf");
-        /* Perspective scales the six-pixel reference marks according to their eye distance. */
+        /* Perspective scales the compact three-pixel reference marks according to their eye distance. */
         const char *p = svg ? string_c_str(svg) : "";
         size_t ticks = 0;
         while ((p = strstr(p, "data-plot-tick="))) {
@@ -1366,7 +1501,7 @@ static void test_plot_surface_view(void)
                 break;
             }
             double length = hypot(end_x - x, end_y - y);
-            ok = ok && length > 5.99 && length < 10.01 && x > 0 && x < 800 && y > 0 && y < 500;
+            ok = ok && length > 2.99 && length < 5.01 && x > 0 && x < 800 && y > 0 && y < 500;
             ++ticks;
             ++p;
         }
@@ -1481,6 +1616,7 @@ int tests_main(void)
     TEST_RUN_CASE(test_plot_surface, NULL);
     TEST_RUN_CASE(test_plot_surface_height, NULL);
     TEST_RUN_CASE(test_plot_surface_view, NULL);
+    TEST_RUN_CASE(test_plot_surface_small_stack, NULL);
     TEST_RUN_CASE(test_plot_surface_origin, NULL);
     TEST_RUN_CASE(test_plot_perspective, NULL);
     TEST_RUN_CASE(test_plot_axis_legibility, NULL);
@@ -1488,6 +1624,7 @@ int tests_main(void)
     TEST_RUN_CASE(test_plot_tick_density, NULL);
     TEST_RUN_CASE(test_plot_surface_tick_catalogue, NULL);
     TEST_RUN_CASE(test_plot_label_spacing, NULL);
+    TEST_RUN_CASE(test_plot_occlusion, NULL);
     TEST_SECTION("README examples");
     TEST_RUN_OUTPUT(example_plot_svg);
     TEST_RUN_OUTPUT(example_plot_surface);

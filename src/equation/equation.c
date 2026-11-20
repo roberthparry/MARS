@@ -58,10 +58,13 @@ equation_t *equ_simplify_with_context(const equation_t *equation, const expr_con
           expr_context_refine(context, equation->rhs);
     if (!lhs || !rhs)
         goto cleanup;
+    bool reduced = !equation->lhs_display_TeX && !equation->lhs_display_unbound &&
+                   !equation->rhs_display_TeX && !equation->rhs_display_unbound &&
+                   equ_reduce_rational_sides(&lhs, &rhs);
     result = equation->bindings ? equ_new_with_inferred_bindings(lhs, rhs) : equ_new(lhs, rhs);
     if (result) {
         result->power_series_domain = equation->power_series_domain;
-        result->fractional_coefficients = equation->fractional_coefficients;
+        result->fractional_coefficients = equation->fractional_coefficients || reduced;
         if (equ_set_display_TeX(result, equation->lhs_display_TeX, equation->rhs_display_TeX) != 0 ||
             equ_set_display_unbound(result, equation->lhs_display_unbound, equation->rhs_display_unbound) != 0) {
             equ_free(result);
@@ -2549,6 +2552,32 @@ error:
     return NULL;
 }
 
+/* Share one structural centre across solved branches before any output style chooses its notation. */
+static void equ_solutions_beautify(equation_solutions_t *solutions)
+{
+    size_t count = equ_solutions_count(solutions);
+    if (count < 2u || count > 16u)
+        return;
+    const expr_t *expressions[16] = {0};
+    expr_t *ordered[16] = {0};
+    const expr_t *coordinate = equ_lhs(equ_solutions_at(solutions, 0u));
+    for (size_t i = 0u; i < count; ++i) {
+        const equation_t *solution = equ_solutions_at(solutions, i);
+        if (!expr_struct_eq(coordinate, equ_lhs(solution)) || equ_rhs_display_TeX(solution) ||
+            equ_rhs_display_unbound(solution))
+            return;
+        expressions[i] = equ_rhs(solution);
+    }
+    if (!expr_beautify_shared_centre(expressions, count, ordered))
+        return;
+    for (size_t i = 0u; i < count; ++i) {
+        if (!ordered[i])
+            continue;
+        expr_free(solutions->solutions[i]->rhs);
+        solutions->solutions[i]->rhs = ordered[i];
+    }
+}
+
 /* Publish only a complete solve; stopped work restores its original numeric bindings. */
 equation_solutions_t *equ_derive_solutions(const equation_t *equation)
 {
@@ -2560,6 +2589,7 @@ equation_solutions_t *equ_derive_solutions(const equation_t *equation)
     if (snapshot && !original)
         return NULL;
     equation_solutions_t *result = equ_derive_solutions_impl(equation);
+    equ_solutions_beautify(result);
     if (!equ_computation_active()) {
         equ_restore_binding_values(bindings, original);
         equ_solutions_free(result);

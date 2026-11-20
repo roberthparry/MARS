@@ -442,7 +442,8 @@ int number_mpfr_ensure(const number_mpfr_t *value, size_t precision_bits)
         mpfr_init2(mutable_value->value, precision);
         mutable_value->initialised = true;
     }
-    if (precision_bits != 0u && mpfr_get_prec(mutable_value->value) < precision)
+    /* Borrowed shared constants must track increases in working precision, even without an explicit request. */
+    if ((precision_bits != 0u || mutable_value->immortal) && mpfr_get_prec(mutable_value->value) < precision)
         mpfr_prec_round(mutable_value->value, precision, MPFR_RNDN);
     if (mutable_value->constant_id != NUMBER_CONST_COUNT)
         return number_mpfr_set_const_id(mutable_value->value, mutable_value->constant_id);
@@ -635,7 +636,8 @@ size_t number_get_precision_mpfr(const number_t *number)
 
     if (!value || number_mpfr_ensure(value, 0u) != 0)
         return 0u;
-    return (size_t)mpfr_get_prec(value->value);
+    /* A larger cached constant must not promote later calculations after the working precision decreases. */
+    return value->immortal ? number_default_precision_bits : (size_t)mpfr_get_prec(value->value);
 }
 
 long number_get_exponent2_mpfr(const number_t *number)

@@ -4,6 +4,7 @@
  *
  * Uses a disposable plaintext globe with real photographic metadata and synthetic river geometry. Tests the
  * same format dispatch used by HTTP without accessing installed data or requiring a browser or network.
+ * The README ownership example uses only a small metadata catalogue because cache identity needs no imagery.
  */
 #include <math.h>
 #include <stdio.h>
@@ -472,7 +473,16 @@ static int surface_identity_example(void)
 
 static bool surface_readme_fixture(const char *directory)
 {
-    return test_lab_texture_database(directory) && surface_identity_example() == EXIT_SUCCESS;
+    string_t *path = string_sprintf("%s/globe.db", directory);
+    sqlite_t *db = path ? sqlite_open_plain(path) : NULL;
+    /* Opening a configured session and fingerprinting its file metadata never requires image payloads. */
+    bool ready = db && sqlite_exec_cstr(db,
+        "CREATE TABLE globe_texture_dataset(id INTEGER PRIMARY KEY, format_version INTEGER NOT NULL);"
+        "INSERT INTO globe_texture_dataset VALUES(1,2)") &&
+        !setenv("MARS_GLOBE_DB_PATH", string_c_str(path), 1) && !setenv("MARS_GLOBE_DB_KEY", "", 1);
+    sqlite_close(db);
+    string_free(path);
+    return ready && surface_identity_example() == EXIT_SUCCESS;
 }
 
 static void example_globe_reader_identity(void)

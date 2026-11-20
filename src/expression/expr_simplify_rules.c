@@ -199,6 +199,63 @@ cleanup:
     return out;
 }
 
+static expr_t *exact_angle_square(const expr_t *argument, unsigned depth)
+{
+    if (!argument || depth >= 128u)
+        return NULL;
+    if (expr_is_op(argument, &ops_neg))
+        return exact_angle_square(argument->a, depth + 1u);
+    if (expr_is_op(argument, &ops_sqrt))
+        return expr_retain_expr(argument->a);
+    bool product = expr_is_op(argument, &ops_mul), quotient = expr_is_op(argument, &ops_div);
+    if (product || quotient) {
+        expr_t *left = exact_angle_square(argument->a, depth + 1u);
+        expr_t *right = exact_angle_square(argument->b, depth + 1u);
+        expr_t *square = left && right ? (product ? expr_mul(left, right) : expr_div(left, right)) : NULL;
+        expr_free(right);
+        expr_free(left);
+        return expr_simplify_owned(square);
+    }
+    return expr_simplify_owned(expr_mul(argument, argument));
+}
+
+/* Certify familiar inverse angles from exact algebra rather than recognising rounded numerical values. */
+bool expr_exact_acos_pi_ratio(const expr_t *argument, long *numerator_out, unsigned long *denominator_out)
+{
+    static const unsigned char denominators[] = {2, 3, 4, 6, 1};
+    if (!numerator_out || !denominator_out)
+        return false;
+    expr_t *exact = expr_exact_algebraic_value(argument);
+    expr_t *expanded = exact ? expr_expand_preserved_for_display(exact) : NULL;
+    expr_t *square = exact_angle_square(expanded, 0u);
+    number_t squared = NUM_NAN;
+    bool rational = expr_match_const_value(square, &squared) && num_is_exact(squared) && num_is_real(squared);
+    number_t quarters = rational ? num_mul_long(squared, 4L) : num_clone(NUM_NAN);
+    number_t four = num_create_from_long(4L);
+    bool supported = rational && num_is_integer(quarters) && num_ge(quarters, NUM_ZERO) &&
+                     num_le(quarters, four);
+    number_t value = supported ? expr_eval(exact) : num_clone(NUM_NAN);
+    bool certified = false;
+    if (supported && num_is_finite(value) && num_is_real(value)) {
+        size_t slot = (size_t)num_to_double(quarters);
+        unsigned long denominator = denominators[slot];
+        long numerator = slot == 4u ? 0L : 1L;
+        if (num_lt(value, NUM_ZERO))
+            numerator = (long)denominator - numerator;
+        *numerator_out = numerator;
+        *denominator_out = denominator;
+        certified = true;
+    }
+    num_destroy(&value);
+    num_destroy(&four);
+    num_destroy(&quarters);
+    num_destroy(&squared);
+    expr_free(square);
+    expr_free(expanded);
+    expr_free(exact);
+    return certified;
+}
+
 static expr_t *expr_simplify_try_unary_symbolic_inverse_fold(const expr_t *op, const number_t *value, expr_t *arg)
 {
     long numer;

@@ -518,6 +518,13 @@ For a non-packaged WASI libc installation, set `LAB_WASM_INCLUDE` to its header
 directory and `LAB_WASM_LIBC` to its `libc.a` archive. The defaults are
 `/usr/include/wasm32-wasi` and `/usr/lib/wasm32-wasi/libc.a`.
 The toolchain is needed at build time, not to run an already-built browser module.
+
+The browser, codec and image WebAssembly modules reserve a 256 KiB C stack before
+their static data. Solid-axis projection needs more than the linker's default
+64 KiB; placing the stack first also makes an overflow trap before it can damage
+resident menus or allocator state. This reservation is included in the existing
+module memory limits.
+
 The Lab builds both `lab_browser.wasm` for the page and `lab_codec.wasm` for
 background response decoding in `tools/mars_lab/build/<mode>/wasm/`. The normal
 Lab build includes both; neither needs Emscripten, shared-memory WASM threads or
@@ -547,7 +554,7 @@ MARS Lab WebAssembly assembly: tools/mars_lab/build/release/wasm/src/
 Each C module produces a matching `.s` file, such as
 `tools/mars_lab/build/release/wasm/src/lab_surface_math.s`. Add `DEBUG=1` to use
 `build/debug/wasm/src/`; both configurations use the same optimised WASM flags
-as their normal object builds. The Lab-local equivalent is
+and source-specific include paths as their normal object builds. The Lab-local equivalent is
 `make -C tools/mars_lab wasm-asm`.
 
 These are pre-link WebAssembly instructions, not native CPU assembly or the

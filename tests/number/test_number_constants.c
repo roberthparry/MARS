@@ -21,6 +21,31 @@ void run_number_constant_tests(void)
     printf(C_CYAN "Testing named constants and decimal powers...\n" C_RESET);
 
     {
+        size_t saved = num_get_default_prec_bits();
+        const number_t constants[] = {NUM_PI, NUM_PI_6, NUM_SQRT3};
+        bool ok = true;
+        for (size_t i = 0u; i < sizeof constants / sizeof *constants; ++i) {
+            num_set_default_prec_bits(96u);
+            number_t low = num_const_prec(constants[i], 96u), shared = num_clone(constants[i]);
+            (void)num_get_prec_bits(shared);
+            num_set_default_prec_bits(2048u);
+            number_t high = num_clone(constants[i]), reference = num_const_prec(constants[i], 2048u);
+            number_t retained = num_clone(low);
+            ok = ok && num_get_prec_bits(high) >= 2048u && num_get_prec_bits(retained) == 96u &&
+                 num_eq(high, reference) && num_eq(retained, low);
+            num_set_default_prec_bits(96u);
+            ok = ok && num_get_prec_bits(shared) == 96u && num_get_prec_bits(reference) == 2048u;
+            num_destroy(&retained);
+            num_destroy(&reference);
+            num_destroy(&high);
+            num_destroy(&low);
+            num_destroy(&shared);
+        }
+        num_set_default_prec_bits(saved);
+        ASSERT_TRUE(ok);
+    }
+
+    {
         const size_t precisions[] = {64u, 128u, 512u};
         const char *aliases[] = {"sqrt_pi_over_two", "sqrt(pi/2)", "sqrt(@pi/2)", "√(π/2)"};
         for (size_t i = 0u; i < sizeof precisions / sizeof *precisions; ++i) {

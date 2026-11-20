@@ -217,6 +217,8 @@ Cloning a named MPFR mathematical constant retains its identity. An explicit
 precision increase can therefore recompute that constant, rather than simply
 padding its previously rounded approximation with more digits. Ordinary
 computed values retain their existing approximation when widened.
+Borrowed shared mathematical constants also grow to the current working precision
+when it increases. Explicitly materialised, owned snapshots retain their chosen precision.
 
 Precision control helpers use the same naming convention:
 

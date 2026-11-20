@@ -58,7 +58,8 @@ bool lab_worker_equation_plot_titles(const equation_t *equation, const expr_t *f
         expr_free(sides[side]);
         sides[side] = simplified;
     }
-    equation_t *display = ok ? equ_new(sides[0], sides[1]) : NULL;
+    equation_t *source = ok ? equ_new(sides[0], sides[1]) : NULL;
+    equation_t *display = source ? equ_simplify_with_context(source, NULL) : NULL;
     if (display) {
         *plain = equ_to_text(display, style_UNBOUND);
         *TeX = equ_to_TeX_body_wrapped(display, LAB_WORKER_EQUATION_LINE_LIMIT_LATEX);
@@ -71,6 +72,7 @@ bool lab_worker_equation_plot_titles(const equation_t *equation, const expr_t *f
         *TeX = NULL;
     }
     equ_free(display);
+    equ_free(source);
     expr_free(sides[1]);
     expr_free(sides[0]);
     return ok;

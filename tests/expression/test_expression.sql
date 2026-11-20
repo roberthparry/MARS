@@ -7,6 +7,44 @@ CREATE TABLE IF NOT EXISTS expression_cases (
 CREATE INDEX IF NOT EXISTS expression_cases_operation ON expression_cases(operation, name);
 
 INSERT INTO test_case_runner(module, source, parent, table_name, operation) VALUES (
+    'expression.shared_centres', 'tests/expression/test_expr_to_string.c',
+    'tests.test_expr_t_to_string.test_to_string_all.test_to_string_shared_centres',
+    'expression_cases', 'shared_centre')
+ON CONFLICT(module) DO UPDATE SET table_name=excluded.table_name, operation=excluded.operation;
+INSERT INTO expression_cases(name, operation, input, expected) VALUES
+    ('shared_centre_radical', 'shared_centre', '["sqrt(3)-2*cos(pi/18)","4*cos(pi/18)+sqrt(3)"]',
+     '{"plain":["√(3) - 2·cos(π/18)","√(3) + 4·cos(π/18)"],"TeX":["\\sqrt{3} - 2\\mkern-2mu \\cos(\\frac{\\pi}{18})","\\sqrt{3} + 4\\mkern-2mu \\cos(\\frac{\\pi}{18})"]}'),
+    ('shared_centre_functions', 'shared_centre', '["sin(t)+c","c-sin(t)","exp(t)+c"]',
+     '{"plain":["c + sin(t)","c - sin(t)","c + exp(t)"],"TeX":["c + \\sin(t)","c - \\sin(t)","c + e^{t}"]}'),
+    ('shared_centre_negative', 'shared_centre', '["sin(t)-sqrt(5)","-sqrt(5)-cos(t)"]',
+     '{"plain":["-√(5) + sin(t)","-√(5) - cos(t)"],"TeX":["-\\sqrt{5} + \\sin(t)","-\\sqrt{5} - \\cos(t)"]}'),
+    ('shared_centre_multiple', 'shared_centre', '["sin(t)+a+b","b+cos(t)+a"]',
+     '{"plain":["a + b + sin(t)","a + b + cos(t)"],"TeX":["a + b + \\sin(t)","a + b + \\cos(t)"]}'),
+    ('shared_centre_opposite_sign_control', 'shared_centre', '["sin(t)+c","cos(t)-c"]',
+     '{"plain":["sin(t) + c","cos(t) - c"],"TeX":["\\sin(t) + c","\\cos(t) - c"]}'),
+    ('shared_centre_duplicate', 'shared_centre', '["sin(t)+c+c","c+cos(t)"]',
+     '{"plain":["c + sin(t) + c","c + cos(t)"],"TeX":["c + \\sin(t) + c","c + \\cos(t)"]}')
+ON CONFLICT(name) DO UPDATE SET input=excluded.input, expected=excluded.expected;
+
+INSERT INTO test_case_runner(module, source, parent, table_name, operation) VALUES (
+    'expression.unit_coefficients_TeX', 'tests/expression/test_expr_to_string.c',
+    'tests.test_expr_t_to_string.test_to_string_all.test_to_string_unit_coefficients_TeX',
+    'expression_cases', 'unit_coefficient_TeX')
+ON CONFLICT(module) DO UPDATE SET table_name=excluded.table_name, operation=excluded.operation;
+INSERT OR IGNORE INTO expression_cases(name, operation, input, expected) VALUES
+    ('unit_conjugate_difference', 'unit_coefficient_TeX', 'B-conj(B)', 'B - \overline{B}'),
+    ('unit_reversed_conjugate', 'unit_coefficient_TeX', 'conj(B)-B', '-B + \overline{B}'),
+    ('unit_conjugate_integer_control', 'unit_coefficient_TeX', '21*B-conj(B)', '21\mkern-2mu B - \overline{B}'),
+    ('unit_conjugate_weight_control', 'unit_coefficient_TeX', 'B-3*conj(B)', 'B - 3\mkern-2mu \overline{B}'),
+    ('unit_conjugate_standalone_integer', 'unit_coefficient_TeX', 'B-1-conj(B)', 'B - \overline{B} - 1'),
+    ('unit_projection_positive', 'unit_coefficient_TeX', 'B/2+conj(B)/2', '\mathfrak{Re}\mathopen{}\left\{B\right\}'),
+    ('unit_projection_negative', 'unit_coefficient_TeX', '-B/2-conj(B)/2', '-\mathfrak{Re}\mathopen{}\left\{B\right\}'),
+    ('unit_common_conjugate_positive', 'unit_coefficient_TeX', '(1/2)*B+(1/2)*conj(B)', '\mathfrak{Re}\mathopen{}\left\{B\right\}'),
+    ('unit_common_conjugate_negative', 'unit_coefficient_TeX', '(-1/2)*B+(-1/2)*conj(B)', '-\mathfrak{Re}\mathopen{}\left\{B\right\}'),
+    ('unit_projection_mixed_sum', 'unit_coefficient_TeX', 'A-Re(B)+conj(C)', 'A - \mathfrak{Re}\mathopen{}\left\{B\right\} + \overline{C}')
+ON CONFLICT(name) DO UPDATE SET input=excluded.input, expected=excluded.expected;
+
+INSERT INTO test_case_runner(module, source, parent, table_name, operation) VALUES (
     'expression.exact_decimal_literals', 'tests/expression/test_expr_from_string.c',
     'tests.test_expr_t_from_string.test_from_string_exact_decimal_literals', 'expression_cases', 'exact_decimal_literal')
 ON CONFLICT(module) DO UPDATE SET table_name=excluded.table_name, operation=excluded.operation;

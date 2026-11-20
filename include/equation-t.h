@@ -139,7 +139,12 @@ equation_t *equ_display_expanded(const equation_t *equation, const expr_t *wrt);
  * @param equation Borrowed source equation; never modified.
  * @param context Borrowed context, or NULL to capture named constants while keeping variables free.
  * @return Owned equation, or NULL on failure; release with equ_free().
- * Names remain symbolic and unknown conditions remain. Special solver notation is preserved without
+ * Names remain symbolic and unknown conditions remain. Exact rational offsets move across the equality;
+ * common non-zero numerical scales are removed without cancelling symbolic denominators.
+ * Two-term relations containing a factored product retain it on one side, clearing rational denominators
+ * and factoring integer content on the other side. Otherwise shared numerical denominators are separated
+ * into individually reduced fractions with factored numerators.
+ * Special solver notation is preserved without
  * rewriting its underlying side. This is result simplification, not a proof that the equation holds.
  */
 equation_t *equ_simplify_with_context(const equation_t *equation, const expr_context_t *context);

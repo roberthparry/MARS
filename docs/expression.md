@@ -147,6 +147,8 @@ Finite real decimal literals use the same exact reader as binding values, includ
 so symbolic coefficient arithmetic does not introduce repeating floating-point approximations. Extremely
 large decimal exponents retain the number module's range handling instead of allocating unbounded integer padding.
 Rational scales on algebraic quotients share one fraction bar; derivatives and integrals retain their separate notation.
+Native polynomial solvers can recover authored radical coefficients from their preserved
+binding expressions without converting rounded numerical values into exact constants.
 Taylor equations retain exact fractional coefficients throughout their presentation,
 so that `17/10` stays fractional in that series context even though an ordinary expression may display `1.7`.
 
@@ -2483,6 +2485,10 @@ common centre first in TeX: $a+b$ together with $a-b$. The formatter recognises
 the common term and opposite shifts structurally, independently of function
 or variable names. Unpaired sums retain their ordinary ordering, and the
 underlying expressions are unchanged.
+For small solution families, the native beautifier also recognises signed additive
+terms shared by every branch and places that common centre first in each member.
+It preserves the remaining term order and matches structure and signs exactly,
+including repeated terms; numerical resemblance does not establish a shared centre.
 Explicit rational coefficients stay at the start of an algebraic quotient's
 product in TeX, for both positive and negative terms. A shared factor such as
 ½ therefore occupies the same position in paired exponents, rather than being
@@ -2745,6 +2751,8 @@ twice its real part, with any common numeric coefficient outside the projection.
 Unequal coefficients retain conjugation; the formatter does not split off a
 partial real-part term. This native structural rule preserves exact radicals
 and applies consistently to TeX, Expression and Function output.
+TeX omits unit scalar coefficients on conjugates and projections; a coefficient
+of negative one is displayed as a minus sign, while standalone ones and other coefficients remain explicit.
 Postfix `z^*` is equivalent. `abs(z)` and paired bars `|z|` are
 also equivalent for every scalar type; for complex values and expressions
 they denote the modulus `sqrt(z*z^*)`. An unmatched bar is a syntax error.

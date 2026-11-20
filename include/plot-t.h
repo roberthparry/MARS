@@ -5,7 +5,7 @@
  * plot_t copies sampled or measured number_t coordinates, labels and styles.
  * Linear bottom/left axes with open top/right edges, automatic or explicit bounds, ticks, a grid and a legend
  * are rendered in C, with independent RGB colours for curves, axes, grid and labels.
- * Rectangular height grids have azimuth, elevation and roll controls, connected exterior axes with named positive-end
+ * Rectangular height grids have azimuth, elevation and roll controls, exterior or origin-centred axes with positive-end
  * cone arrows, a pinhole camera, depth-scaled labels, automatic or manual height limits, coloured facets and
  * holes at missing values; they cannot be mixed
  * with curve series in the same scene. Endpoint names stay upright during rotation.
@@ -56,6 +56,8 @@ typedef struct {
     bool smart_y; /**< Opt-in robust curve Y or surface height range; no visible clipping annotation. */
     bool guard_gaps; /**< Use robust Y bounds for discontinuous line series even in Fit all; manual bounds win. */
     bool equal_units; /**< Preserve equal physical coordinate units in two-dimensional projections. */
+    bool axes_at_origin; /**< Place 3D axes through the mathematical origin; default false selects exterior scales.
+                             Two-dimensional axes are unaffected. The origin may lie outside the visible bounds. */
     bool legend_box; /**< Enclose the legend in a box with coloured line or dotted-tip impulse samples. */
     bool legend_above; /**< Reserve space above the axes for a boxed legend; requires legend and legend_box. */
     bool schematic_impulses; /**< Draw equal-height thin stems with dotted tips; weights remain in hover titles. */

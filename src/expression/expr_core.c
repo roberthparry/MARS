@@ -4,6 +4,7 @@
  *
  * Allocates nodes, manages their references and caches, and constructs variables, constants and derivative graphs.
  * This is the central ownership and evaluation machinery on which the symbolic units depend.
+ * Algebraic value snapshots recover authored radical coefficients without promoting rounded values to exact ones.
  *
  * This is part of the expr_t implementation. Preserve expression ownership, symbol identity and mathematical
  * domain restrictions when extending these operations.
@@ -341,6 +342,53 @@ expr_t *expr_binding_value_expression(const expr_t *binding)
     expr_t *result = num_is_finite(value) ? expr_new_const(value) : NULL;
     num_destroy(&value);
     return result;
+}
+
+/* Recover authored rational arithmetic and radicals without guessing an exact value from rounded digits. */
+static expr_t *exact_algebraic_value(const expr_t *source, unsigned depth)
+{
+    if (!source || !source->ops || depth >= 128u)
+        return NULL;
+    if (source->ops == &ops_const || source->ops == &ops_var) {
+        number_t value = expr_get_val(source);
+        bool exact = num_is_exact(value) && num_is_finite(value);
+        expr_t *result = exact ? expr_new_const(value) : NULL;
+        num_destroy(&value);
+        if (!exact && source->binding_expr) {
+            expr_t *expanded = expr_binding_expr_eval_expr(source->binding_expr);
+            result = exact_algebraic_value(expanded, depth + 1u);
+            expr_free(expanded);
+        }
+        return result;
+    }
+    const expr_ops_t *ops = source->ops;
+    bool power = ops == &ops_pow || ops == &ops_root;
+    bool unary = ops == &ops_neg || ops == &ops_sqrt || ops == &ops_cubrt || ops == &ops_conj || ops == &ops_pow_d;
+    bool binary = ops == &ops_add || ops == &ops_sub || ops == &ops_mul || ops == &ops_div || power;
+    if (!unary && !binary)
+        return NULL;
+    if (power || ops == &ops_pow_d) {
+        number_t exponent = power ? expr_eval(source->b) : num_clone(source->c);
+        bool rational = num_is_exact(exponent) && num_is_real(exponent) && num_is_finite(exponent);
+        num_destroy(&exponent);
+        if (!rational)
+            return NULL;
+    }
+    expr_t *left = exact_algebraic_value(source->a, depth + 1u);
+    expr_t *right = binary ? exact_algebraic_value(source->b, depth + 1u) : NULL;
+    expr_t *result = NULL;
+    if (left && (!binary || right))
+        result = ops == &ops_pow_d ? expr_pow(left, &source->c)
+                                  : binary ? ops->apply_binary(left, right) : ops->apply_unary(left);
+    expr_free(right);
+    expr_free(left);
+    return result;
+}
+
+/* Supply an independent algebraic coefficient graph to native polynomial solvers. */
+expr_t *expr_exact_algebraic_value(const expr_t *source)
+{
+    return exact_algebraic_value(source, 0u);
 }
 
 void expr_set_name(expr_t *expr, const char *name)

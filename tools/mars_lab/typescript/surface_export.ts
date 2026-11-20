@@ -22,7 +22,7 @@ interface MarsSurfaceSVGPath {
 interface MarsSurfaceSVGPlan {
     series: MarsSurfaceSVGPath[];
     axes: string[];
-    solids: {path: string; shade: number; axis: number; cone: boolean}[];
+    solids: {path: string; shade: number; axis: number; cone: boolean; faded?: boolean; visible?: string[]}[];
 }
 
 /** Native capability used to construct a vector drawing plan. */
@@ -65,7 +65,9 @@ class MarsSurfaceExporter {
         if (!view?.chart.isConnected) return null;
         if (!view.polygons || !view.framePlan) return null; // View is not fully prepared.
         const segments = view.chart.dataset.segments === 'true';
-        const plan = this.native.call('lab_surface_svg_plan', view.polygons(),
+        const polygons = view.polygons();
+        if (!segments) this.native.call('lab_surface_visibility', view.framePlan, polygons);
+        const plan = this.native.call('lab_surface_svg_plan', polygons,
             view.framePlan.paths.slice(view.framePlan.axisPathCount ?? 0), Number(segments),
             view.framePlan.solids ?? []) as MarsSurfaceSVGPlan;
         const drawing = document.createElementNS(MarsSurfaceSVGWriter.namespace, 'g');
@@ -73,8 +75,15 @@ class MarsSurfaceExporter {
         for (const face of plan.solids) {
             MarsSurfaceSVGWriter.node(drawing, 'path', {
                 d: face.path, fill: '#94b8b1', stroke: '#94b8b1', 'stroke-width': 0.35,
-                'stroke-linejoin': 'round', 'data-axis-colour': '#94b8b1', 'data-axis-shade': face.shade
+                'stroke-linejoin': 'round', 'data-axis-colour': '#94b8b1', 'data-axis-shade': face.shade,
+                opacity: face.faded ? view.framePlan.hiddenAxisOpacity ?? 0.4 : 1
             });
+            for (const path of face.visible ?? []) {
+                MarsSurfaceSVGWriter.node(drawing, 'path', {
+                    d: path, fill: '#94b8b1', stroke: 'none',
+                    'data-axis-colour': '#94b8b1', 'data-axis-shade': face.shade
+                });
+            }
         }
         this.appendAxes(drawing, plan.axes, view.framePlan.texts,
             view.framePlan.pathWidths?.slice(view.framePlan.axisPathCount ?? 0) ?? []);

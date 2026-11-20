@@ -348,6 +348,7 @@ int lab_worker_equation_mesh(equation_t *equation, expr_t *first, expr_t *second
         bounds[2 * axis + 1] = upper + padding;
     }
     plot_options_t options = plot_options_default();
+    options.axes_at_origin = true;
     options.width = 800;
     options.height = 650;
     options.x_label = expr_symbol_name(first);

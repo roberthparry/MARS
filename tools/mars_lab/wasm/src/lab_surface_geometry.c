@@ -182,13 +182,16 @@ static jsref projected_polygon(const frame_t *f, jsref points)
     }
     count = clip(polygon, count);
     int out = lab_dom_object(LAB_VALUE_OBJECT), vertices = lab_dom_object(LAB_VALUE_ARRAY);
+    int depths = lab_dom_object(LAB_VALUE_ARRAY);
     for (unsigned i = 0; i < count; ++i) {
         double p[3];
         project(f, polygon[i], p);
         depth += p[2];
         lab_dom_push(vertices, vector(p, 2));
+        lab_dom_push(depths, lab_dom_numeric(p[2]));
     }
     lab_dom_set(out, "points", vertices);
+    lab_dom_set(out, "depths", depths);
     lab_dom_set(out, "depth", lab_dom_numeric(count ? depth / count : 0));
     return out;
 }
@@ -332,6 +335,19 @@ void lab_surface_frame(view_jsref view, jsref override_bounds)
         return;
     }
     f.fit = f.projection.fit;
+    lab_dom_set(out, "rows", vector(f.rows, 9));
+    lab_dom_set(out, "scaling", vector(f.scale, 3));
+    lab_dom_set(out, "offset", vector(f.offset, 3));
+    lab_dom_set(out, "width", lab_dom_numeric(f.width));
+    lab_dom_set(out, "height", lab_dom_numeric(f.height));
+    lab_dom_set(out, "fit", lab_dom_numeric(f.fit));
+    lab_dom_set(out, "distance", lab_dom_numeric(f.projection.distance));
+    lab_dom_set(out, "radius", lab_dom_numeric(f.projection.radius));
+    lab_dom_set(out, "centre", vector(f.projection.centre, 2));
+    /* Fit the solid axes before constructing the surface's matching homogeneous camera. */
+    lab_surface_axes(view, out);
+    f.fit = f.projection.fit = numeric(out, "fit");
+    read_vector(lab_dom_get(out, "centre"), f.projection.centre, 2);
     double matrix[16] = {0};
     double shift_x = 2 * f.projection.centre[0] / f.width - 1;
     double shift_y = 1 - 2 * f.projection.centre[1] / f.height;
@@ -344,15 +360,5 @@ void lab_surface_frame(view_jsref view, jsref override_bounds)
     matrix[12] = shift_x; matrix[13] = shift_y;
     matrix[15] = 1;
     lab_dom_set(out, "matrix", vector(matrix, 16));
-    lab_dom_set(out, "rows", vector(f.rows, 9));
-    lab_dom_set(out, "scaling", vector(f.scale, 3));
-    lab_dom_set(out, "offset", vector(f.offset, 3));
-    lab_dom_set(out, "width", lab_dom_numeric(f.width));
-    lab_dom_set(out, "height", lab_dom_numeric(f.height));
-    lab_dom_set(out, "fit", lab_dom_numeric(f.fit));
-    lab_dom_set(out, "distance", lab_dom_numeric(f.projection.distance));
-    lab_dom_set(out, "radius", lab_dom_numeric(f.projection.radius));
-    lab_dom_set(out, "centre", vector(f.projection.centre, 2));
-    lab_surface_axes(view, out);
     lab_dom_return(out);
 }

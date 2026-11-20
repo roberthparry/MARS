@@ -43,8 +43,8 @@
   }
 
   .header-statue {
-    inset: 0.4rem auto auto 50%;
-    width: 1.75rem;
+    inset: 0.4rem auto auto 62%;
+    width: 3.45rem;
     height: 3rem;
     max-height: calc(100% - 0.8rem);
   }

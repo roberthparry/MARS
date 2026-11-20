@@ -122,6 +122,13 @@ void lab_surface_svg_plan(jsref polygons, jsref paths, lab_surface_primitive_t k
             lab_dom_set(entry, "shade", lab_dom_get(face, "shade"));
             lab_dom_set(entry, "axis", lab_dom_get(face, "axis"));
             lab_dom_set(entry, "cone", lab_dom_get(face, "cone"));
+            int fragments = lab_dom_get(face, "visible"), visible = lab_dom_object(LAB_VALUE_ARRAY);
+            lab_dom_set(entry, "faded", lab_dom_scalar(LAB_VALUE_BOOLEAN, lab_dom_type(fragments) == LAB_VALUE_ARRAY));
+            for (unsigned j = 0; j < lab_dom_count(fragments); ++j) {
+                int fragment = commands(lab_dom_item(fragments, j), 0, 1, 24);
+                if (fragment) lab_dom_push(visible, fragment);
+            }
+            lab_dom_set(entry, "visible", visible);
             lab_dom_push(solid_paths, entry);
         }
         lab_dom_release(mark);

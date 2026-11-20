@@ -81,9 +81,15 @@ static bool isolate_strip(expr_t **domain, const expr_t *value, bool half)
     if (ok && half) {
         expr_t *unit = expr_new_named_const(NUM_I, "i");
         expr_t *pole = unit ? expr_mul(unit, width) : NULL;
-        expr_t *difference = pole ? expr_sub(value, pole) : NULL;
+        /* Use the authored algebra for the pole restriction as for the strip boundary. Cached pi values
+         * can have different precisions; reconnect any live bindings after expanding their notation. */
+        expr_t *preserved = expr_expand_preserved_for_display(value);
+        expr_t *expanded = preserved ? expr_clone_linked_symbols(preserved, value) : NULL;
+        expr_t *difference = pole && expanded ? expr_sub(expanded, pole) : NULL;
         ok = difference && isolate_nonzero(domain, difference);
         expr_free(difference);
+        expr_free(expanded);
+        expr_free(preserved);
         expr_free(pole);
         expr_free(unit);
     }

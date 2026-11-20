@@ -144,6 +144,7 @@ static const struct lab_svr_asset lab_svr_assets[] = {
     {"/js/transport.js", "@scripts/transport.js", "text/javascript; charset=utf-8", 4194304},
     {"/index.css", "@assets/index.css", "text/css; charset=utf-8", 4194304},
     {"/images/mars_statue.png", "@assets/images/mars_statue.png", "image/png", 524288},
+    {"/images/ophelia_statue.png", "@assets/images/ophelia_statue.png", "image/png", 2097152},
     {"/css/theme.css", "@assets/css/theme.css", "text/css; charset=utf-8", 4194304},
     {"/css/skins.css", "@assets/css/skins.css", "text/css; charset=utf-8", 4194304},
     {"/css/layout.css", "@assets/css/layout.css", "text/css; charset=utf-8", 4194304},

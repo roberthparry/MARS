@@ -495,7 +495,7 @@ Callers supplying their own connections retain their chosen cache settings.
 
 `globe_reader_identity()` refreshes a session and returns an owned, opaque fingerprint
 of its resolved database path and database/WAL metadata, or `NULL` if unavailable.
-It exposes neither paths nor keys and does not read the whole database. It is a cache
+It exposes neither paths nor keys and does not read the whole database or require image payloads. It is a cache
 generation identifier, not a content checksum; compare identities before and after
 preparing derived imagery. Release the returned string with `string_free()`.
 

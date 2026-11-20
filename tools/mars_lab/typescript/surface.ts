@@ -23,11 +23,16 @@ class MarsSurfaceGPU {
         private readonly segments: boolean,
         private readonly program: WebGLProgram,
         private readonly buffer: WebGLBuffer,
+        private readonly axisBuffer: WebGLBuffer,
+        private readonly attributes: number[],
         private readonly shaders: WebGLShader[],
         private readonly camera: WebGLUniformLocation | null,
         private readonly domainScale: WebGLUniformLocation | null,
         private readonly domainOffset: WebGLUniformLocation | null,
         private readonly palette: WebGLUniformLocation | null,
+        private readonly axisMode: WebGLUniformLocation | null,
+        private readonly axisColour: WebGLUniformLocation | null,
+        private readonly axisOpacity: WebGLUniformLocation | null,
         readonly maxSize: number
     ) {}
 
@@ -42,24 +47,32 @@ class MarsSurfaceGPU {
         catch (_) { return null; }
         if (!gl) return null;
         const shaders: WebGLShader[] = [];
-        let program: WebGLProgram | null = null, buffer: WebGLBuffer | null = null;
+        let program: WebGLProgram | null = null, buffer: WebGLBuffer | null = null, axisBuffer: WebGLBuffer | null = null;
         try {
             const precision = (gl.getShaderPrecisionFormat(gl.FRAGMENT_SHADER, gl.HIGH_FLOAT)?.precision ?? 0) > 0 ?
                 'highp' : 'mediump';
             const sources: [number, string][] = [[gl.VERTEX_SHADER, `
                 attribute vec3 position; attribute vec3 colour; attribute vec3 corner;
+                attribute vec4 projected; attribute float illumination;
                 uniform mat4 camera; uniform vec3 domainScale; uniform vec3 domainOffset;
+                uniform bool axisMode; uniform vec3 axisColour;
                 varying mediump vec3 shade; varying mediump vec3 edge; varying ${precision} vec3 coordinate;
                 void main() {
+                    if (axisMode) {
+                        coordinate = vec3(0.0); gl_Position = projected;
+                        shade = axisColour * illumination; edge = vec3(1.0); return;
+                    }
                     coordinate = (position - vec3(0.5)) * domainScale + domainOffset;
                     gl_Position = camera * vec4(coordinate, 1.0); shade = colour; edge = corner;
                 }
             `], [gl.FRAGMENT_SHADER, `
                 precision ${precision} float;
                 uniform mat3 palette;
+                uniform bool axisMode; uniform float axisOpacity;
                 varying mediump vec3 shade; varying mediump vec3 edge; varying ${precision} vec3 coordinate;
                 void main() {
                     if (any(greaterThan(abs(coordinate), vec3(0.5000001)))) discard;
+                    if (axisMode) { gl_FragColor = vec4(shade, axisOpacity); return; }
                     float wire = smoothstep(0.0, 0.025, min(edge.x, min(edge.y, edge.z)));
                     vec3 themed = clamp(palette * shade, 0.0, 1.0);
                     gl_FragColor = vec4(mix(themed * 0.65, themed, wire), 1.0);
@@ -80,26 +93,29 @@ class MarsSurfaceGPU {
             if (!gl.getProgramParameter(program, gl.LINK_STATUS)) throw new Error('Surface program unavailable');
             gl.useProgram(program);
             buffer = gl.createBuffer();
-            if (!buffer) throw new Error('Surface buffer allocation failed');
+            axisBuffer = gl.createBuffer();
+            if (!buffer || !axisBuffer) throw new Error('Surface buffer allocation failed');
             gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
             gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
-            for (const [i, name] of ['position', 'colour', 'corner'].entries()) {
-                const location = gl.getAttribLocation(program, name);
-                gl.enableVertexAttribArray(location);
-                gl.vertexAttribPointer(location, 3, gl.FLOAT, false, 36, i * 12);
-            }
+            const attributes = ['position', 'colour', 'corner', 'projected', 'illumination']
+                .map(name => gl.getAttribLocation(program!, name));
             const camera = gl.getUniformLocation(program, 'camera');
             const domainScale = gl.getUniformLocation(program, 'domainScale');
             const domainOffset = gl.getUniformLocation(program, 'domainOffset');
             const palette = gl.getUniformLocation(program, 'palette');
+            const axisMode = gl.getUniformLocation(program, 'axisMode');
+            const axisColour = gl.getUniformLocation(program, 'axisColour');
+            const axisOpacity = gl.getUniformLocation(program, 'axisOpacity');
             gl.enable(gl.DEPTH_TEST);
             gl.disable(gl.CULL_FACE);
             const viewport = gl.getParameter(gl.MAX_VIEWPORT_DIMS) as Int32Array;
             const maximum = gl.getParameter(gl.MAX_RENDERBUFFER_SIZE) as number;
-            return new MarsSurfaceGPU(gl, canvas, vertices.length / 9, segments, program, buffer,
-                shaders, camera, domainScale, domainOffset, palette, Math.min(4096, maximum, ...viewport));
+            return new MarsSurfaceGPU(gl, canvas, vertices.length / 9, segments, program, buffer, axisBuffer, attributes,
+                shaders, camera, domainScale, domainOffset, palette, axisMode, axisColour, axisOpacity,
+                Math.min(4096, maximum, ...viewport));
         } catch (_) {
             if (buffer) gl.deleteBuffer(buffer);
+            if (axisBuffer) gl.deleteBuffer(axisBuffer);
             if (program) gl.deleteProgram(program);
             for (const shader of shaders) gl.deleteShader(shader);
             gl.getExtension('WEBGL_lose_context')?.loseContext();
@@ -112,17 +128,50 @@ class MarsSurfaceGPU {
      * A false visibility flag clears without drawing; a lost or disposed context returns false
      * so the caller can switch to software rendering.
      */
-    draw(matrix: Float32Array, scaling: number[], offset: number[], visible: boolean): boolean {
+    draw(matrix: Float32Array, scaling: number[], offset: number[], visible: boolean,
+         axes = new Float32Array(), hiddenOpacity = 0.4): boolean {
         const gl = this.gl;
         if (this.disposed || gl.isContextLost()) return false;
         gl.viewport(0, 0, this.canvas.width, this.canvas.height);
         gl.clearColor(0, 0, 0, 0);
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer);
+        for (const [i, location] of this.attributes.entries()) {
+            if (i < 3) {
+                gl.enableVertexAttribArray(location);
+                gl.vertexAttribPointer(location, 3, gl.FLOAT, false, 36, i * 12);
+            } else gl.disableVertexAttribArray(location);
+        }
+        gl.uniform1i(this.axisMode, 0);
         gl.uniformMatrix4fv(this.camera, false, matrix);
         gl.uniform3fv(this.domainScale, scaling);
         gl.uniform3fv(this.domainOffset, offset);
         gl.uniformMatrix3fv(this.palette, false, WorksheetPlotPalette.matrix());
         gl.drawArrays(this.segments ? gl.LINES : gl.TRIANGLES, 0, visible ? this.vertexCount : 0);
+        if (axes.length) {
+            gl.bindBuffer(gl.ARRAY_BUFFER, this.axisBuffer);
+            gl.bufferData(gl.ARRAY_BUFFER, axes, gl.STREAM_DRAW);
+            for (let i = 0; i < 3; ++i) gl.disableVertexAttribArray(this.attributes[i]);
+            gl.enableVertexAttribArray(this.attributes[3]);
+            gl.enableVertexAttribArray(this.attributes[4]);
+            gl.vertexAttribPointer(this.attributes[3], 4, gl.FLOAT, false, 20, 0);
+            gl.vertexAttribPointer(this.attributes[4], 1, gl.FLOAT, false, 20, 16);
+            gl.uniform1i(this.axisMode, 1);
+            gl.uniform3fv(this.axisColour, WorksheetPlotPalette.axis_colour());
+            // Keep hidden sections visible with a light fade, using the surface's actual depth buffer.
+            gl.enable(gl.BLEND);
+            gl.blendFuncSeparate(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA, gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+            gl.depthMask(false);
+            gl.depthFunc(gl.GREATER);
+            gl.uniform1f(this.axisOpacity, hiddenOpacity);
+            gl.drawArrays(gl.TRIANGLES, 0, axes.length / 5);
+            gl.disable(gl.BLEND);
+            gl.depthMask(true);
+            gl.depthFunc(gl.LEQUAL);
+            gl.uniform1f(this.axisOpacity, 1);
+            gl.drawArrays(gl.TRIANGLES, 0, axes.length / 5);
+            gl.depthFunc(gl.LESS);
+        }
         return true;
     }
 
@@ -131,6 +180,7 @@ class MarsSurfaceGPU {
         if (this.disposed) return;
         this.disposed = true;
         this.gl.deleteBuffer(this.buffer);
+        this.gl.deleteBuffer(this.axisBuffer);
         this.gl.deleteProgram(this.program);
         for (const shader of this.shaders) this.gl.deleteShader(shader);
         this.gl.getExtension('WEBGL_lose_context')?.loseContext();
@@ -583,7 +633,8 @@ class MarsSurfacePreview {
 
         // 4. Render with WebGL, or retry with Canvas if the GPU fails.
         if (view.gpu) {
-            if (!view.gpu.draw(new Float32Array(frame.matrix), frame.scaling, frame.offset, frame.drawMesh)) {
+            if (!view.gpu.draw(new Float32Array(frame.matrix), frame.scaling, frame.offset, frame.drawMesh,
+                               new Float32Array(frame.axisVertices ?? []), frame.hiddenAxisOpacity)) {
                 const savedView = this.snapshot();
                 this.dispose();
                 const fallback = this.prepare(chart, savedView, true);
@@ -593,7 +644,7 @@ class MarsSurfacePreview {
             return false;
         }
         // 5. Paint axes, reveal the overlay, synchronise zoom and schedule settling.
-        view.paintAxes = this.paintAxes.bind(this, frame);
+        view.paintAxes = (ctx: MarsSurfaceAxisContext): void => this.paintAxes(frame, ctx, !view.gpu);
         view.paintAxes(view.ink);
         this.showView(view);
         this.syncZoom(view);
@@ -607,6 +658,8 @@ class MarsSurfacePreview {
         if (!ctx || !view.polygons) return false;
         ctx.clearRect(0, 0, view.width, view.height);
         const triangles = view.polygons();
+        if (view.chart.dataset.segments !== 'true')
+            this.host.native.call('lab_surface_visibility', view.framePlan, triangles);
         ctx.strokeStyle = WorksheetPlotPalette.colour('#193d4659');
         ctx.lineWidth = 0.45;
         for (const triangle of triangles) {
@@ -629,17 +682,27 @@ class MarsSurfacePreview {
         return true;
     }
 
-    private paintAxes(frame: MarsSurfaceFrame, ctx: MarsSurfaceAxisContext): void {
+    private paintAxes(frame: MarsSurfaceFrame, ctx: MarsSurfaceAxisContext, solids = true): void {
         ctx.clearRect(0, 0, frame.width, frame.height);
         ctx.lineWidth = 0.35; ctx.lineJoin = 'round';
-        for (const face of frame.solids ?? []) {
+        for (const face of solids ? frame.solids ?? [] : []) {
             ctx.fillStyle = ctx.strokeStyle = WorksheetPlotPalette.axis_shade(face.shade);
+            ctx.globalAlpha = face.visible ? frame.hiddenAxisOpacity ?? 0.4 : 1;
             ctx.beginPath();
             face.points.forEach((point, i) => {
                 if (i) ctx.lineTo(point[0], point[1]);
                 else ctx.moveTo(point[0], point[1]);
             });
             ctx.closePath(); ctx.fill(); ctx.stroke();
+            ctx.globalAlpha = 1;
+            for (const polygon of face.visible ?? []) {
+                ctx.beginPath();
+                polygon.forEach((point, i) => {
+                    if (i) ctx.lineTo(point[0], point[1]);
+                    else ctx.moveTo(point[0], point[1]);
+                });
+                ctx.closePath(); ctx.fill();
+            }
         }
         ctx.strokeStyle = WorksheetPlotPalette.colour('#94b8b1');
         ctx.fillStyle = WorksheetPlotPalette.colour('#b8ccc5'); ctx.lineWidth = 1.4;

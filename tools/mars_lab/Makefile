@@ -174,6 +174,7 @@ LAB_WASM_OBJS += $(LAB_BUILD_DIR)/wasm/marslib/globe_view.o
 LAB_WASM_OBJS += $(LAB_BUILD_DIR)/wasm/marslib/quaternion.o
 LAB_WASM_OBJS += $(LAB_BUILD_DIR)/wasm/marslib/plot_axis_frame.o
 LAB_WASM_OBJS += $(LAB_BUILD_DIR)/wasm/marslib/plot_projection.o
+LAB_WASM_OBJS += $(LAB_BUILD_DIR)/wasm/marslib/plot_occlusion.o
 LAB_WASM_OBJS += $(IMAGE_WASM_OBJS)
 LAB_WASM_ASM := $(LAB_WASM_OBJS:.o=.s)
 # Debian/Ubuntu's wasi-libc keeps musl maths in libc.a; libm.a is an empty compatibility archive.
@@ -182,6 +183,9 @@ LAB_WASM_INCLUDE ?= /usr/include/wasm32-wasi
 LAB_WASM_LIBC ?= /usr/lib/wasm32-wasi/libc.a
 # Retain the memory ABI used by the codec and direct browser regression fixtures.
 LAB_WASM_MEMORY_EXPORTS := --export=memset --export=memcpy --export=memmove --export=memcmp
+# Solid-axis projection nests roughly 74 KiB of C frames. Keep explicit headroom
+# and place the stack before static data so an overflow traps instead of corrupting it.
+LAB_WASM_STACK_FLAGS := --stack-first -z stack-size=262144
 LAB_WASM_CFLAGS := --target=wasm32-unknown-unknown -O2 -Wall -Wextra -Werror -ffreestanding -fno-builtin -fvisibility=default \
                    -nostdlib -nostdlibinc -Wmissing-prototypes -isystem "$(LAB_WASM_INCLUDE)" -Iinclude -Itools/mars_lab/wasm/include
 
@@ -198,7 +202,7 @@ $(LAB_BUILD_DIR)/wasm/marslib/image_%.s: src/image/%.c tools/mars_lab/Makefile |
 image-wasm: $(IMAGE_WASM)
 
 $(IMAGE_WASM): $(IMAGE_WASM_OBJS) $(LAB_BUILD_DIR)/wasm/marslib/array.o $(LAB_WASM_LIBC)
-	"$(LAB_WASM_LD)" --no-entry --export-memory $(IMAGE_WASM_EXPORTS) \
+	"$(LAB_WASM_LD)" --no-entry --export-memory $(LAB_WASM_STACK_FLAGS) $(IMAGE_WASM_EXPORTS) \
 	    --initial-memory=2097152 --max-memory=100663296 $(filter %.o,$^) "$(LAB_WASM_LIBC)" -o $@
 
 # Link lightweight shared components separately; do not pull in the native libmars archive.
@@ -210,14 +214,23 @@ $(LAB_BUILD_DIR)/wasm/marslib/plot_axis_frame.s: src/plot/plot_axis_frame.c tool
 	@mkdir -p $(dir $@)
 	"$(LAB_WASM_CC)" $(LAB_WASM_CFLAGS) --target=wasm32-wasi -fvisibility=hidden -MMD -MP -MF $@.d -MT $@ -S $< -o $@
 
-$(LAB_BUILD_DIR)/wasm/src/lab_surface_axes.o: LAB_WASM_CFLAGS += -Isrc
-$(LAB_BUILD_DIR)/wasm/src/lab_surface_geometry.o: LAB_WASM_CFLAGS += -Isrc
+$(LAB_BUILD_DIR)/wasm/src/lab_surface_axes.o $(LAB_BUILD_DIR)/wasm/src/lab_surface_axes.s: LAB_WASM_CFLAGS += -Isrc
+$(LAB_BUILD_DIR)/wasm/src/lab_surface_geometry.o $(LAB_BUILD_DIR)/wasm/src/lab_surface_geometry.s: LAB_WASM_CFLAGS += -Isrc
+$(LAB_BUILD_DIR)/wasm/src/lab_surface_visibility.o $(LAB_BUILD_DIR)/wasm/src/lab_surface_visibility.s: LAB_WASM_CFLAGS += -Isrc
 
 $(LAB_BUILD_DIR)/wasm/marslib/plot_projection.o: src/plot/plot_projection.c tools/mars_lab/Makefile | check-lab-wasm-deps
 	@mkdir -p $(dir $@)
 	"$(LAB_WASM_CC)" $(LAB_WASM_CFLAGS) -MMD -MP -MF $(@:.o=.d) -c $< -o $@
 
 $(LAB_BUILD_DIR)/wasm/marslib/plot_projection.s: src/plot/plot_projection.c tools/mars_lab/Makefile | check-lab-wasm-deps
+	@mkdir -p $(dir $@)
+	"$(LAB_WASM_CC)" $(LAB_WASM_CFLAGS) -MMD -MP -MF $@.d -MT $@ -S $< -o $@
+
+$(LAB_BUILD_DIR)/wasm/marslib/plot_occlusion.o: src/plot/plot_occlusion.c tools/mars_lab/Makefile | check-lab-wasm-deps
+	@mkdir -p $(dir $@)
+	"$(LAB_WASM_CC)" $(LAB_WASM_CFLAGS) -MMD -MP -MF $(@:.o=.d) -c $< -o $@
+
+$(LAB_BUILD_DIR)/wasm/marslib/plot_occlusion.s: src/plot/plot_occlusion.c tools/mars_lab/Makefile | check-lab-wasm-deps
 	@mkdir -p $(dir $@)
 	"$(LAB_WASM_CC)" $(LAB_WASM_CFLAGS) -MMD -MP -MF $@.d -MT $@ -S $< -o $@
 
@@ -293,7 +306,7 @@ lab-wasm-asm: $(LAB_WASM_ASM)
 # Only the declared browser bridge may remain unresolved; never import missing libc or module functions.
 # Export application definitions, not the library's hidden helpers and WASI entry points.
 $(LAB_WASM): $(LAB_WASM_OBJS) $(LAB_WASM_LIBC) tools/mars_lab/wasm/lab_browser.imports tools/mars_lab/Makefile
-	"$(LAB_WASM_LD)" --no-entry --export-dynamic --export-memory --allow-undefined-file=tools/mars_lab/wasm/lab_browser.imports \
+	"$(LAB_WASM_LD)" --no-entry --export-dynamic --export-memory $(LAB_WASM_STACK_FLAGS) --allow-undefined-file=tools/mars_lab/wasm/lab_browser.imports \
 	    $(LAB_WASM_MEMORY_EXPORTS) --initial-memory=69206016 --max-memory=100663296 \
 	    $(LAB_WASM_OBJS) "$(LAB_WASM_LIBC)" -o $@
 
@@ -304,7 +317,7 @@ LAB_WASM_LD ?= wasm-ld
 
 # Workers need only the codec and queue policy, never DOM imports or UI state.
 $(LAB_CODEC_WASM): $(addprefix $(LAB_BUILD_DIR)/wasm/src/,lab_browser.o lab_browser_storage.o lab_jobs.o lab_job_worker.o) $(LAB_WASM_WIRE_OBJ) $(LAB_WASM_LIBC) tools/mars_lab/wasm/lab_codec.imports tools/mars_lab/Makefile
-	"$(LAB_WASM_LD)" --no-entry --export-dynamic --export-memory --allow-undefined-file=tools/mars_lab/wasm/lab_codec.imports \
+	"$(LAB_WASM_LD)" --no-entry --export-dynamic --export-memory $(LAB_WASM_STACK_FLAGS) --allow-undefined-file=tools/mars_lab/wasm/lab_codec.imports \
 	    $(LAB_WASM_MEMORY_EXPORTS) --initial-memory=33554432 --max-memory=33554432 \
 	    $(filter %.o,$^) "$(LAB_WASM_LIBC)" -o $@
 .PHONY: check-lab-wasm-deps

@@ -44,6 +44,19 @@ equation whose sides use the shared [expression context](expr_context.md).
 the same simplification to its solution formulae. Pass NULL to capture named
 constant bindings automatically; numerical variable guesses never supply sign
 proofs. Release these results with `equ_free()` and `equ_solutions_free()`.
+Exact rational offsets move to the constant side of an equality. Shared coefficient
+magnitudes and common integer factors are removed using exact arithmetic, giving
+a reduced relation after fixed coordinates have been substituted. Unequal rational
+coefficients retain their ordinary fractions; unknown symbolic denominators are
+never cancelled. Two-term relations containing a factored product keep it on one
+side of the equality. Rational denominators are cleared and the other side's
+integer content is factored, preserving useful sums and differences inside products.
+Otherwise shared numerical denominators are separated into individually
+reduced fractions, retaining useful factored numerators. The two sides keep their
+original orientation.
+Rational offsets inside affine product factors are exposed so their constant
+contributions can be collected. Principal terms appear before the remaining
+factored dependent corrections, independently of the coordinate names.
 
 The context does not filter roots, prove an equation true, change numerical seeds
 or select solver branches. Unknown conditions remain, and search/completeness
@@ -307,6 +320,9 @@ with structurally opposite terms also share a native `±` row: the common centre
 appears first, cancelling terms are simplified, and any shared denominator and
 integer branch condition are retained. The underlying branches remain separate;
 numerical evaluations do not establish a symbolic pairing.
+When all branches share an additive centre, native symmetry beautification puts
+that centre first throughout the family, including a lone root beside a `±` pair.
+This structural ordering applies to plain and TeX output without changing the roots.
 Opposite branches with the same expression and exactly opposite real coefficients
 also combine into one `±` row, including rational multiples of radicals. A zero
 centre is omitted in both plain and TeX output; the solver still retains each
@@ -361,8 +377,15 @@ solution set, Lab cards and Ophelia RUN output. The bounded rational search may
 miss large-denominator roots. When no rational factor is certified, exact real
 coefficients use Cardano radicals instead. The cube-root branches are coupled
 through their exact product, including when all three roots are real.
-Inexact or complex coefficients retain the numerical fallback.
-Repeated-root cubics retain their existing duplicate-free exact solution path.
+Authored real radical coefficients also retain their expression trees, including
+supplied constant bindings. Their reduced cubic is constructed with exact algebra
+before selecting and coupling the cube-root branches. Three-real-root solutions
+use a real sine/cosine form when exact algebra certifies the reduced inverse-cosine angle
+as a supported rational multiple of pi. The angle is divided by three symbolically;
+unsupported angles retain conjugate cube roots. Symmetric roots remain paired during
+compact presentation. Repeated roots are returned only once. Opaque floating-point coefficients
+are never recognised as surds from their rounded digits; they and complex
+coefficients retain the numerical fallback.
 
 For example, entering:
 

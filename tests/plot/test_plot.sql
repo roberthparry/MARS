@@ -7,6 +7,23 @@ CREATE TABLE IF NOT EXISTS plot_cases (
 CREATE INDEX IF NOT EXISTS plot_cases_operation ON plot_cases(operation, name);
 
 INSERT INTO test_case_runner(module, source, parent, table_name, operation) VALUES (
+    'plot.occlusion', 'tests/plot/test_plot.c', 'tests.test_plot_occlusion', 'plot_cases', 'occlusion')
+ON CONFLICT(module) DO UPDATE SET table_name=excluded.table_name, operation=excluded.operation;
+
+INSERT OR IGNORE INTO plot_cases(name, operation, input, expected) VALUES
+    ('occlusion_empty', 'occlusion', '[[[0,0,0.2],[10,0,0.2],[10,10,0.2],[0,10,0.2]],[]]', '100'),
+    ('occlusion_front', 'occlusion',
+     '[[[0,0,0.2],[10,0,0.2],[10,10,0.2],[0,10,0.2]],[[[0,0,0.4],[10,0,0.4],[10,10,0.4]],[[0,0,0.4],[10,10,0.4],[0,10,0.4]]]]', '0'),
+    ('occlusion_behind', 'occlusion',
+     '[[[0,0,0.2],[10,0,0.2],[10,10,0.2],[0,10,0.2]],[[[0,0,0.1],[10,0,0.1],[10,10,0.1]],[[0,0,0.1],[10,10,0.1],[0,10,0.1]]]]', '100'),
+    ('occlusion_overlap', 'occlusion',
+     '[[[0,0,0.2],[10,0,0.2],[10,10,0.2],[0,10,0.2]],[[[0,0,0.4],[5,0,0.4],[5,10,0.4]],[[0,0,0.4],[5,10,0.4],[0,10,0.4]],[[0,0,0.4],[5,0,0.4],[5,10,0.4]]]]', '50'),
+    ('occlusion_depth_crossing', 'occlusion',
+     '[[[0,0,0.2],[10,0,0.2],[10,10,0.2],[0,10,0.2]],[[[0,0,0.1],[10,0,0.3],[10,10,0.3]],[[0,0,0.1],[10,10,0.3],[0,10,0.1]]]]', '50'),
+    ('occlusion_hole', 'occlusion',
+     '[[[0,0,0.2],[10,0,0.2],[10,10,0.2],[0,10,0.2]],[[[0,0,0.4],[3,0,0.4],[3,10,0.4]],[[0,0,0.4],[3,10,0.4],[0,10,0.4]],[[7,0,0.4],[10,0,0.4],[10,10,0.4]],[[7,0,0.4],[10,10,0.4],[7,10,0.4]]]]', '40');
+
+INSERT INTO test_case_runner(module, source, parent, table_name, operation) VALUES (
     'plot.surface_origin', 'tests/plot/test_plot.c', 'tests.test_plot_surface_origin', 'plot_cases', 'surface_origin')
 ON CONFLICT(module) DO UPDATE SET table_name=excluded.table_name, operation=excluded.operation;
 
@@ -21,6 +38,17 @@ INSERT OR IGNORE INTO plot_cases(name, operation, input, expected) VALUES
 
 -- Preserve case identities and selections when the frame presentation changes.
 UPDATE plot_cases SET expected='outside_connected' WHERE operation='surface_origin';
+
+INSERT INTO plot_cases(name, operation, input, expected) VALUES
+    ('surface_origin_centred_symmetric', 'surface_origin', '["-2","2","-3","3","-4","4"]',
+     'origin 0.5 0.5 0.5'),
+    ('surface_origin_centred_asymmetric', 'surface_origin', '["-1","3","-3","5","-4","4"]',
+     'origin 0.25 0.375 0.5'),
+    ('surface_origin_centred_extreme', 'surface_origin', '["-1e400","3e400","-1e400","3e400","-1e400","3e400"]',
+     'origin 0.25 0.25 0.25'),
+    ('surface_origin_centred_torus', 'surface_origin', '["-16","16","-16","16","-4","4"]',
+     'origin 0.5 0.5 0.5')
+ON CONFLICT(name) DO UPDATE SET input=excluded.input, expected=excluded.expected;
 
 INSERT INTO test_case_runner(module, source, parent, table_name, operation) VALUES (
     'plot.perspective', 'tests/plot/test_plot.c', 'tests.test_plot_perspective', 'plot_cases', 'perspective')

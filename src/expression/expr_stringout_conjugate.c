@@ -6,6 +6,7 @@
  * of an operand and its conjugate become a real-part projection. Unequal totals remain separate, avoiding a
  * partial rewrite which would mix conjugation and real-part notation for the same operand. Original expression
  * trees and exact complex radicals are retained; projection nodes here are unevaluated display views.
+ * Unit scalar weights disappear from TeX products, with negative unity rendered as ordinary negation.
  */
 
 #include <stdint.h>
@@ -146,6 +147,18 @@ static bool expr_conjugate_common_factor(const expr_t *expr, sbuf_t *buffer, int
     return false;
 }
 
+static const TeX_model_node_t *expr_notation_conjugate_scale(notation_build_t *build, number_t coefficient,
+                                                             const TeX_model_node_t *operand)
+{
+    if (num_is_one(coefficient))
+        return operand;
+    if (num_eq(coefficient, NUM_NEG_ONE))
+        return notation_build_node(build,
+            (TeX_node_view_t){.kind = TeX_NODE_NEGATIVE, .child_count = 1u}, &operand);
+    const TeX_model_node_t *parts[] = {notation_build_number(build, coefficient), operand};
+    return notation_build_node(build, (TeX_node_view_t){.kind = TeX_NODE_PRODUCT, .child_count = 2u}, parts);
+}
+
 static const TeX_model_node_t *expr_notation_common_conjugate(notation_build_t *build, const expr_t *expr)
 {
     if (!expr_is_op(expr, &ops_add) || !expr_is_mul(expr->a) || !expr_is_mul(expr->b))
@@ -164,8 +177,9 @@ static const TeX_model_node_t *expr_notation_common_conjugate(notation_build_t *
             const TeX_model_node_t *projection = notation_build_node(build,
                 (TeX_node_view_t){.kind = TeX_NODE_REAL_PROJECTION, .child_count = 1u}, &operand);
             const TeX_model_node_t *parts[] = {notation_build_expr(build, factor), projection};
-            const TeX_model_node_t *result = notation_build_node(build,
-                (TeX_node_view_t){.kind = TeX_NODE_PRODUCT, .child_count = 2u}, parts);
+            const TeX_model_node_t *result = expr_is_const(factor) && !factor->name
+                ? expr_notation_conjugate_scale(build, factor->c, projection)
+                : notation_build_node(build, (TeX_node_view_t){.kind = TeX_NODE_PRODUCT, .child_count = 2u}, parts);
             expr_free(factor);
             return result;
         }
@@ -179,10 +193,7 @@ static const TeX_model_node_t *expr_notation_conjugate_term(notation_build_t *bu
     const TeX_model_node_t *operand = notation_build_expr(build, base);
     if (kind != TeX_NODE_COUNT)
         operand = notation_build_node(build, (TeX_node_view_t){.kind = kind, .child_count = 1u}, &operand);
-    if (num_is_one(coefficient))
-        return operand;
-    const TeX_model_node_t *parts[] = {notation_build_number(build, coefficient), operand};
-    return notation_build_node(build, (TeX_node_view_t){.kind = TeX_NODE_PRODUCT, .child_count = 2u}, parts);
+    return expr_notation_conjugate_scale(build, coefficient, operand);
 }
 
 /* Group a sum already known to contain a conjugate. */

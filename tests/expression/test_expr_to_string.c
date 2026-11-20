@@ -10,6 +10,9 @@
  */
 
 #include "string-t.h"
+#include "json-t.h"
+#define MARS_SHARED_EXPR_INTERNAL_ACCESS
+#include "internal/expr_internal.h"
 #define MARS_EXPR_INTERNAL_ACCESS
 #include "expression/expr_internal.h"
 #include "test_database.h"
@@ -2744,6 +2747,103 @@ static void test_to_string_complex_projection_TeX(void)
         test_to_string_complex_projection_TeX_cases_row);
 }
 
+static void test_to_string_unit_coefficients_TeX_cases_row(const void *data)
+{
+    const test_database_case_t *row = data;
+    expr_t *expr = expr_from_text(row->input, NULL);
+    char *before = expr ? expr_to_string(expr, style_EXPRESSION) : NULL;
+    char *TeX = expr ? expr_to_TeX_body(expr) : NULL;
+    char *after = expr ? expr_to_string(expr, style_EXPRESSION) : NULL;
+    bool ok = TeX && !strcmp(TeX, string_c_str(row->expected)) && before && after && !strcmp(before, after);
+    printf("  %s -> %s\n", string_c_str(row->input), TeX ? TeX : "NULL");
+    free(after);
+    free(TeX);
+    free(before);
+    expr_free(expr);
+    ASSERT_TRUE(ok);
+}
+
+static void test_to_string_unit_coefficients_TeX(void)
+{
+    test_run_database_cases(__FILE__, __LINE__, "expression.unit_coefficients_TeX", NULL,
+        test_to_string_unit_coefficients_TeX_cases_row);
+}
+
+static void test_to_string_shared_centres_row(const void *data)
+{
+    const test_database_case_t *row = data;
+    json_t *inputs = json_from_text(row->input), *expected = json_from_text(row->expected);
+    string_t *plain_key = string_new_with("plain"), *TeX_key = string_new_with("TeX");
+    const json_t *plain_expected = json_object_get(expected, plain_key);
+    const json_t *TeX_expected = json_object_get(expected, TeX_key);
+    size_t count = json_array_size(inputs);
+    expr_t *sources[16] = {0}, *ordered[16] = {0};
+    const expr_t *expressions[16] = {0};
+    char *before[16] = {0};
+    bool ok = count >= 2u && count <= 16u && json_array_size(plain_expected) == count &&
+              json_array_size(TeX_expected) == count;
+    for (size_t i = 0u; ok && i < count; ++i) {
+        sources[i] = expr_from_text(json_string_value(json_array_get(inputs, i)), NULL);
+        expressions[i] = sources[i];
+        before[i] = sources[i] ? expr_to_string(sources[i], style_UNBOUND) : NULL;
+        ok = before[i] != NULL;
+    }
+    ok = ok && expr_beautify_shared_centre(expressions, count, ordered);
+    for (size_t i = 0u; ok && i < count; ++i) {
+        const expr_t *shown = ordered[i] ? ordered[i] : sources[i];
+        char *plain = expr_to_string(shown, style_UNBOUND), *TeX = expr_to_TeX_body(shown);
+        char *after = expr_to_string(sources[i], style_UNBOUND);
+        const string_t *wanted_plain = json_string_value(json_array_get(plain_expected, i));
+        const string_t *wanted_TeX = json_string_value(json_array_get(TeX_expected, i));
+        expr_t *difference = expr_simplify_owned(expr_sub(shown, sources[i]));
+        number_t residual = difference ? expr_eval(difference) : num_clone(NUM_NAN);
+        ok = plain && TeX && after && wanted_plain && wanted_TeX && !strcmp(before[i], after) &&
+             !strcmp(plain, string_c_str(wanted_plain)) && !strcmp(TeX, string_c_str(wanted_TeX)) &&
+             num_is_zero(residual);
+        expr_bindings_t *bindings = expr_bindings_from_expr_internal(sources[i]);
+        /* Source binding changes must remain visible through a reordered graph, including repeated symbols. */
+        for (long phase = 1L; ok && phase <= 2L; ++phase) {
+            for (size_t j = 0u; j < expr_bindings_count(bindings); ++j) {
+                number_t value = num_create_from_long(phase + (long)j);
+                expr_set_val(expr_bindings_expr_at(bindings, j), value);
+                num_destroy(&value);
+            }
+            number_t original = expr_eval(sources[i]), actual = expr_eval(shown);
+            number_t error = num_sub(actual, original), magnitude = num_abs(error);
+            number_t tolerance = num_create_from_string("1e-25");
+            ok = num_is_finite(magnitude) && num_lt(magnitude, tolerance);
+            num_destroy(&tolerance);
+            num_destroy(&magnitude);
+            num_destroy(&error);
+            num_destroy(&actual);
+            num_destroy(&original);
+        }
+        expr_bindings_free(bindings);
+        printf("  %s[%zu] -> %s; %s\n", string_c_str(row->name), i, plain ? plain : "NULL", TeX ? TeX : "NULL");
+        num_destroy(&residual);
+        expr_free(difference);
+        free(after);
+        free(TeX);
+        free(plain);
+    }
+    for (size_t i = 0u; i < 16u; ++i) {
+        free(before[i]);
+        expr_free(ordered[i]);
+        expr_free(sources[i]);
+    }
+    string_free(TeX_key);
+    string_free(plain_key);
+    json_free(expected);
+    json_free(inputs);
+    ASSERT_TRUE(ok);
+}
+
+static void test_to_string_shared_centres(void)
+{
+    test_run_database_cases(__FILE__, __LINE__, "expression.shared_centres", NULL,
+        test_to_string_shared_centres_row);
+}
+
 static void test_to_string_equal_conjugate_sums(void)
 {
     static const struct { const char *source; bool paired; } cases[] = {
@@ -2885,6 +2985,8 @@ void test_to_string_all(void)
     TEST_RUN_SUBTEST(test_to_string_exact_rational_powers, NULL);
     TEST_RUN_SUBTEST(test_to_string_conjugate_overbar_TeX, NULL);
     TEST_RUN_SUBTEST(test_to_string_complex_projection_TeX, NULL);
+    TEST_RUN_SUBTEST(test_to_string_unit_coefficients_TeX, NULL);
+    TEST_RUN_SUBTEST(test_to_string_shared_centres, NULL);
     TEST_RUN_SUBTEST(test_to_string_compact_product_quotient_TeX, NULL);
     TEST_RUN_SUBTEST(test_to_string_exact_rational_TeX, NULL);
     TEST_RUN_SUBTEST(test_to_string_square_denominator, NULL);

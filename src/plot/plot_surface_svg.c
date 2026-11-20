@@ -25,6 +25,8 @@
 #include "plot_axis_frame.h"
 #define MARS_PLOT_INTERNAL_ACCESS
 #include "plot_projection.h"
+#define MARS_PLOT_INTERNAL_ACCESS
+#include "plot_occlusion.h"
 
 typedef struct {
     double u, v, z, x, y, depth;
@@ -41,13 +43,15 @@ typedef struct {
     double units[3];
     plot_projection_t projection;
     plot_axis_frame_t frame;
+    double origin[3];
+    bool origin_axes;
 } camera_t;
 
 static camera_t camera(const plot_t *plot, double label_width, const number_t bounds[6])
 {
     NUM_SCOPE(numbers);
     double radians = acos(-1) / 180;
-    camera_t view = {.units = {1, 1, 1}};
+    camera_t view = {.units = {1, 1, 1}, .origin_axes = plot->options.axes_at_origin};
     double ca = cos(plot->azimuth * radians), sa = sin(plot->azimuth * radians);
     double ce = cos(plot->elevation * radians), se = sin(plot->elevation * radians);
     double cr = cos(plot->roll * radians), sr = sin(plot->roll * radians);
@@ -58,8 +62,13 @@ static camera_t camera(const plot_t *plot, double label_width, const number_t bo
     for (unsigned i = 1; i < 3; ++i)
         if (num_gt(spans[i], longest))
             longest = spans[i];
-    for (unsigned i = 0; i < 3; ++i)
+    for (unsigned i = 0; i < 3; ++i) {
         view.units[i] = num_to_double(num_div(spans[i], longest));
+        if (view.origin_axes) {
+            view.origin[i] = num_to_double(num_div(num_neg(bounds[2 * i]), spans[i]));
+            view.origin_axes = isfinite(view.origin[i]);
+        }
+    }
     double horizontal[] = {ca * view.units[0], -sa * view.units[1], 0};
     double vertical[] = {-se * sa * view.units[0], -se * ca * view.units[1], -ce * view.units[2]};
     double rows[9];
@@ -94,9 +103,10 @@ static bool pointer_map(string_t *svg, const vertex_t p[3], double distance)
         coefficients[axis * 3 + 2] = values[0] - a * p[0].x - b * p[0].y;
     }
     bool ok = string_append_cstr(svg, " data-uv=\"") == 0;
+    /* Twelve significant digits exceed the retained vertices' nine, without bloating every facet's hover map. */
     for (unsigned i = 0; ok && i < 9; ++i)
-        ok = string_append_format(svg, "%s%.17g", i ? " " : "", coefficients[i]) >= 0;
-    return ok && string_append_format(svg, "\" data-uv-denominator=\"%.17g %.17g %.17g\"",
+        ok = string_append_format(svg, "%s%.12g", i ? " " : "", coefficients[i]) >= 0;
+    return ok && string_append_format(svg, "\" data-uv-denominator=\"%.12g %.12g %.12g\"",
                                       coefficients[9], coefficients[10], coefficients[11]) >= 0;
 }
 
@@ -115,6 +125,8 @@ static void project(const camera_t *view, vertex_t *vertex)
 
 static bool frame_axes(camera_t *view)
 {
+    if (view->origin_axes)
+        return plot_projection_origin_frame(&view->projection, view->origin, &view->frame);
     double corners[8][2];
     for (unsigned i = 0; i < 8; ++i) {
         vertex_t at = {.u = !!(i & 1), .v = !!(i & 2), .z = !!(i & 4)};
@@ -215,6 +227,11 @@ static vertex_t axis_vertex(const camera_t *view, unsigned axis, double t)
 {
     unsigned corner = view->frame.corner[axis];
     vertex_t at = {.u = !!(corner & 1), .v = !!(corner & 2), .z = !!(corner & 4)};
+    if (view->origin_axes) {
+        at.u = view->origin[0];
+        at.v = view->origin[1];
+        at.z = view->origin[2];
+    }
     if (axis == 0)
         at.u = t;
     else if (axis == 1)
@@ -229,9 +246,12 @@ static bool solid_axis(const camera_t *view, unsigned axis, plot_axis_solid_t *s
 {
     unsigned corner = view->frame.corner[axis];
     double lower[] = {!!(corner & 1), !!(corner & 2), !!(corner & 4)}, upper[3];
+    if (view->origin_axes)
+        for (unsigned i = 0; i < 3; ++i) lower[i] = view->origin[i];
     for (unsigned i = 0; i < 3; ++i) upper[i] = lower[i];
+    lower[axis] = 0;
     upper[axis] = 1;
-    return plot_axis_solid(&view->projection, lower, upper, axis, solid);
+    return plot_axis_solid(&view->projection, lower, upper, axis, view->origin_axes, solid);
 }
 
 static unsigned axis_colour(unsigned colour, double shade)
@@ -244,10 +264,27 @@ static unsigned axis_colour(unsigned colour, double shade)
     return out;
 }
 
-static bool axes(string_t *svg, const plot_t *plot, const camera_t *view, number_t bounds[6])
+static bool visible_axis_face(const plot_occlusion_polygon_t *polygon, void *context)
 {
-    plot_axis_solid_t solids[3] = {0};
-    plot_axis_face_t faces[PLOT_AXIS_FACES * 3];
+    string_t *svg = context;
+    bool ok = string_append_cstr(svg, "<path data-axis-visible=\"true\" stroke=\"none\" d=\"") == 0;
+    for (unsigned i = 0; ok && i < polygon->count; ++i)
+        ok = string_append_format(svg, "%s %.3f %.3f", i ? " L" : "M",
+                                  polygon->point[i][0], polygon->point[i][1]) >= 0;
+    return ok && string_append_cstr(svg, " Z\"/>\n") == 0;
+}
+
+static bool axes(string_t *svg, const plot_t *plot, const camera_t *view, number_t bounds[6],
+                  plot_occlusion_t *occlusion)
+{
+    /* Keep the bounded mesh off the calculation stack, which a forked process may be unable to grow. */
+    struct {
+        plot_axis_solid_t solids[3];
+        plot_axis_face_t faces[PLOT_AXIS_FACES * 3];
+    } *scratch = calloc(1, sizeof *scratch);
+    if (!scratch) return false;
+    plot_axis_solid_t *solids = scratch->solids;
+    plot_axis_face_t *faces = scratch->faces;
     unsigned count = 0, base_colour = plot->options.axis_colour;
     for (unsigned axis = 0; axis < 3; ++axis) {
         if (!solid_axis(view, axis, &solids[axis])) continue;
@@ -264,13 +301,26 @@ static bool axes(string_t *svg, const plot_t *plot, const camera_t *view, number
         for (unsigned j = 0; ok && j < face->count; ++j)
             ok = string_append_format(svg, "%s %.3f %.3f", j ? " L" : "M",
                                        face->point[j][0], face->point[j][1]) >= 0;
-        ok = ok && string_append_cstr(svg, " Z\"/>\n") == 0;
+        ok = ok && string_append_format(svg, " Z\" opacity=\"%.3f\"/>\n",
+                                       occlusion ? PLOT_AXIS_HIDDEN_OPACITY : 1.0) >= 0;
+        if (ok && occlusion) {
+            plot_occlusion_polygon_t polygon = {.count = face->count};
+            for (unsigned j = 0; j < face->count; ++j) {
+                polygon.point[j][0] = face->point[j][0];
+                polygon.point[j][1] = face->point[j][1];
+                polygon.point[j][2] = 1 / (view->projection.distance + face->depths[j]);
+            }
+            ok = string_append_format(svg, "<g fill=\"#%06x\" data-axis-colour=\"#%06x\" "
+                "data-axis-shade=\"%.6f\">", colour, base_colour, face->shade) >= 0 &&
+                 plot_occlusion_visible(occlusion, &polygon, visible_axis_face, svg) &&
+                 string_append_cstr(svg, "</g>\n") == 0;
+        }
     }
     /* Retain centreline metadata for native inspection and drag targets, without drawing wire arrows. */
     ok = ok && string_append_cstr(svg, "</g><g data-plot-axes=\"true\" opacity=\"0\">\n") == 0;
     for (unsigned axis = 0; ok && axis < 3; ++axis) {
         if (!solids[axis].count) continue;
-        vertex_t start = axis_vertex(view, axis, 0);
+        vertex_t start = {.x = solids[axis].start[0], .y = solids[axis].start[1]};
         const plot_axis_arrow_t *arrow = &solids[axis].arrow;
         ok = string_append_format(svg, "<path data-axis-line=\"%u\" d=\"M %.3f %.3f L %.3f %.3f\"/>\n",
             axis, start.x, start.y, arrow->tip[0], arrow->tip[1]) >= 0 && string_append_format(svg,
@@ -297,8 +347,6 @@ static bool axes(string_t *svg, const plot_t *plot, const camera_t *view, number
     }
     for (unsigned axis = 0; ok && axis < 3; ++axis) {
         if (!solids[axis].count) continue;
-        vertex_t a = axis_vertex(view, axis, 0), b = axis_vertex(view, axis, 1);
-        double length = hypot(b.x - a.x, b.y - a.y);
         double nx = view->frame.normal[axis][0], ny = view->frame.normal[axis][1];
         number_t ticks[12], span = num_sub(bounds[axis * 2 + 1], bounds[axis * 2]);
         size_t tick_count = plot_ticks(bounds[axis * 2], bounds[axis * 2 + 1], ticks);
@@ -318,7 +366,7 @@ static bool axes(string_t *svg, const plot_t *plot, const camera_t *view, number
             vertex_t at = points[i], tip = at;
             double scale = scales[i];
             bool shown = (visible & (1u << i)) != 0;
-            tip.x += nx * 6 * scale; tip.y += ny * 6 * scale;
+            tip.x += nx * 3 * scale; tip.y += ny * 3 * scale;
             string_t *label = plot_tick_label(ticks[i], span);
             bool zero = zero_tick == i;
             labels.font_size = 13 * scale;
@@ -331,7 +379,7 @@ static bool axes(string_t *svg, const plot_t *plot, const camera_t *view, number
                 base_colour, 1.2 * scale) >= 0 && stroke(svg, at, tip) &&
                 string_append_cstr(svg, "</g>") == 0 && (!shown || plot_tick_text(svg, &labels, label, axis,
                     position[0], position[1],
-                    side, length < 96 ? nx : 0, length < 96 ? ny : 0));
+                    side, nx, ny));
             string_free(label); num_destroy(&ticks[i]);
         }
         num_destroy(&span);
@@ -339,13 +387,14 @@ static bool axes(string_t *svg, const plot_t *plot, const camera_t *view, number
     ok = ok && string_append_cstr(svg, "</g>\n") == 0;
     for (unsigned axis = 0; ok && axis < 3; ++axis) {
         if (!solids[axis].count) continue;
-        vertex_t start = axis_vertex(view, axis, 0);
+        vertex_t start = {.x = solids[axis].start[0], .y = solids[axis].start[1]};
         const plot_axis_arrow_t *arrow = &solids[axis].arrow;
         ok = string_append_format(svg, "<path data-axis-handle=\"%u\" d=\"M %.3f %.3f L %.3f %.3f\" "
             "fill=\"none\" stroke=\"transparent\" stroke-width=\"44\" stroke-linecap=\"round\" "
             "vector-effect=\"non-scaling-stroke\" pointer-events=\"stroke\"/>\n",
             axis, start.x, start.y, arrow->tip[0], arrow->tip[1]) >= 0;
     }
+    free(scratch);
     return ok;
 }
 
@@ -460,6 +509,12 @@ string_t *plot_surface_svg(const plot_t *plot)
         errno = ERANGE;
         return NULL;
     }
+    const string_t *axis_names[] = {plot->x_label, plot->y_label, plot->z_label};
+    double name_widths[3];
+    for (unsigned axis = 0; axis < 3; ++axis)
+        name_widths[axis] = string_length(axis_names[axis]) * 14 * 0.8;
+    (void)plot_projection_fit_axes(&view.projection, plot->options.width, plot->options.height,
+                                   &view.frame, view.origin_axes ? view.origin : NULL, name_widths);
     bool faceted = plot->mesh || plot->refined_count;
     const number_t *x = plot->refined_count ? plot->refined_x : plot->surface_x;
     const number_t *y = plot->refined_count ? plot->refined_y : plot->surface_y;
@@ -562,6 +617,9 @@ string_t *plot_surface_svg(const plot_t *plot)
         if (ok) ok = string_append_cstr(svg, "\"") == 0;
         if (ok && plot->segments)
             ok = string_append_cstr(svg, " data-segments=\"true\"") == 0;
+        if (ok && view.origin_axes)
+            ok = string_append_format(svg, " data-axis-origin=\"%.17g %.17g %.17g\"",
+                view.origin[0], view.origin[1], view.origin[2]) >= 0;
         if (ok && !faces && !lines)
             ok = string_append_cstr(svg, " data-empty=\"true\"") == 0;
         if (ok && count && isfinite(num_to_double(full[0])) && isfinite(num_to_double(full[1])))
@@ -574,12 +632,24 @@ string_t *plot_surface_svg(const plot_t *plot)
              string_append_cstr(svg, "</text><g data-series=\"0\" stroke=\"#193d46\" "
                  "stroke-opacity=\"0.35\" stroke-width=\"0.45\" stroke-linejoin=\"round\">\n") == 0;
     }
+    plot_occlusion_t *occlusion = ok && faces ? plot_occlusion_new() : NULL;
+    ok = ok && (!faces || occlusion);
     for (size_t i = 0; ok && i < faces; ++i) {
         const facet_t *f = &facets[i];
         vertex_t polygon[5];
         double depth, height = 0;
         int clipped = clip_facet(vertices, f, &view, height_bounds, spans[2], polygon, &depth);
         ok = computation_step_current("plot.surface.draw") && clipped >= 3;
+        for (int j = 1; ok && j + 1 < clipped; ++j) {
+            unsigned corners[] = {0, (unsigned)j, (unsigned)j + 1};
+            double triangle[3][3];
+            for (unsigned k = 0; k < 3; ++k) {
+                const vertex_t *point = &polygon[corners[k]];
+                triangle[k][0] = point->x; triangle[k][1] = point->y;
+                triangle[k][2] = 1 / (view.projection.distance + point->depth);
+            }
+            ok = plot_occlusion_add(occlusion, triangle);
+        }
         for (int j = 0; j < clipped; ++j)
             height += polygon[j].z;
         if (ok)
@@ -609,8 +679,10 @@ string_t *plot_surface_svg(const plot_t *plot)
                     "fill=\"#%06x\" font-family=\"sans-serif\" font-size=\"14\">"
                     "No surface found in this view</text>", plot->options.width / 2, plot->options.height / 2,
                     (unsigned)plot->options.label_colour) >= 0;
-    ok = ok && string_append_cstr(svg, "</g>\n") == 0 && axes(svg, plot, &view, bounds) &&
+    ok = ok && (!occlusion || plot_occlusion_build(occlusion));
+    ok = ok && string_append_cstr(svg, "</g>\n") == 0 && axes(svg, plot, &view, bounds, occlusion) &&
          string_append_cstr(svg, "</svg>\n") == 0;
+    plot_occlusion_free(occlusion);
     free(facets);
     free(vertices);
     if (!ok) {

@@ -515,6 +515,18 @@ expr_t *expr_simplify_owned(expr_t *expr);
 expr_t *expr_beautify_presimplified(const expr_t *expr);
 
 /**
+ * @brief Place structurally shared signed summands first throughout a small expression family.
+ * @param expressions Borrowed array of two to sixteen graphs, neither modified nor retained on return.
+ * @param count Number of family members. Each additive graph is limited to eight terms and depth sixteen.
+ * @param[out] ordered Required zero-initialised array of count slots, receiving owned replacements only for
+ * reordered members. Release every populated slot with expr_free(); NULL denotes an unchanged member.
+ * @return True on success, including unsupported or unshared structures left unchanged; false on invalid
+ * arguments or allocation failure, with output slots unchanged. Matching is structural and preserves signed
+ * multiplicities, source symbol identities and values. Callers serialise access against source mutation.
+ */
+bool expr_beautify_shared_centre(const expr_t *const *expressions, size_t count, expr_t **ordered);
+
+/**
  * @brief Factor common terms after calculus processing; return an owned expression.
  * @param expr Borrowed source expression to inspect or transform without transferring ownership.
  * @return Owned expression reference released with expr_free, or NULL when the requested form is unavailable or the
@@ -602,36 +614,40 @@ expr_t *expr_new_summation(const expr_t *term, const expr_t *index);
 expr_t *expr_new_finite_summation(const expr_t *term, const expr_t *index, const expr_t *upper);
 
 /**
- * @brief Return an owned, simplified sum of two borrowed operands.
- * @param left Borrowed mathematical operand; no input ownership transfers.
- * @param right Borrowed mathematical operand; no input ownership transfers.
+ * @brief Consume two owned operand references and return their simplified sum.
+ * @param left Owned mathematical operand reference, consumed even on failure.
+ * @param right Owned mathematical operand reference, consumed even on failure; a second owned reference is
+ * required when both operands point to the same graph.
  * @return Owned expression reference released with expr_free, or NULL when the requested form is unavailable or the
  * operation fails.
  */
 expr_t *expr_add_simplify_owned(const expr_t *left, const expr_t *right);
 
 /**
- * @brief Return an owned, simplified difference of two borrowed operands.
- * @param left Borrowed mathematical operand; no input ownership transfers.
- * @param right Borrowed mathematical operand; no input ownership transfers.
+ * @brief Consume two owned operand references and return their simplified difference.
+ * @param left Owned mathematical operand reference, consumed even on failure.
+ * @param right Owned mathematical operand reference, consumed even on failure; a second owned reference is
+ * required when both operands point to the same graph.
  * @return Owned expression reference released with expr_free, or NULL when the requested form is unavailable or the
  * operation fails.
  */
 expr_t *expr_sub_simplify_owned(const expr_t *left, const expr_t *right);
 
 /**
- * @brief Return an owned, simplified product of two borrowed operands.
- * @param left Borrowed mathematical operand; no input ownership transfers.
- * @param right Borrowed mathematical operand; no input ownership transfers.
+ * @brief Consume two owned operand references and return their simplified product.
+ * @param left Owned mathematical operand reference, consumed even on failure.
+ * @param right Owned mathematical operand reference, consumed even on failure; a second owned reference is
+ * required when both operands point to the same graph.
  * @return Owned expression reference released with expr_free, or NULL when the requested form is unavailable or the
  * operation fails.
  */
 expr_t *expr_mul_simplify_owned(const expr_t *left, const expr_t *right);
 
 /**
- * @brief Return an owned, simplified quotient of two borrowed operands.
- * @param left Borrowed mathematical operand; no input ownership transfers.
- * @param right Borrowed mathematical operand; no input ownership transfers.
+ * @brief Consume two owned operand references and return their simplified quotient.
+ * @param left Owned mathematical operand reference, consumed even on failure.
+ * @param right Owned mathematical operand reference, consumed even on failure; a second owned reference is
+ * required when both operands point to the same graph.
  * @return Owned expression reference released with expr_free, or NULL when the requested form is unavailable or the
  * operation fails.
  */
@@ -732,6 +748,18 @@ const expr_t *expr_formal_derivative_wrt_at(const expr_t *expr, size_t index);
  * The result has independent ownership; no mutable state is shared between callers.
  */
 expr_t *expr_exact_sin_pi_ratio(long numerator, unsigned long denominator);
+
+/**
+ * @brief Certify a principal arccosine as an exact rational multiple of pi.
+ * @param argument Borrowed finite real algebraic expression, neither modified nor retained.
+ * @param numerator Required output receiving the signed numerator of the multiple, unchanged on failure.
+ * @param denominator Required output receiving its positive denominator, unchanged on failure.
+ * @return True on certification, or false for unsupported values, opaque floating-point inputs,
+ * invalid outputs or allocation failure. Exact algebra must prove that the squared argument is
+ * one of 0, 1/4, 1/2, 3/4 or 1; numerical proximity never establishes an exact angle.
+ * Callers must serialise access against mutation of the source graph.
+ */
+bool expr_exact_acos_pi_ratio(const expr_t *argument, long *numerator, unsigned long *denominator);
 
 /**
  * @brief Describe certified rational power reductions in an expression before its working is simplified away.
@@ -1105,6 +1133,16 @@ bool expr_copy_binding_value(expr_t *destination, const expr_t *source);
  * The result retains no references to the source binding; concurrent mutation of that binding is unsupported.
  */
 expr_t *expr_binding_value_expression(const expr_t *binding);
+
+/**
+ * @brief Recover an independently owned algebraic value from exact scalar arithmetic and authored radicals.
+ * @param source Borrowed coefficient graph or supplied scalar binding; neither modified nor retained.
+ * @return Owned graph released with expr_free(), or NULL for unset bindings, opaque inexact values,
+ * non-algebraic operations, excessive nesting or allocation failure. Rational arithmetic, rational powers,
+ * principal roots and conjugation are supported, including their preserved authored binding metadata.
+ * No rounded value is recognised or promoted to an exact constant. Concurrent source mutation is unsupported.
+ */
+expr_t *expr_exact_algebraic_value(const expr_t *source);
 
 /**
  * @brief Return an owning Function-style binding value, retaining exact algebra, or NULL on failure.

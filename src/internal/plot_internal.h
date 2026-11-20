@@ -1,9 +1,10 @@
 /**
  * @file plot_internal.h
- * @brief Controlled access to display-only plot-axis geometry.
+ * @brief Controlled access to display-only plot-axis geometry and projective visibility.
  *
  * Retained WebAssembly rendering uses the native cube-frame and positive-arrow plans without
  * importing scene storage, mathematical values or the full plot implementation.
+ * A shared triangle hierarchy clips visible axis fragments for software and SVG output.
  * Ordinary scene consumers use the public plot-t.h API.
  */
 #ifndef MARS_SHARED_PLOT_INTERNAL_H
@@ -17,5 +18,7 @@
 #include "../plot/plot_axis_frame.h"
 #define MARS_PLOT_INTERNAL_ACCESS
 #include "../plot/plot_projection.h"
+#define MARS_PLOT_INTERNAL_ACCESS
+#include "../plot/plot_occlusion.h"
 
 #endif

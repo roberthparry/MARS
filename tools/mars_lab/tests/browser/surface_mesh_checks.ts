@@ -1,6 +1,6 @@
 /**
  * @file surface_mesh_checks.ts
- * @brief Native retained-mesh decoding, exterior-axis layout and vertex-layout regressions.
+ * @brief Native retained-mesh decoding, exterior and origin-centred axes, and vertex-layout regressions.
  *
  * Supplies small SVG fixtures directly to WebAssembly, checking geometry admission,
  * fan triangulation, colour expansion and temporary-handle lifetime without a GPU.
@@ -8,8 +8,10 @@
 interface Window {
     /** @brief Validate native display-metadata decoding through the real browser bridge. */
     checkLabSurfaceMesh(): void;
-    /** @brief Validate connected exterior scales, rotation, zoom and bounded numeric label spacing. */
+    /** @brief Validate exterior and origin-centred axes, rotation, zoom and bounded numeric label spacing. */
     checkLabSurfaceAxes(): void;
+    /** @brief Verify depth-faded axes in real GPU pixels and native software/export plans. */
+    checkLabSurfaceVisibility(): void;
 }
 
 /** @brief Exercise native mesh preparation using detached, fixture-owned SVG elements. */
@@ -78,6 +80,69 @@ window.checkLabSurfaceMesh = function checkLabSurfaceMesh(): void {
               'large repeated preparations release per-record handles');
     }
     window.checkLabSurfaceAxes();
+    window.checkLabSurfaceVisibility();
+};
+
+/** @brief Hidden sections stay clearly visible, while front sections and the uncovered background remain solid. */
+window.checkLabSurfaceVisibility = function checkLabSurfaceVisibility(): void {
+    function check(condition: unknown, message: string): asserts condition {
+        if (!condition) throw new Error('Surface visibility: ' + message);
+    }
+    const original = WorksheetAppearance.controller.current();
+    WorksheetAppearance.controller.select('0', false);
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = 64;
+    const vertices: number[] = [];
+    for (const point of [[.25, .25, .5], [.75, .25, .5], [.75, .75, .5],
+                         [.25, .25, .5], [.75, .75, .5], [.25, .75, .5]])
+        vertices.push(...point, .1, .2, .3, 1, 1, 1);
+    const gpu = MarsSurfaceGPU.create(canvas, new Float32Array(vertices), false);
+    check(gpu, 'real WebGL renderer is available');
+    const gl = canvas.getContext('webgl')!;
+    const camera = new Float32Array([2, 0, 0, 0, 0, 2, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
+    const pixel = (x: number, y: number): Uint8Array => {
+        const value = new Uint8Array(4);
+        gl.readPixels(x, y, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, value);
+        return value;
+    };
+    try {
+        check(gpu.draw(camera, [1, 1, 1], [0, 0, 0], true), 'surface-only baseline draws');
+        const baseline = pixel(40, 32);
+        const axes: number[] = [];
+        for (const point of [[-.9, -.05], [.9, -.05], [.9, .05], [-.9, -.05], [.9, .05], [-.9, .05]])
+            axes.push(...point, .5, 1, 1);
+        for (const point of [[-.05, -.9], [.05, -.9], [.05, .9], [-.05, -.9], [.05, .9], [-.05, .9]])
+            axes.push(...point, -.5, 1, 1);
+        check(gpu.draw(camera, [1, 1, 1], [0, 0, 0], true, new Float32Array(axes), .4),
+              'axes draw in front of and behind the same surface depth buffer');
+        const hidden = pixel(40, 32), outside = pixel(8, 32), front = pixel(32, 40);
+        const colour = [148, 184, 177];
+        for (let i = 0; i < 3; ++i) {
+            check(Math.abs(hidden[i] - (colour[i] * .4 + baseline[i] * .6)) <= 2,
+                  'covered axes retain forty per cent opacity rather than disappearing');
+            check(Math.abs(outside[i] - colour[i]) <= 2 && Math.abs(front[i] - colour[i]) <= 2,
+                  'uncovered and front-facing sections remain solid');
+        }
+        check(hidden[3] === 255 && outside[3] === 255 && front[3] === 255,
+              'faded axes preserve the opaque surface underneath');
+        check(gl.getError() === gl.NO_ERROR, 'depth passes do not leave GPU errors');
+    } finally {
+        gpu.dispose();
+        WorksheetAppearance.controller.select(original, false);
+    }
+    const face: MarsSurfaceAxisFace = {points: [[0, 0], [10, 0], [10, 10], [0, 10]],
+        depths: [2, 2, 2, 2], shade: .8, axis: 0, cone: false};
+    const frame = {distance: 10, solids: [face]} as MarsSurfaceFrame;
+    const cover = [
+        {points: [[0, 0], [5, 0], [5, 10]], depths: [0, 0, 0]},
+        {points: [[0, 0], [5, 10], [0, 10]], depths: [0, 0, 0]}
+    ];
+    labDOM.call('lab_surface_visibility', frame, cover);
+    check(face.visible?.length && face.visible.every(piece => piece.every(point => point[0] >= 5 - 1e-8)),
+          'software visibility keeps the uncovered half solid and fades only the covered half');
+    const plan = labDOM.call<MarsSurfaceSVGPlan>('lab_surface_svg_plan', [], [], 0, [face]);
+    check(plan.solids[0].faded && plan.solids[0].visible?.length === face.visible.length,
+          'vector export retains both the faint full face and its opaque visible fragments');
 };
 
 /** @brief Check axis geometry through the real WebAssembly camera and projection bridge. */
@@ -156,6 +221,7 @@ window.checkLabSurfaceAxes = function checkLabSurfaceAxes(): void {
         check(supported >= 2, 'face-on perspective retains two silhouette scales and the short third joining scale');
         check(!!plan.solids?.length && plan.solids.length <= 102 && plan.solids.every(face => face.points.length >= 3 &&
               face.shade >= 0 && face.shade <= 1), 'axes are bounded opaque cylinder and cone meshes');
+        checkClearance(plan);
         for (let axis = 0; axis < 3; ++axis)
             check(plan.solids!.some(face => face.axis === axis && face.cone) &&
                   plan.solids!.some(face => face.axis === axis && !face.cone),
@@ -173,6 +239,20 @@ window.checkLabSurfaceAxes = function checkLabSurfaceAxes(): void {
         }
         check(['x', 'y', 'z'].every(name => plan.texts.some(item => item.text === name)),
               'positive axis directions retain their names');
+    }
+    /** @brief Measure actual projected arrow meshes and names against the shared viewport clearance. */
+    function checkClearance(plan: MarsSurfaceFrame): void {
+        for (const face of plan.solids ?? [])
+            check(face.points.every(point => point[0] >= 15.99 && point[0] <= plan.width - 15.99 &&
+                  point[1] >= 15.99 && point[1] <= plan.height - 15.99),
+                  'extended shafts and cone tips stay clear of every viewport edge');
+        for (const label of plan.texts.filter(label => label.bold)) {
+            const size = label.size ?? 14, width = label.text.length * size * 0.8;
+            const left = label.x - (label.align === 'right' ? width : label.align === 'center' ? width / 2 : 0);
+            check(left >= 15.99 && left + width <= plan.width - 15.99 && label.y - size >= 15.99 &&
+                  label.y + size * 0.3 <= plan.height - 15.99,
+                  'positive axis names keep their clearance beside the arrowheads');
+        }
     }
     for (const angles of [[315, 30, 0], [18, 80, 45], [145, 15, 135], [315, 30, 180], [85, 5, 3], [90, 30, 90]]) {
         view.orientation = labDOM.call<number[]>('lab_surface_camera', 0, angles, null, null, null, 0);
@@ -256,4 +336,48 @@ window.checkLabSurfaceAxes = function checkLabSurfaceAxes(): void {
     view.height = 650;
     check(intermediateTickCount(frame(), 1) === 9 && view.ticks.length === 33,
           'resizing does not permanently prune the numerical tick catalogue');
+
+    chart.dataset.axisOrigin = '0.25 0.375 0.5';
+    view.units = [1, 1, 1];
+    Reflect.set(volume, 'sampled', [-1, 3, -3, 5, -4, 4]);
+    Reflect.set(volume, 'sampleExponent', 0);
+    for (const exponent of [0, 1]) {
+        volume.exponent = exponent;
+        for (const angles of [[315, 30, 0], [18, 80, 45], [145, 15, 135]]) {
+            view.orientation = labDOM.call<number[]>('lab_surface_camera', 0, angles, null, null, null, 0);
+            const plan = frame();
+            checkClearance(plan);
+            const zero = [0.25, 0.375, 0.5].map(value => 0.5 + (value - 0.5) * Math.pow(2, exponent));
+            const crossing = labDOM.call<number[]>('lab_surface_project', plan, zero);
+            for (let axis = 0; axis < 3; ++axis) {
+                const lower = [...zero], upper = [...zero];
+                lower[axis] = -0.08;
+                upper[axis] = 1.08;
+                const a = labDOM.call<number[]>('lab_surface_project', plan, lower);
+                const b = labDOM.call<number[]>('lab_surface_project', plan, upper);
+                const path = plan.paths[axis * 2];
+                const dx = path[2] - path[0], dy = path[3] - path[1];
+                check(Math.hypot(path[0] - a[0], path[1] - a[1]) < 1e-8 &&
+                      Math.abs(dx * (crossing[1] - path[1]) - dy * (crossing[0] - path[0])) /
+                          Math.hypot(dx, dy) < 1e-8,
+                      'all three retained axes pass through the exact mathematical zero after rotation and zoom');
+                check((path[2] - b[0]) * (b[0] - a[0]) + (path[3] - b[1]) * (b[1] - a[1]) > 0,
+                      'origin-centred cones continue to point in the positive coordinate direction');
+            }
+        }
+    }
+    volume.exponent = 0;
+    chart.dataset.axisOrigin = '0.5 0.5 0.5';
+    for (const [width, height] of [[320, 240], [560, 420], [800, 800], [1200, 700]]) {
+        view.width = width;
+        view.height = height;
+        for (const units of [[1, 1, 1], [1, 1, 0.25], [0.25, 1, 1]]) {
+            view.units = units;
+            for (const angles of [[0, 5, 0], [90, 5, 0], [180, 5, 0], [270, 5, 0],
+                                  [315, 30, 45], [0, 30, 90]]) {
+                view.orientation = labDOM.call<number[]>('lab_surface_camera', 0, angles, null, null, null, 0);
+                checkClearance(frame());
+            }
+        }
+    }
 };

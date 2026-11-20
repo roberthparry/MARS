@@ -218,6 +218,9 @@ as curves, with equal weight for each finite grid sample. This is a viewing
 heuristic, not a determination of where the function diverges. Constant heights receive a padded vertical
 range. Normalisation retains `number_t` precision before the configurable perspective
 projection. Faces are depth-ordered and shaded blue, teal and gold by height.
+Temporary solid-axis meshes use owned, per-render scratch storage that is freed
+before returning, keeping the native calculation stack bounded even in a forked
+worker whose memory limit prevents further stack growth.
 Three adjoining edges of the outer coordinate frame carry the positive-direction
 arrows, tick strokes and decimal scales, without an enclosing box. The edges form
 one connected chain at their actual viewport corners. A shared native selector
@@ -235,11 +238,14 @@ Every native surface retains its complete numerical tick catalogue. Each view
 selects tick strokes from their projected spacing and perspective size, prioritising
 zero and the outer values when crowded. Rotation and resizing can restore all
 intermediate marks without resampling the surface.
-Surface labels sit close to the tick tips, with a four-pixel gap at the reference
+Surface labels sit beside compact three-pixel ticks, with a 1.5-pixel gap at the reference
 font size; ascent, descent and perspective scaling determine their anchors.
 The camera reserves a compact border while allowing for long scientific labels.
-Labels may move slightly outwards along their tick's normal; labels that
-still cannot fit are omitted without removing their tick marks. Curves also thin crowded tick labels.
+The 3D plotting area sits slightly lower, with extra space above it to separate
+arrowheads and axis names from the title; this allowance reduces in short viewports.
+Numeric labels keep this gap even on short axes; labels that cannot fit are omitted
+without removing their tick marks. Endpoint axis names can move to avoid collisions.
+Curves also thin crowded tick labels.
 The camera fits the visible facets and coordinate axes with space for the heading
 and labels, rather than reserving empty projected bounding-box corners. This fit
 scales both screen directions uniformly and preserves mesh proportions.
@@ -296,8 +302,24 @@ Each surface axis ends in an arrow pointing towards increasing values, labelled
 with the copied `x_label`, `y_label` or `z_label` option (defaults `x`, `y`, `f`).
 Arrowheads extend clear of shared frame corners at the upper coordinate bound,
 including inverted camera views and ranges containing only negative values.
-In 3D plots, the axes are opaque, shaded circular cylinders ending in cones.
+In 3D plots, the axes are shaded circular cylinders ending in cones. Portions
+behind the surface retain 40% opacity, while portions in front stay opaque.
+Perspective-correct depth testing or indexed polygon clipping preserves holes
+and intersections in WebGL, software rendering and SVG output.
 Two-dimensional plots retain their existing line axes.
+The shared camera fit reserves sixteen pixels of viewport clearance for the actual
+projected shafts, arrowheads and axis names, while retaining the space above the
+volume for its title. The surface and its axes share the adjusted perspective;
+mathematical ranges and zoom bounds are unchanged.
+Set `plot_options_t.axes_at_origin` to place the three axes through the mathematical
+origin with shafts extending eight per cent beyond each end of the coordinate
+interval, so they project beyond the surface. Tick positions and values keep the
+original interval, and cone arrowheads still point in the positive directions.
+Native-precision zero fractions keep asymmetric and very large ranges
+accurate before projection. The SVG carries these fractions in `data-axis-origin`
+so retained rendering applies the same placement during rotation and volume changes.
+The default remains the connected exterior frame; MARS Lab uses origin-centred
+axes for its surfaces and implicit meshes. The origin can lie outside the visible volume.
 
 The surface, axes and tick positions use the same pinhole camera. With camera
 depth \(Z\) increasing away from the viewer, eye distance \(D=4R\) for enclosing

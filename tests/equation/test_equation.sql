@@ -7,6 +7,87 @@ CREATE TABLE IF NOT EXISTS equation_cases (
 CREATE INDEX IF NOT EXISTS equation_cases_operation ON equation_cases(operation, name);
 
 INSERT INTO test_case_runner(module, source, parent, table_name, operation) VALUES (
+    'equation.rational_relations', 'tests/equation/test_equation.c',
+    'tests.test_equation_rational_relations', 'equation_cases', 'rational_relation')
+ON CONFLICT(module) DO UPDATE SET table_name=excluded.table_name, operation=excluded.operation;
+INSERT INTO equation_cases(name, operation, input, expected) VALUES
+    ('relation_circle_slice', 'rational_relation', '(4949*y^2+4949*z^2+3025)/2371600=1',
+     'y^2+z^2=2368575/4949'),
+    ('relation_egg_fractions', 'rational_relation', '(49*(x+100)*(y^2+1)+3025*x^2)/2371600=1',
+     '49*(x+100)*(y^2+1)=3025*(784-x^2)'),
+    ('relation_factored_reversed', 'rational_relation', '1=(49*(x+100)*(y^2+1)+3025*x^2)/2371600',
+     '3025*(784-x^2)=49*(x+100)*(y^2+1)'),
+    ('relation_factored_rationals', 'rational_relation', '(u+2)*(v^2+1)/6+w^2/4=5/3',
+     '2*(u+2)*(v^2+1)=20-3*w^2'),
+    ('relation_factored_negative_term', 'rational_relation', '(u+2)*(v^2+1)-3*w^2=5',
+     '(u+2)*(v^2+1)=5+3*w^2'),
+    ('relation_factored_negative_product', 'rational_relation', '-(u+2)*(v^2+1)/6+w^2/4=5/3',
+     '2*(u+2)*(v^2+1)=3*w^2-20'),
+    ('relation_factored_zero_target', 'rational_relation', '2*(u+2)*(v^2+1)+4*w^2=0',
+     '(u+2)*(v^2+1)=-2*w^2'),
+    ('relation_factored_integer_content', 'rational_relation', '6*(u+2)*(v^2+1)+12*w^2=24',
+     '(u+2)*(v^2+1)=2*(2-w^2)'),
+    ('relation_shifted_product', 'rational_relation', 'u^2+(v+3)*(w^2+1)=10',
+     '(v+3)*(w^2+1)=10-u^2'),
+    ('relation_subtracted_shift', 'rational_relation', '(3-v)*(w^2+1)+u^2=10',
+     '(3-v)*(w^2+1)=10-u^2'),
+    ('relation_negative_shift', 'rational_relation', 'u^2+(v-3)*(w^2+1)=10',
+     '(v-3)*(w^2+1)=10-u^2'),
+    ('relation_ellipse_fractions', 'rational_relation', '(16*x^2+9*y^2)/144=1', 'x^2/9+y^2/16=1'),
+    ('relation_circle_reversed', 'rational_relation', '1=(4949*y^2+4949*z^2+3025)/2371600',
+     '2368575/4949=y^2+z^2'),
+    ('relation_integer_content', 'rational_relation', '4*y^2+8*z^2+3=23', 'y^2+2*z^2=5'),
+    ('relation_equal_rationals', 'rational_relation', '2*y/3+2*z/3+1/7=5', 'y+z=51/7'),
+    ('relation_unequal_rationals', 'rational_relation', 'y/3+z/5+1=2', 'y/3+z/5=1'),
+    ('relation_exact_fraction_offset', 'rational_relation', 'x^2+y^2+1/9=4', 'x^2+y^2=35/9'),
+    ('relation_trigonometric_terms', 'rational_relation', '4*sin(t)+4*cos(t)+1=7', 'sin(t)+cos(t)=3/2'),
+    ('relation_symbolic_divisor_control', 'rational_relation', '(2*y+2*z+1)/a=3', '(2*y+2*z+1)/a=3'),
+    ('relation_numeric_truth_control', 'rational_relation', '4=5', '4=5'),
+    ('relation_named_constant_control', 'rational_relation', '{2*x+1=a | x=?; a=15}', '{2*x+1=a | x=?; a=15}'),
+    ('relation_symbolic_sides_control', 'rational_relation', 'y=2*x+3', 'y=2*x+3')
+ON CONFLICT(name) DO UPDATE SET input=excluded.input, expected=excluded.expected;
+
+INSERT INTO test_case_runner(module, source, parent, table_name, operation) VALUES (
+    'equation.algebraic_cubics', 'tests/equation/test_equation.c',
+    'tests.test_equation_algebraic_cubics', 'equation_cases', 'algebraic_cubic')
+ON CONFLICT(module) DO UPDATE SET table_name=excluded.table_name, operation=excluded.operation;
+INSERT INTO equation_cases(name, operation, input, expected, precision) VALUES
+    ('algebraic_cubic_three_real', 'algebraic_cubic', 'x^3-3*sqrt(3)*x^2-3*x+sqrt(3)=0',
+     '{"count":3,"real":3,"trigonometric":true,"centre":"sqrt(3)","compact_limit":600,"roots":["-tan(2*pi/9)","tan(pi/9)","tan(4*pi/9)"]}', 70),
+    ('algebraic_cubic_three_real_high_precision', 'algebraic_cubic', 'x^3-3*sqrt(3)*x^2-3*x+sqrt(3)=0',
+     '{"count":3,"real":3,"trigonometric":true,"centre":"sqrt(3)","compact_limit":600,"roots":["-tan(2*pi/9)","tan(pi/9)","tan(4*pi/9)"]}', 309),
+    ('algebraic_cubic_scaled', 'algebraic_cubic', '-2*x^3+6*sqrt(3)*x^2+6*x-2*sqrt(3)=0',
+     '{"count":3,"real":3,"roots":["-tan(2*pi/9)","tan(pi/9)","tan(4*pi/9)"]}', 70),
+    ('algebraic_cubic_radical_leading', 'algebraic_cubic', 'sqrt(2)*x^3-3*sqrt(6)*x^2-3*sqrt(2)*x+sqrt(6)=0',
+     '{"count":3,"real":3,"roots":["-tan(2*pi/9)","tan(pi/9)","tan(4*pi/9)"]}', 70),
+    ('algebraic_cubic_fractional_scale', 'algebraic_cubic', 'x^3/7-3*sqrt(3)*x^2/7-3*x/7+sqrt(3)/7=0',
+     '{"count":3,"real":3,"roots":["-tan(2*pi/9)","tan(pi/9)","tan(4*pi/9)"]}', 70),
+    ('algebraic_cubic_bound_coefficient', 'algebraic_cubic', '{x^3-3*a*x^2-3*x+a=0 | x=?; a=sqrt(3)}',
+     '{"count":3,"real":3,"roots":["-tan(2*pi/9)","tan(pi/9)","tan(4*pi/9)"]}', 70),
+    ('algebraic_cubic_complex_pair', 'algebraic_cubic', 'x^3+sqrt(2)*x+sqrt(5)=0',
+     '{"count":3,"real":1}', 70),
+    ('algebraic_cubic_negative_cardano_argument', 'algebraic_cubic', 'x^3-sqrt(2)*x+sqrt(5)=0',
+     '{"count":3,"real":1}', 70),
+    ('algebraic_cubic_repeated', 'algebraic_cubic', '(x-sqrt(2))^2*(x+2*sqrt(2))=0',
+     '{"count":2,"real":2,"roots":["sqrt(2)","-2*sqrt(2)"]}', 70),
+    ('algebraic_cubic_triple', 'algebraic_cubic', '(x-sqrt(3))^3=0',
+     '{"count":1,"real":1,"roots":["sqrt(3)"]}', 70),
+    ('algebraic_cubic_angle_negative', 'algebraic_cubic', 'x^3-3*x+sqrt(3)=0',
+     '{"count":3,"real":3,"trigonometric":true}', 70),
+    ('algebraic_cubic_angle_rational', 'algebraic_cubic', 'x^3-3*x-1=0',
+     '{"count":3,"real":3,"trigonometric":true}', 70),
+    ('algebraic_cubic_angle_shifted', 'algebraic_cubic', '(x-2)^3-3*(x-2)-1=0',
+     '{"count":3,"real":3,"trigonometric":true,"centre":"2"}', 70),
+    ('algebraic_cubic_angle_constructible', 'algebraic_cubic', 'x^3-3*x-sqrt(2)=0',
+     '{"count":3,"real":3}', 70),
+    ('algebraic_cubic_angle_unsupported', 'algebraic_cubic', 'x^3-3*x+1/5=0',
+     '{"count":3,"real":3,"trigonometric":false}', 70),
+    ('algebraic_cubic_angle_nearby', 'algebraic_cubic', 'x^3-3*x-sqrt(3)+1/10^120=0',
+     '{"count":3,"real":3,"trigonometric":false,"numerical_fallback":true}', 70)
+ON CONFLICT(name) DO UPDATE SET operation=excluded.operation, input=excluded.input,
+    expected=excluded.expected, precision=excluded.precision;
+
+INSERT INTO test_case_runner(module, source, parent, table_name, operation) VALUES (
     'equation.even_quadratic', 'tests/equation/test_equation.c',
     'tests.test_equation_even_quadratic', 'equation_cases', 'even_quadratic')
 ON CONFLICT(module) DO UPDATE SET table_name=excluded.table_name, operation=excluded.operation;
@@ -123,6 +204,10 @@ INSERT OR IGNORE INTO equation_cases(name, operation, input, expected, precision
 
 INSERT OR IGNORE INTO equation_cases(name, operation, input, expected) VALUES
     ('inverse_atanh_pole', 'test_equation_preserves_principal_root_domain_sources', 'atanh(y)=i*pi/2', '');
+
+INSERT OR IGNORE INTO equation_cases(name, operation, input, expected, precision) VALUES
+    ('inverse_atanh_pole_after_precision_change', 'test_equation_preserves_principal_root_domain_sources',
+     'atanh(y)=i*pi/2', '', 309);
 
 INSERT OR IGNORE INTO equation_cases(name, operation, input, expected, precision) VALUES
     ('guarded_inverse_upper_boundary', 'guarded_inverse', 'atanh(y)=1+i*pi/2',

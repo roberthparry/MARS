@@ -28,6 +28,17 @@ typedef struct _plot_projection_t {
     double radius; /**< Enclosing-sphere radius of the coordinate volume, in normalised world units. */
 } plot_projection_t;
 
+/**
+ * @brief Plan label normals for three coordinate axes passing through a projected mathematical origin.
+ * @param projection Borrowed finite camera, neither changed nor retained.
+ * @param origin Required normalised position of zero in each coordinate interval, without clamping.
+ * @param[out] frame Required output receiving perpendicular label normals and zeroed, unused corner indices.
+ * @return True on success; false for invalid pointers or non-finite origin coordinates, leaving output unchanged.
+ * No allocation or ownership transfer occurs. Axis endpoint order stays increasing in each coordinate.
+ * Independent calls are safe concurrently. Scene callers calculate origin fractions at native precision.
+ */
+bool plot_projection_origin_frame(const plot_projection_t *projection, const double origin[3], plot_axis_frame_t *frame);
+
 /** @brief Fixed numerical-scale and solid-axis limits, independent of sampled surface size. */
 enum {
     PLOT_AXIS_MAX_TICKS = 12, /**< Maximum catalogue size of one numerical coordinate scale. */
@@ -38,6 +49,7 @@ enum {
 /** @brief One opaque, shaded, projected face of an axis cylinder or cone. */
 typedef struct _plot_axis_face_t {
     double point[PLOT_AXIS_SIDES][2]; /**< Projected polygon vertices; only count entries are initialised. */
+    double depths[PLOT_AXIS_SIDES]; /**< Camera depths at the matching vertices, for projective visibility. */
     unsigned count; /**< Number of vertices, between three and PLOT_AXIS_SIDES. */
     unsigned axis; /**< Physical coordinate-axis index, zero through two. */
     bool cone; /**< True for the cone and its base; false for the cylinder and its lower cap. */
@@ -49,6 +61,7 @@ typedef struct _plot_axis_face_t {
 typedef struct _plot_axis_solid_t {
     plot_axis_face_t face[PLOT_AXIS_FACES]; /**< Cylinder and cone faces; valid entries precede count. */
     unsigned count; /**< Number of valid faces; zero for a collapsed projected axis. */
+    double start[2]; /**< Projected cylinder start, including any extension below the numerical interval. */
     plot_axis_arrow_t arrow; /**< Projected centreline direction, cone tip, silhouette wings and name anchor. */
     double name_scale; /**< Pinhole size multiplier at the upper axis endpoint labelled by the annotation. */
 } plot_axis_solid_t;
@@ -62,10 +75,28 @@ typedef struct _plot_axis_solid_t {
  * @param sphere True for a rotation-stable enclosing-sphere fit; false to fit the projected coordinate box.
  * @param[out] projection Required output receiving the camera on success; left unchanged on failure.
  * @return True for a finite non-degenerate camera; false for invalid dimensions, basis or output.
- * @details The eye is four enclosing radii from the centre. No allocations or retained state; thread-safe.
+ * @details The eye is four enclosing radii from the centre. Extra space above the fitted volume separates
+ * arrowheads and axis names from the title, reducing proportionally in short viewports.
+ * No allocations or retained state; thread-safe.
  */
 bool plot_projection_init(const double rows[9], double width, double height, double label_width,
                           bool sphere, plot_projection_t *projection);
+
+/**
+ * @brief Reduce the camera scale only as needed to keep solid axes and their names inside the viewport.
+ * @param[in,out] projection Required fitted camera, updated on success and unchanged on failure.
+ * @param width Finite viewport width in pixels, greater than eighty.
+ * @param height Finite viewport height in pixels, greater than one hundred and twenty.
+ * @param frame Borrowed selected exterior edges or origin-axis label normals; never changed or retained.
+ * @param origin Optional three-number normalised mathematical origin; NULL selects exterior frame edges.
+ * Axes outside the current coordinate volume do not change its framing.
+ * @param name_widths Required three-number conservative name widths at the base fourteen-pixel font size.
+ * @return True when the axes fit with sixteen pixels of edge clearance, false for invalid geometry or
+ * names too large to fit within eight bounded adjustments. Title clearance is retained above the volume.
+ * No allocation, mathematical evaluation or ownership transfer occurs. Independent cameras are thread-safe.
+ */
+bool plot_projection_fit_axes(plot_projection_t *projection, double width, double height,
+                              const plot_axis_frame_t *frame, const double origin[3], const double name_widths[3]);
 
 /**
  * @brief Transform a normalised coordinate-volume point into camera coordinates.
@@ -101,7 +132,7 @@ double plot_projection_size(const plot_projection_t *projection, double depth);
  * @param font_size Positive perspective-scaled label height in drawing pixels.
  * @param[out] out Required two-number text anchor and baseline; may alias tip.
  * @return Minus one for end alignment, zero for centred alignment, or one for start alignment.
- * @details Reserves four pixels at the thirteen-pixel reference font and accounts for ascent and descent.
+ * @details Reserves 1.5 pixels at the thirteen-pixel reference font and accounts for ascent and descent.
  * Callers perform collision and viewport checks. Invalid inputs propagate non-finite coordinates;
  * no allocation, retained state or ownership transfer occurs. Safe for concurrent calls with separate outputs.
  */
@@ -137,6 +168,7 @@ bool plot_projection_contains(const plot_projection_t *projection, double x, dou
  * @param[in] lower Required normalised unit-volume lower coordinate endpoint.
  * @param[in] upper Required normalised upper coordinate endpoint; determines increasing direction.
  * @param axis Physical axis index, zero through two, retained in every face.
+ * @param extend Extend the shaft by eight per cent of the coordinate interval at each end before adding the cone.
  * @param[out] solid Required output receiving a bounded shaded mesh and projected arrow on success.
  * @return True on success; false for invalid, collapsed or eye-crossing geometry, leaving output unchanged.
  * @details Uses constant physical radii, a camera-fixed light and sixteen-sided circular sections.
@@ -144,7 +176,7 @@ bool plot_projection_contains(const plot_projection_t *projection, double x, dou
  * No allocations, expression evaluation or retained state; thread-safe with separate outputs.
  */
 bool plot_axis_solid(const plot_projection_t *projection, const double lower[3], const double upper[3],
-                     unsigned axis, plot_axis_solid_t *solid);
+                     unsigned axis, bool extend, plot_axis_solid_t *solid);
 
 /**
  * @brief Compare projected solid faces for far-to-near painter ordering.

@@ -1,0 +1,12 @@
+Mode: built-in image_gen, with a transparent background.
+Input: user-supplied Ophelia portrait, converted into a full-length Roman marble
+statue and refined through approved previews to give it a thinner plinth.
+Output: ophelia_statue.png, 958 by 1642 pixels, preserving the generated alpha.
+The header displays Ophelia at 85 percent of Mars's height, with aligned bases.
+
+Final edit prompt:
+Use case: precise-object-edit.
+Edit target: the supplied transparent full-length marble statue of Ophelia.
+Make ONLY her stone plinth substantially thinner: halve the vertical thickness of the present slab again. Its front vertical edge should be a very narrow stone lip, about 12–16 pixels on this 1642-pixel-tall image, instead of a thick block. Keep the slab's width and front-facing perspective. Keep its plain marble texture.
+Preserve the entire figure exactly: face, flower wreath, hair, braids, expression, hands, pose, body proportions, every fold of the long gown, compact train, lighting, material, camera angle and size. Do not redesign or rescale her. Keep the gown resting on the slab. Do not add steps or moulding.
+Full figure and base visible, centred, small transparent margins. Real transparent alpha background; no floor, background, shadow, text, watermark or other figure.

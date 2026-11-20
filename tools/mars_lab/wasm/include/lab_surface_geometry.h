@@ -52,7 +52,7 @@ bool lab_surface_contains(frame_jsref frame, double x, double y);
  * @brief Transform, clip and project one segment or triangle.
  * @param frame Scoped projection record returned by lab_surface_frame.
  * @param points Scoped array of two or three unit-volume [x, y, z] arrays; more than three produces no vertices.
- * @details Publishes a record with projected two-dimensional points and mean camera depth through lab_dom_return.
+ * @details Publishes projected two-dimensional points, per-vertex camera depths and mean depth through lab_dom_return.
  * An entirely clipped primitive has an empty points array and zero depth.
  */
 void lab_surface_polygon(frame_jsref frame, jsref points);
@@ -68,6 +68,16 @@ void lab_surface_polygon(frame_jsref frame, jsref points);
  * with O(n) browser-owned output and sorting storage, and bounded native scratch space.
  */
 void lab_surface_polygons(frame_jsref frame, jsref primitives, lab_surface_primitive_t kind);
+
+/**
+ * @brief Attach visible axis-face fragments using perspective-correct surface occlusion.
+ * @param[in,out] frame Borrowed camera frame; its solid faces receive browser-owned visible polygon arrays.
+ * @param polygons Borrowed clipped surface polygons, including per-vertex camera depths.
+ * @details Reuses an indexed native clipper for this frame only. No expressions or source vertices are changed.
+ * Already completed frames are left unchanged. Invalid geometry or allocation failure leaves the visibility
+ * flag unset so a later call may retry; all temporary native allocations are released before returning.
+ */
+void lab_surface_visibility(frame_jsref frame, jsref polygons);
 
 /**
  * @brief Clip a segment or triangle against the closed unit cube.

@@ -162,6 +162,12 @@ INSERT INTO test_case_runner(module, source, parent, table_name, operation) VALU
     'tests.test_lab_equation_parameters', 'mars_lab_cases', 'equation_parameters')
 ON CONFLICT(module) DO UPDATE SET table_name=excluded.table_name, operation=excluded.operation;
 
+INSERT INTO mars_lab_cases(name, operation, input, expected) VALUES
+    ('equation_radical_cubic_display', 'equation_parameters',
+     '{"equation":"x^3-3*sqrt(3)*x^2-3*x+sqrt(3)=0","precision":70}',
+     '{"route":"/equation-eval","status":"200","parameters":{},"display_contains":"x &= \\sqrt{3} +","display_excludes":"\\sqrt[3]{","bindings":{"x":"variable"}}')
+ON CONFLICT(name) DO UPDATE SET input=excluded.input, expected=excluded.expected;
+
 INSERT OR IGNORE INTO mars_lab_cases(name, operation, input, expected) VALUES
     ('equation_inverse_curve_parameters', 'equation_parameters',
      '{"expression":"{x=-(2*atanh(sqrt(C+2*exp(y))/sqrt(C)))/sqrt(C)+D | x=?, y=?; C=?, D=?}","wrt":"x","action":"plot","plot_source_mode":"equation","precision":32}',
@@ -210,6 +216,20 @@ INSERT OR IGNORE INTO mars_lab_cases(name, operation, input, expected) VALUES
 
 -- Fixing any coordinate, including the selected first one, changes the plot dimension without changing its role.
 INSERT OR IGNORE INTO mars_lab_cases(name, operation, input, expected) VALUES
+    ('equation_torus_equatorial_circles', 'equation_parameters',
+     '{"expression":"{(x^2+y^2+z^2+91)^2=400*(x^2+y^2) | x=?, y=?, z=0}","wrt":"x","action":"plot","plot_source_mode":"equation","precision":32}',
+     '{"status":"200","parameters":{},"axes":["x","y"],"title_excludes":"z","contour_radii":[7,13]}'),
+    ('equation_nested_circles', 'equation_parameters',
+     '{"expression":"(x^2+y^2-1)*(x^2+y^2-9)=0","wrt":"x","action":"plot","plot_source_mode":"equation","precision":32}',
+     '{"status":"200","parameters":{},"axes":["x","y"],"contour_radii":[1,3]}'),
+    ('equation_nested_circles_translated', 'equation_parameters',
+     '{"expression":"((x-4)^2+(y+2)^2-1)*((x-4)^2+(y+2)^2-9)=0","wrt":"x","action":"plot","plot_source_mode":"equation","precision":32}',
+     '{"status":"200","parameters":{},"axes":["x","y"],"contour_centre":[4,-2],"contour_radii":[1,3]}'),
+    ('equation_torus_manual_inner_circle', 'equation_parameters',
+     '{"expression":"{(x^2+y^2+z^2+91)^2=400*(x^2+y^2) | x=?, y=?, z=0}","wrt":"x","action":"plot","plot_source_mode":"equation","precision":32,"plot_lower":"-8","plot_upper":"8","plot_scale":"manual","plot_y_lower":"-8","plot_y_upper":"8"}',
+     '{"status":"200","parameters":{},"axes":["x","y"],"contour_radii":[7]}');
+
+INSERT OR IGNORE INTO mars_lab_cases(name, operation, input, expected) VALUES
     ('equation_fixed_first_coordinate', 'equation_parameters',
      '{"expression":"{x^2+y^2+z^2=4 | x=1, y=?, z=?}","wrt":"x","action":"plot","plot_source_mode":"equation","precision":32}',
      '{"status":"200","parameters":{},"plot_marker":"data-series","plot_excludes":"data-surface","axes":["y","z"],"bindings":{"x":"variable","y":"variable","z":"variable"},"values":{"x":"1"}}'),
@@ -236,22 +256,25 @@ INSERT OR IGNORE INTO mars_lab_cases(name, operation, input, expected) VALUES
 INSERT OR IGNORE INTO mars_lab_cases(name, operation, input, expected) VALUES
     ('equation_caption_fixed_egg', 'equation_parameters',
      '{"expression":"{x^2/784+(y^2+z^2)/484*(1+0.01*x)=1 | x=?, y=?, z=1}","wrt":"x","action":"plot","plot_source_mode":"equation","precision":32}',
-     '{"status":"200","parameters":{},"axes":["x","y"],"title_contains":"y² + 1","title_excludes":"z","title_TeX_contains":"y^{2} + 1","title_TeX_excludes":"z","bindings":{"x":"variable","y":"variable","z":"variable"},"values":{"z":"1"}}'),
+     '{"status":"200","parameters":{},"axes":["x","y"],"title_contains":"3025","title_excludes":"z","title_TeX_contains":"784 - x^{2}","title_TeX_excludes":"\\frac","bindings":{"x":"variable","y":"variable","z":"variable"},"values":{"z":"1"}}'),
     ('equation_caption_exact_radical', 'equation_parameters',
      '{"expression":"{x^2+y^2+z^2=4 | x=?, y=?, z=sqrt(2)}","wrt":"x","action":"plot","plot_source_mode":"equation","precision":32}',
-     '{"status":"200","parameters":{},"axes":["x","y"],"title_contains":"x² + y² + 2 = 4","title_excludes":"z","title_TeX_contains":"x^{2} + y^{2} + 2 &= 4","title_TeX_excludes":"z"}'),
+     '{"status":"200","parameters":{},"axes":["x","y"],"title_contains":"x² + y² = 2","title_excludes":"z","title_TeX_contains":"x^{2} + y^{2} &= 2","title_TeX_excludes":"z"}'),
     ('equation_caption_exact_fraction', 'equation_parameters',
      '{"expression":"{x^2+y^2+z^2=4 | x=?, y=?, z=1/3}","wrt":"x","action":"plot","plot_source_mode":"equation","precision":32}',
-     '{"status":"200","parameters":{},"axes":["x","y"],"title_excludes":"z","title_TeX_contains":"y^{2} + 1}{9}","title_TeX_excludes":"z"}'),
+     '{"status":"200","parameters":{},"axes":["x","y"],"title_excludes":"z","title_TeX_contains":"y^{2} &= \\frac{35}{9}","title_TeX_excludes":"z"}'),
     ('equation_caption_fixed_named', 'equation_parameters',
      '{"expression":"{u^2+v^2+w^2=4 | u=1, v=?, w=?}","wrt":"u","action":"plot","plot_source_mode":"equation","precision":32}',
-     '{"status":"200","parameters":{},"axes":["v","w"],"title_contains":"v² + w² + 1 = 4","title_excludes":"u","title_TeX_contains":"v^{2} + w^{2} + 1 &= 4"}'),
+     '{"status":"200","parameters":{},"axes":["v","w"],"title_contains":"v² + w² = 3","title_excludes":"u","title_TeX_contains":"v^{2} + w^{2} &= 3"}'),
     ('equation_caption_mesh_parameter', 'equation_parameters',
      '{"expression":"{x^2+y^2+z^2=r^2 | x=?, y=?, z=?; r=2}","wrt":"x","action":"plot","plot_source_mode":"equation","plot_quality":"preview","precision":32}',
      '{"status":"200","parameters":{},"axes":["x","y","z"],"title_contains":"x² + y² + z² = 4","title_excludes":"r","title_TeX_contains":"z^{2} &= 4","bindings":{"r":"constant"},"values":{"r":"2"}}'),
     ('equation_caption_curve_parameter', 'equation_parameters',
      '{"expression":"{x^2+a=4 | x=?; a=1}","wrt":"x","action":"plot","plot_source_mode":"equation","precision":32}',
-     '{"status":"200","parameters":{},"axes":["x"],"title_contains":"x² + 1 = 4","title_excludes":"a","title_TeX_contains":"x^{2} + 1 &= 4","bindings":{"a":"constant"}}'),
+     '{"status":"200","parameters":{},"axes":["x"],"title_contains":"x² = 3","title_excludes":"a","title_TeX_contains":"x^{2} &= 3","bindings":{"a":"constant"}}'),
+    ('equation_caption_reduced_circle', 'equation_parameters',
+     '{"expression":"{x^2/784+(y^2+z^2)/484*(1+0.01*x)=1 | x=1, y=?, z=?}","wrt":"x","action":"plot","plot_source_mode":"equation","precision":32}',
+     '{"status":"200","parameters":{},"axes":["y","z"],"title_contains":"y² + z²","title_excludes":"x","title_TeX_contains":"y^{2} + z^{2} &= \\frac{2368575}{4949}","title_TeX_excludes":"3025","values":{"x":"1"}}'),
     ('equation_caption_selected_parameter', 'equation_parameters',
      '{"expression":"{y=a*x+b | x=?, y=?; a=?, b=?}","wrt":"x","action":"plot","plot_source_mode":"equation","precision":32,"plot_slices":"a\t-2\t2\t1\t250\nb\t-2\t2\t1\t-1"}',
      '{"status":"200","parameters":{"a":"-1","b":"1"},"title_contains":"y = 1 - x","title_excludes":"b - x","title_TeX_contains":"y &= 1 - x","bindings":{"a":"constant","b":"constant"}}')

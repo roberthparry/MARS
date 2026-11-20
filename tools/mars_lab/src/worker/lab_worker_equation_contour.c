@@ -159,6 +159,18 @@ static bool sample(contour_t *contour, const double bounds[4], size_t side)
     return ok;
 }
 
+/* Distinguish enclosed components from open curves after at least one wider discovery probe. */
+static bool enclosed(const double extent[4], const double bounds[4])
+{
+    for (unsigned axis = 0; axis < 2; ++axis) {
+        double margin = (bounds[axis * 2 + 1] - bounds[axis * 2]) * 0.0001;
+        if (extent[axis * 2] <= bounds[axis * 2] + margin ||
+            extent[axis * 2 + 1] >= bounds[axis * 2 + 1] - margin)
+            return false;
+    }
+    return true;
+}
+
 /* Sample only a private worker equation; restore its binding values and numerical precision on every exit. */
 int lab_worker_equation_contour(equation_t *equation, expr_t *first, expr_t *second, char **argv,
                                 const char *title_text, const char *title_TeX)
@@ -179,9 +191,23 @@ int lab_worker_equation_contour(equation_t *equation, expr_t *first, expr_t *sec
     ok = ok && isfinite(bounds[0]) && isfinite(bounds[1]) && bounds[0] < bounds[1] && bounds[2] < bounds[3];
     bool valid_bounds = ok;
     double centre[] = {(bounds[0] + bounds[1]) / 2, (bounds[2] + bounds[3]) / 2};
+    double extent[] = {INFINITY, -INFINITY, INFINITY, -INFINITY};
+    bool discovered = false;
     for (unsigned attempt = 0; ok && attempt < 5; ++attempt) {
         ok = sample(&contour, bounds, 33);
-        if (contour.count || (fixed_x && manual))
+        bool previous = discovered, stable = discovered;
+        if (ok && contour.count) {
+            double tolerance = fmax(contour.extent[1] - contour.extent[0],
+                                    contour.extent[3] - contour.extent[2]) * 0.001;
+            for (unsigned i = 0; i < 4; ++i) {
+                stable &= fabs(contour.extent[i] - extent[i]) <= tolerance;
+                extent[i] = i % 2 ? fmax(extent[i], contour.extent[i]) : fmin(extent[i], contour.extent[i]);
+            }
+            discovered = true;
+        }
+        if ((ok && contour.count && (fixed_x || manual || stable ||
+                                    (previous && !enclosed(contour.extent, bounds)))) ||
+            (fixed_x && manual))
             break;
         if (!fixed_x) {
             bounds[0] = centre[0] + (bounds[0] - centre[0]) * 4;
@@ -196,11 +222,11 @@ int lab_worker_equation_contour(equation_t *equation, expr_t *first, expr_t *sec
             bounds[3] = centre[1] + (bounds[3] - centre[1]) * 4;
         }
     }
-    if (ok && contour.count && !fixed_x && !manual) {
-        double span = fmax(contour.extent[1] - contour.extent[0], contour.extent[3] - contour.extent[2]);
+    if (ok && discovered && !fixed_x && !manual) {
+        double span = fmax(extent[1] - extent[0], extent[3] - extent[2]);
         if (span > 0) {
             for (unsigned axis = 0; axis < 2; ++axis) {
-                double centre = (contour.extent[2 * axis] + contour.extent[2 * axis + 1]) / 2;
+                double centre = (extent[2 * axis] + extent[2 * axis + 1]) / 2;
                 bounds[2 * axis] = centre - span * 0.6;
                 bounds[2 * axis + 1] = centre + span * 0.6;
             }

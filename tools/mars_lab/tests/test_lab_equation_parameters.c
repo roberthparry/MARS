@@ -7,6 +7,7 @@
  * together. Inputs and expected metadata live in tests/mars_lab/test_mars_lab.sql.
  * These checks do not reinterpret equations or change saved worksheets.
  */
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -17,6 +18,62 @@
 #include "test_harness.h"
 #include "test_database.h"
 #include "test_lab_support.h"
+
+static bool svg_number(const char *svg, const char *name, double *value)
+{
+    char key[64];
+    snprintf(key, sizeof key, "%s=\"", name);
+    const char *field = strstr(svg, key);
+    if (!field) return false;
+    char *end = NULL;
+    *value = strtod(field + strlen(key), &end);
+    return end && *end == '"' && isfinite(*value);
+}
+
+static bool contour_radii(const char *svg, const json_t *expected)
+{
+    const json_t *radii = lab_eval_get(expected, "contour_radii");
+    size_t count = json_array_size(radii);
+    if (!count) return true;
+    if (count > 16) return false;
+    double frame[8], centre[2] = {0, 0}, wanted[16];
+    static const char *const names[] = {"data-plot-left", "data-plot-top", "data-plot-width", "data-plot-height",
+                                        "data-x-min", "data-x-max", "data-y-min", "data-y-max"};
+    for (unsigned i = 0; i < 8; ++i)
+        if (!svg_number(svg, names[i], &frame[i])) return false;
+    for (size_t i = 0; i < count; ++i) {
+        const string_t *value = json_number_text(json_array_get(radii, i));
+        if (!value) return false;
+        wanted[i] = strtod(string_c_str(value), NULL);
+    }
+    for (unsigned i = 0; i < 2; ++i) {
+        const string_t *value = json_number_text(json_array_get(lab_eval_get(expected, "contour_centre"), i));
+        if (value) centre[i] = strtod(string_c_str(value), NULL);
+    }
+    const char *series = strstr(svg, "data-series=\"0\""), *end = series ? strstr(series, "</g>") : NULL;
+    if (!end || !(frame[2] > 0) || !(frame[3] > 0)) return false;
+    unsigned found = 0, points = 0;
+    for (const char *path = strstr(series, "<path d=\"M "); path && path < end;
+         path = strstr(path + 1, "<path d=\"M ")) {
+        double xy[4];
+        if (sscanf(path, "<path d=\"M %lf %lf L %lf %lf", xy, xy + 1, xy + 2, xy + 3) != 4) return false;
+        for (unsigned vertex = 0; vertex < 2; ++vertex) {
+            double x = frame[4] + (xy[vertex * 2] - frame[0]) / frame[2] * (frame[5] - frame[4]);
+            double y = frame[7] - (xy[vertex * 2 + 1] - frame[1]) / frame[3] * (frame[7] - frame[6]);
+            double radius = hypot(x - centre[0], y - centre[1]);
+            bool matches = false;
+            /* At most sixteen expected components; every native sampled endpoint must belong to one. */
+            for (size_t i = 0; i < count; ++i)
+                if (fabs(radius - wanted[i]) < wanted[i] * 0.001 + 0.001) {
+                    found |= 1u << i;
+                    matches = true;
+                }
+            if (!matches) return false;
+            ++points;
+        }
+    }
+    return points > 20 && found == (1u << count) - 1;
+}
 
 static void equation_parameter_row(const void *data)
 {
@@ -65,6 +122,7 @@ static void equation_parameter_row(const void *data)
     }
     const char *excluded = lab_eval_text(expected, "plot_excludes"), *svg = lab_eval_text(response, "plot_svg");
     if (*excluded) ok = ok && !strstr(svg, excluded);
+    ok = ok && contour_radii(svg, expected);
     const json_t *axes = lab_eval_get(expected, "axes"), *actual_axes = lab_eval_get(response, "plot_axis_names");
     if (axes) {
         ok = ok && json_array_size(axes) == json_array_size(actual_axes);

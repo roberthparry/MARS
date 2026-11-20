@@ -21,22 +21,29 @@ async function checkAppearanceMonthMenu(check: LabTestCheck): Promise<void> {
     const shell = month.closest<HTMLElement>('.select-shell')!;
     const button = shell?.querySelector<HTMLButtonElement>('.select-button')!;
     const picker = document.getElementById('marsDatePicker')!;
+    const check_months = (stage: string) => check(
+        shell.querySelectorAll('.select-option:not(.hidden)').length === 12,
+        'all twelve months remain available ' + stage + ': ' + shell.querySelector('.select-option.hidden')?.outerHTML);
     try {
         WorksheetLocations.picker.open(input, opener);
+        check_months('after opening the calendar');
         check(shell && button && month.classList.contains('select-native-source') &&
             month.getAttribute('aria-hidden') === 'true' && button.getAttribute('aria-label') === 'Calendar month' &&
             month.getBoundingClientRect().width <= 1 && month.getBoundingClientRect().height <= 1 &&
             getComputedStyle(month).pointerEvents === 'none',
             'the month picker exposes a labelled themed button instead of an operating-system select');
         button.click();
+        check_months('after opening the month menu');
         check(shell.classList.contains('open') && shell.querySelectorAll('.select-option').length === 12 &&
             !shell.querySelector('.select-search') && button.textContent === 'November',
             'opening the month menu shows all twelve months without search');
         shell.querySelector<HTMLButtonElement>('[data-value="2"]')!.click();
+        check_months('after choosing February');
         check(input.value === '2026-02-13' && button.textContent === 'February' && !shell.classList.contains('open'),
             'choosing a themed month commits the date and synchronises the label');
         document.getElementById('marsDatePickerYearDown')!.click();
         document.getElementById('marsDatePickerNext')!.click();
+        check_months('after year and month navigation');
         check(input.value === '2025-03-13' && button.textContent === 'March',
             'year and month navigation keep the enhanced menu selection current');
         button.dispatchEvent(new KeyboardEvent('keydown', {key: 'ArrowDown', bubbles: true, cancelable: true}));
@@ -49,6 +56,7 @@ async function checkAppearanceMonthMenu(check: LabTestCheck): Promise<void> {
             'Escape closes the month menu and restores focus while retaining the calendar');
         button.click();
         WorksheetLocations.picker.close();
+        check_months('after closing the calendar');
         check(!shell.classList.contains('open'), 'closing the calendar also dismisses its month menu');
         WorksheetLocations.picker.open(input, opener);
         check(button.textContent === 'March' && !shell.classList.contains('open'),
@@ -226,12 +234,21 @@ window.checkLabAppearance = async function checkLabAppearance(): Promise<void> {
                 check(Math.abs(menu_box.top - selector_box.bottom - 4) < 1 &&
                     Math.abs(menu_box.left - selector_box.left) < 1 && Math.abs(menu_box.right - selector_box.right) < 1,
                     `${width}x${height}: the month dropdown opens directly beneath its selector with matching edges`);
-                check(menu_box.left >= 0 && menu_box.right <= width && menu_box.top >= 0 && menu_box.bottom <= height &&
+                const months_visible = menu_box.left >= 0 && menu_box.right <= width &&
+                    menu_box.top >= 0 && menu_box.bottom <= height &&
                     options.length === 12 && options.every(option => {
                         const box = option.getBoundingClientRect();
                         return box.top >= menu_box.top && box.bottom <= menu_box.bottom &&
                             option.contains(almanacDoc.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2));
-                    }), `${width}x${height}: all twelve themed months are visible and clickable in ${names[index]}`);
+                    });
+                check(months_visible, `${width}x${height}: all twelve themed months are visible and clickable in ` +
+                    names[index] + (months_visible ? '' : ': ' + JSON.stringify({menu:menu_box,
+                        options:options.map(option => {
+                            const box = option.getBoundingClientRect();
+                            const hit = almanacDoc.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
+                            return {month:option.textContent, box, option:box.width ? undefined : option.outerHTML,
+                                hit:hit?.outerHTML.slice(0, 180)};
+                        })})));
                 almanacProbe.style.color = 'var(--ink)';
                 check(almanacStyle(month_menu).color === almanacStyle(almanacProbe).color,
                     `${width}x${height}: the month menu text follows ${names[index]}`);

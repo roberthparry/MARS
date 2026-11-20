@@ -570,9 +570,10 @@ Open the **Settings** cog at the top-right corner of the page header, then choos
 Only the cog appears in the header. Close Settings with its close button, Escape,
 or a click outside the panel. **0. Earth (Default)** is the existing green design.
 The other choices use their own palette and static SVG background artwork.
-The header includes a compact Mars statue cutout with a transparent background.
-Its stone shading is retained while the selected theme's accent colours tint it;
-it fits the existing header on desktop and mobile without intercepting controls.
+The header includes transparent Mars and Ophelia statue cutouts standing together.
+Ophelia is shorter, with a thin plinth aligned with Mars's base. Both retain their
+stone shading while the selected theme's accent colours tint them; the pair fits
+the existing header on desktop and mobile without intercepting controls.
 The skin menu uses MARS's accessible C/WASM selection control after startup, so
 its selected, hovered and keyboard-focused options use the current skin's accent
 colour consistently. Arrow keys navigate it; Enter selects and Escape closes it.
@@ -3365,6 +3366,21 @@ axis; **Second variable** can override this choice. Additional unset symbols
 receive plot-local slice controls rather than becoming extra axes.
 Explicit 3-D mode can sample two variables even when their worksheet values
 are already supplied. Constant bindings remain parameters, never automatic axes.
+
+Automatic two-coordinate equation framing probes beyond the first discovered
+contour, allowing nested components such as both equatorial circles of a torus
+to share one view. Enclosed components are checked in wider windows until their
+extents stabilise, within a bounded discovery budget. Explicit coordinate limits
+remain fixed. Finite sampling cannot certify that every remote or tiny component
+has been found.
+
+Three-dimensional axes share the surface's perspective. Where an axis passes
+behind the surface it retains 40% opacity, so its course remains clearly visible;
+sections in front remain solid. The torus hole therefore leaves the axes solid
+where they are unobstructed. Software drawing and SVG export use the same rule.
+Camera fitting includes extended shafts, cone tips and axis names, with sixteen
+pixels of clearance inside the viewport. Rotating towards an edge therefore
+keeps the arrow clear of the plot card's padding without changing the sampled ranges.
 
 #### Parameter slices
 

@@ -109,6 +109,7 @@ interface MarsSurfaceMesh {
 /** Projected polygon vertices and their rendering depth. */
 interface MarsSurfacePolygon {
     points: MarsSurfacePoint2[];
+    depths?: number[];
     depth: number;
 }
 
@@ -154,14 +155,18 @@ interface MarsSurfaceFrame {
     axisPathCount?: number;
     pathWidths?: number[];
     solids?: MarsSurfaceAxisFace[];
+    axisVertices?: number[];
+    hiddenAxisOpacity?: number;
 }
 
 /** One projected cylinder or cone face, shaded by native camera-space lighting. */
 interface MarsSurfaceAxisFace {
     points: number[][];
+    depths?: number[];
     shade: number;
     axis: number;
     cone: boolean;
+    visible?: number[][][];
 }
 
 /** Live SVG chart carrying only its currently displayed native camera frame for pointer admission. */
@@ -171,6 +176,7 @@ interface MarsSurfaceChart extends SVGSVGElement {
 
 /** The small drawing protocol shared by Canvas and vector axis output. */
 interface MarsSurfaceAxisContext {
+    globalAlpha?: number;
     strokeStyle: string | CanvasGradient | CanvasPattern;
     fillStyle: string | CanvasGradient | CanvasPattern;
     lineWidth: number;

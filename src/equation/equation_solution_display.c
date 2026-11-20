@@ -5,6 +5,7 @@
  * Orders solutions and produces compact text with shared structure retained where possible. It works on solver
  * results rather than altering the mathematical equation to fit an output format.
  *
+ * Structurally symmetric roots stay together even when numerical sorting separates their companion root.
  * The equation module plans paired roots and shared definitions. TeX owns the
  * layout syntax when the caller requests typeset output.
  */
@@ -27,6 +28,15 @@ static const equation_t *ordered_solution_at(const equation_solutions_t *solutio
     return equ_solutions_at(solutions, order ? order[i] : i);
 }
 
+static bool display_pair_parts(const expr_t *a, const expr_t *b, const expr_t **centre, const expr_t **offset)
+{
+    const expr_t *b_centre = NULL, *b_offset = NULL;
+    bool a_sub = false, b_sub = false;
+    return expr_match_add_sub_expr(a, centre, offset, &a_sub) &&
+           expr_match_add_sub_expr(b, &b_centre, &b_offset, &b_sub) && a_sub != b_sub &&
+           expr_struct_eq(*centre, b_centre) && expr_struct_eq(*offset, b_offset);
+}
+
 /* Render lengthy exact root sets with shared definitions and symmetric root pairs. */
 string_t *equ_solutions_compact_text(const equation_solutions_t *solutions, const size_t *order, style_t output_style)
 {
@@ -37,6 +47,8 @@ string_t *equ_solutions_compact_text(const equation_solutions_t *solutions, cons
     expr_t *rows[16] = {0};
     const expr_t *roots[32] = {0};
     string_t *rendered[16] = {0};
+    const equation_t *ordered[16] = {0}, *arranged[16] = {0};
+    bool used[16] = {false};
     expr_function_temporaries_t *plan = NULL;
     string_t *definitions = NULL;
     string_t *lhs = NULL;
@@ -49,6 +61,7 @@ string_t *equ_solutions_compact_text(const equation_solutions_t *solutions, cons
     const expr_t *variable = equ_lhs(ordered_solution_at(solutions, order, 0u));
     for (size_t i = 0u; i < count; ++i) {
         const equation_t *solution = ordered_solution_at(solutions, order, i);
+        ordered[i] = solution;
         if (!expr_struct_eq(variable, equ_lhs(solution)))
             return NULL;
         number_t value = expr_eval(equ_rhs(solution));
@@ -62,19 +75,41 @@ string_t *equ_solutions_compact_text(const equation_solutions_t *solutions, cons
     }
     if (length < (count % 2u ? 240u : 600u))
         return NULL;
+    /* At most sixteen displayed roots: bounded structural matching preserves genuine pairs before compaction. */
+    for (size_t slot = count % 2u; slot < count; slot += 2u) {
+        bool found = false;
+        for (size_t a = 0u; !found && a < count; ++a) {
+            if (used[a])
+                continue;
+            for (size_t b = a + 1u; !found && b < count; ++b) {
+                const expr_t *centre = NULL, *offset = NULL;
+                if (!used[b] && display_pair_parts(equ_rhs(ordered[a]), equ_rhs(ordered[b]), &centre, &offset)) {
+                    arranged[slot] = ordered[a];
+                    arranged[slot + 1u] = ordered[b];
+                    used[a] = used[b] = found = true;
+                }
+            }
+        }
+        if (!found)
+            break;
+    }
+    for (size_t i = 0u, slot = 0u; i < count; ++i) {
+        if (used[i])
+            continue;
+        while (arranged[slot])
+            ++slot;
+        arranged[slot++] = ordered[i];
+    }
     if (count % 2u) {
-        rows[0] = expr_clone(equ_rhs(ordered_solution_at(solutions, order, 0u)));
+        rows[0] = expr_clone(equ_rhs(arranged[0]));
         if (!rows[0])
             goto cleanup;
     }
     for (size_t i = count % 2u; i < count; i += 2u) {
-        const expr_t *a = equ_rhs(ordered_solution_at(solutions, order, i));
-        const expr_t *b = equ_rhs(ordered_solution_at(solutions, order, i + 1u));
-        const expr_t *a_centre = NULL, *a_offset = NULL, *b_centre = NULL, *b_offset = NULL;
-        bool a_sub = false, b_sub = false;
-        if (expr_match_add_sub_expr(a, &a_centre, &a_offset, &a_sub) &&
-            expr_match_add_sub_expr(b, &b_centre, &b_offset, &b_sub) && a_sub != b_sub &&
-            expr_struct_eq(a_centre, b_centre) && expr_struct_eq(a_offset, b_offset)) {
+        const expr_t *a = equ_rhs(arranged[i]);
+        const expr_t *b = equ_rhs(arranged[i + 1u]);
+        const expr_t *a_centre = NULL, *a_offset = NULL;
+        if (display_pair_parts(a, b, &a_centre, &a_offset)) {
             rows[i] = expr_clone(a_centre);
             rows[i + 1u] = expr_clone(a_offset);
             if (!rows[i] || !rows[i + 1u])

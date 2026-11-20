@@ -515,7 +515,8 @@ static void test_lab_extra_mesh_budget(void)
     const char *ranges[][6] = {
         {"-6.55", "5.17", "-4.04", "7.68", "-5.86", "5.86"},
         {"-25", "25", "-25", "25", "-25", "25"},
-        {"-2", "2", "-2", "2", "-2", "2"}
+        {"-2", "2", "-2", "2", "-2", "2"},
+        {"-1", "1", "-1", "1", "-1", "1"}
     };
     for (size_t i = 0; i < sizeof(ranges) / sizeof(*ranges); ++i) {
         unsigned status = 0;
@@ -527,8 +528,13 @@ static void test_lab_extra_mesh_budget(void)
             ranges[i][0], ranges[i][1], ranges[i][2], ranges[i][3], ranges[i][4], ranges[i][5]);
         json_t *fields = request("/eval", string_c_str(payload), &status);
         const char *svg = lab_eval_text(fields, "plot_svg");
+        const char *sample = strstr(svg, "data-sample-side=\"");
+        unsigned side = sample ? (unsigned)strtoul(sample + strlen("data-sample-side=\""), NULL, 10) : 0;
+        bool reduced = contains(fields, "plot_svg", "data-detail-reduced=\"true\"");
+        /* Visibility metadata contributes to the budget too; the marker must describe the actual sampling. */
         bool ok = status == 200 && test_lab_ok(fields, true) &&
-                  contains(fields, "plot_svg", "data-detail-reduced=\"true\"") == (i < 2) &&
+                  side >= 3 && side <= 25 && reduced == (side < 25) &&
+                  (i >= 2 || reduced) && (i != 3 || side == 25) &&
                   contains(fields, "plot_svg", "data-uv=") && strlen(svg) < 7u * 1024u * 1024u;
         const char *attributes[] = {"x-min", "x-max", "y-min", "y-max", "z-min", "z-max"};
         for (unsigned axis = 0; ok && axis < 6; ++axis) {
@@ -543,6 +549,10 @@ static void test_lab_extra_mesh_budget(void)
         json_t *decoded = encoded ? lab_wire_decode(array_get(encoded, 0), array_size(encoded)) : NULL;
         const json_t *card = lab_eval_get(lab_eval_get(lab_eval_get(decoded, "presentation"), "calculus"), "plot");
         ok = ok && !failed && decoded && !strcmp(svg, lab_eval_text(card, "svg"));
+        if (!ok)
+            fprintf(stderr, "Mesh budget range %zu: HTTP %u, SVG %zu bytes, reduced %d, UV %d, wire failure %d, error %s\n",
+                    i, status, strlen(svg), contains(fields, "plot_svg", "data-detail-reduced=\"true\""),
+                    contains(fields, "plot_svg", "data-uv="), failed, lab_eval_text(fields, "error"));
         json_free(decoded);
         array_destroy(encoded);
         json_free(fields);
@@ -2729,8 +2739,10 @@ static void test_lab_extra_ode_parameter_controls(void)
               contains(response, "binding_expression", "c = ?") && contains(response, "binding_expression", "m = ?") &&
               contains(response, "binding_expression", "k = ?") && contains(response, "binding_expression", "c>=0") &&
               contains(response, "solutions", "½·(√(c² - 4km) - c)·t/m") &&
-              contains(response, "solutions_TeX", "e^{\\frac{1}{2}") &&
-              contains(response, "solutions_TeX", "e^{-\\frac{1}{2}") &&
+              contains(response, "solutions_TeX", "e^{\\frac{\\left(\\sqrt{c^{2} - 4\\mkern-2mu k\\mkern-2mu m} - c"
+                                                "\\right)\\mkern-2mu t}{2\\mkern-2mu m}}") &&
+              contains(response, "solutions_TeX", "e^{-\\frac{\\left(\\sqrt{c^{2} - 4\\mkern-2mu k\\mkern-2mu m} + c"
+                                                "\\right)\\mkern-2mu t}{2\\mkern-2mu m}}") &&
               !contains(response, "solutions_TeX", "\\frac{t\\mkern-2mu \\left(");
     if (!ok) show_failure(response);
     json_free(response);

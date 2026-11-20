@@ -265,6 +265,7 @@ static string_t *surface_svg(const char *source, const char *first, const char *
         bits *= 2;
     }
     plot_options_t options = plot_options_default();
+    options.axes_at_origin = true;
     options.title = "";
     options.x_label = first;
     options.y_label = second;

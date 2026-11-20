@@ -21,6 +21,8 @@
 #include "equation-t.h"
 #include "expression-t.h"
 #include "json-t.h"
+#define MARS_SHARED_EXPR_INTERNAL_ACCESS
+#include "internal/expr_internal.h"
 #define MARS_SHARED_EQUATION_INTERNAL_ACCESS
 #include "internal/equation_internal.h"
 #include "test_harness.h"
@@ -143,6 +145,14 @@ static bool test_equation_all_solutions_satisfy(const equation_t *equation, cons
         number_t magnitude = num_abs(value);
 
         ok = substituted && num_is_finite(magnitude) && num_le(magnitude, tolerance);
+        if (!ok) {
+            string_t *error = num_to_string(magnitude);
+            number_t root_value = expr_eval(rhs);
+            printf("Root %zu residual %s (root precision %zu bits), expected at most %s\n", i,
+                   error ? string_c_str(error) : "unavailable", num_get_prec_bits(root_value), tolerance_text);
+            num_destroy(&root_value);
+            string_free(error);
+        }
         num_destroy(&magnitude);
         num_destroy(&value);
         expr_free(substituted);
@@ -1397,6 +1407,228 @@ static void test_equation_cubic_preserves_certified_surds(void)
         equ_solutions_free(result);
         equ_free(equation);
     }
+}
+
+static bool test_relation_fraction_sum(const expr_t *expression)
+{
+    const expr_t *left = NULL, *right = NULL, *numerator = NULL, *denominator = NULL;
+    bool subtract = false;
+    return expr_match_add_sub_expr(expression, &left, &right, &subtract) &&
+           expr_match_div_expr(left, &numerator, &denominator) &&
+           expr_match_div_expr(right, &numerator, &denominator);
+}
+
+static void rational_relation_row(const void *data)
+{
+    const test_database_case_t *row = data;
+    equation_t *source = equ_from_text(row->input), *expected = equ_from_text(row->expected);
+    string_t *before = source ? equ_to_text(source, style_UNBOUND) : NULL;
+    equation_t *reduced = source ? equ_simplify_with_context(source, NULL) : NULL;
+    string_t *after = source ? equ_to_text(source, style_UNBOUND) : NULL;
+    string_t *plain = reduced ? equ_to_text(reduced, style_UNBOUND) : NULL;
+    bool ok = expected && reduced && before && after && plain && !strcmp(string_c_str(before), string_c_str(after));
+    const expr_t *actual_sides[] = {equ_lhs(reduced), equ_rhs(reduced)};
+    const expr_t *expected_sides[] = {equ_lhs(expected), equ_rhs(expected)};
+    for (size_t side = 0u; ok && side < 2u; ++side) {
+        expr_t *linked = expr_clone_linked_symbols(expected_sides[side], actual_sides[side]);
+        expr_t *raw_difference = expr_sub(actual_sides[side], linked);
+        expr_t *difference = expr_simplify(raw_difference);
+        number_t value = difference ? expr_eval(difference) : num_clone(NUM_NAN);
+        ok = num_is_zero(value);
+        if (test_relation_fraction_sum(expected_sides[side]))
+            ok = ok && test_relation_fraction_sum(actual_sides[side]);
+        num_destroy(&value);
+        expr_free(difference);
+        expr_free(raw_difference);
+        expr_free(linked);
+    }
+    string_printf("%S -> %S\n", row->input, plain);
+    string_free(plain);
+    string_free(after);
+    string_free(before);
+    equ_free(reduced);
+    equ_free(expected);
+    equ_free(source);
+    ASSERT_TRUE(ok);
+}
+
+static void test_equation_rational_relations(void)
+{
+    test_run_database_cases(__FILE__, __LINE__, "equation.rational_relations", NULL, rational_relation_row);
+}
+
+static void algebraic_cubic_row(const void *data)
+{
+    const test_database_case_t *row = data;
+    size_t saved = num_get_default_prec_bits();
+    num_set_default_prec_digits(row->precision);
+    json_t *expected = json_from_text(row->expected);
+    equation_t *problem = equ_from_text(row->input);
+    equation_solutions_t *solutions = problem ? equ_derive_solutions(problem) : NULL;
+    string_t *count_key = string_new_with("count"), *real_key = string_new_with("real");
+    string_t *roots_key = string_new_with("roots"), *compact_key = string_new_with("compact_limit");
+    number_t count = NUM_NAN, real_count = NUM_NAN;
+    bool ok = expected && json_number_value(json_object_get(expected, count_key), &count) &&
+              json_number_value(json_object_get(expected, real_key), &real_count) &&
+              solutions && equ_solutions_count(solutions) == (size_t)num_to_double(count);
+    size_t real = 0;
+    string_t *tolerance_text = string_sprintf("1e-%zu", row->precision / 2u);
+    number_t tolerance = num_create_from_text(tolerance_text);
+    for (size_t i = 0; ok && i < equ_solutions_count(solutions); ++i) {
+        const expr_t *rhs = equ_rhs(equ_solutions_at(solutions, i));
+        number_t value = expr_eval(rhs);
+        ok = num_is_finite(value);
+        real += num_is_real(value);
+        num_destroy(&value);
+    }
+    string_t *numeric_key = string_new_with("numerical_fallback");
+    bool numerical_fallback = false;
+    (void)json_bool_value(json_object_get(expected, numeric_key), &numerical_fallback);
+    string_free(numeric_key);
+    ok = ok && real == (size_t)num_to_double(real_count) &&
+         test_equation_all_solutions_satisfy(problem, equ_binding(problem, "x"), solutions,
+                                             string_c_str(tolerance_text)) &&
+         (numerical_fallback || test_equation_result_has_rhs_text_containing(solutions, style_LATEX, "\\sqrt{"));
+    if (!ok) printf("%s: algebraic root validation failed\n", string_c_str(row->name));
+    const json_t *roots = json_object_get(expected, roots_key);
+    string_t *trig_key = string_new_with("trigonometric");
+    bool trig = false;
+    if (json_bool_value(json_object_get(expected, trig_key), &trig)) {
+        bool has_cos = test_equation_result_has_rhs_text_containing(solutions, style_LATEX, "\\cos");
+        bool has_cube = test_equation_result_has_rhs_text_containing(solutions, style_LATEX, "\\sqrt[3]");
+        ok = ok && has_cos == trig && (!trig || !has_cube);
+        if (!ok) printf("%s: trigonometric=%d cosine=%d cube=%d\n", string_c_str(row->name), trig, has_cos, has_cube);
+    }
+    string_free(trig_key);
+    string_t *centre_key = string_new_with("centre");
+    const string_t *centre_source = json_string_value(json_object_get(expected, centre_key));
+    expr_t *centre = centre_source ? expr_from_text(centre_source, NULL) : NULL;
+    char *centre_plain = centre ? expr_to_string(centre, style_UNBOUND) : NULL;
+    char *centre_TeX = centre ? expr_to_TeX_body(centre) : NULL;
+    for (size_t i = 0u; ok && centre_source && i < equ_solutions_count(solutions); ++i) {
+        const expr_t *rhs = equ_rhs(equ_solutions_at(solutions, i));
+        char *plain = expr_to_string(rhs, style_UNBOUND), *TeX = expr_to_TeX_body(rhs);
+        ok = centre_plain && centre_TeX && plain && TeX && !strncmp(plain, centre_plain, strlen(centre_plain)) &&
+             !strncmp(TeX, centre_TeX, strlen(centre_TeX));
+        if (!ok) printf("%s: shared centre is not leading: %s\n", string_c_str(row->name), plain ? plain : "NULL");
+        free(TeX);
+        free(plain);
+    }
+    free(centre_TeX);
+    free(centre_plain);
+    expr_free(centre);
+    string_free(centre_key);
+    /* At most three independently specified roots; match each once rather than accepting repeated branches. */
+    unsigned matched = 0;
+    size_t order[3] = {0};
+    for (size_t i = 0; ok && i < json_array_size(roots); ++i) {
+        const string_t *text = json_string_value(json_array_get(roots, i));
+        expr_t *reference = text ? expr_from_text(text, NULL) : NULL;
+        number_t wanted = reference ? expr_eval(reference) : num_clone(NUM_NAN);
+        bool found = false;
+        for (size_t j = 0; !found && j < equ_solutions_count(solutions); ++j) {
+            number_t actual = expr_eval(equ_rhs(equ_solutions_at(solutions, j)));
+            number_t error = num_sub(actual, wanted), magnitude = num_abs(error);
+            found = !(matched & (1u << j)) && num_is_finite(magnitude) && num_le(magnitude, tolerance);
+            if (found) {
+                matched |= 1u << j;
+                order[i] = j;
+            }
+            num_destroy(&magnitude);
+            num_destroy(&error);
+            num_destroy(&actual);
+        }
+        ok = found;
+        if (!found) printf("%s: independent root %zu not matched\n", string_c_str(row->name), i);
+        num_destroy(&wanted);
+        expr_free(reference);
+    }
+    number_t compact_limit = NUM_NAN;
+    if (ok && json_number_value(json_object_get(expected, compact_key), &compact_limit)) {
+        /* The independently specified root order models the Lab's numerical sort before native pairing. */
+        string_t *compact = equ_solutions_compact_text(solutions, order, style_LATEX);
+        if (!compact) {
+            compact = string_new();
+            for (size_t i = 0u; compact && i < equ_solutions_count(solutions); ++i) {
+                char *text = expr_to_TeX_body(equ_rhs(equ_solutions_at(solutions, order[i])));
+                if (!text || string_append_cstr(compact, text) < 0) {
+                    string_free(compact);
+                    compact = NULL;
+                }
+                free(text);
+            }
+        }
+        ok = compact && string_length(compact) <= (size_t)num_to_double(compact_limit);
+        if (!ok) printf("%s: compact layout failed\n", string_c_str(row->name));
+        string_free(compact);
+        if (trig && json_array_size(roots) == 3u) {
+            string_t *pair = equ_solution_pair_rhs_text(equ_solutions_at(solutions, order[0]),
+                                                       equ_solutions_at(solutions, order[1]), style_LATEX);
+            ok = ok && pair && strstr(string_c_str(pair), "\\pm") && !strstr(string_c_str(pair), "\\pm -");
+            if (!ok) printf("%s: paired layout failed\n", string_c_str(row->name));
+            string_free(pair);
+        }
+    }
+    num_destroy(&compact_limit);
+    if (!ok) {
+        string_t *text = solutions ? equ_solutions_compact_text(solutions, NULL, style_UNBOUND) : NULL;
+        printf("%s: %s; real roots %zu\n", string_c_str(row->name), text ? string_c_str(text) : "no solutions", real);
+        string_free(text);
+    }
+    num_destroy(&tolerance);
+    num_destroy(&real_count);
+    num_destroy(&count);
+    string_free(tolerance_text);
+    string_free(compact_key);
+    string_free(roots_key);
+    string_free(real_key);
+    string_free(count_key);
+    equ_solutions_free(solutions);
+    equ_free(problem);
+    json_free(expected);
+    num_set_default_prec_bits(saved);
+    TEST_ASSERT_TRUE(ok, "authored radical coefficients retain exact, distinct branches satisfying the original cubic");
+}
+
+static void test_equation_algebraic_cubics(void)
+{
+    test_run_database_cases(__FILE__, __LINE__, "equation.algebraic_cubics", NULL, algebraic_cubic_row);
+}
+
+static void test_equation_cubic_opaque_coefficients(void)
+{
+    number_t supplied = num_create_from_string("1.25");
+    expr_t *x = expr_new_named_var(NUM_NAN, "x"), *coefficient = expr_new_const(supplied);
+    number_t exponent = num_create_from_long(3);
+    expr_t *cube = expr_pow(x, &exponent), *linear = expr_mul(coefficient, x);
+    expr_t *left = expr_add(cube, linear), *right = expr_new_const(NUM_NEG_ONE);
+    equation_t *problem = equ_new_with_inferred_bindings(left, right);
+    equation_solutions_t *solutions = problem ? equ_derive_solutions(problem) : NULL;
+    number_t retained = expr_eval(coefficient);
+    bool ok = !num_is_exact(supplied) && solutions && equ_solutions_count(solutions) == 3 && num_eq(supplied, retained) &&
+              !test_equation_result_has_rhs_text_containing(solutions, style_LATEX, "\\sqrt") &&
+              test_equation_all_solutions_satisfy(problem, equ_binding(problem, "x"), solutions, "1e-20");
+    if (!ok) {
+        string_t *text = solutions ? equ_solutions_compact_text(solutions, NULL, style_UNBOUND) : NULL;
+        printf("Opaque coefficient exact=%d retained=%d count=%zu radical=%d residual=%d; %s\n",
+               num_is_exact(supplied), num_eq(supplied, retained), equ_solutions_count(solutions),
+               test_equation_result_has_rhs_text_containing(solutions, style_LATEX, "\\sqrt"),
+               test_equation_all_solutions_satisfy(problem, equ_binding(problem, "x"), solutions, "1e-20"),
+               text ? string_c_str(text) : "no solutions");
+        string_free(text);
+    }
+    num_destroy(&retained);
+    num_destroy(&exponent);
+    num_destroy(&supplied);
+    equ_solutions_free(solutions);
+    equ_free(problem);
+    expr_free(right);
+    expr_free(left);
+    expr_free(linear);
+    expr_free(cube);
+    expr_free(coefficient);
+    expr_free(x);
+    TEST_ASSERT_TRUE(ok, "an opaque floating coefficient keeps numerical roots without an invented exact surd");
 }
 
 static void test_equation_solves_cubic_repeated_root_once(void)
@@ -2690,11 +2922,20 @@ static void test_equation_inverts_roots_and_constant_powers(void)
 static void test_equation_preserves_principal_root_domain_sources_row(const void *data)
 {
     const test_database_case_t *row = data;
+    size_t saved = num_get_default_prec_bits();
+    if (row->precision > num_get_default_prec_digits()) {
+        /* A previous high-precision calculation may have warmed pi without warming its half-period constant. */
+        num_set_default_prec_digits(row->precision);
+        number_t warmed = num_clone(NUM_PI);
+        num_destroy(&warmed);
+        num_set_default_prec_bits(saved);
+    }
     equation_t *equation = equ_from_string(string_c_str(row->input));
     equation_solutions_t *solutions = equ_derive_solutions(equation);
     bool ok = solutions && !equ_solutions_count(solutions) && equ_solutions_proven_empty(solutions);
     equ_solutions_free(solutions);
     equ_free(equation);
+    num_set_default_prec_bits(saved);
     ASSERT_TRUE(ok);
 }
 
@@ -3071,6 +3312,9 @@ int tests_main(void)
 {
     TEST_SECTION("Equation Basics");
     TEST_RUN_IN_GROUP(test_equation_database_cases, tests, "equation,database-cases");
+    TEST_RUN_IN_GROUP(test_equation_algebraic_cubics, tests, "equation,exact-cubic");
+    TEST_RUN_IN_GROUP(test_equation_rational_relations, tests, "equation,presentation");
+    TEST_RUN_IN_GROUP(test_equation_cubic_opaque_coefficients, tests, "equation,numeric-cubic");
     TEST_RUN_IN_GROUP(test_equation_solution_pairs, tests, NULL);
     TEST_RUN_IN_GROUP(test_equation_even_quadratic, tests, NULL);
     TEST_RUN_IN_GROUP(test_equation_complex_power_families, tests, NULL);

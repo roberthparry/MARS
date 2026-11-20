@@ -4,6 +4,9 @@
  *
  * Attempts rational factorisation and constructs supported cubic radical expressions, with coefficient-based
  * numerical support. This unit supplies degree-three solutions to the equation dispatcher.
+ * Authored real radical coefficients are recovered as algebraic graphs, with coupled cube-root branches,
+ * exact reduced-coefficient arithmetic and duplicate-free repeated roots. Opaque inexact values remain numerical.
+ * Three-real-root cubics use real trigonometric formulae when exact algebra certifies a familiar inverse angle.
  *
  * This belongs to the equation_t implementation. Public callers work with equations and solution collections;
  * internal matching or numerical attempts are not independent application APIs.
@@ -327,10 +330,10 @@ static expr_t *equ_cubic_expr_cuberoot(const expr_t *expr)
 
 static expr_t *equ_cubic_symbolic_p(const expr_t *a, const expr_t *b, const expr_t *c)
 {
-    expr_t *a_sq = expr_pow_long(a, 2L);
+    expr_t *a_sq = expr_simplify_owned(expr_mul(a, a));
     expr_t *ac = expr_mul(a, c);
     expr_t *three_ac = expr_mul_long(ac, 3L);
-    expr_t *b_sq = expr_pow_long(b, 2L);
+    expr_t *b_sq = expr_simplify_owned(expr_mul(b, b));
     expr_t *numerator = (three_ac && b_sq) ? expr_sub(three_ac, b_sq) : NULL;
     expr_t *denominator = expr_mul_long(a_sq, 3L);
     expr_t *quotient = (numerator && denominator) ? expr_div(numerator, denominator) : NULL;
@@ -347,9 +350,10 @@ static expr_t *equ_cubic_symbolic_p(const expr_t *a, const expr_t *b, const expr
 
 static expr_t *equ_cubic_symbolic_q(const expr_t *a, const expr_t *b, const expr_t *c, const expr_t *d)
 {
-    expr_t *a_sq = expr_pow_long(a, 2L);
-    expr_t *a_cu = expr_pow_long(a, 3L);
-    expr_t *b_cu = expr_pow_long(b, 3L);
+    expr_t *a_sq = expr_simplify_owned(expr_mul(a, a));
+    expr_t *a_cu = expr_simplify_owned(expr_mul(a_sq, a));
+    expr_t *b_sq = expr_simplify_owned(expr_mul(b, b));
+    expr_t *b_cu = expr_simplify_owned(expr_mul(b_sq, b));
     expr_t *a_sq_d = (a_sq && d) ? expr_mul(a_sq, d) : NULL;
     expr_t *first = expr_mul_long(a_sq_d, 27L);
     expr_t *ab = expr_mul(a, b);
@@ -372,6 +376,7 @@ static expr_t *equ_cubic_symbolic_q(const expr_t *a, const expr_t *b, const expr
     expr_free(first);
     expr_free(a_sq_d);
     expr_free(b_cu);
+    expr_free(b_sq);
     expr_free(a_cu);
     expr_free(a_sq);
     return out;
@@ -391,12 +396,14 @@ static expr_t *equ_cubic_symbolic_discriminant(const expr_t *p, const expr_t *q)
 {
     expr_t *q_half = expr_div_long(q, 2L);
     expr_t *p_third = expr_div_long(p, 3L);
-    expr_t *q_half_sq = expr_pow_long(q_half, 2L);
-    expr_t *p_third_cu = expr_pow_long(p_third, 3L);
+    expr_t *q_half_sq = expr_simplify_owned(expr_mul(q_half, q_half));
+    expr_t *p_third_sq = expr_simplify_owned(expr_mul(p_third, p_third));
+    expr_t *p_third_cu = expr_simplify_owned(expr_mul(p_third_sq, p_third));
     expr_t *sum = (q_half_sq && p_third_cu) ? expr_add(q_half_sq, p_third_cu) : NULL;
     expr_t *out = expr_simplify_owned(sum);
 
     expr_free(p_third_cu);
+    expr_free(p_third_sq);
     expr_free(q_half_sq);
     expr_free(p_third);
     expr_free(q_half);
@@ -458,7 +465,68 @@ static expr_t *equ_cubic_symbolic_root(const expr_t *u, const expr_t *v, const e
     return root;
 }
 
-static int equ_try_solve_symbolic_cubic(const expr_t *residual, const expr_t *wrt, equation_solutions_t *solutions)
+static int equ_cubic_trigonometric_expressions(const expr_t *p, const expr_t *q, const expr_t *shift,
+                                               const expr_t *wrt, equation_solutions_t *solutions)
+{
+    expr_t *radius_square = expr_div_long(p, -3L);
+    expr_t *radius = expr_simplify_owned(expr_sqrt(radius_square));
+    expr_t *radius_cube = expr_simplify_owned(expr_mul(radius_square, radius));
+    expr_t *denominator = expr_mul_long(radius_cube, -2L);
+    expr_t *ratio = expr_simplify_owned(expr_div(q, denominator));
+    long numerator = 0L;
+    unsigned long angle_denominator = 0u;
+    bool known_angle = expr_exact_acos_pi_ratio(ratio, &numerator, &angle_denominator);
+    expr_t *pi = known_angle ? expr_new_named_const(NUM_PI, "@pi") : NULL;
+    expr_t *angle_numerator = pi ? (numerator == 1L ? expr_retain_expr(pi) : expr_mul_long(pi, numerator)) : NULL;
+    expr_t *third_angle = angle_numerator ? expr_div_long(angle_numerator, (long)angle_denominator * 3L) : NULL;
+    expr_t *cosine = third_angle ? expr_cos(third_angle) : NULL;
+    expr_t *sine = third_angle ? expr_sin(third_angle) : NULL;
+    expr_t *real = cosine ? expr_simplify_owned(expr_mul(radius, cosine)) : NULL;
+    expr_t *three = expr_const_long(3L), *sqrt_three = expr_sqrt(three);
+    expr_t *sine_scale = sine ? expr_simplify_owned(expr_mul(radius, sqrt_three)) : NULL;
+    expr_t *pair_offset = sine_scale ? expr_simplify_owned(expr_mul(sine_scale, sine)) : NULL;
+    expr_t *negative_real = real ? expr_neg(real) : NULL;
+    expr_t *pair_centre = negative_real ? expr_simplify_owned(expr_sub(negative_real, shift)) : NULL;
+    expr_t *twice_real = real ? expr_mul_long(real, 2L) : NULL;
+    expr_t *single = twice_real ? expr_simplify_owned(expr_sub(twice_real, shift)) : NULL;
+    int rc = known_angle ? -1 : 1;
+    if (single && pair_centre && pair_offset) {
+        rc = equ_append_solution_expr(wrt, single, solutions);
+        for (unsigned i = 0u; !rc && i < 2u; ++i) {
+            expr_t *root = i ? expr_sub(pair_centre, pair_offset) : expr_add(pair_centre, pair_offset);
+            root = expr_simplify_owned(root);
+            rc = root ? equ_append_solution_expr(wrt, root, solutions) : -1;
+            expr_free(root);
+        }
+    }
+    expr_free(single);
+    expr_free(twice_real);
+    expr_free(pair_centre);
+    expr_free(negative_real);
+    expr_free(pair_offset);
+    expr_free(sine_scale);
+    expr_free(sqrt_three);
+    expr_free(three);
+    expr_free(real);
+    expr_free(sine);
+    expr_free(cosine);
+    expr_free(third_angle);
+    expr_free(angle_numerator);
+    expr_free(pi);
+    expr_free(ratio);
+    expr_free(denominator);
+    expr_free(radius_cube);
+    expr_free(radius);
+    expr_free(radius_square);
+    return rc;
+}
+
+static int equ_cubic_radical_expressions(const expr_t *p, const expr_t *q, const expr_t *shift,
+                                          const expr_t *discriminant, const expr_t *wrt,
+                                          equation_solutions_t *solutions);
+
+static int equ_try_solve_symbolic_cubic(const expr_t *residual, const expr_t *wrt, bool exact_coefficients,
+                                        equation_solutions_t *solutions)
 {
     expr_t *constant = NULL;
     expr_t *linear = NULL;
@@ -479,12 +547,30 @@ static int equ_try_solve_symbolic_cubic(const expr_t *residual, const expr_t *wr
         rc = 1;
         goto cleanup;
     }
+    if (exact_coefficients) {
+        expr_t **coefficients[] = {&constant, &linear, &quadratic, &cubic};
+        for (size_t i = 0; i < 4u; ++i) {
+            expr_t *exact = expr_exact_algebraic_value(*coefficients[i]);
+            if (!exact) {
+                rc = 1;
+                goto cleanup;
+            }
+            expr_free(*coefficients[i]);
+            *coefficients[i] = exact;
+        }
+    }
 
     p = equ_cubic_symbolic_p(cubic, quadratic, linear);
     q = equ_cubic_symbolic_q(cubic, quadratic, linear, constant);
     shift = equ_cubic_symbolic_shift(cubic, quadratic);
     discriminant = (p && q) ? equ_cubic_symbolic_discriminant(p, q) : NULL;
-    if (!p || !q || !shift || !discriminant || !equ_cubic_symbolic_uv(q, discriminant, &u, &v))
+    if (!p || !q || !shift || !discriminant)
+        goto cleanup;
+    if (exact_coefficients) {
+        rc = equ_cubic_radical_expressions(p, q, shift, discriminant, wrt, solutions);
+        goto cleanup;
+    }
+    if (!equ_cubic_symbolic_uv(q, discriminant, &u, &v))
         goto cleanup;
 
     root = equ_cubic_symbolic_root(u, v, shift, NULL, NULL);
@@ -576,16 +662,53 @@ static int equ_cubic_try_rational_factor(const number_t *coeffs, const number_t 
     return 1;
 }
 
-static int equ_cubic_exact_radicals(number_t p, number_t q, number_t shift, number_t discriminant,
-                                    const expr_t *wrt, equation_solutions_t *solutions)
+static int equ_cubic_radical_expressions(const expr_t *p, const expr_t *q, const expr_t *shift,
+                                          const expr_t *discriminant, const expr_t *wrt,
+                                          equation_solutions_t *solutions)
 {
-    if (!num_is_exact(p) || !num_is_exact(q) || !num_is_exact(shift) ||
-        !num_is_real(p) || !num_is_real(q) || !num_is_real(shift) || num_is_zero(discriminant))
-        return 1;
-    expr_t *disc = expr_new_const(discriminant);
-    expr_t *radical = expr_sqrt(disc);
-    number_t half = equ_div_long(q, -2L);
-    expr_t *centre = expr_new_const(half);
+    number_t discriminant_value = expr_eval(discriminant);
+    if (num_is_zero(discriminant_value)) {
+        expr_t *first = NULL, *second = NULL;
+        if (expr_is_exact_zero(p)) {
+            first = expr_simplify_owned(expr_neg(shift));
+        } else {
+            expr_t *three_q = expr_mul_long(q, 3L), *two_p = expr_mul_long(p, -2L);
+            expr_t *positive = expr_div(three_q, p), *negative = expr_div(three_q, two_p);
+            first = expr_simplify_owned(expr_sub(positive, shift));
+            second = expr_simplify_owned(expr_sub(negative, shift));
+            expr_free(negative);
+            expr_free(positive);
+            expr_free(two_p);
+            expr_free(three_q);
+        }
+        int rc = first ? equ_append_solution_expr(wrt, first, solutions) : -1;
+        if (!rc && second)
+            rc = equ_append_solution_expr(wrt, second, solutions);
+        expr_free(second);
+        expr_free(first);
+        num_destroy(&discriminant_value);
+        return rc;
+    }
+    bool three_real = num_is_real(discriminant_value) && num_lt(discriminant_value, NUM_ZERO);
+    if (three_real) {
+        int rc = equ_cubic_trigonometric_expressions(p, q, shift, wrt, solutions);
+        if (rc != 1) {
+            num_destroy(&discriminant_value);
+            return rc;
+        }
+    }
+    expr_t *radical = NULL;
+    if (three_real) {
+        expr_t *magnitude = expr_simplify_owned(expr_neg(discriminant));
+        expr_t *root = expr_sqrt(magnitude), *unit = expr_new_const(NUM_I);
+        radical = expr_simplify_owned(expr_mul(unit, root));
+        expr_free(unit);
+        expr_free(root);
+        expr_free(magnitude);
+    } else {
+        radical = expr_sqrt(discriminant);
+    }
+    expr_t *centre = expr_div_long(q, -2L);
     expr_t *argument = expr_add(centre, radical);
     number_t value = expr_eval(argument);
     if (num_is_zero(value)) {
@@ -598,17 +721,33 @@ static int equ_cubic_exact_radicals(number_t p, number_t q, number_t shift, numb
     expr_t *positive = negative ? expr_simplify_owned(expr_neg(argument)) : expr_clone(argument);
     expr_t *cube = equ_cubic_expr_cuberoot(positive);
     expr_t *u = negative ? expr_simplify_owned(expr_neg(cube)) : expr_clone(cube);
-    number_t minus_p_third = equ_div_long(p, -3L);
-    expr_t *product = expr_new_const(minus_p_third);
+    expr_t *product = expr_div_long(p, -3L);
     /* When the discriminant is negative, u*v=-p/3=|u|^2: keep the conjugate
      * relationship explicit so real roots do not retain imaginary round-off. */
-    expr_t *v = expr_simplify_owned(num_lt(discriminant, NUM_ZERO) ? expr_conj(u) : expr_div(product, u));
-    expr_t *offset = expr_new_const(shift);
+    expr_t *v = expr_simplify_owned(three_real ? expr_conj(u) : expr_div(product, u));
+    expr_t *offset = expr_retain_expr(shift);
     expr_t *omega = equ_cubic_omega_expr(false);
     expr_t *conjugate = equ_cubic_omega_expr(true);
     expr_t *pair_centre = NULL;
     expr_t *pair_offset = NULL;
-    if (num_is_real(discriminant) && num_gt(discriminant, NUM_ZERO)) {
+    if (three_real) {
+        /* The conjugate branches share their real centre; avoid expanding the cube roots against omega. */
+        expr_t *sum = expr_add(u, v), *half_sum = expr_div_long(sum, -2L);
+        pair_centre = expr_sub(half_sum, offset);
+        expr_t *difference = expr_sub(u, v);
+        expr_t *three = expr_const_long(3L), *sqrt_three = expr_sqrt(three);
+        expr_t *imaginary = expr_new_const(NUM_I), *factor = expr_mul(imaginary, sqrt_three);
+        expr_t *scaled = expr_mul(factor, difference);
+        pair_offset = expr_div_long(scaled, 2L);
+        expr_free(scaled);
+        expr_free(factor);
+        expr_free(imaginary);
+        expr_free(sqrt_three);
+        expr_free(three);
+        expr_free(difference);
+        expr_free(half_sum);
+        expr_free(sum);
+    } else if (num_is_real(discriminant_value) && num_gt(discriminant_value, NUM_ZERO)) {
         expr_t *sum = expr_simplify_owned(expr_add(u, v));
         expr_t *half_sum = expr_div_long(sum, -2L);
         pair_centre = expr_simplify_owned(expr_sub(half_sum, offset));
@@ -653,10 +792,25 @@ static int equ_cubic_exact_radicals(number_t p, number_t q, number_t shift, numb
     expr_free(argument);
     expr_free(centre);
     expr_free(radical);
-    expr_free(disc);
-    num_destroy(&minus_p_third);
+    num_destroy(&discriminant_value);
     num_destroy(&value);
-    num_destroy(&half);
+    return rc;
+}
+
+static int equ_cubic_exact_radicals(number_t p, number_t q, number_t shift, number_t discriminant,
+                                    const expr_t *wrt, equation_solutions_t *solutions)
+{
+    if (!num_is_exact(p) || !num_is_exact(q) || !num_is_exact(shift) ||
+        !num_is_real(p) || !num_is_real(q) || !num_is_real(shift) || num_is_zero(discriminant))
+        return 1;
+    expr_t *p_expr = expr_new_const(p), *q_expr = expr_new_const(q);
+    expr_t *offset = expr_new_const(shift), *disc = expr_new_const(discriminant);
+    int rc = p_expr && q_expr && offset && disc
+        ? equ_cubic_radical_expressions(p_expr, q_expr, offset, disc, wrt, solutions) : -1;
+    expr_free(disc);
+    expr_free(offset);
+    expr_free(q_expr);
+    expr_free(p_expr);
     return rc;
 }
 
@@ -725,10 +879,19 @@ int equ_try_solve_cubic(const equation_t *equation, const expr_t *wrt, equation_
         goto cleanup;
 
     ok = equ_match_polynomial_expr(residual, wrt, 3u, coeffs) && !num_is_zero(coeffs[3]);
-    if (ok)
-        rc = equ_solve_cubic_coefficients(coeffs, wrt, solutions);
-    else
-        rc = equ_try_solve_symbolic_cubic(residual, wrt, solutions);
+    if (ok) {
+        bool exact = true, real = true;
+        for (size_t i = 0; i < 4u; ++i) {
+            exact &= num_is_exact(coeffs[i]);
+            real &= num_is_real(coeffs[i]) && num_is_finite(coeffs[i]);
+        }
+        if (!exact && real)
+            rc = equ_try_solve_symbolic_cubic(residual, wrt, true, solutions);
+        if (exact || !real || rc == 1)
+            rc = equ_solve_cubic_coefficients(coeffs, wrt, solutions);
+    } else {
+        rc = equ_try_solve_symbolic_cubic(residual, wrt, false, solutions);
+    }
 
 cleanup:
     equ_destroy_numbers(coeffs, 4u);

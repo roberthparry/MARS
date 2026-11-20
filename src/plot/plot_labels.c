@@ -3,8 +3,9 @@
  * @brief Bounded native tick-label spacing shared by curve and surface renderers.
  *
  * Conservative numeric glyph rectangles keep neighbouring labels apart without
- * relying on browser font measurements. Surface labels may move slightly outwards;
- * labels that still cannot fit are omitted, while their tick strokes remain.
+ * relying on browser font measurements. Surface tick labels stay beside their ticks;
+ * labels that cannot fit are omitted, while their tick strokes remain. Endpoint
+ * axis names may move slightly to find a clear position.
  * Three endpoint names and at most twelve ticks per axis bound the collision scan.
  */
 #include <math.h>
@@ -41,15 +42,19 @@ bool plot_tick_text(string_t *out, plot_tick_layout_t *layout, const string_t *l
     if (!width)
         return true;
     /* Endpoint names also try either side when nearly parallel axes converge. */
-    unsigned attempts = axis >= 3 ? 12 : 4;
+    /* Small normal-direction alternatives retain nearly touching labels beside their ticks. */
+    static const double nudges[] = {0, -1, 1, -2, 2};
+    unsigned attempts = axis >= 3 ? 12 : 5;
     for (unsigned attempt = 0; attempt < attempts; ++attempt) {
-        double offset = (attempt % 4) * layout->font_size * 1.5;
-        double side = attempt < 4 ? 0 : attempt < 8 ? layout->font_size * 2 : -layout->font_size * 2;
+        double offset = axis >= 3 ? (attempt % 4) * layout->font_size * 1.5
+                                 : nudges[attempt] * layout->font_size / 13;
+        double side = axis < 3 || attempt < 4 ? 0 : attempt < 8 ? layout->font_size * 2 : -layout->font_size * 2;
         double at_x = x + dx * offset - dy * side, at_y = y + dy * offset + dx * side;
         if (axis >= 3) {
             double before = anchor < 0 ? width : anchor == 0 ? width / 2 : 0;
-            at_x = fmax(2 + before, fmin(layout->width - 2 - width + before, at_x));
-            at_y = fmax(layout->font_size + 2, fmin(layout->height - layout->font_size * 0.3 - 2, at_y));
+            double top = 16 + fmin(48, fmax(0, layout->height - 240) / 4);
+            at_x = fmax(16 + before, fmin(layout->width - 16 - width + before, at_x));
+            at_y = fmax(layout->font_size + top, fmin(layout->height - layout->font_size * 0.3 - 16, at_y));
         }
         double left = at_x - (anchor < 0 ? width : anchor == 0 ? width / 2 : 0);
         plot_label_box_t box = {left, at_y - layout->font_size, left + width, at_y + layout->font_size * 0.3};

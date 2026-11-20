@@ -98,8 +98,10 @@ static bool equ_pair_negative(const expr_t *expr, unsigned depth)
     bool scalar = expr_match_scaled_expr(expr, &scale, &base) || expr_match_const_value(expr, &scale);
     bool negative = scalar && num_lt(scale, NUM_ZERO);
     num_destroy(&scale);
+    if (!scalar && expr_match_mul_expr(expr, &left, &right))
+        negative = equ_pair_negative(left, depth + 1u) != equ_pair_negative(right, depth + 1u);
     if (!scalar && expr_match_div_expr(expr, &left, &right))
-        negative = equ_pair_negative(left, depth + 1u);
+        negative = equ_pair_negative(left, depth + 1u) != equ_pair_negative(right, depth + 1u);
     return negative;
 }
 
@@ -311,11 +313,6 @@ string_t *equ_solution_pair_rhs_text(const equation_t *first, const equation_t *
         equ_pair_term_t displacement = sums[0].terms[matched[0]];
         expr_t *offset = expr_simplify_owned(displacement.subtract ? expr_sub(half_difference, displacement.expr) :
                                                                     expr_add(half_difference, displacement.expr));
-        if (offset && equ_pair_negative(offset, 0u)) {
-            expr_t *positive = expr_simplify_owned(expr_neg(offset));
-            expr_free(offset);
-            offset = positive;
-        }
         expr_t *pretty_centre = expr_beautify(centre);
         expr_t *pretty_offset = expr_beautify(offset);
         expr_t *expanded_centre = expr_display_expanded(pretty_centre);
@@ -327,6 +324,12 @@ string_t *equ_solution_pair_rhs_text(const equation_t *first, const equation_t *
         if (expanded_offset) {
             expr_free(pretty_offset);
             pretty_offset = expanded_offset;
+        }
+        /* Expand authored factors before inspecting their sign, including exact trigonometric coefficients. */
+        if (pretty_offset && equ_pair_negative(pretty_offset, 0u)) {
+            expr_t *positive = expr_simplify_owned(expr_neg(pretty_offset));
+            expr_free(pretty_offset);
+            pretty_offset = positive;
         }
         expr_t *factored_centre = expr_factor_common_post_calculus(pretty_centre);
         if (factored_centre) {

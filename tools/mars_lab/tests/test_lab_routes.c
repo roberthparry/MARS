@@ -459,6 +459,11 @@ static bool route_contracts(const char *directory)
         "\"plot_second_upper\":\"20\",\"plot_scale\":\"all\"}", "application/x-protobuf", NULL, NULL);
     result = response ? lab_wire_decode(http_response_body(response), http_response_body_size(response)) : NULL;
     const json_t *plot = test_lab_member(test_lab_member(test_lab_member(result, "presentation"), "calculus"), "plot");
+    if (response && http_response_status(response) != 200) {
+        string_t *diagnostic = json_to_string(result);
+        string_fprintf(stderr, "Refined surface response: %s\n", diagnostic ? string_c_str(diagnostic) : "null");
+        string_free(diagnostic);
+    }
     ok = route_check(response, 200, test_lab_ok(result, true) && strlen(test_lab_text(plot, "svg")) > 3000000 &&
                      !test_lab_member(result, "plot_svg") && !test_lab_member(result, "raw"),
                      "POST /eval refined mesh fits the complete Protobuf HTTP response") && ok;

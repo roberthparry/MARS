@@ -51,6 +51,21 @@ equation_t *equ_new_with_owned_bindings(const expr_t *lhs, const expr_t *rhs, ex
  */
 equation_t *equ_reduction_new(const equation_t *source, const expr_t *lhs, const expr_t *rhs);
 
+/**
+ * @brief Reduce rational offsets, common numerical scales and shared numerical denominators across an equality.
+ * @param[in,out] lhs Required pointer to an owned left side, replaced and released only on success.
+ * @param[in,out] rhs Required pointer to an independently owned right side, similarly replaced on success.
+ * @return True after equivalent reduction; false for unchanged, unsupported or invalid input, or allocation
+ * failure, leaving both sides untouched. One side must be rational; the other is bounded to sixty-four
+ * additive terms and depth thirty-two. A two-term factored relation clears rational denominators and moves its
+ * companion term across the equality, factoring integer content. Otherwise unrelated terms retain separate
+ * reduced fractions and factored numerators.
+ * Affine rational shifts expose constant contributions; factored dependent corrections follow principal terms.
+ * Only non-zero rational factors are removed; domains and live symbols
+ * are retained. The caller owns both resulting graphs and releases them with expr_free().
+ */
+bool equ_reduce_rational_sides(expr_t **lhs, expr_t **rhs);
+
 struct _expr_function_temporaries_t;
 
 /** @brief Reserve and report one solver attempt, search seed or numerical iteration in the current scope. */

@@ -67,6 +67,11 @@ namespace WorksheetPlotPalette {
         return current().matrix;
     }
 
+    /** @brief Return the current axis colour as normalised WebGL channels. */
+    export function axis_colour(): Float32Array {
+        return new Float32Array(rgb(colour('#94b8b1')));
+    }
+
     /** @brief Grade a native hexadecimal plot colour, preserving alpha and non-colour SVG values. */
     export function colour(original: string): string {
         const palette = current();

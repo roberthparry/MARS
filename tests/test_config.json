@@ -903,6 +903,25 @@
     },
     "tests": {
       "enabled": true,
+      "test_equation_algebraic_cubics": {
+        "algebraic_cubic_angle_constructible": true,
+        "algebraic_cubic_angle_nearby": true,
+        "algebraic_cubic_angle_negative": true,
+        "algebraic_cubic_angle_rational": true,
+        "algebraic_cubic_angle_shifted": true,
+        "algebraic_cubic_angle_unsupported": true,
+        "algebraic_cubic_bound_coefficient": true,
+        "algebraic_cubic_complex_pair": true,
+        "algebraic_cubic_fractional_scale": true,
+        "algebraic_cubic_negative_cardano_argument": true,
+        "algebraic_cubic_radical_leading": true,
+        "algebraic_cubic_repeated": true,
+        "algebraic_cubic_scaled": true,
+        "algebraic_cubic_three_real": true,
+        "algebraic_cubic_three_real_high_precision": true,
+        "algebraic_cubic_triple": true,
+        "enabled": true
+      },
       "test_equation_basics": {
         "enabled": true,
         "test_equation_avoids_existing_branch_parameter_name": true,
@@ -988,6 +1007,7 @@
         "complex_power_shifted_target": true,
         "enabled": true
       },
+      "test_equation_cubic_opaque_coefficients": true,
       "test_equation_database_cases": {
         "enabled": true,
         "guarded_root_polynomial_branches": true,
@@ -1035,7 +1055,33 @@
         "enabled": true,
         "inverse_atanh_lower_cut": true,
         "inverse_atanh_pole": true,
+        "inverse_atanh_pole_after_precision_change": true,
         "negative_power_zero_target": true
+      },
+      "test_equation_rational_relations": {
+        "enabled": true,
+        "relation_circle_reversed": true,
+        "relation_circle_slice": true,
+        "relation_egg_fractions": true,
+        "relation_ellipse_fractions": true,
+        "relation_equal_rationals": true,
+        "relation_exact_fraction_offset": true,
+        "relation_factored_integer_content": true,
+        "relation_factored_negative_product": true,
+        "relation_factored_negative_term": true,
+        "relation_factored_rationals": true,
+        "relation_factored_reversed": true,
+        "relation_factored_zero_target": true,
+        "relation_integer_content": true,
+        "relation_named_constant_control": true,
+        "relation_negative_shift": true,
+        "relation_numeric_truth_control": true,
+        "relation_shifted_product": true,
+        "relation_subtracted_shift": true,
+        "relation_symbolic_divisor_control": true,
+        "relation_symbolic_sides_control": true,
+        "relation_trigonometric_terms": true,
+        "relation_unequal_rationals": true
       },
       "test_equation_relation_separators": {
         "case_0e711620698875f8": true,
@@ -2310,6 +2356,8 @@
           },
           "test_to_string_reciprocal_products_TeX": {
             "enabled": true,
+            "rational_scaled_quotient": true,
+            "rational_scaled_root_quotient": true,
             "reciprocal_cube_root": true,
             "reciprocal_multiple_powers": true,
             "reciprocal_root_multiple_factors": true,
@@ -2317,6 +2365,15 @@
             "reciprocal_root_sum_right": true,
             "reciprocal_square": true,
             "reciprocal_unit_power": true
+          },
+          "test_to_string_shared_centres": {
+            "enabled": true,
+            "shared_centre_duplicate": true,
+            "shared_centre_functions": true,
+            "shared_centre_multiple": true,
+            "shared_centre_negative": true,
+            "shared_centre_opposite_sign_control": true,
+            "shared_centre_radical": true
           },
           "test_to_string_special_functions": true,
           "test_to_string_square_denominator": true,
@@ -2332,6 +2389,19 @@
             "enabled": true,
             "test_to_string_unary_sqrt_expr": true,
             "test_to_string_unary_sqrt_func": true
+          },
+          "test_to_string_unit_coefficients_TeX": {
+            "enabled": true,
+            "unit_common_conjugate_negative": true,
+            "unit_common_conjugate_positive": true,
+            "unit_conjugate_difference": true,
+            "unit_conjugate_integer_control": true,
+            "unit_conjugate_standalone_integer": true,
+            "unit_conjugate_weight_control": true,
+            "unit_projection_mixed_sum": true,
+            "unit_projection_negative": true,
+            "unit_projection_positive": true,
+            "unit_reversed_conjugate": true
           },
           "test_to_string_wrapped_TeX_aligned_subtraction": true,
           "test_to_string_wrapped_TeX_distributes_scale": true
@@ -4686,6 +4756,13 @@
       "axis_legibility_5": true,
       "enabled": true
     },
+    "test_plot_axis_stability": {
+      "axis_stability_east": true,
+      "axis_stability_north": true,
+      "axis_stability_south": true,
+      "axis_stability_west": true,
+      "enabled": true
+    },
     "test_plot_axis_title_space": true,
     "test_plot_control": true,
     "test_plot_decimal_ticks": true,
@@ -4698,6 +4775,15 @@
     "test_plot_label_notation": true,
     "test_plot_label_spacing": true,
     "test_plot_limits": true,
+    "test_plot_occlusion": {
+      "enabled": true,
+      "occlusion_behind": true,
+      "occlusion_depth_crossing": true,
+      "occlusion_empty": true,
+      "occlusion_front": true,
+      "occlusion_hole": true,
+      "occlusion_overlap": true
+    },
     "test_plot_perspective": {
       "enabled": true,
       "perspective_centre": true,
@@ -4717,12 +4803,17 @@
     "test_plot_surface_origin": {
       "enabled": true,
       "surface_origin_asymmetric": true,
+      "surface_origin_centred_asymmetric": true,
+      "surface_origin_centred_extreme": true,
+      "surface_origin_centred_symmetric": true,
+      "surface_origin_centred_torus": true,
       "surface_origin_extreme": true,
       "surface_origin_mixed": true,
       "surface_origin_negative": true,
       "surface_origin_positive": true,
       "surface_origin_symmetric": true
     },
+    "test_plot_surface_small_stack": true,
     "test_plot_surface_tick_catalogue": true,
     "test_plot_surface_view": true,
     "test_plot_svg": true,
@@ -4735,13 +4826,6 @@
       "tick_density_reverse": true,
       "tick_density_short_readable": true,
       "tick_density_without_zero": true
-    },
-    "test_plot_axis_stability": {
-      "enabled": true,
-      "axis_stability_north": true,
-      "axis_stability_east": true,
-      "axis_stability_south": true,
-      "axis_stability_west": true
     }
   },
   "tests/protobuf/test_protobuf.c": {
@@ -6050,34 +6134,40 @@
       "enabled": true,
       "test_lab_equation_parameters": {
         "enabled": true,
+        "equation_caption_curve_parameter": true,
+        "equation_caption_exact_fraction": true,
+        "equation_caption_exact_radical": true,
+        "equation_caption_fixed_egg": true,
+        "equation_caption_fixed_named": true,
+        "equation_caption_mesh_parameter": true,
+        "equation_caption_reduced_circle": true,
+        "equation_caption_selected_parameter": true,
+        "equation_cleared_coordinate_surface": true,
         "equation_display_all_dependent_branches": true,
         "equation_display_x_of_t": true,
         "equation_display_y_of_x": true,
         "equation_exact_constant_narrow_parameter": true,
         "equation_fixed_constant_parameter": true,
+        "equation_fixed_coordinate_axis_choice": true,
+        "equation_fixed_first_coordinate": true,
+        "equation_fixed_named_coordinate": true,
+        "equation_fixed_second_coordinate": true,
+        "equation_fixed_tapered_ellipsoid": true,
+        "equation_fixed_third_coordinate": true,
         "equation_four_coordinates_notice": true,
         "equation_inverse_curve_parameters": true,
         "equation_line_parameters": true,
         "equation_named_coordinates_parameters": true,
+        "equation_nested_circles": true,
+        "equation_nested_circles_translated": true,
         "equation_parameter_invalid_limits": true,
         "equation_parameter_slider_position": true,
+        "equation_radical_cubic_display": true,
         "equation_three_coordinate_parameter": true,
+        "equation_torus_equatorial_circles": true,
+        "equation_torus_manual_inner_circle": true,
         "equation_unwrapped_inverse_display": true,
-        "equation_unwrapped_inverse_plot": true,
-        "equation_fixed_first_coordinate": true,
-        "equation_fixed_second_coordinate": true,
-        "equation_fixed_third_coordinate": true,
-        "equation_fixed_coordinate_axis_choice": true,
-        "equation_fixed_named_coordinate": true,
-        "equation_fixed_tapered_ellipsoid": true,
-        "equation_cleared_coordinate_surface": true,
-        "equation_caption_fixed_egg": true,
-        "equation_caption_exact_radical": true,
-        "equation_caption_exact_fraction": true,
-        "equation_caption_fixed_named": true,
-        "equation_caption_mesh_parameter": true,
-        "equation_caption_curve_parameter": true,
-        "equation_caption_selected_parameter": true
+        "equation_unwrapped_inverse_plot": true
       }
     }
   },
