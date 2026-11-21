@@ -948,6 +948,18 @@ expr_t *expr_deriv_rational_over_polynomial_power(const expr_t *expr, const expr
 expr_t *expr_deriv_cosine_harmonic_antiderivative(const expr_t *expr, const expr_t *wrt);
 expr_t *expr_finite_progression_closed_form(const expr_t *expr);
 
+/**
+ * @brief Build a sampling identity for a fixed finite progression of an entire elementary function.
+ * @param expr Borrowed authored sum; not modified or consumed.
+ * @param axes Borrowed array of count coordinate nodes, kept live by the caller during sampling.
+ * @param count Number of coordinates, from one to three.
+ * @return Owned graph with linked source bindings, released with expr_free(), or NULL for unsupported sums,
+ * coordinate-dependent or invalid bounds, invalid arguments or allocation failure. Rebuild after changing
+ * non-coordinate bindings. Non-finite evaluations must fall back to expr to preserve removable points.
+ * Access to mutable linked graphs must remain confined to their owning thread.
+ */
+expr_t *expr_finite_progression_sample_form(const expr_t *expr, const expr_t *const *axes, size_t count);
+
 /** @brief Identify the upper bound, step and function of a finite progression. */
 bool expr_finite_progression_parts(const expr_t *expr, const expr_t **upper, expr_t **step,
                                    const expr_ops_t **function);

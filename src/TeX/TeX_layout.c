@@ -35,7 +35,7 @@ string_t *TeX_qualification(const string_t *operand, const char *caption, TeX_qu
     return result;
 }
 
-/* Arrange already selected derivation rows without interpreting their mathematics. */
+/* Keep an ordinary identity on one line; conditional alternatives retain their case layout. */
 string_t *TeX_align_derivation(const string_t *start, const char *result, const char *alternative,
                                const char *condition, const char *condition_value)
 {
@@ -53,7 +53,7 @@ string_t *TeX_align_derivation(const string_t *start, const char *result, const 
             "\\end{cases}\n\\end{aligned}", start, alternative, condition, condition_value,
             result, condition, condition_value);
     else
-        status = string_append_format(out, "\\begin{aligned}[t]\n&%S \\\\\n&= %s\n\\end{aligned}", start, result);
+        status = string_append_format(out, "%S = %s", start, result);
     if (status >= 0)
         return out;
     string_free(out);

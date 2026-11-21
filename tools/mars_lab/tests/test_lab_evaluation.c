@@ -201,6 +201,7 @@ static void test_lab_calendar_validation(void)
     fflush(NULL);
     pid_t child = fork();
     if (!child) {
+        mars_settings_key_provider(NULL);
         bool ready = mars_settings_isolate() && mars_settings_load();
         if (ready) calendar_validation_checks();
         mars_settings_isolation_close();

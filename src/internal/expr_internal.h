@@ -803,6 +803,18 @@ bool expr_finite_summation_exceeds_direct_limit(const expr_t *expr);
 expr_t *expr_finite_progression_closed_form(const expr_t *expr);
 
 /**
+ * @brief Build a sampling identity for a fixed finite progression of an entire elementary function.
+ * @param expr Borrowed authored sum; not modified or consumed.
+ * @param axes Borrowed array of count coordinate nodes, kept live by the caller during sampling.
+ * @param count Number of coordinates, from one to three.
+ * @return Owned graph with linked source bindings, released with expr_free(), or NULL for unsupported sums,
+ * coordinate-dependent or invalid bounds, invalid arguments or allocation failure. Rebuild after changing
+ * non-coordinate bindings. Non-finite evaluations must fall back to expr to preserve removable points.
+ * Access to mutable linked graphs must remain confined to their owning thread.
+ */
+expr_t *expr_finite_progression_sample_form(const expr_t *expr, const expr_t *const *axes, size_t count);
+
+/**
  * @brief Return whether a progression reduction depends on the supplied value of its step.
  *
  * @param expr Expression to inspect.

@@ -1621,6 +1621,80 @@ static void test_lab_extra_plot_tangent_bounds(void)
     TEST_ASSERT_TRUE(ok, "tangent over multiples of pi renders with manual limits at double and high precision");
 }
 
+static void progression_plot_row(const void *data)
+{
+    const test_database_case_t *row = data;
+    unsigned status = 0u;
+    json_t *response = request("/eval", string_c_str(row->input), &status);
+    const char *svg = lab_eval_text(response, "plot_svg");
+    const char *series = strstr(svg, "data-series=");
+    const char *end = series ? strstr(series, "</g>") : NULL;
+    size_t paths = 0u;
+    for (const char *path = series ? strstr(series, "<path d=\"M ") : NULL; path && end && path < end;
+         path = strstr(path + 1, "<path d=\"M "))
+        ++paths;
+    number_t minimum = num_create_from_text(row->expected), actual = num_create_from_long((long)paths);
+    bool ok = status == 200u && test_lab_ok(response, true) && num_ge(actual, minimum);
+    num_destroy(&actual);
+    num_destroy(&minimum);
+    if (!ok)
+        string_printf("Progression plot %S: status %u, visible path segments %zu\n", row->name, status, paths);
+    json_free(response);
+    TEST_ASSERT_TRUE(ok, "automatic finite-progression views retain a non-empty curve instead of empty axes");
+}
+
+static void test_lab_extra_progression_plots(void)
+{
+    test_run_database_cases(__FILE__, __LINE__, "mars_lab.progression_plots", NULL, progression_plot_row);
+}
+
+static void progression_sample_row(const void *data)
+{
+    NUM_SCOPE(numbers);
+    const test_database_case_t *row = data;
+    size_t saved = num_get_default_prec_bits();
+    num_set_default_prec_bits((size_t)row->precision);
+    json_t *input = json_from_text(row->input);
+    const char *name = test_lab_text(input, "axis");
+    if (!*name)
+        name = "x";
+    expr_bindings_t *bindings = NULL;
+    expr_t *expression = expr_from_string(test_lab_text(input, "expression"), &bindings);
+    expr_t *point_expression = expr_from_string(test_lab_text(input, "point"), NULL);
+    expr_t *axis = bindings ? expr_bindings_get(bindings, name) : NULL;
+    bool owned = !axis;
+    if (owned)
+        axis = expr_new_named_var(NUM_NAN, name);
+    lab_worker_sample_t *sample = lab_worker_sample_new(expression, &axis, 1, (size_t)row->precision);
+    number_t point = point_expression ? expr_eval(point_expression) : NUM_NAN;
+    number_t value = lab_worker_sample_eval(sample, &point);
+    number_t expected = num_create_from_text(row->expected);
+    number_t tolerance = num_add(num_mul(num_abs(expected), num_create_from_string("1e-12")),
+                                 num_create_from_string("1e-80"));
+    bool ok = sample && (num_is_nan(expected) ? num_is_nan(value) :
+                         num_is_finite(value) && num_le(num_abs(num_sub(value, expected)), tolerance));
+    if (!ok)
+        string_printf("Progression sample %S: got %.17g, expected %.17g\n", row->name,
+                       num_to_double(value), num_to_double(expected));
+    num_destroy(&tolerance);
+    num_destroy(&expected);
+    num_destroy(&value);
+    num_destroy(&point);
+    lab_worker_sample_free(sample);
+    if (owned)
+        expr_free(axis);
+    expr_free(point_expression);
+    expr_free(expression);
+    expr_bindings_free(bindings);
+    num_set_default_prec_bits(saved);
+    TEST_ASSERT_TRUE(ok, "closed-form sampling preserves removable points and discrete sum bounds");
+}
+
+static void test_lab_extra_progression_samples(void)
+{
+    test_run_database_cases(__FILE__, __LINE__, "mars_lab.progression_samples", NULL, progression_sample_row);
+}
+
 static void test_lab_extra_plot_precision(void)
 {
     static const struct { size_t intervals, budget; unsigned preferred, expected; } depths[] = {
@@ -3397,6 +3471,8 @@ void test_lab_evaluation_extra_cases(void)
     TEST_RUN_IN_GROUP(test_lab_extra_equation_frame, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_nested_root_equation, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_plot_precision, tests, NULL);
+    TEST_RUN_IN_GROUP(test_lab_extra_progression_plots, tests, NULL);
+    TEST_RUN_IN_GROUP(test_lab_extra_progression_samples, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_plot_title_fallback, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_native_records, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_editor_and_cards, tests, NULL);

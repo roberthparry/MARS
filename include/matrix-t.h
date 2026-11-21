@@ -1209,10 +1209,12 @@ matrix_t *mat_nullspace(const matrix_t *A);
  *
  * The selected norm is written to @p out as a `number_t`.
  *
- * @p out should point to a fresh or already-cleared `number_t`, such as a
- * value previously initialised with `num_new()`.
+ * Initialise @p out to `NUM_NAN`, or release its previous value before this
+ * call. Success writes a newly owned value without releasing an existing
+ * value. Release the result with `num_destroy()`, including within a
+ * numerical scope: exact diagonal results are detached from that scope.
  *
- * @param A     Input matrix.
+ * @param A     Borrowed input matrix, retained only for the duration of this call.
  * @param type  Norm to compute.
  * @param out   Output location for the norm value.
  * @return      0 on success, nonzero on error.
@@ -1224,10 +1226,11 @@ int mat_norm(const matrix_t *A, mat_norm_type_t type, number_t *out);
  *
  * The condition number is written to @p out as a `number_t`.
  *
- * @p out should point to a fresh or already-cleared `number_t`, such as a
- * value previously initialised with `num_new()`.
+ * Initialise @p out to `NUM_NAN`, or release its previous value before this
+ * call. Success writes a newly owned value without releasing an existing
+ * value. Release the result with `num_destroy()` when it is no longer needed.
  *
- * @param A     Input matrix.
+ * @param A     Borrowed input matrix, retained only for the duration of this call.
  * @param type  Norm in which to compute the condition number.
  * @param out   Output location for the condition number.
  * @return      0 on success, nonzero on error.

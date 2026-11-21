@@ -422,8 +422,13 @@ static void test_context_consumer_boundaries(void)
                                      EXPR_CONTEXT_POSITIVE, NUM_NAN));
     display = equ_simplify_with_context(equation, context);
     text = expr_to_string(equ_rhs(display), style_UNBOUND);
-    TEST_ASSERT_STR_EQ(text, "x + 2");
+    TEST_ASSERT_STR_EQ(text, "x");
     free(text);
+    number_t left = expr_eval(equ_lhs(display)), minus_two = num_create_from_long(-2);
+    bool reduced = num_eq(left, minus_two);
+    num_destroy(&minus_two);
+    num_destroy(&left);
+    TEST_ASSERT_TRUE(reduced, "proving the restriction retains both sides of the reduced equation -2 = x");
     equ_free(display);
     snapshot = mat_simplify_with_context(matrix, context);
     mat_get(snapshot, 1, 1, &entry);

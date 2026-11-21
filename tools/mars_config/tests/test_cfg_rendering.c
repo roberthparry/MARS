@@ -8,6 +8,7 @@
  * fixed references, including a pinned Babel/CLDR fixture; Gregorian arithmetic and
  * civil Hijri expectations are independent of the SQL view. Optional ICU C calls
  * retain the long Hebrew and Hijri oracle comparisons without runtime Python.
+ * The sequential oracle releases ICU's process caches before unloading its library.
  * The original ordered locale-data SHA-256 snapshot uses test-only libsodium;
  * Catalogue coverage loads only the schema and location-data prefix, excluding
  * holiday-rule history, with the original all-town locale coverage assertion.
@@ -1029,6 +1030,7 @@ typedef struct {
     void (*set_millis)(void *, double, int *);
     int32_t (*get)(const void *, int, int *);
     void (*close)(void *);
+    void (*cleanup)(void);
 } test_cfg_rendering_oracle_t;
 
 static void *test_cfg_rendering_icu_symbol(void *library, const char *name)
@@ -1048,6 +1050,9 @@ static void test_cfg_rendering_oracle_close(test_cfg_rendering_oracle_t *oracle)
 {
     if (oracle->calendar)
         oracle->close(oracle->calendar);
+    /* This fixture owns the sole ICU client; its process cache must be released before dlclose. */
+    if (oracle->cleanup)
+        oracle->cleanup();
     if (oracle->library)
         dlclose(oracle->library);
     *oracle = (test_cfg_rendering_oracle_t){0};
@@ -1069,14 +1074,17 @@ static bool test_cfg_rendering_oracle_open(test_cfg_rendering_oracle_t *oracle, 
     void *set_symbol = test_cfg_rendering_icu_symbol(oracle->library, "ucal_setMillis");
     void *get_symbol = test_cfg_rendering_icu_symbol(oracle->library, "ucal_get");
     void *close_symbol = test_cfg_rendering_icu_symbol(oracle->library, "ucal_close");
-    bool ok = open_symbol && set_symbol && get_symbol && close_symbol && sizeof oracle->open == sizeof open_symbol &&
+    void *cleanup_symbol = test_cfg_rendering_icu_symbol(oracle->library, "u_cleanup");
+    bool ok = open_symbol && set_symbol && get_symbol && close_symbol && cleanup_symbol &&
+              sizeof oracle->open == sizeof open_symbol &&
               sizeof oracle->set_millis == sizeof set_symbol && sizeof oracle->get == sizeof get_symbol &&
-              sizeof oracle->close == sizeof close_symbol;
+              sizeof oracle->close == sizeof close_symbol && sizeof oracle->cleanup == sizeof cleanup_symbol;
     if (ok) {
         memcpy(&oracle->open, &open_symbol, sizeof oracle->open);
         memcpy(&oracle->set_millis, &set_symbol, sizeof oracle->set_millis);
         memcpy(&oracle->get, &get_symbol, sizeof oracle->get);
         memcpy(&oracle->close, &close_symbol, sizeof oracle->close);
+        memcpy(&oracle->cleanup, &cleanup_symbol, sizeof oracle->cleanup);
         const uint16_t utc[] = {85, 84, 67};
         int status = 0;
         oracle->calendar = oracle->open(utc, 3, locale, 0, &status);

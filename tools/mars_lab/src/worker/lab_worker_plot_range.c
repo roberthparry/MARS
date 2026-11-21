@@ -6,6 +6,8 @@
  * values. Invalid outer margins are trimmed only at unspecified endpoints. This is
  * a viewing heuristic, not a proof of the complete domain or a global feature search;
  * unresolved parameters, isolated values and missed narrow features require bounds.
+ * Recognised entire-function progressions use their native closed form for value
+ * and slope probes, retaining the authored sum at removable singularities.
  * All work uses a private expression graph and preserves worksheet precision/bindings.
  */
 #include <ctype.h>
@@ -13,6 +15,8 @@
 #include <math.h>
 #include <string.h>
 
+#define MARS_SHARED_EXPR_INTERNAL_ACCESS
+#include "internal/expr_internal.h"
 #define MARS_LAB_WORKER_INTERNAL_ACCESS
 #include "lab_worker_internal.h"
 
@@ -37,7 +41,7 @@ static number_t coordinate(number_t lo, number_t hi, unsigned index, unsigned co
     return num_add(lo, num_mul(num_sub(hi, lo), num_create_from_frac(index, count - 1)));
 }
 
-static bool candidate(expr_t *formula, expr_t *const axes[2], unsigned dimensions,
+static bool candidate(expr_t *formula, expr_t *gradient_formula, expr_t *const axes[2], unsigned dimensions,
                       number_t bounds[4], const bool automatic[4], bool constant)
 {
     unsigned side = dimensions == 2 ? 7 : 33, rows = dimensions == 2 ? side : 1;
@@ -45,6 +49,7 @@ static bool candidate(expr_t *formula, expr_t *const axes[2], unsigned dimension
     double values[49], peak = 0;
     double previous_value = 0, previous_slope = 0;
     unsigned previous_column = side, reversals = 0;
+    expr_t *evaluation = gradient_formula ? gradient_formula : formula;
     for (unsigned row = 0; row < rows; ++row) {
         NUM_SCOPE(row_numbers);
         if (dimensions == 2)
@@ -54,7 +59,11 @@ static bool candidate(expr_t *formula, expr_t *const axes[2], unsigned dimension
             expr_set_val(axes[0], coordinate(bounds[0], bounds[1], col, side));
             number_t result = NUM_NAN, derivative = NUM_NAN;
             const expr_t *variables[] = {axes[0]};
-            if (dimensions != 1u || expr_eval_derivatives(formula, 1u, variables, &result, &derivative) != 0) {
+            if (dimensions != 1u || expr_eval_derivatives(evaluation, 1u, variables, &result, &derivative) != 0) {
+                num_destroy(&result);
+                result = expr_eval(evaluation);
+            }
+            if (gradient_formula && !num_is_finite(result)) {
                 num_destroy(&result);
                 result = expr_eval(formula);
             }
@@ -182,6 +191,8 @@ bool lab_worker_plot_ranges(const char *source, const char *first, const char *s
     for (unsigned i = 0; i < dimensions; ++i)
         if (owned[i])
             axes[i] = expr_new_named_var(NUM_NAN, i ? second : first);
+    const expr_t *coordinates[] = {axes[0], axes[1]};
+    expr_t *gradient_formula = expr_finite_progression_sample_form(formula, coordinates, dimensions);
     ok = ok && formula && axes[0] && (!second || axes[1]);
     bool constant = false;
     if (ok && dimensions == 2) {
@@ -225,11 +236,12 @@ bool lab_worker_plot_ranges(const char *source, const char *first, const char *s
                 bounds[i + 1] = num_scope_detach(num_clone(hi));
             }
         }
-        found = candidate(formula, axes, dimensions, bounds, automatic, constant);
+        found = candidate(formula, gradient_formula, axes, dimensions, bounds, automatic, constant);
         /* Candidate may replace endpoints while the local number scope is active. */
         for (unsigned i = 0; i < 2 * dimensions; ++i)
             bounds[i] = num_scope_detach(bounds[i]);
     }
+    expr_free(gradient_formula);
     expr_free(formula);
     for (unsigned i = 0; i < dimensions; ++i)
         if (owned[i])

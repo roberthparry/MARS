@@ -148,12 +148,21 @@ class WorksheetHistoryPersistence {
         if (this.started || this.restoring) return;
         this.restoring = true;
         try {
-            const stored = localStorage.getItem('mars.history.client.v1');
-            this.client = stored && /^[a-f0-9]{32}$/.test(stored) ? stored : this.id();
-            localStorage.setItem('mars.history.client.v1', this.client);
-            this.session = this.id();
+            let stored: string | null = null, lastMode = NaN;
+            try { stored = localStorage.getItem('mars.history.client.v1'); } catch { /* Try the recovery cache identity. */ }
+            try {
+                const mode = localStorage.getItem('mars.history.mode.v1');
+                if (mode !== null) lastMode = Number(mode);
+            } catch { /* Retain the active worksheet when the mode preference is unavailable. */ }
             await this.openCache();
-            const cached = (await this.cache()).filter(record => record.client === this.client);
+            const recovery = await this.cache();
+            const identities = new Set(recovery.map(record => record.client).filter(
+                (client): client is string => typeof client === 'string' && /^[a-f0-9]{32}$/.test(client)));
+            this.client = stored && /^[a-f0-9]{32}$/.test(stored) ? stored :
+                identities.size === 1 ? identities.values().next().value! : this.id();
+            try { localStorage.setItem('mars.history.client.v1', this.client); } catch { /* Server history can still restore and save. */ }
+            this.session = this.id();
+            const cached = recovery.filter(record => record.client === this.client);
             let online = false, saved: SavedHistoryRecord[] = [];
             try {
                 const result = await this.request({action: 'load'});
@@ -161,19 +170,27 @@ class WorksheetHistoryPersistence {
                 saved = result.data.records;
                 online = true;
             } catch { /* Recover locally while the server is unavailable. */ }
-            const byMode = new Map(saved.map(record => [record.mode, record]));
+            const serverRecords = new Map(saved.map(record => [record.mode, record]));
+            const byMode = new Map(serverRecords);
             for (const local of cached) {
                 const server = byMode.get(local.mode);
                 if (!online || (local.pending && ((server && local.epoch === server.epoch && local.revision === server.revision) ||
                     (!server && local.revision === 0)))) byMode.set(local.mode, local);
             }
             const initial = WorksheetWorkspace.mode.currentMode();
-            const lastMode = Number(localStorage.getItem('mars.history.mode.v1'));
             const active = Number.isInteger(lastMode) && byMode.has(lastMode) ? this.names[lastMode] : initial;
             const states = new Map<number, WorksheetSnapshot>();
-            for (const [mode, record] of byMode) {
+            for (const [mode, selected] of byMode) {
                 try {
-                    const state = this.install(record);
+                    let record = selected, state: WorksheetSnapshot;
+                    try { state = this.install(record); }
+                    catch (error) {
+                        const server = serverRecords.get(mode);
+                        if (!server || server === record) throw error;
+                        state = this.install(server);
+                        record = server;
+                        this.warn('Saved server history was restored because the local recovery record could not be read.');
+                    }
                     if (record.pending) this.dirty.add(mode);
                     this.records.set(mode, record);
                     await this.cache(record);
@@ -181,7 +198,11 @@ class WorksheetHistoryPersistence {
                     WorksheetWorkspace.mode.setMode(this.names[mode], {force: true});
                     await WorksheetPersistence.navigation.restore(state);
                     if (state.mode === 'almanac') this.restoredGlobeCamera = state.globeCamera;
-                } catch { this.warn('A damaged or unsupported history record was ignored.'); this.blocked.add(mode); }
+                } catch (error) {
+                    const detail = error instanceof Error ? error.message : String(error);
+                    this.warn(`Could not restore ${this.names[mode]} history: ${detail}. Saved records have been retained.`);
+                    this.blocked.add(mode);
+                }
             }
             WorksheetWorkspace.mode.setMode(active, {force: true});
             const current = states.get(this.names.indexOf(active));
@@ -195,7 +216,7 @@ class WorksheetHistoryPersistence {
             window.addEventListener('pagehide', this.leave);
             document.addEventListener('visibilitychange', this.visibility);
             this.poll = window.setInterval(() => this.observe(), 500);
-        } catch { this.warn('Persistent history needs browser storage; this session’s Back/Forward still works.'); }
+        } catch { this.warn('History could not be restored; saved records have been retained.'); }
         finally { this.restoring = false; }
         if (this.dirty.size) this.schedule();
     }

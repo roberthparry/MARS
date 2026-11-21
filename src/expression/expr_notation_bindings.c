@@ -174,7 +174,7 @@ static const TeX_model_node_t *build_binding(notation_build_t *build, const expr
 
         case EXPR_BINDING_EXPR_UNARY_OP: {
             if (binding->u.unary_op.ops == &ops_exp) {
-                number_t exponent = num_new();
+                number_t exponent = NUM_NAN;
                 long numerator = 0L, denominator = 0L;
                 bool root = expr_binding_expr_number_value(binding->u.unary_op.child, &exponent) &&
                     num_get_small_rational(exponent, &numerator, &denominator) && numerator == 1L && denominator > 1L;

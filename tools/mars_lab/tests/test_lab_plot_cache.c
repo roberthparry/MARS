@@ -91,7 +91,13 @@ static bool cache_checks(const char *directory)
             pid_t child = fork();
             if (child == 0) {
                 string_t *shared = run(args, 1, NULL);
-                _exit(equal(initial, shared) ? 0 : 1);
+                bool matched = equal(initial, shared);
+                string_free(shared);
+                string_free(cached);
+                string_free(initial);
+                string_free(baseline);
+                lab_proc_workers_stop();
+                _exit(matched ? 0 : 1);
             }
             int status = -1;
             ok = child > 0 && waitpid(child, &status, 0) == child && WIFEXITED(status) && !WEXITSTATUS(status);
@@ -129,7 +135,10 @@ static bool cache_checks(const char *directory)
     pid_t child = fork();
     if (child == 0) {
         string_t *shared = run(args, 1, NULL);
-        _exit(shared ? 0 : 1);
+        bool present = shared != NULL;
+        string_free(shared);
+        lab_proc_workers_stop();
+        _exit(present ? 0 : 1);
     }
     int status = -1;
     ok = child > 0 && waitpid(child, &status, 0) == child && WIFEXITED(status) && !WEXITSTATUS(status);
@@ -191,7 +200,8 @@ static bool equation_evaluation_reuse(const char *directory)
     if (marked_record)
         lab_proc_plot_cache_put(key, marked_record, true);
     pid_t child = ok && marked_record ? fork() : -1;
-    if (child == 0) {
+    bool replay_child = child == 0;
+    if (replay_child) {
         double seconds = 0;
         string_t *drawn = run(plot, 30000, &seconds);
         bool reused = drawn && strstr(string_c_str(drawn), "plot_cache_fixture retained\n") &&
@@ -203,16 +213,17 @@ static bool equation_evaluation_reuse(const char *directory)
         printf("Completed zeta evaluation reused by a separate plot request: %.4fs\n", seconds);
         fflush(stdout);
         string_free(drawn);
-        _exit(reused ? 0 : 1);
+        ok = reused;
+    } else {
+        status = -1;
+        ok = ok && child > 0 && waitpid(child, &status, 0) == child && WIFEXITED(status) && !WEXITSTATUS(status);
+        plot[3] = "156";
+        string_t *changed_key = path ? lab_proc_plot_key(plot, NULL, path, true) : NULL;
+        string_t *changed = changed_key ? lab_proc_plot_cache_get(changed_key, true) : NULL;
+        ok = ok && !changed && !equal(key, changed_key);
+        string_free(changed);
+        string_free(changed_key);
     }
-    status = -1;
-    ok = ok && child > 0 && waitpid(child, &status, 0) == child && WIFEXITED(status) && !WEXITSTATUS(status);
-    plot[3] = "156";
-    string_t *changed_key = path ? lab_proc_plot_key(plot, NULL, path, true) : NULL;
-    string_t *changed = changed_key ? lab_proc_plot_cache_get(changed_key, true) : NULL;
-    ok = ok && !changed && !equal(key, changed_key);
-    string_free(changed);
-    string_free(changed_key);
     string_free(marked_record);
     json_free(marked);
     json_free(marked_results);
@@ -224,6 +235,10 @@ static bool equation_evaluation_reuse(const char *directory)
     string_free(key);
     string_free(path);
     string_free(output);
+    if (replay_child) {
+        lab_proc_workers_stop();
+        _exit(ok ? 0 : 1);
+    }
     return ok;
 }
 

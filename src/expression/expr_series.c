@@ -959,6 +959,51 @@ static expr_series_trigonometric_kind_t expr_series_match_trigonometric_term(con
     return EXPR_SERIES_TRIGONOMETRIC_NONE;
 }
 
+static expr_t *expr_series_function_progression_endpoint(const expr_t *argument, const expr_t *base,
+                                                        size_t prefix_length)
+{
+    const expr_t *left = NULL;
+    const expr_t *right = NULL;
+    const expr_t *candidate = NULL;
+    number_t base_value = NUM_NAN;
+    number_t endpoint_value = NUM_NAN;
+    number_t prefix_value = num_create_from_long((long)prefix_length);
+    expr_t *endpoint = NULL;
+    long scale = 0L;
+
+    if (!argument || !base)
+        goto cleanup;
+    if (expr_series_match_positive_long_scale(argument, base, &scale)) {
+        endpoint_value = num_create_from_long(scale);
+    } else {
+        base_value = expr_eval(base);
+        if (num_is_exact(base_value) && num_is_one(base_value)) {
+            candidate = argument;
+        } else if (expr_match_mul_expr(argument, &left, &right) && left && right) {
+            if (expr_series_simplified_equal(left, base))
+                candidate = right;
+            else if (expr_series_simplified_equal(right, base))
+                candidate = left;
+        }
+        if (!candidate)
+            goto cleanup;
+        endpoint_value = expr_eval(candidate);
+        if (num_is_nan(endpoint_value) && (expr_is_variable(candidate) || expr_is_named_const(candidate))) {
+            endpoint = expr_clone(candidate);
+            goto cleanup;
+        }
+    }
+    if (num_is_exact(endpoint_value) && num_is_integer(endpoint_value) && num_is_finite(endpoint_value) &&
+        num_gt(endpoint_value, prefix_value))
+        endpoint = expr_new_const(endpoint_value);
+
+cleanup:
+    num_destroy(&prefix_value);
+    num_destroy(&endpoint_value);
+    num_destroy(&base_value);
+    return endpoint;
+}
+
 static string_t *expr_series_expand_trigonometric_progression(const string_t *source, bool *expanded_out,
                                                               string_t **display_TeX_out)
 {
@@ -1020,8 +1065,7 @@ static string_t *expr_series_expand_trigonometric_progression(const string_t *so
                 expr_free(term);
                 goto cleanup;
             }
-            if (!unit_angle_step)
-                angle_step = expr_clone(argument);
+            angle_step = expr_clone(argument);
         } else if (unit_angle_step) {
             if (!num_is_exact(argument_value) || !num_eq(argument_value, expected)) {
                 num_destroy(&expected);
@@ -1054,42 +1098,14 @@ static string_t *expr_series_expand_trigonometric_progression(const string_t *so
         expr_t *expanded_endpoint_term = endpoint_term ? expr_expand_preserved_for_display(endpoint_term) : NULL;
         const expr_t *matched_endpoint_term = expanded_endpoint_term ? expanded_endpoint_term : endpoint_term;
         const expr_t *argument = NULL;
-        number_t endpoint_value = NUM_NAN;
-
         const bool endpoint_matches =
             expr_series_match_trigonometric_term(matched_endpoint_term, &argument) == trigonometric_kind;
-        const expr_t *endpoint_argument = argument;
 
         if (!endpoint_matches || !argument) {
             expr_free(expanded_endpoint_term);
             goto cleanup;
         }
-        if (!unit_angle_step) {
-            const expr_t *left = NULL;
-            const expr_t *right = NULL;
-
-            if (!expr_match_mul_expr(argument, &left, &right) || !left || !right) {
-                expr_free(expanded_endpoint_term);
-                goto cleanup;
-            }
-            if (expr_series_simplified_equal(left, angle_step))
-                endpoint_argument = right;
-            else if (expr_series_simplified_equal(right, angle_step))
-                endpoint_argument = left;
-            else {
-                expr_free(expanded_endpoint_term);
-                goto cleanup;
-            }
-        }
-        endpoint_value = expr_eval(endpoint_argument);
-        if ((!expr_is_variable(endpoint_argument) && !expr_is_named_const(endpoint_argument)) ||
-            !num_is_nan(endpoint_value)) {
-            num_destroy(&endpoint_value);
-            expr_free(expanded_endpoint_term);
-            goto cleanup;
-        }
-        num_destroy(&endpoint_value);
-        endpoint = expr_clone(endpoint_argument);
+        endpoint = expr_series_function_progression_endpoint(argument, angle_step, ellipsis_index);
         expr_free(expanded_endpoint_term);
     }
     endpoint_text = endpoint ? expr_to_string(endpoint, style_UNBOUND) : NULL;
@@ -1195,7 +1211,6 @@ static string_t *expr_series_expand_weighted_trigonometric_progression(const str
     const expr_t *endpoint_numerator = NULL;
     const expr_t *endpoint_denominator = NULL;
     const expr_t *endpoint_argument = NULL;
-    const expr_t *endpoint_factor = NULL;
     expr_t *endpoint = NULL;
     char *angle_text = NULL;
     char *endpoint_text = NULL;
@@ -1241,16 +1256,8 @@ static string_t *expr_series_expand_weighted_trigonometric_progression(const str
         !endpoint_numerator || !endpoint_denominator ||
         expr_series_match_trigonometric_term(endpoint_numerator, &endpoint_argument) != kind || !endpoint_argument)
         goto cleanup;
-    if (expr_match_mul_expr(endpoint_argument, &endpoint_factor, &first_argument) && endpoint_factor &&
-        first_argument && expr_series_simplified_equal(first_argument, angle_step) &&
-        expr_series_simplified_equal(endpoint_factor, endpoint_denominator)) {
-        endpoint = expr_clone(endpoint_denominator);
-    } else if (expr_match_mul_expr(endpoint_argument, &first_argument, &endpoint_factor) && endpoint_factor &&
-               first_argument && expr_series_simplified_equal(first_argument, angle_step) &&
-               expr_series_simplified_equal(endpoint_factor, endpoint_denominator)) {
-        endpoint = expr_clone(endpoint_denominator);
-    }
-    if (!endpoint || (!expr_is_variable(endpoint) && !expr_is_named_const(endpoint)))
+    endpoint = expr_series_function_progression_endpoint(endpoint_argument, angle_step, ellipsis_index);
+    if (!endpoint || !expr_series_simplified_equal(endpoint, endpoint_denominator))
         goto cleanup;
 
     angle_text = expr_to_string(angle_step, style_UNBOUND);
@@ -1296,38 +1303,6 @@ cleanup:
     return output;
 }
 
-static expr_t *expr_series_unary_progression_endpoint(const expr_t *argument, const expr_t *base)
-{
-    const expr_t *left = NULL;
-    const expr_t *right = NULL;
-    const expr_t *candidate = NULL;
-    number_t base_value = NUM_NAN;
-    number_t endpoint_value = NUM_NAN;
-    expr_t *endpoint = NULL;
-
-    if (!argument || !base)
-        return NULL;
-    base_value = expr_eval(base);
-    if (num_is_exact(base_value) && num_is_one(base_value)) {
-        candidate = argument;
-    } else if (expr_match_mul_expr(argument, &left, &right) && left && right) {
-        if (expr_series_simplified_equal(left, base))
-            candidate = right;
-        else if (expr_series_simplified_equal(right, base))
-            candidate = left;
-    }
-    if (!candidate || (!expr_is_variable(candidate) && !expr_is_named_const(candidate)))
-        goto cleanup;
-    endpoint_value = expr_eval(candidate);
-    if (num_is_nan(endpoint_value))
-        endpoint = expr_clone(candidate);
-
-cleanup:
-    num_destroy(&endpoint_value);
-    num_destroy(&base_value);
-    return endpoint;
-}
-
 static const char *expr_series_unary_progression_index_name(const expr_t *first, const expr_t *endpoint)
 {
     static const char *const candidates[] = {"k", "j", "m", "l", "r", "s", "t"};
@@ -1335,8 +1310,7 @@ static const char *expr_series_unary_progression_index_name(const expr_t *first,
     expr_bindings_t *endpoint_bindings = expr_bindings_from_expr_internal(endpoint);
     const char *name = "index";
 
-    if (!first_bindings || !endpoint_bindings)
-        goto cleanup;
+    /* A constant endpoint has no bindings; it still permits the ordinary short index names. */
     for (size_t i = 0u; i < sizeof(candidates) / sizeof(candidates[0]); ++i) {
         if (!expr_bindings_get(first_bindings, candidates[i]) && !expr_bindings_get(endpoint_bindings, candidates[i])) {
             name = candidates[i];
@@ -1344,7 +1318,6 @@ static const char *expr_series_unary_progression_index_name(const expr_t *first,
         }
     }
 
-cleanup:
     expr_bindings_free(endpoint_bindings);
     expr_bindings_free(first_bindings);
     return name;
@@ -1409,7 +1382,7 @@ static string_t *expr_series_expand_unary_function_progression(const string_t *s
         if (!expr_match_same_reapplicable_unary_function(endpoint_term, first, &endpoint_argument) ||
             !endpoint_argument)
             goto cleanup;
-        endpoint = expr_series_unary_progression_endpoint(endpoint_argument, first_argument);
+        endpoint = expr_series_function_progression_endpoint(endpoint_argument, first_argument, ellipsis_index);
     }
     if (!endpoint)
         goto cleanup;

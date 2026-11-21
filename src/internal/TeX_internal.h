@@ -322,7 +322,7 @@ string_t *TeX_align_equation_rows(const string_t *definitions, const string_t *l
 string_t *TeX_format_definitions(const string_t *const *names, const TeX_t *const *values, size_t count);
 
 /**
- * @brief Align a starting expression and optional result, with an optional two-case result.
+ * @brief Join an ordinary identity on one line, or arrange an optional two-case result.
  * @param start Borrowed rendered initial mathematical expression for the derivation.
  * @param result Borrowed already computed mathematical result or rendered result text, according to its declared
  * type.

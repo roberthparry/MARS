@@ -28,6 +28,13 @@
 
 #include "test_lab_support.h"
 
+/* Ordinary fixtures resolve build defaults without opening the user's key store. */
+string_t *test_lab_unavailable_key(bool create)
+{
+    (void)create;
+    return NULL;
+}
+
 /* Installed ephemeris checks need the same configuration snapshot as the application and almanac suite. */
 bool test_lab_resource_settings(void)
 {
@@ -37,7 +44,9 @@ bool test_lab_resource_settings(void)
     } settings;
     if (!settings.attempted) {
         settings.attempted = true;
+        mars_settings_key_provider(NULL);
         settings.ready = mars_settings_isolate() && mars_settings_load();
+        mars_settings_key_provider(test_lab_unavailable_key);
     }
     return settings.ready;
 }

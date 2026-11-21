@@ -19,6 +19,7 @@
 #include <unistd.h>
 
 #include "http-t.h"
+#include "mars_settings.h"
 #include "tba_wire.h"
 #include "tba_chart.h"
 #include "tba_csv.h"
@@ -33,6 +34,12 @@
 #include "test_tba_support.h"
 
 TEST_SUITE_CONFIG(TEST_CONFIG_GLOBAL);
+
+static string_t *test_unavailable_settings_key(bool create)
+{
+    (void)create;
+    return NULL;
+}
 
 static void test_tba_defaults(void)
 {
@@ -391,6 +398,14 @@ static void test_tba_native_routes(void)
     string_t *state = string_sprintf("%s/state.pb", directory);
     bool ok = state && setenv("TBA_LAB_STATE_FILE", string_c_str(state), 1) == 0 &&
               setenv("TBA_LAB_UPLOAD_DIR", directory, 1) == 0;
+    const char *home_env = getenv("MARS_HOME"), *locator_env = getenv("MARS_CONFIG_FILE");
+    bool had_home = home_env != NULL, had_locator = locator_env != NULL;
+    string_t *old_home = home_env ? string_new_with(home_env) : NULL;
+    string_t *old_locator = locator_env ? string_new_with(locator_env) : NULL;
+    string_t *locator = string_sprintf("%s/mars.json", directory);
+    ok = ok && locator && (!had_home || old_home) && (!had_locator || old_locator) &&
+         !setenv("MARS_HOME", directory, 1) && !setenv("MARS_CONFIG_FILE", string_c_str(locator), 1);
+    mars_settings_key_provider(test_unavailable_settings_key);
     tba_app_t *app = ok ? tba_app_new(NULL) : NULL;
     ok = app && test_tba_csv() && test_tba_template() && tba_date_cstr("29/02/2024") == 20240229 &&
          tba_date_cstr("29/02/2023") == 0 && tba_date_next(20261231, "daily") == 20270101 && ok;
@@ -407,6 +422,16 @@ static void test_tba_native_routes(void)
         ok = test_tba_wire(app) && ok;
 
     tba_app_free(app);
+    mars_settings_isolation_close();
+    mars_settings_key_provider(NULL);
+    bool home_restored = old_home ? !setenv("MARS_HOME", string_c_str(old_home), 1) :
+                                   had_home || !unsetenv("MARS_HOME");
+    bool locator_restored = old_locator ? !setenv("MARS_CONFIG_FILE", string_c_str(old_locator), 1) :
+                                         had_locator || !unsetenv("MARS_CONFIG_FILE");
+    ok = home_restored && locator_restored && ok;
+    string_free(locator);
+    string_free(old_locator);
+    string_free(old_home);
     string_free(state);
     file_t *root = file_new_cstr(directory);
     ok = root && test_tba_cleanup(root) && ok;

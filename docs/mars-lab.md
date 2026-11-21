@@ -856,8 +856,15 @@ the existing server access controls still apply.
 Changes are checkpointed incrementally, with an exit/visibility-change save attempt
 and one bounded IndexedDB recovery record per mode. Exit delivery is best-effort;
 already acknowledged checkpoints survive a process or browser shutdown. Offline
-recovery never replaces a newer server revision. Clearing browser storage loses
-that profile's association with its saved history, but does not erase other profiles.
+recovery never replaces a newer server revision. A failed browser preference read
+or write cannot prevent server history from loading. If the client identifier is
+unavailable, the recovery cache can supply it when all retained records belong to
+one profile; records from different profiles are never combined. Clearing both
+browser stores loses that profile's association with its saved history, but does
+not erase other profiles.
+If a pending local recovery record cannot be validated or imported, the valid
+server record for that same mode is restored instead. Other modes retain their
+own recovery choices; an unusable local record cannot hide acknowledged server history.
 The last mode and its current snapshot are restored before initial evaluation;
 Almanac also restores its saved orientation and zoom without an arrival animation.
 Results are recalculated rather than retaining plot images or geography caches.
@@ -3589,6 +3596,12 @@ Releasing a gesture leaves the same viewport and geometry visible, ready for the
 next gesture. Escape, losing browser focus or a cancelled pointer restores the
 starting orientation; a superseding plot invalidates an unfinished gesture.
 
+Recognised finite sine, cosine, hyperbolic sine/cosine and exponential sums use
+their native closed form for range detection, curve values and derivatives.
+Their integer upper bound must be fixed with respect to the plotted coordinates.
+At removable singularities, including the sine/cosine formula at zero, evaluation
+falls back to the authored finite sum so valid points remain visible.
+
 Sampling and camera presentation are separate. Native MARS still supplies the
 normalised coordinates, colours, tick labels, precision checks and domain gaps.
 Axis arrowheads always point towards increasing coordinate values, independently
@@ -3805,7 +3818,11 @@ finishes at full detail. Escape or pointer cancellation restores the starting
 view. Reset restores the view from before zooming or panning.
 Adaptive subdivision depth fits the callback allowance even when every interval
 needs refinement. Unresolved edges remain gaps, rather than exhausting the budget
-and discarding the whole curve. Automatic ranges prefer a smaller informative
+and discarding the whole curve. Automatic ranges use a recognised finite
+progression's native closed form for value and slope probes, falling back to the
+original sum at removable singularities. This prevents a coarse oscillation
+sample from selecting a window that subsequently produces empty axes.
+Automatic ranges prefer a smaller informative
 window when repeated value jumps contradict the endpoint tangents; explicit
 range endpoints are preserved.
 Spread two fingers to zoom in and bring them together to zoom out. Curves track

@@ -117,9 +117,16 @@ static matrix_t *matrix_appell_series(unsigned family, const number_t *a, const 
     number_t commute_norm = NUM_NAN, x_norm = NUM_NAN, y_norm = NUM_NAN;
     bool commute = difference && mat_norm(difference, MAT_NORM_INF, &commute_norm) == 0 && num_is_zero(commute_norm);
     mat_free(difference); mat_free(yx); mat_free(xy);
-    if (!commute || mat_norm(x, MAT_NORM_INF, &x_norm) || mat_norm(y, MAT_NORM_INF, &y_norm)) return NULL;
+    num_destroy(&commute_norm);
+    if (!commute || mat_norm(x, MAT_NORM_INF, &x_norm) || mat_norm(y, MAT_NORM_INF, &y_norm)) {
+        num_destroy(&y_norm);
+        num_destroy(&x_norm);
+        return NULL;
+    }
     number_t inflation = num_create_from_frac(65537, 65536);
-    x_norm = num_mul(x_norm, inflation); y_norm = num_mul(y_norm, inflation);
+    number_t inflated_x_norm = num_mul(x_norm, inflation), inflated_y_norm = num_mul(y_norm, inflation);
+    num_destroy(&y_norm);
+    num_destroy(&x_norm);
     size_t precision = num_get_default_prec_bits();
     unsigned parameter_count = family == 1 || family == 4 ? 4u : 5u;
     for (unsigned j = 0; j < parameter_count; ++j) {
@@ -132,7 +139,9 @@ static matrix_t *matrix_appell_series(unsigned family, const number_t *a, const 
         if (right > precision) precision = right;
     }
     number_appell_plan_t plan;
-    if (!number_appell_series_plan(family, a, x_norm, y_norm, precision, &plan) || plan.degree > 2048) return NULL;
+    if (!number_appell_series_plan(family, a, inflated_x_norm, inflated_y_norm, precision, &plan) ||
+        plan.degree > 2048)
+        return NULL;
     number_t one = num_create_from_string("1.0");
     if (num_set_prec_bits(&one, plan.working_bits)) return NULL;
     size_t width = plan.m_last < (long)plan.degree ? (size_t)plan.m_last + 1u : (size_t)plan.degree + 1u;

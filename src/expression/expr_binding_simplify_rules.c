@@ -15,15 +15,15 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "string-t.h"
+#define MARS_SHARED_NUMBER_INTERNAL_ACCESS
+#include "internal/number_internal.h"
 #define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_binding_simplify.h"
 #define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_stringout.h"
 #define MARS_EXPR_STRINGOUT_INTERNAL_ACCESS
 #include "expr_stringout_internal.h"
-#define MARS_SHARED_NUMBER_INTERNAL_ACCESS
-#include "internal/number_internal.h"
-#include "string-t.h"
 
 static expr_binding_expr_t *binding_expr_fold_to_expr_owned(expr_binding_expr_t *expr, expr_binding_expr_t *folded);
 static expr_binding_expr_t *binding_expr_number_from_value(number_t value);
@@ -706,8 +706,12 @@ expr_binding_expr_t *binding_expr_try_simplify_sqrt_numeric_square(expr_binding_
         return expr;
     }
 
-    if (!expr_binding_expr_number_value(base, &value) || !num_is_real(value))
+    if (!expr_binding_expr_number_value(base, &value))
         return expr;
+    if (!num_is_real(value)) {
+        num_destroy(&value);
+        return expr;
+    }
 
     magnitude = num_abs(value);
     num_destroy(&value);

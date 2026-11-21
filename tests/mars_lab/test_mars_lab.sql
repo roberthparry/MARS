@@ -7,6 +7,41 @@ CREATE TABLE IF NOT EXISTS mars_lab_cases (
 CREATE INDEX IF NOT EXISTS mars_lab_cases_operation ON mars_lab_cases(operation, name);
 
 INSERT INTO test_case_runner(module, source, parent, table_name, operation) VALUES (
+    'mars_lab.progression_plots', 'tools/mars_lab/tests/test_lab_evaluation_extra.c',
+    'tests.test_lab_extra_progression_plots', 'mars_lab_cases', 'progression_plot')
+ON CONFLICT(module) DO UPDATE SET table_name=excluded.table_name, operation=excluded.operation;
+INSERT INTO mars_lab_cases(name, operation, input, expected) VALUES
+    ('progression_plot_sine_literal', 'progression_plot', '{"expression":"@Z_(k=1)^100 sin(kx)","action":"plot","wrt":"x","precision":40}', '20'),
+    ('progression_plot_cosine_literal', 'progression_plot', '{"expression":"@Z_(k=1)^100 cos(kx)","action":"plot","wrt":"x","precision":40}', '20'),
+    ('progression_plot_sine_bound', 'progression_plot', '{"expression":"{@Z_(k=1)^n sin(kx)|n=100}","action":"plot","wrt":"x","precision":40}', '20')
+ON CONFLICT(name) DO UPDATE SET input=excluded.input, expected=excluded.expected;
+
+INSERT INTO mars_lab_cases(name, operation, input, expected) VALUES
+    ('progression_plot_sine_500', 'progression_plot', '{"expression":"@Z_(k=1)^500 sin(kx)","action":"plot","wrt":"x","precision":97}', '20'),
+    ('progression_plot_cosine_500', 'progression_plot', '{"expression":"@Z_(k=1)^500 cos(kx)","action":"plot","wrt":"x","precision":97}', '20'),
+    ('progression_plot_bound_500', 'progression_plot', '{"expression":"{@Z_(k=1)^n sin(kx)|n=500}","action":"plot","wrt":"x","precision":97}', '20')
+ON CONFLICT(name) DO UPDATE SET input=excluded.input, expected=excluded.expected;
+
+INSERT INTO test_case_runner(module, source, parent, table_name, operation) VALUES (
+    'mars_lab.progression_samples', 'tools/mars_lab/tests/test_lab_evaluation_extra.c',
+    'tests.test_lab_extra_progression_samples', 'mars_lab_cases', 'progression_sample')
+ON CONFLICT(module) DO UPDATE SET table_name=excluded.table_name, operation=excluded.operation;
+INSERT INTO mars_lab_cases(name, operation, input, expected, precision) VALUES
+    ('progression_sample_sine_zero_double', 'progression_sample', '{"expression":"@Z_(k=1)^500 sin(kx)","point":"0"}', '0', 53),
+    ('progression_sample_sine_zero_precise', 'progression_sample', '{"expression":"@Z_(k=1)^500 sin(kx)","point":"0"}', '0', 384),
+    ('progression_sample_cosine_zero_double', 'progression_sample', '{"expression":"@Z_(k=1)^500 cos(kx)","point":"0"}', '500', 53),
+    ('progression_sample_cosine_zero_precise', 'progression_sample', '{"expression":"@Z_(k=1)^500 cos(kx)","point":"0"}', '500', 384),
+    ('progression_sample_sinh_zero', 'progression_sample', '{"expression":"@Z_(k=1)^500 sinh(kx)","point":"0"}', '0', 384),
+    ('progression_sample_cosh_zero', 'progression_sample', '{"expression":"@Z_(k=1)^500 cosh(kx)","point":"0"}', '500', 384),
+    ('progression_sample_exp_zero', 'progression_sample', '{"expression":"@Z_(k=1)^500 exp(kx)","point":"0"}', '500', 384),
+    ('progression_sample_tiny_sine', 'progression_sample', '{"expression":"@Z_(k=1)^500 sin(kx)","point":"1e-60"}', '1.2525e-55', 384),
+    ('progression_sample_empty', 'progression_sample', '{"expression":"@Z_(k=1)^0 sin(kx)","point":"1"}', '0', 384),
+    ('progression_sample_negative_upper', 'progression_sample', '{"expression":"@Z_(k=1)^(-1) sin(kx)","point":"1"}', '0', 384),
+    ('progression_sample_noninteger_upper', 'progression_sample', '{"expression":"@Z_(k=1)^(3/2) sin(kx)","point":"1"}', 'NaN', 384),
+    ('progression_sample_coordinate_upper', 'progression_sample', '{"expression":"{@Z_(k=1)^n sin(kx)|x=1}","axis":"n","point":"3/2"}', 'NaN', 384)
+ON CONFLICT(name) DO UPDATE SET input=excluded.input, expected=excluded.expected, precision=excluded.precision;
+
+INSERT INTO test_case_runner(module, source, parent, table_name, operation) VALUES (
     'mars_lab.equation_pairs', 'tools/mars_lab/tests/test_lab_evaluation_extra.c',
     'tests.test_lab_extra_equation', 'mars_lab_cases', 'equation_pair')
 ON CONFLICT(module) DO UPDATE SET table_name=excluded.table_name, operation=excluded.operation;

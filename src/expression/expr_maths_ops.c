@@ -3580,6 +3580,30 @@ expr_t *expr_finite_progression_closed_form(const expr_t *expr)
     return out ? out : expr_finite_progression_scaled_closed_form(expr);
 }
 
+/* Entire summands permit closed-form sampling; fixed integer bounds preserve the sum's discrete domain. */
+expr_t *expr_finite_progression_sample_form(const expr_t *expr, const expr_t *const *axes, size_t count)
+{
+    const expr_t *upper = NULL;
+    const expr_ops_t *function = NULL;
+    expr_t *step = NULL, *closed = NULL, *linked = NULL;
+    long terms = 0;
+    if (!axes || !count || count > 3 || !expr_finite_progression_parts(expr, &upper, &step, &function))
+        return NULL;
+    bool entire = function == &ops_sin || function == &ops_cos || function == &ops_sinh ||
+                  function == &ops_cosh || function == &ops_exp;
+    bool fixed = entire && expr_summation_bound_to_long(upper, &terms) && terms >= 0;
+    /* A plot has at most three coordinate identities; this is not a symbol-table lookup. */
+    for (size_t i = 0; fixed && i < count; ++i)
+        fixed = axes[i] && !expr_contains_progression_index(upper, axes[i]);
+    if (fixed && function->finite_progression)
+        closed = function->finite_progression(upper, step);
+    if (closed)
+        linked = expr_clone_linked_symbols(closed, expr);
+    expr_free(closed);
+    expr_free(step);
+    return linked;
+}
+
 /* Render a recognised native finite progression together with the exact identity supplied by its function. */
 
 

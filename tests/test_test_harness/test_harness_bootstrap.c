@@ -107,6 +107,11 @@ static void core_probe_skip(void)
 
 static void test_core_subprocesses(void)
 {
+    /* Valgrind redirects readlink to the client binary; directly executing the proc link relaunches Valgrind. */
+    char executable[4096];
+    ssize_t length = readlink("/proc/self/exe", executable, sizeof executable);
+    TEST_ASSERT_TRUE(length > 0 && (size_t)length < sizeof executable, "resolve the bootstrap executable");
+    executable[length] = '\0';
     const char *modes[] = {"fail", "skip"};
     for (size_t i = 0; i < 2; ++i) {
         const char *path = test_case_temp_path(i ? "skip.txt" : "fail.txt");
@@ -116,7 +121,7 @@ static void test_core_subprocesses(void)
         if (!child) {
             FILE *output = freopen(path, "w", stdout);
             if (!output || setenv("MARS_TEST_CORE_PROBE", modes[i], 1)) _exit(120);
-            execl("/proc/self/exe", "test_test_harness", (char *)NULL);
+            execl(executable, "test_test_harness", (char *)NULL);
             _exit(121);
         }
         int status = 0;

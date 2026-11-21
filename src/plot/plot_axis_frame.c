@@ -109,7 +109,10 @@ bool plot_axis_frame(const double corners[8][2], const plot_axis_frame_t *previo
                 double score = 0, intrusion = 0, readable = clearance, previous_direction[2] = {0}, previous_length = 0;
                 unsigned supported = 0;
                 for (unsigned step = 0; step < 3; ++step) {
-                    unsigned axis = order[step], next = at ^ (1u << axis);
+                    unsigned axis = order[step];
+                    if (axis >= 3)
+                        return false;
+                    unsigned next = at ^ (1u << axis);
                     candidate.corner[axis] = at & ~(1u << axis);
                     unsigned mask = (1u << axis) - 1, corner = candidate.corner[axis];
                     unsigned slot = (corner & mask) | ((corner >> (axis + 1)) << axis);

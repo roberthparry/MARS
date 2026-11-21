@@ -12,6 +12,15 @@
 #include "json-t.h"
 
 /**
+ * @brief Refuse host credentials for ordinary native fixtures.
+ * @param[in] create Requested key-creation permission; deliberately ignored.
+ * @return NULL without allocating or consulting the desktop key store; the caller owns no result.
+ * @note Supply to mars_settings_key_provider before starting workers. Installed-resource tests use
+ * the default provider only inside their separately owned settings helper.
+ */
+string_t *test_lab_unavailable_key(bool create);
+
+/**
  * @brief Load the configured read-only resource snapshot for tests that require installed ephemeris data.
  * @return True when settings are available; false when the secure key source or stored configuration is unavailable.
  * @note Call in the parent before forking ephemeris fixtures. The first call loads once through the isolated

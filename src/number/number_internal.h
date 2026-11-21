@@ -827,7 +827,16 @@ void number_physical_constants_shutdown(void);
 number_t number_create_exact_mpfr_long_prec(long value, size_t precision_bits);
 number_t number_create_exact_mpfr_dyadic_prec(long numerator, int exponent2, size_t precision_bits);
 number_t number_const_return_like(const number_t *like, number_const_id_t id);
+
+/**
+ * @brief Negate a constant using the input's representation and ordinary temporary ownership.
+ * @param like Borrowed representation and precision exemplar; not modified or retained.
+ * @param id Constant to materialise and negate.
+ * @return Live value registered with the caller's numerical scope, or caller-owned when no scope is active.
+ * Invalid constants and allocation failures return an invalid value. Release unscoped results with num_destroy().
+ */
 number_t number_neg_const_return_like(const number_t *like, number_const_id_t id);
+
 number_t number_imag_const_return_like(const number_t *like, number_const_id_t id);
 number_t number_const_like(const number_t *like, number_const_id_t id);
 

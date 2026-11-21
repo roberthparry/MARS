@@ -1233,7 +1233,7 @@ static void test_TeX_numeric_constant_lookups(void)
         if (!expected)
             expected = num_eq(NUM_SQRT_HALF, NUM_SQRT2_OVER_TWO) ? "\\sqrt{\\frac{1}{2}}" : "\\frac{\\sqrt{2}}{2}";
         number_t copy = num_const_prec(*constants[i].value, num_get_prec_bits(*constants[i].value));
-        expr_t *expression = expr_new_const(num_clone(copy));
+        expr_t *expression = expr_new_const(copy);
         TeX_t *literal = numeric_notation(copy);
         char *atom = expr_to_TeX_body(expression);
         TEST_ASSERT_TRUE(literal && !strcmp(TeX_source(literal), expected),

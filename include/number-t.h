@@ -1161,7 +1161,14 @@ number_t num_legendre_chi(const number_t order, const number_t number);
  */
 number_t num_bessel_J(const number_t order, const number_t argument);
 
-/** @brief Principal modified Bessel K; zero arguments and unsupported numerical ranges return NaN. */
+/**
+ * @brief Evaluate principal modified Bessel K for real or complex orders and arguments.
+ * @param order Borrowed cylinder order; not modified or retained after the call.
+ * @param argument Borrowed cylinder argument; not modified or retained after the call.
+ * @return Owning result at the widest input precision, or NaN for zero arguments, non-finite inputs or
+ * unsupported numerical ranges. Release with num_destroy(); an enclosing NUM_SCOPE reclaims ordinary
+ * temporary results automatically. Use num_scope_detach() to retain a result beyond that scope.
+ */
 number_t num_bessel_K(const number_t order, const number_t argument);
 
 /**
@@ -1197,6 +1204,10 @@ number_t num_struve_H(const number_t order, const number_t argument);
  * Supports real and complex inputs, including Y_0 and negative integer orders. At zero argument, negative
  * half-integer orders return zero; other orders return NaN. Exact negative real arguments take the upper-bank
  * value. Non-finite inputs, unsupported ranges and exhausted guards return NaN. See docs/number.md.
+ * @param order Borrowed cylinder order; not modified or retained after the call.
+ * @param argument Borrowed cylinder argument; not modified or retained after the call.
+ * @return Owning result or NaN as described above. Release with num_destroy(); an enclosing NUM_SCOPE
+ * reclaims temporary results automatically. Use num_scope_detach() to retain a result beyond that scope.
  */
 number_t num_bessel_Y(const number_t order, const number_t argument);
 /**

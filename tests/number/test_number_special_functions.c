@@ -175,17 +175,18 @@ void run_number_bessel_k_ownership_tests(void)
         NUM_SCOPE(scope);
         number_t z = num_create_from_string("1+i");
 
-        k0 = num_bessel_K(NUM_ZERO, NUM_ONE);
-        k1 = num_bessel_K(NUM_ONE, NUM_ONE);
-        k2 = num_bessel_K(NUM_TWO, NUM_ONE);
-        half_real = num_bessel_K(NUM_HALF, NUM_ONE);
-        half_complex = num_bessel_K(NUM_HALF, z);
-        opposite_half = num_bessel_K(num_neg(NUM_HALF), z);
-        opposite_real = num_bessel_K(num_neg(NUM_HALF), NUM_ONE);
-        cut_half = num_bessel_K(NUM_HALF, NUM_NEG_ONE);
-        singular = num_bessel_K(NUM_ZERO, NUM_ZERO);
-        nonfinite = num_bessel_K(NUM_NAN, NUM_ONE);
-        oversized = num_bessel_K(NUM_ZERO, num_create_from_long(1001));
+        /* These results deliberately outlive this scope and must be detached explicitly. */
+        k0 = num_scope_detach(num_bessel_K(NUM_ZERO, NUM_ONE));
+        k1 = num_scope_detach(num_bessel_K(NUM_ONE, NUM_ONE));
+        k2 = num_scope_detach(num_bessel_K(NUM_TWO, NUM_ONE));
+        half_real = num_scope_detach(num_bessel_K(NUM_HALF, NUM_ONE));
+        half_complex = num_scope_detach(num_bessel_K(NUM_HALF, z));
+        opposite_half = num_scope_detach(num_bessel_K(num_neg(NUM_HALF), z));
+        opposite_real = num_scope_detach(num_bessel_K(num_neg(NUM_HALF), NUM_ONE));
+        cut_half = num_scope_detach(num_bessel_K(NUM_HALF, NUM_NEG_ONE));
+        singular = num_scope_detach(num_bessel_K(NUM_ZERO, NUM_ZERO));
+        nonfinite = num_scope_detach(num_bessel_K(NUM_NAN, NUM_ONE));
+        oversized = num_scope_detach(num_bessel_K(NUM_ZERO, num_create_from_long(1001)));
     }
     {
         NUM_SCOPE(scope);

@@ -154,10 +154,10 @@ number_t num_bessel_K(const number_t order, const number_t argument)
 {
     NUM_SCOPE(scope);
     if (!num_is_finite(order) || !num_is_finite(argument) || num_is_zero(argument))
-        return num_clone(NUM_NAN);
+        return number_scope_result(&scope, num_clone(NUM_NAN));
     double size = num_to_double(num_abs(argument)), degree = num_to_double(num_abs(order));
     if (!isfinite(size) || !isfinite(degree) || size > 1000 || degree > 1000)
-        return num_clone(NUM_NAN);
+        return number_scope_result(&scope, num_clone(NUM_NAN));
     size_t precision = number_cylindrical_precision(order, argument);
     size_t work = precision + 96u + (size_t)ceil(4*(size+degree));
     bool integral = num_is_real(order) && num_is_integer(order);
@@ -167,7 +167,7 @@ number_t num_bessel_K(const number_t order, const number_t argument)
         number_t distance = num_abs(num_sub(order, nearest));
         double lost = -num_to_double(num_log(distance))/log(2.0);
         if (!isfinite(lost) || lost > 65536)
-            return num_clone(NUM_NAN);
+            return number_scope_result(&scope, num_clone(NUM_NAN));
         if (lost > 0)
             work += (size_t)ceil(lost);
     }
@@ -195,7 +195,7 @@ number_t num_bessel_K(const number_t order, const number_t argument)
     if (num_is_real(order) && num_is_real(argument) && num_gt(argument, NUM_ZERO))
         replace_value(&result, num_real_part(result));
     num_set_prec_bits(&result, precision);
-    return num_scope_detach(result);
+    return number_scope_result(&scope, result);
 }
 
 enum { BESSEL_Y_MAX_WORK_BITS = 65536, BESSEL_Y_MAX_TERMS = 20000 };
@@ -438,12 +438,12 @@ number_t num_bessel_Y(const number_t order, const number_t argument)
 {
     NUM_SCOPE(scope);
     if (!num_is_finite(order) || !num_is_finite(argument))
-        return num_clone(NUM_NAN);
+        return number_scope_result(&scope, num_clone(NUM_NAN));
     if (num_is_zero(argument)) {
         /* Y_(-m-1/2) is a signed J_(m+1/2), whose principal limit at zero vanishes. */
         if (num_is_real(order) && num_lt(order, NUM_ZERO) && num_is_integer(num_add(order, NUM_HALF)))
-            return num_clone(NUM_ZERO);
-        return num_clone(NUM_NAN);
+            return number_scope_result(&scope, num_clone(NUM_ZERO));
+        return number_scope_result(&scope, num_clone(NUM_NAN));
     }
     size_t precision = number_cylindrical_precision(order, argument);
     double size = num_to_double(num_abs(argument)), degree = num_to_double(num_abs(order));
@@ -451,7 +451,7 @@ number_t num_bessel_Y(const number_t order, const number_t argument)
     bool real_argument = num_is_real(argument);
     if (!isfinite(degree) || degree > 1000 ||
         ((!integral || !real_argument) && (!isfinite(size) || size > 1000)))
-        return num_clone(NUM_NAN);
+        return number_scope_result(&scope, num_clone(NUM_NAN));
     size_t guard = 96u;
     if (!integral || !real_argument)
         guard += (size_t)ceil(4 * (size + degree));
@@ -459,7 +459,7 @@ number_t num_bessel_Y(const number_t order, const number_t argument)
         /* An exact large rational still needs absolute argument accuracy for phase reduction. */
         long exponent = num_get_exponent2(num_abs(argument));
         if (exponent > BESSEL_Y_MAX_WORK_BITS)
-            return num_clone(NUM_NAN);
+            return number_scope_result(&scope, num_clone(NUM_NAN));
         if (exponent > 0)
             guard += (size_t)exponent;
     }
@@ -468,12 +468,12 @@ number_t num_bessel_Y(const number_t order, const number_t argument)
         number_t distance = num_abs(num_sub(order, nearest));
         long exponent = num_get_exponent2(distance);
         if (exponent < -BESSEL_Y_MAX_WORK_BITS)
-            return num_clone(NUM_NAN);
+            return number_scope_result(&scope, num_clone(NUM_NAN));
         if (exponent < 0)
             guard += (size_t)(-exponent);
     }
     if (guard >= BESSEL_Y_MAX_WORK_BITS || precision > BESSEL_Y_MAX_WORK_BITS - guard)
-        return num_clone(NUM_NAN);
+        return number_scope_result(&scope, num_clone(NUM_NAN));
     mpfr_prec_t work = (mpfr_prec_t)(precision + guard);
     mpc_t nu, z, result;
     mpc_init2(nu, work);
@@ -516,5 +516,5 @@ number_t num_bessel_Y(const number_t order, const number_t argument)
     mpc_clear(nu);
     mpc_clear(z);
     mpc_clear(result);
-    return num_scope_detach(value);
+    return number_scope_result(&scope, value);
 }

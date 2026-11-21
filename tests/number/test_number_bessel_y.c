@@ -248,7 +248,7 @@ void run_number_bessel_y_qcomplex_ownership_tests(void)
     ASSERT_EQ_INT(num_set_default_prec_bits(saved_precision), 0);
 }
 
-/* Detached Bessel Y results remain owned by the caller after all input temporaries expire. */
+/* Scoped results are reclaimed automatically; explicitly detached results outlive their inputs. */
 void run_number_bessel_y_scope_lifetime_tests(void)
 {
     size_t saved_precision = num_get_default_prec_bits();
@@ -257,13 +257,24 @@ void run_number_bessel_y_scope_lifetime_tests(void)
     ASSERT_EQ_INT(num_set_default_prec_bits(256u), 0);
     {
         NUM_SCOPE(scope);
+        number_t arguments[] = {NUM_ONE, num_create_from_string("2+i")};
+        number_t pi = num_const(NUM_PI);
+        for (size_t i = 0; i < sizeof arguments / sizeof *arguments; ++i) {
+            NUM_SCOPE(iteration);
+            number_t value = num_bessel_Y(NUM_HALF, arguments[i]);
+            number_t factor = num_sqrt(num_div(NUM_TWO, num_mul(pi, arguments[i])));
+            assert_bessel_Y_close(value, num_neg(num_mul(factor, num_cos(arguments[i]))), "1e-65");
+        }
+    }
+    {
+        NUM_SCOPE(scope);
         number_t z = num_create_from_string("2+i");
 
-        positive = num_bessel_Y(NUM_HALF, NUM_ONE);
-        complex_value = num_bessel_Y(NUM_HALF, z);
-        zero = num_bessel_Y(num_neg(NUM_HALF), NUM_ZERO);
-        singular = num_bessel_Y(NUM_ZERO, NUM_ZERO);
-        rejected = num_bessel_Y(NUM_NAN, NUM_ONE);
+        positive = num_scope_detach(num_bessel_Y(NUM_HALF, NUM_ONE));
+        complex_value = num_scope_detach(num_bessel_Y(NUM_HALF, z));
+        zero = num_scope_detach(num_bessel_Y(num_neg(NUM_HALF), NUM_ZERO));
+        singular = num_scope_detach(num_bessel_Y(NUM_ZERO, NUM_ZERO));
+        rejected = num_scope_detach(num_bessel_Y(NUM_NAN, NUM_ONE));
     }
     {
         NUM_SCOPE(scope);

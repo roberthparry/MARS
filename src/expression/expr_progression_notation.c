@@ -65,9 +65,14 @@ char *expr_finite_progression_identity_TeX(const expr_t *expression)
     } else if (!function->finite_progression) {
         expr_free(step);
         return NULL;
-    } else if (!step->name || !*step->name ||
+    } else if (expr_is_unnamed_const(upper) || !step->name || !*step->name ||
                (function != &ops_sin && function != &ops_cos && function != &ops_sinh && function != &ops_cosh)) {
         closed = function->finite_progression(upper, step);
+        if (closed && expr_is_unnamed_const(upper)) {
+            expr_t *simplified = expr_display_simplified(closed);
+            expr_free(closed);
+            closed = simplified;
+        }
     } else
         symbolic = true;
     notation_build_t *build = notation_build_new();

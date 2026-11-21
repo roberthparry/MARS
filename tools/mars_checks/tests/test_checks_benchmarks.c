@@ -405,7 +405,8 @@ static bool benchmark_test_wrapped_inputs(const string_t *text, const char *row,
     string_t *wanted_width = string_sprintf("width:%zuch", width);
     const string_t *style = xml_get_attribute(span, key);
     bool ok = span && checks_equal(xml_name(span), "span") && style && wanted_width &&
-              string_find(style, string_c_str(wanted_width)) >= 0 && restored;
+              string_find(style, string_c_str(wanted_width)) >= 0 &&
+              string_find(style, "max-width:100%;") >= 0 && restored;
     ok = ok && benchmark_test_input_text(span, restored, width);
     string_t *wanted = string_new_with(expected);
     ok = ok && wanted && string_compare(restored, wanted) == 0;

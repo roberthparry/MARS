@@ -7,6 +7,70 @@ CREATE TABLE IF NOT EXISTS expression_cases (
 CREATE INDEX IF NOT EXISTS expression_cases_operation ON expression_cases(operation, name);
 
 INSERT INTO test_case_runner(module, source, parent, table_name, operation) VALUES (
+    'expression.binding_square_domain', 'tests/expression/test_expr_from_string.c',
+    'tests.test_expr_t_from_string.test_binding_square_domain_ownership',
+    'expression_cases', 'binding_square_domain')
+ON CONFLICT(module) DO UPDATE SET source=excluded.source, parent=excluded.parent,
+    table_name=excluded.table_name, operation=excluded.operation;
+INSERT INTO expression_cases(name, operation, input, expected) VALUES
+    ('binding_square_complex_positive_real', 'binding_square_domain', '3+4i', 'unchanged'),
+    ('binding_square_complex_negative_real', 'binding_square_domain', '-3+4i', 'unchanged'),
+    ('binding_square_positive_real', 'binding_square_domain', '3', '3'),
+    ('binding_square_negative_real', 'binding_square_domain', '-3', '3')
+ON CONFLICT(name) DO UPDATE SET input=excluded.input, expected=excluded.expected;
+
+INSERT INTO test_case_runner(module, source, parent, table_name, operation) VALUES (
+    'expression.function_series_endpoints', 'tests/expression/test_expr_from_string.c',
+    'tests.test_expr_t_from_string.test_from_string_function_series_endpoints',
+    'expression_cases', 'function_series_endpoint')
+ON CONFLICT(module) DO UPDATE SET table_name=excluded.table_name, operation=excluded.operation;
+INSERT INTO expression_cases(name, operation, input, expected) VALUES
+    ('series_explicit_sine_unbound', 'function_series_endpoint', '@Z_(k=1)^100 sin(kx)',
+     '["\\sum_{k=1}^{100}\\sin(k\\mkern-2mu x)",null,"\\sin(50\\mkern-2mu x)"]'),
+    ('series_explicit_sine_value', 'function_series_endpoint', '{@Z_(k=1)^100 sin(kx) | x=pi/6}',
+     '["\\sum_{k=1}^{100}\\sin(k\\mkern-2mu x)","3/2+sqrt(3)","\\sin(50\\mkern-2mu x)"]'),
+    ('series_explicit_sine_zero', 'function_series_endpoint', '{@Z_(k=1)^100 sin(kx) | x=0}',
+     '["\\sum_{k=1}^{100}\\sin(k\\mkern-2mu x)","0","\\sin(50\\mkern-2mu x)"]'),
+    ('series_explicit_cosine_unbound', 'function_series_endpoint', '@Z_(k=1)^100 cos(kx)',
+     '["\\sum_{k=1}^{100}\\cos(k\\mkern-2mu x)",null,"\\sin(50\\mkern-2mu x)"]'),
+    ('series_literal_sine_unbound', 'function_series_endpoint', 'sin(x)+sin(2x)+sin(3x)+...+sin(100x)',
+     '["\\sum_{k=1}^{100}\\sin(k\\mkern-2mu x)",null]'),
+    ('series_literal_sine_value', 'function_series_endpoint', '{sin(x)+sin(2x)+sin(3x)+...+sin(100x) | x=pi/6}',
+     '["\\sum_{k=1}^{100}\\sin(k\\mkern-2mu x)","3/2+sqrt(3)"]'),
+    ('series_literal_cosine_value', 'function_series_endpoint', '{cos(x)+cos(2x)+cos(3x)+…+cos(100x) | x=pi/6}',
+     '["\\sum_{k=1}^{100}\\cos(k\\mkern-2mu x)","sqrt(3)/2"]'),
+    ('series_literal_sinh_value', 'function_series_endpoint', '{sinh(x)+sinh(2x)+sinh(3x)+...+sinh(6x) | x=ln(2)}',
+     '["\\sum_{k=1}^{6}\\sinh(k\\mkern-2mu x)","8001/128"]'),
+    ('series_literal_cosh_value', 'function_series_endpoint', '{cosh(x)+cosh(2x)+cosh(3x)+...+cosh(6x) | x=ln(2)}',
+     '["\\sum_{k=1}^{6}\\cosh(k\\mkern-2mu x)","8127/128"]'),
+    ('series_literal_sine_zero', 'function_series_endpoint', '{sin(x)+sin(2x)+sin(3x)+...+sin(100x) | x=0}',
+     '["\\sum_{k=1}^{100}\\sin(k\\mkern-2mu x)","0"]'),
+    ('series_literal_cosine_zero', 'function_series_endpoint', '{cos(x)+cos(2x)+cos(3x)+...+cos(100x) | x=0}',
+     '["\\sum_{k=1}^{100}\\cos(k\\mkern-2mu x)","100"]'),
+    ('series_literal_unit_angles', 'function_series_endpoint', 'sin(1)+sin(2)+sin(3)+...+sin(6)',
+     '["\\sum_{k=1}^{6}\\sin(k)","sin(3)*sin(7/2)/sin(1/2)"]'),
+    ('series_literal_exp', 'function_series_endpoint', '{exp(x)+exp(2x)+exp(3x)+...+exp(6x) | x=ln(2)}',
+     '["\\sum_{k=1}^{6}","126"]'),
+    ('series_literal_erf', 'function_series_endpoint', '{erf(x)+erf(2x)+erf(3x)+...+erf(4x) | x=0}',
+     '["\\sum_{k=1}^{4}","0"]'),
+    ('series_literal_weighted_sine', 'function_series_endpoint', '{sin(x)+sin(2x)/2+sin(3x)/3+...+sin(4x)/4 | x=pi/2}',
+     '["\\sum_{k=1}^{4}","2/3"]'),
+    ('series_literal_weighted_cosine', 'function_series_endpoint', '{cos(x)+cos(2x)/2+cos(3x)/3+...+cos(4x)/4 | x=pi/2}',
+     '["\\sum_{k=1}^{4}","-1/4"]'),
+    ('series_literal_weighted_sinh', 'function_series_endpoint', '{sinh(x)+sinh(2x)/2+sinh(3x)/3+...+sinh(4x)/4 | x=ln(2)}',
+     '["\\sum_{k=1}^{4}","639/128"]'),
+    ('series_literal_weighted_cosh', 'function_series_endpoint', '{cosh(x)+cosh(2x)/2+cosh(3x)/3+...+cosh(4x)/4 | x=ln(2)}',
+     '["\\sum_{k=1}^{4}","2179/384"]'),
+    ('series_literal_skipped_index', 'function_series_endpoint', 'sin(x)+sin(2x)+sin(4x)+...+sin(100x)', 'null'),
+    ('series_literal_mixed_function', 'function_series_endpoint', 'sin(x)+cos(2x)+sin(3x)+...+sin(100x)', 'null'),
+    ('series_literal_fractional_endpoint', 'function_series_endpoint', 'sin(x)+sin(2x)+sin(3x)+...+sin(100.5x)', 'null'),
+    ('series_literal_overlapping_endpoint', 'function_series_endpoint', 'sin(x)+sin(2x)+sin(3x)+...+sin(3x)', 'null'),
+    ('series_literal_negative_endpoint', 'function_series_endpoint', 'sin(x)+sin(2x)+sin(3x)+...+sin(-100x)', 'null'),
+    ('series_literal_non_linear_endpoint', 'function_series_endpoint', 'sin(x)+sin(2x)+sin(3x)+...+sin(100x^2)', 'null'),
+    ('series_literal_weight_mismatch', 'function_series_endpoint', 'sin(x)+sin(2x)/2+sin(3x)/3+...+sin(100x)/99', 'null')
+ON CONFLICT(name) DO UPDATE SET input=excluded.input, expected=excluded.expected;
+
+INSERT INTO test_case_runner(module, source, parent, table_name, operation) VALUES (
     'expression.shared_centres', 'tests/expression/test_expr_to_string.c',
     'tests.test_expr_t_to_string.test_to_string_all.test_to_string_shared_centres',
     'expression_cases', 'shared_centre')

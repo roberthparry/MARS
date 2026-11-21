@@ -83,6 +83,14 @@ Plans are limited to 256 instructions and depth 64; they neither modify source
 bindings nor change `expr_eval()` or worksheet precision. Rebuild a plan when
 non-coordinate bindings change. This interface is not an installed public API.
 
+The controlled `expr_finite_progression_sample_form()` interface supplies a linked
+closed-form graph for finite sine, cosine, hyperbolic sine/cosine and exponential
+progressions whose non-negative integer upper bound is independent of the plotted
+coordinates. Native workers use that graph for values and derivatives, retaining
+the authored sum as a fallback at removable singularities. Coordinate-dependent
+or non-integer bounds retain ordinary summation semantics. This numerical sampling
+choice does not change the authored expression or its worksheet bindings.
+
 Use [`computation_run()`](computation.md#scoped-native-calculations) to place native
 work under a shared cancellation flag, deadline and work allowance without changing
 expression ownership. Evaluation, differentiation (including reverse derivatives),
@@ -735,7 +743,7 @@ additional special functions, parameter conditions or continuation machinery.
 | `dilog`, `polylog1`, `polylog`, `legendre_chi` | Source on a branch cut needs explicit boundary-value conventions. Exponentially composed arguments are a separate potentially convergent family. |
 | `qdigamma` | Depends on the base, poles and the source's position; a direct zero argument can be singular. |
 | `zetah`, `zatahp` | Varying the order or the offset gives different convergence and pole conditions. |
-| `lerch_phi`, `lommel_S`, `appell_F1`, `lauricella_F`, `hypergeometric_pFq` | Parameter-dependent growth, cuts and singularities prevent a universal formula for arbitrary argument placement. |
+| `lerch_phi`, `lommel_S`, `appell_F1`, `appell_F2`, `appell_F3`, `appell_F4`, `lauricella_F`, `hypergeometric_pFq` | Parameter-dependent growth, cuts and singularities prevent a universal formula for arbitrary argument placement. |
 | `beta`, `logbeta`, `beta_pdf`, `logbeta_pdf`, `binomial`, `harmonic_poly` | Parameter positions matter. Polynomial specialisations may reduce to existing rules. The current beta-density constructor is an analytic expression, not an automatically compactly supported density. |
 | `chebyshev_Tn`, `chebyshev_Un`, `hermite_Hn` | Fixed non-negative integral degrees give polynomials with ordinary Laplace transforms. Direct named-polynomial Laplace rules are not yet implemented; their Fourier pairs are documented separately. |
 
@@ -3207,9 +3215,18 @@ terms establish a single exact model. Geometric and inverse-index-power forms
 use their corresponding identities. Otherwise, MARS constructs the unique
 Lagrange polynomial `P(k)` through the supplied coefficient terms, verifies
 that the written terminal term agrees with `P(N)`, and lowers the series to
-`Σ(k=1..N) P(k)`. The TeX derivation records that sigma form before the
-simplified sum and final value. If an endpoint is already named `n`, the dummy
+`Σ(k=1..N) P(k)`. The TeX derivation joins that sigma form and its simplified
+result in a single-line identity; conditional alternatives retain their case layout.
+If an endpoint is already named `n`, the dummy
 index changes to `k`, `j`, `m`, or `l` so that the two bindings cannot collide.
+
+Function progressions accept both named and literal positive-integer endpoints.
+Circular and hyperbolic sine/cosine series use the same closed-form identities in
+either case, including their removable zero-angle limits. Reciprocal-index-weighted
+series and other supported unary functions retain their finite sigma forms where
+no closed form applies. Every supplied prefix term must have the expected
+consecutive argument; a literal endpoint must follow that prefix, and fractional,
+negative or mismatched terminal indices are rejected.
 
 [MARS Lab plot titles](mars-lab.md#native-function-plots) retain this source sigma
 notation without appending the derivation or replacing it with a closed-form

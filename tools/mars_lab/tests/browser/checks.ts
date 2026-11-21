@@ -426,6 +426,58 @@
         }
     }
 
+    async function checkLiteralFunctionSeries() {
+        const originalMode = WorksheetWorkspace.mode.currentMode();
+        const originalSource = WorksheetBindings.editor.currentExpressionText();
+        const source = 'sin(x) + sin(2x) + sin(3x) + ... + sin(100x)';
+        try {
+            await WorksheetWorkspace.mode.selectWorksheetMode('expression');
+            for (const input of [source, '@Z_(k=1)^100 sin(kx)']) {
+                await WorksheetRequests.presentation.prepareLabEditor(input);
+                WorksheetBindings.controller.setExpressionEditor(input);
+                await WorksheetWorkspace.mode.evaluateCurrentMode();
+                await waitForAutomaticPlot();
+                check(!WorksheetContext.rendered.classList.contains('error') &&
+                      WorksheetContext.rendered.querySelector('svg') &&
+                      WorksheetWorkspace.presentation.state.lastTex.includes('\\frac{\\sin(') &&
+                      WorksheetWorkspace.presentation.state.lastTex.includes('101'),
+                      'A literal sine-series endpoint reaches the rendered native closed form: ' + JSON.stringify({
+                          error: WorksheetContext.rendered.classList.contains('error'),
+                          TeX: WorksheetWorkspace.presentation.state.lastTex,
+                          rendered: WorksheetContext.rendered.textContent,
+                          svg: Boolean(WorksheetContext.rendered.querySelector('svg'))
+                      }));
+                const plot = document.getElementById('plotRendered')!;
+                const paths = [...plot.querySelectorAll<SVGPathElement>('[data-series] path')];
+                const visible = paths.filter(path => {
+                    const bounds = path.getBoundingClientRect(), style = getComputedStyle(path);
+                    return bounds.width > 0 && bounds.height > 0 && style.stroke !== 'none' &&
+                        Number(style.opacity) > 0 && Number(style.strokeOpacity) > 0;
+                });
+                check(visible.length > 8 && plot.dataset.displayTex?.includes('\\sum'),
+                      'The finite sine series has a visible non-empty curve: ' + JSON.stringify({
+                          input, paths: paths.length, visible: visible.length, title: plot.dataset.displayTex,
+                          feedback: document.getElementById('plotFeedback')?.textContent
+                      }));
+            }
+            for (const [binding, expected] of [['pi/6', 1.5 + Math.sqrt(3)], ['0', 0]] as const) {
+                const bound = `{ ${source} | x=${binding} }`;
+                await WorksheetRequests.presentation.prepareLabEditor(bound);
+                WorksheetBindings.controller.setExpressionEditor(bound);
+                await WorksheetWorkspace.mode.evaluateCurrentMode();
+                const value = Number(WorksheetContext.value.textContent?.trim());
+                check(!WorksheetContext.rendered.classList.contains('error') &&
+                      Math.abs(value - expected) < 1e-12 &&
+                      !document.getElementById('valueCard')!.classList.contains('hidden'),
+                      `A bound literal sine series displays its numerical value at x=${binding}`);
+            }
+        } finally {
+            WorksheetWorkspace.mode.setMode(originalMode);
+            await WorksheetRequests.presentation.prepareLabEditor(originalSource);
+            WorksheetBindings.controller.setExpressionEditor(originalSource);
+        }
+    }
+
     async function checkComplexEquationPlot() {
         const originalMode = WorksheetWorkspace.mode.currentMode();
         try {
@@ -3708,6 +3760,7 @@
             }
             if (new URLSearchParams(location.search).get('evaluation-check') === '1') {
                 await runBrowserGroup('mode-entry result reuse', check_mode_entry_results);
+                await runBrowserGroup('literal function-series endpoints', checkLiteralFunctionSeries);
                 await runBrowserGroup('complex equation root diagram', checkComplexEquationPlot);
                 await runBrowserGroup('first Almanac entry and interrupted re-entry', checkAlmanacFirstEntry);
                 await runBrowserGroup('checkLabWorkspaceDom', window.checkLabWorkspaceDom);

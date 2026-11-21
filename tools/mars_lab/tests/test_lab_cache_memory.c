@@ -18,7 +18,7 @@
 #include "lab_country_cache.h"
 
 typedef struct _cache_fixture_t {
-    const char *input[4];
+    const char *input[5];
     jsref returned;
     double numeric, entries, bytes;
 } cache_fixture_t;
@@ -31,7 +31,7 @@ static cache_fixture_t *fixture(void)
 
 static const char *input(jsref value)
 {
-    assert(value > 0 && value < 4);
+    assert(value > 0 && value < 5);
     return fixture()->input[value];
 }
 
@@ -51,6 +51,19 @@ int lab_dom_utf8_copy(jsref value, unsigned char *target, unsigned capacity)
 bool lab_dom_starts_with(jsref value, const char *prefix)
 {
     return strncmp(input(value), prefix, strlen(prefix)) == 0;
+}
+
+/* Borrow one synchronous literal without introducing a fixture allocation. */
+jsref lab_dom_string(const char *text)
+{
+    fixture()->input[4] = text;
+    return 4;
+}
+
+/* String handles compare by their contents, as JavaScript string values do. */
+bool lab_dom_equal(jsref left, jsref right)
+{
+    return strcmp(input(left), input(right)) == 0;
 }
 
 /* Output handles are scoped sentinels, never heap allocations. */
@@ -125,6 +138,9 @@ int main(void)
     assert(!lab_flag_cache_put(1, 2, 3));
     fixture()->input[1] = "GB"; fixture()->input[3] = "invalid image";
     assert(!lab_flag_cache_put(1, 2, 3));
+    fixture()->input[2] = "Offshore"; fixture()->input[3] = "/offshore_flag.svg";
+    assert(lab_flag_cache_put(1, 2, 3));
+    lab_flag_cache_get(1); assert(fixture()->returned == 10);
     free(large);
     memset(fixture(), 0, sizeof *fixture());
     lab_flag_cache_clear(); lab_country_cache_clear();

@@ -799,6 +799,59 @@ window.checkLabHistoryPersistence = async (): Promise<void> => {
         check((await call({action: 'save', ...records[0]})).status === 409, 'older revision remains rejected');
         localStorage.setItem('mars.history.client.v1', client);
         localStorage.setItem('mars.history.mode.v1', '6');
+        const storageSet = Storage.prototype.setItem, storageGet = Storage.prototype.getItem;
+        try {
+            for (const fault of ['quota', 'mode', 'identity']) {
+                for (let mode = 0; mode < 7; ++mode) {
+                    native.lab_workspace_history_clear(mode, 0); native.lab_workspace_history_clear(mode, 1);
+                }
+                WorksheetWorkspace.mode.setMode('almanac', {force: true});
+                Storage.prototype.setItem = function (key, value) {
+                    if (key === 'mars.history.client.v1') throw new DOMException('Storage quota exceeded', 'QuotaExceededError');
+                    return storageSet.call(this, key, value);
+                };
+                Storage.prototype.getItem = function (key) {
+                    if ((fault === 'mode' && key === 'mars.history.mode.v1') ||
+                        (fault === 'identity' && key === 'mars.history.client.v1'))
+                        throw new DOMException('Storage access unavailable', 'SecurityError');
+                    return storageGet.call(this, key);
+                };
+                reopened = new WorksheetHistoryPersistence();
+                await reopened.start();
+                check(WorksheetWorkspace.mode.currentMode() === 'almanac', `${fault}: retain the selected mode`);
+                for (let mode = 0; mode < 7; ++mode)
+                    check(native.lab_workspace_history_count(mode, 0) === 1 && native.lab_workspace_history_count(mode, 1) === 1,
+                          `${fault}: browser storage failure cannot hide ${names[mode]} server history`);
+                check(reopened.restoredGlobeCamera?.[4] === 87.25, `${fault}: saved observer camera is restored`);
+                reopened.dispose(); reopened = null;
+            }
+        } finally {
+            Storage.prototype.setItem = storageSet;
+            Storage.prototype.getItem = storageGet;
+            reopened?.dispose(); reopened = null;
+        }
+        {
+            const server = ((await call({action: 'load'})).body.records as SavedHistoryRecord[]).find(record => record.mode === 6)!;
+            const cacheOwner = new WorksheetHistoryPersistence();
+            Reflect.set(cacheOwner, 'client', client);
+            try {
+                await Reflect.get(cacheOwner, 'openCache').call(cacheOwner);
+                await Reflect.get(cacheOwner, 'cache').call(cacheOwner, {...server, pending: true,
+                    history: {...server.history, back: [new Uint8Array([255])]}});
+            } finally { cacheOwner.dispose(); }
+            for (let mode = 0; mode < 7; ++mode) {
+                native.lab_workspace_history_clear(mode, 0); native.lab_workspace_history_clear(mode, 1);
+            }
+            reopened = new WorksheetHistoryPersistence();
+            await reopened.start();
+            check(native.lab_workspace_history_count(6, 0) === 1 && native.lab_workspace_history_count(6, 1) === 1 &&
+                  !Reflect.get(reopened, 'blocked').has(6),
+                  'a damaged pending Almanac cache cannot hide its valid server history');
+            for (let mode = 0; mode < 6; ++mode)
+                check(native.lab_workspace_history_count(mode, 0) === 1 && native.lab_workspace_history_count(mode, 1) === 1,
+                      `${names[mode]}: Almanac recovery retains the other mode histories`);
+            reopened.dispose(); reopened = null;
+        }
         for (let mode = 0; mode < 7; ++mode) {
             native.lab_workspace_history_clear(mode, 0); native.lab_workspace_history_clear(mode, 1);
         }

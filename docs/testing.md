@@ -624,6 +624,125 @@ stop on the first diagnostic. If sandbox restrictions prevent LeakSanitizer's
 final scan, report that check as incomplete rather than disabling leak detection
 and calling the result clean.
 
+### Recorded Check: 20 November 2026
+
+Sequential release-build Valgrind checks used a 2 GiB native-job ceiling and
+1.5 GiB ceilings for focused reruns, with test-job swap disabled. Definite,
+indirect and possible leaks remained errors; no suppressions were added.
+
+The checks found and corrected temporary ownership in exponential-root
+formatting, complex square-root binding rejection, matrix Appell norm values,
+Bessel K results and negative-constant shortcuts. The affected cases passed
+ordinary and Valgrind reruns with no lost allocations or invalid accesses.
+Four SQL-backed binding cases cover rejected complex inputs and real
+magnitudes. Matrix, Expression and Number regression checks and their README
+examples also passed after the fixes.
+
+A related-code review applied the same ownership rule to Bessel Y, with its
+existing lifetime fixture covering both automatic cleanup and explicit detachment.
+Two scoped real/complex results leaked 208 direct and 280 indirect bytes with
+the previous implementation. The same fixture passed ordinary and Valgrind
+checks after the correction, with zero lost bytes and zero errors. The Number
+regression batch and its README examples also passed.
+
+Test-side corrections removed a redundant TeX-fixture clone, updated a stale
+canonical-equation assertion and supplied the cache fixture's borrowed-string
+callbacks. Fresh test-database creation exposed Number SQL inserts preceding
+their table definition; moving the definition first preserved the existing
+cases and allowed all five SQLite data cases to pass Valgrind. The standalone
+harness bootstrap now resolves its executable before launching child probes:
+direct execution of `/proc/self/exe` under Valgrind could relaunch Valgrind
+itself. The corrected parent and both probes freed all heap blocks and reported
+zero errors.
+
+Forked plot-cache fixtures now release their inherited output strings and JSON
+records before leaving. Native Lab and checker fixtures give process-capture
+scratch files an explicit temporary directory, rather than initialising the
+desktop key store to locate it. Ordinary Lab fixtures refuse host credentials;
+installed-resource checks read configuration through their separately owned
+settings helper. The affected 52 calculation, weather and diagnostic checks and
+five checker regressions passed ordinary and sanitizer reruns. The plot guide
+also received the formula-preview styles already used by other mathematical
+guides, fixing its documentation-policy regression.
+
+The independent calendar oracle now closes its ICU calendar and releases ICU's
+process caches before unloading the library. Without that final cleanup, a
+parent-process oracle availability check left allocations without their owning
+library; subsequent forked fixtures inherited them and reported the same leaks.
+The initial full configuration run and isolated reproductions remain recorded.
+All 20 affected configuration cases, including their README checks, then passed
+the combined sanitizer rerun without leak reports; the other 80 cases had passed
+the original full run.
+
+Ordinary checker fixtures now also refuse host credentials before any child
+process starts; their encrypted-settings fixture still supplies its own synthetic
+key. All 100 checker cases passed the combined sanitizer rerun after that
+isolation correction. A separate sanitizer formatting warning exposed an
+unescaped literal percentage sign in benchmark Markdown styles. The formatter
+now escapes it and the existing wrapping checks verify the percentage style.
+All 100 cases passed again after that correction, without sanitizer diagnostic reports.
+
+Some native application fixtures exceeded their existing calculation or startup
+deadlines under Valgrind. Those interrupted runs remain incomplete, rather than
+passes; their inputs and deadlines were not relaxed. Application reruns use a
+separate `-O1` AddressSanitizer/UndefinedBehaviourSanitizer build, with leak
+checking enabled, a 64 MiB quarantine and four allocation stack frames. Its
+test-only exit wrapper scans forked fixtures before `_exit`. A clean control
+exits successfully, while a deliberately leaked 123-byte allocation produces a
+leak report and exit status 99. System compilers are not part of this instrumented
+build; tracing GCC itself under Valgrind produced compiler diagnostics that
+prevented otherwise valid example programmes from compiling.
+
+An optimised combined sanitizer build also exceeded some calculation deadlines.
+The corresponding 42-case ordinary rerun passed with the original limits.
+Separate memory-only calculation probes therefore use an instrumented executable
+with four times the execution allowance for worker requests normally limited to
+30–120 seconds. Inputs, numerical precision, result assertions and the 2 GiB RAM
+ceiling are unchanged. This temporary probe does not change application binaries
+or verify their original deadline policy. The failed deadline-bound runs remain
+recorded; memory-probe timings are excluded from ordinary timing statistics.
+All 42 memory-only calculation probes completed successfully, without sanitizer
+memory-error reports. Their execution allowances remain separate from the
+ordinary application deadline checks.
+
+The final ordinary application runs passed all 648 native Lab checks and 36
+output examples, all 100 configuration cases, and all 100 checker cases.
+The largest recorded follow-up job peak was 2 018 746 368 bytes (about 1.88 GiB),
+with no test-job swap use or out-of-memory event.
+
+ASan's shadow mappings cannot fit the application's ordinary virtual-address
+ceiling. The disposable instrumented build therefore uses the cgroup's 2 GiB
+physical-memory limit in place of that ceiling. Three allocator-policy cases
+are checked separately in the ordinary executable: the worker's reported hard
+address-space limit, rejection of an oversized allocation, and bounded resident
+growth. All six ordinary worker-session checks passed, including unchanged
+resident memory after 48 further jobs. This does not count as sanitizer
+verification of the virtual-address policy.
+
+Four focused Firefox/WASM batches covered history persistence, calendar and
+Almanac navigation, evaluation reuse and function series, and plot controls.
+Each included the browser processes in a 1.5 GiB cgroup with swap disabled;
+allocation-bound and stack checks passed. A larger combined browser batch
+reached that limit and was recorded as incomplete before splitting the checks.
+These traces complement native leak checking; they do not establish that every
+JavaScript or graphics-driver allocation is leak-free. Disposable profiles and
+history fixtures kept the user's saved worksheets separate from the checks.
+
+GLib/GIO/libsecret helper shutdowns still produced possible thread-local
+allocation reports. A standalone libsecret open/release probe reproduced them
+without MARS code or a password lookup. Keep these reports distinct from the
+corrected MARS leaks. The foreign-`LOCPATH` locale issue described above was
+also reproduced independently; reruns using the system locale path were clean.
+Recorded timing-outlier flags were retained. Isolated comparisons against the
+previous constant helper did not show a repeatable slowdown from its ownership
+fix, and no timing thresholds or baselines were reset.
+The historical plot timing warnings also reproduced with the axis implementation
+from before its added bounds guard, using matching compilation and linking.
+An isolated six-case Lab timing review returned four cases close to their
+previous timings. Solar and eclipse fixture timings remained elevated at about
+467 ms and 20.1 seconds respectively; those warnings remain open and recorded,
+separate from the successful memory and functional checks.
+
 ### Recorded Check: 19 October 2026
 
 Memory checks found and corrected numerical temporary-scope ownership errors,

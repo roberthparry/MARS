@@ -5,6 +5,7 @@
  * Uses the existing global test configuration and shared tests_main harness.
  * README programme cases are registered last. Helpers only create and remove
  * uniquely named temporary trees, using the same public file API as the tool.
+ * Ordinary fixtures refuse host credentials; settings fixtures supply their own key provider.
  */
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE
@@ -12,17 +13,36 @@
 
 #include <stdlib.h>
 
-#include "mars_paths.h"
+#include "file-t.h"
+#include "mars_settings.h"
 
 #include "test_harness.h"
 #include "test_checks.h"
 
 TEST_SUITE_CONFIG(TEST_CONFIG_GLOBAL);
 
+static string_t *test_checks_unavailable_key(bool create)
+{
+    (void)create;
+    return NULL;
+}
+
+/* Keep process-capture scratch files independent of the user's application settings. */
+void test_program_setup(void)
+{
+    mars_settings_key_provider(test_checks_unavailable_key);
+    const char *temporary = getenv("TMPDIR");
+    if ((!temporary || !*temporary) && setenv("TMPDIR", "/tmp", 1))
+        checks_fatal("initialising checker test temporary directory");
+}
+
 /* Allocate a private fixture tree. */
 string_t *test_checks_root(void)
 {
-    file_t *directory = mars_path_temporary();
+    const char *temporary = getenv("TMPDIR");
+    string_t *parent = checks_text(temporary && *temporary ? temporary : "/tmp");
+    file_t *directory = file_create_temp_directory(parent);
+    string_free(parent);
     if (!directory)
         checks_fatal("creating checker test fixture");
     string_t *root = checks_text(file_path(directory));

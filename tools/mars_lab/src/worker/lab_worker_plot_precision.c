@@ -14,6 +14,8 @@
 
 #define MARS_SHARED_NUMBER_INTERNAL_ACCESS
 #include "internal/number_internal.h"
+#define MARS_SHARED_EXPR_INTERNAL_ACCESS
+#include "internal/expr_internal.h"
 #define MARS_LAB_WORKER_INTERNAL_ACCESS
 #include "lab_worker_internal.h"
 
@@ -127,7 +129,8 @@ bool lab_worker_plot_bounds(const char *lower, const char *upper, number_t *lo, 
 }
 
 typedef struct {
-    expr_t *expression, *axis;
+    const expr_t *expression;
+    expr_t *axis;
     expr_t *second_derivative;
     expr_t *first_derivative;
     lab_worker_sample_t *value, *first, *second;
@@ -161,8 +164,10 @@ static sampler_status_t evaluate_plot_derivatives(number_t parameter, number_t *
         if (!finite_real(*y))
             return SAMPLER_VALUE;
         *dy = lab_worker_sample_eval(plot->first, &parameter);
-    } else if (expr_eval_derivatives(plot->expression, 1, variables, y, dy) != 0)
-        *y = expr_eval(plot->expression);
+    } else if (expr_eval_derivatives(plot->expression, 1, variables, y, dy) != 0 || !finite_real(*y)) {
+        num_destroy(y);
+        *y = lab_worker_sample_eval(plot->value, &parameter);
+    }
     if (plot->second && finite_real(*y))
         *ddy = lab_worker_sample_eval(plot->second, &parameter);
     return SAMPLER_VALUE;
@@ -179,6 +184,9 @@ static sampler_t *sample_at(const char *source, const char *variable, number_t l
     bool detached_axis = !axis;
     if (detached_axis)
         axis = expr_new_named_var(NUM_NAN, variable);
+    const expr_t *axes[] = {axis};
+    expr_t *reduced = expr_finite_progression_sample_form(expression, axes, 1);
+    const expr_t *derivative_source = reduced ? reduced : expression;
     number_t lo = lab_worker_sample_coordinate(lower, bits), hi = lab_worker_sample_coordinate(upper, bits);
     sampler_options_t options = sampler_options_default();
     options.intervals = probes || preview ? 16 : 64;
@@ -187,11 +195,11 @@ static sampler_t *sample_at(const char *source, const char *variable, number_t l
     options.max_depth = lab_worker_plot_depth(options.intervals, options.max_evaluations, preview ? 4u : 8u);
     options.absolute_tolerance = 1e-5;
     options.relative_tolerance = preview ? 0.01 : 0.002;
-    plot_evaluation_t evaluation = {.expression = expression, .axis = axis};
+    plot_evaluation_t evaluation = {.expression = derivative_source, .axis = axis};
     if (!probes && !preview && expression && axis)
-        evaluation.second_derivative = expr_create_2nd_deriv(expression, axis, axis);
+        evaluation.second_derivative = expr_create_2nd_deriv(derivative_source, axis, axis);
     if (!probes && !preview && bits == 53 && expression && axis)
-        evaluation.first_derivative = expr_create_deriv(expression, axis);
+        evaluation.first_derivative = expr_create_deriv(derivative_source, axis);
     evaluation.value = lab_worker_sample_new(expression, &axis, 1, bits);
     evaluation.first = lab_worker_sample_new(evaluation.first_derivative, &axis, 1, bits);
     evaluation.second = lab_worker_sample_new(evaluation.second_derivative, &axis, 1, bits);
@@ -205,6 +213,7 @@ static sampler_t *sample_at(const char *source, const char *variable, number_t l
     lab_worker_sample_free(evaluation.value);
     expr_free(evaluation.first_derivative);
     expr_free(evaluation.second_derivative);
+    expr_free(reduced);
     if (detached_axis)
         expr_free(axis);
     num_destroy(&hi);

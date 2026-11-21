@@ -191,7 +191,7 @@ string_t *benchmark_arguments_markdown(const string_t *inputs, bool exact_layout
     bool wrapped = inputs && (string_length(inputs) > width || (exact_layout && string_find(inputs, ",") >= 0));
     bool ok = cursor && out;
     if (ok && wrapped)
-        ok = string_append_format(out, "<span style=\"display:inline-block;width:%zuch;max-width:100%;"
+        ok = string_append_format(out, "<span style=\"display:inline-block;width:%zuch;max-width:100%%;"
                                       "white-space:normal;overflow-wrap:anywhere\">", width) >= 0;
     size_t column = 0;
     while (ok && !string_cursor_done(cursor)) {

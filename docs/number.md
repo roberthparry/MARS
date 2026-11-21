@@ -367,8 +367,9 @@ Inside an active scope:
 
 Arithmetic helpers that use an internal scope return their results to the
 caller's scope. This includes rounding, integer addition and multiplication,
-arguments and pulse functions; their internal cleanup must neither free the
-returned result nor bypass the caller's automatic cleanup.
+arguments, pulse functions, Bessel K/Y and exact negative-constant shortcuts;
+their internal cleanup must neither free the returned result nor bypass the
+caller's automatic cleanup.
 
 The active scope chain indexes backend and payload ownership. A fixed 256-slot
 direct index handles small live sets without per-entry allocation; colliding keys

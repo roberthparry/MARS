@@ -1,5 +1,13 @@
 -- Precision regressions for previously failing or timed-out benchmark functions.
 
+-- Each precision is decimal significant digits; reference calculations and checks remain in C.
+CREATE TABLE IF NOT EXISTS number_cases (
+    name TEXT PRIMARY KEY, operation TEXT NOT NULL, input TEXT NOT NULL, expected TEXT NOT NULL,
+    precision INTEGER NOT NULL DEFAULT 32 CHECK (precision BETWEEN 1 AND 10000),
+    enabled INTEGER NOT NULL DEFAULT 1 CHECK (enabled IN (0, 1))
+) WITHOUT ROWID;
+CREATE INDEX IF NOT EXISTS number_cases_operation ON number_cases(operation, name);
+
 -- Full-width defining-series references exercise product trees and both precision crossovers.
 WITH precisions(digits) AS (VALUES(80),(300),(900),(1234)),
 operations(name) AS (VALUES('bessel_i_reference'),('bessel_j_reference'),
@@ -366,14 +374,6 @@ cases(name, input) AS (VALUES
     ('gamma_inverse_shifted', '4+0.5i'))
 INSERT OR IGNORE INTO number_cases(name, operation, input, expected, precision)
 SELECT name || '_' || digits, 'gamma_inverse_complex', input, '0', digits FROM cases CROSS JOIN precisions;
--- Each precision is decimal significant digits; reference calculations and checks remain in C.
-CREATE TABLE IF NOT EXISTS number_cases (
-    name TEXT PRIMARY KEY, operation TEXT NOT NULL, input TEXT NOT NULL, expected TEXT NOT NULL,
-    precision INTEGER NOT NULL DEFAULT 32 CHECK (precision BETWEEN 1 AND 10000),
-    enabled INTEGER NOT NULL DEFAULT 1 CHECK (enabled IN (0, 1))
-) WITHOUT ROWID;
-CREATE INDEX IF NOT EXISTS number_cases_operation ON number_cases(operation, name);
-
 -- Independent full-width references cover both hypergeometric kernels and their ordinary-series fallbacks.
 WITH precisions(digits) AS (VALUES(80),(180),(300),(1234)), cases(name,operation,input) AS (VALUES
     ('exponential_real','pfq_0f0_reference','0.7'),

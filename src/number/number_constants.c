@@ -760,12 +760,12 @@ number_t number_const_return_like(const number_t *like, number_const_id_t id)
 
 number_t number_neg_const_return_like(const number_t *like, number_const_id_t id)
 {
-    NUM_SCOPE_SUSPEND(saved_scope);
+    NUM_SCOPE(scope);
     number_t value = number_const_like(like, id);
     number_t out = num_neg(value);
 
     num_destroy(&value);
-    return out;
+    return number_scope_result(&scope, out);
 }
 
 number_t number_imag_const_like_qreal(const number_t *like, number_const_id_t id)

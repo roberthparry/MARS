@@ -4,7 +4,9 @@
  *
  * Coordinate precision belongs to the sampling caller. At ordinary precision a
  * compiled real plan avoids arbitrary-precision expression evaluation; unsupported
- * operations and uncertain results use the original graph. Higher-precision passes
+ * operations and uncertain results use native evaluation. Recognised entire-function
+ * progressions use their native closed form, falling back to the authored sum at
+ * removable singularities. Higher-precision passes
  * always use the native evaluator, making reference probes independent of the fast
  * path. Graphs and bindings must remain private to the calling worker.
  */
@@ -18,7 +20,7 @@
 #include "lab_worker_internal.h"
 
 typedef struct _lab_worker_sample_t {
-    expr_t *expression, *axes[3];
+    expr_t *expression, *reduced, *axes[3];
     size_t count;
     expr_real_sample_t *fast;
 } lab_worker_sample_t;
@@ -45,8 +47,9 @@ lab_worker_sample_t *lab_worker_sample_new(expr_t *expression, expr_t *const *ax
     const expr_t *inputs[3];
     for (size_t i = 0; i < count; ++i)
         inputs[i] = sample->axes[i] = axes[i];
+    sample->reduced = expr_finite_progression_sample_form(expression, inputs, count);
     if (bits <= 53)
-        sample->fast = expr_real_sample_new(expression, inputs, count);
+        sample->fast = expr_real_sample_new(sample->reduced ? sample->reduced : expression, inputs, count);
     return sample;
 }
 
@@ -64,13 +67,21 @@ number_t lab_worker_sample_eval(lab_worker_sample_t *sample, const number_t *coo
     }
     for (size_t i = 0; i < sample->count; ++i)
         expr_set_val(sample->axes[i], coordinates[i]);
+    if (sample->reduced) {
+        number_t value = expr_eval(sample->reduced);
+        if (num_is_finite(value))
+            return value;
+        num_destroy(&value);
+    }
     return expr_eval(sample->expression);
 }
 
 /* The caller owns the graph and its precision lifetime. */
 void lab_worker_sample_free(lab_worker_sample_t *sample)
 {
-    if (sample)
+    if (sample) {
         expr_real_sample_free(sample->fast);
+        expr_free(sample->reduced);
+    }
     free(sample);
 }

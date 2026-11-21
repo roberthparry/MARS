@@ -10,8 +10,11 @@
  */
 
 #include "string-t.h"
+#include "json-t.h"
 #define MARS_EXPR_INTERNAL_ACCESS
 #include "expression/expr_internal.h"
+#define MARS_EXPR_INTERNAL_ACCESS
+#include "expression/expr_binding_simplify.h"
 #include "test_database.h"
 
 #include "test_expr.h"
@@ -643,6 +646,78 @@ static void test_from_string_arithmetic(void)
                     13.0, __LINE__);
 }
 
+static void function_series_endpoint_row(const void *data)
+{
+    const test_database_case_t *row = data;
+    json_t *expected = json_from_text(row->expected);
+    string_t *derivation_TeX = NULL;
+    expr_bindings_t *bindings = NULL;
+    expr_t *expression = expr_from_string_with_derivation_TeX(string_c_str(row->input), &bindings, &derivation_TeX);
+    if (expression && !derivation_TeX) {
+        char *identity = expr_finite_progression_identity_TeX(expression);
+        derivation_TeX = identity ? string_new_with(identity) : NULL;
+        free(identity);
+    }
+
+    ASSERT_NOT_NULL(expected);
+    if (json_type(expected) == JSON_NULL) {
+        ASSERT_NULL(expression);
+    } else {
+        const string_t *sigma = json_string_value(json_array_get(expected, 0u));
+        const string_t *value_text = json_string_value(json_array_get(expected, 1u));
+        const string_t *closed_fragment = json_string_value(json_array_get(expected, 2u));
+        char *plain = expression ? expr_to_string(expression, style_EXPRESSION) : NULL;
+        char *function = expression ? expr_to_string(expression, style_FUNCTION) : NULL;
+        char *TeX = expression ? expr_to_string(expression, style_LATEX) : NULL;
+        expr_t *round_trip = plain ? expr_from_string(plain, NULL) : NULL;
+
+        ASSERT_NOT_NULL(expression);
+        ASSERT_NOT_NULL(derivation_TeX);
+        ASSERT_NOT_NULL(sigma);
+        if (!strstr(string_c_str(derivation_TeX), string_c_str(sigma)))
+            string_printf("Series %S: %S; wanted sigma %S\n", row->input, derivation_TeX, sigma);
+        ASSERT_NOT_NULL(strstr(string_c_str(derivation_TeX), string_c_str(sigma)));
+        if (closed_fragment) {
+            TEST_ASSERT_TRUE(strstr(string_c_str(derivation_TeX), string_c_str(closed_fragment)) != NULL,
+                             "literal progression bounds simplify constant arithmetic in the native identity");
+            TEST_ASSERT_TRUE(strstr(string_c_str(derivation_TeX), "\\\\") == NULL,
+                             "an ordinary series identity keeps its sum and closed form on one TeX line");
+        }
+        ASSERT_NOT_NULL(plain);
+        ASSERT_NOT_NULL(function);
+        ASSERT_NOT_NULL(TeX);
+        ASSERT_NOT_NULL(round_trip);
+        if (value_text) {
+            expr_t *reference = expr_from_text(value_text, NULL);
+            number_t want = reference ? expr_eval(reference) : num_clone(NUM_NAN);
+            number_t got = expr_eval(expression);
+            number_t round_trip_value = expr_eval(round_trip);
+
+            ASSERT_TRUE(num_is_finite(got));
+            TEST_ASSERT_EXPR_NUMBER_CLOSE(got, want);
+            TEST_ASSERT_EXPR_NUMBER_CLOSE(round_trip_value, want);
+            num_destroy(&round_trip_value);
+            num_destroy(&got);
+            num_destroy(&want);
+            expr_free(reference);
+        }
+        expr_free(round_trip);
+        free(TeX);
+        free(function);
+        free(plain);
+    }
+    expr_free(expression);
+    expr_bindings_free(bindings);
+    string_free(derivation_TeX);
+    json_free(expected);
+}
+
+static void test_from_string_function_series_endpoints(void)
+{
+    test_run_database_cases(__FILE__, __LINE__, "expression.function_series_endpoints", NULL,
+                            function_series_endpoint_row);
+}
+
 static void test_from_string_series_ellipsis(void)
 {
     const char *source = "1 + 1/2^2 + 1/3^2 + 1/4^2 + ... + 1/2000^2";
@@ -1261,7 +1336,9 @@ static void test_from_string_series_ellipsis(void)
     free(expression_text);
     ASSERT_NOT_NULL(strstr(string_c_str(derivation_TeX), "\\sum_{n=1}^{2000}\\frac{1}{n^{2}}"));
     ASSERT_NOT_NULL(strstr(string_c_str(derivation_TeX), "\\frac{\\pi^{2}}{6} - \\psi^{(1)}(2001)"));
-    ASSERT_NOT_NULL(strstr(string_c_str(derivation_TeX), "&="));
+    ASSERT_NOT_NULL(strstr(string_c_str(derivation_TeX), " = "));
+    TEST_ASSERT_TRUE(strstr(string_c_str(derivation_TeX), "\\\\") == NULL,
+                     "the inverse-square series and its exact result share one TeX line");
     for (long index = 1L; index <= 2000L; ++index) {
         number_t index_value = num_create_from_long(index);
         number_t denominator = num_pow_int(index_value, 2);
@@ -3188,6 +3265,27 @@ static void test_from_string_bindings_with_implicit_builtin_constant(void)
     expr_free(expr);
 }
 
+static void check_binding_square_domain_row(const void *data)
+{
+    const test_database_case_t *row = data;
+    expr_binding_expr_t *base = expr_binding_expr_new_number_text(string_c_str(row->input));
+    expr_binding_expr_t *power = expr_binding_expr_new_powi(base, 2L);
+    expr_binding_expr_t *root = expr_binding_expr_new_unary_op(&ops_sqrt, power);
+    expr_binding_expr_t *result = root ? binding_expr_try_simplify_sqrt_numeric_square(root) : NULL;
+    bool unchanged = string_view_equals_literal(string_view_all(row->expected), "unchanged");
+    char *text = result && !unchanged ? expr_binding_expr_to_string(result) : NULL;
+    bool ok = result && (unchanged ? result == root : text && !strcmp(text, string_c_str(row->expected)));
+    free(text);
+    expr_binding_expr_free(result);
+    TEST_ASSERT_TRUE(ok, "Square-root binding folding preserves complex branches and real magnitudes");
+}
+
+static void test_binding_square_domain_ownership(void)
+{
+    test_run_database_cases(__FILE__, __LINE__, "expression.binding_square_domain", NULL,
+                            check_binding_square_domain_row);
+}
+
 static void test_from_string_bindings_with_constant_expression_value(void)
 {
     expr_bindings_t *bindings = NULL;
@@ -4328,6 +4426,7 @@ void test_expr_t_from_string(void)
     TEST_RUN_SUBTEST(test_from_string_pure_const, NULL);
     TEST_RUN_SUBTEST(test_from_string_arithmetic, NULL);
     TEST_RUN_SUBTEST(test_from_string_series_ellipsis, NULL);
+    TEST_RUN_SUBTEST(test_from_string_function_series_endpoints, NULL);
     TEST_RUN_SUBTEST(test_from_string_functions, NULL);
     TEST_RUN_SUBTEST(test_from_text_api, NULL);
     TEST_RUN_SUBTEST(test_from_string_special_functions, NULL);
@@ -4347,6 +4446,7 @@ void test_expr_t_from_string(void)
     TEST_RUN_SUBTEST(test_greek_symbol_reverse_perfect_hash, NULL);
     TEST_RUN_SUBTEST(test_from_string_bindings_with_implicit_builtin_constant, NULL);
     TEST_RUN_SUBTEST(test_from_string_bindings_with_constant_expression_value, NULL);
+    TEST_RUN_SUBTEST(test_binding_square_domain_ownership, NULL);
     TEST_RUN_SUBTEST(test_from_string_bindings_skip_function_name_letters, NULL);
     TEST_RUN_SUBTEST(test_binding_edit_is_owned_by_expression_library, NULL);
     TEST_RUN_SUBTEST(test_binding_edit_preserves_symbolic_value, NULL);

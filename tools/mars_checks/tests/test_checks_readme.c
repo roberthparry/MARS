@@ -172,8 +172,11 @@ static void test_checks_readme_resource_settings(void)
         string_t *root = test_checks_root();
         fflush(NULL);
         pid_t child = fork();
-        if (!child)
-            _exit(test_checks_readme_resource_child(root, broken != 0) ? 0 : 1);
+        if (!child) {
+            bool passed = test_checks_readme_resource_child(root, broken != 0);
+            string_free(root);
+            _exit(passed ? 0 : 1);
+        }
         int status = 0;
         pid_t waited;
         do {

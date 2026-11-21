@@ -1142,6 +1142,9 @@ Computes a matrix norm. The norm type is specified by `type`:
 
 Returns 0 on success, negative on error. The result is written to `*out` as an
 owning `number_t`.
+Initialise the output to `NUM_NAN`, and release a successful result with
+`num_destroy()`. This also applies inside a numerical scope, since diagonal
+norm results are detached from the scope.
 
 ```c
 int mat_condition_number(const matrix_t *A, mat_norm_type_t type, number_t *out);

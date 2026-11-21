@@ -142,10 +142,10 @@ static string_t *settings_value(const char *name, const char *value)
 {
     if (!value) return NULL;
     size_t length = strlen(name);
-    bool path = (length > 5 && !strcmp(name + length - 5, "_PATH")) ||
-                (length > 5 && !strcmp(name + length - 5, "_FILE")) ||
-                (length > 4 && !strcmp(name + length - 4, "_DIR")) ||
-                (length > 7 && !strcmp(name + length - 7, "_BINARY")) || !strcmp(name, "MARS_CALENDAR_LIBRARY") ||
+    bool path = (length > 5 && !memcmp(name + length - 5, "_PATH", 5)) ||
+                (length > 5 && !memcmp(name + length - 5, "_FILE", 5)) ||
+                (length > 4 && !memcmp(name + length - 4, "_DIR", 4)) ||
+                (length > 7 && !memcmp(name + length - 7, "_BINARY", 7)) || !strcmp(name, "MARS_CALENDAR_LIBRARY") ||
                 !strcmp(name, "MARS_LAB_EXECUTABLE") || !strcmp(name, "TZDIR");
     if (!path || !*value || *value == '/') return settings_text(value);
     if (!strncmp(value, "~/", 2)) {

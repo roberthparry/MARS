@@ -15,28 +15,26 @@
 
 #include "plot-t.h"
 #include "expr_context-t.h"
+#define MARS_SHARED_EXPR_INTERNAL_ACCESS
+#include "internal/expr_internal.h"
 #define MARS_LAB_WORKER_INTERNAL_ACCESS
 #include "lab_worker_internal.h"
 
 typedef struct {
-    const expr_t *expression, *variable;
+    lab_worker_sample_t *sample;
     bool complex;
 } complex_sample_t;
 
 static sampler_status_t complex_value(number_t parameter, number_t *real, number_t *imaginary, void *opaque)
 {
     complex_sample_t *context = opaque;
-    expr_t *coordinate = expr_new_const(parameter);
-    expr_t *bound = coordinate ? expr_substitute(context->expression, context->variable, coordinate) : NULL;
-    number_t value = bound ? expr_eval(bound) : NUM_NAN;
+    number_t value = lab_worker_sample_eval(context->sample, &parameter);
     if (num_is_finite(value)) {
         *real = num_real_part(value);
         *imaginary = num_imag_part(value);
         context->complex |= !num_is_zero(*imaginary);
     }
     num_destroy(&value);
-    expr_free(bound);
-    expr_free(coordinate);
     return SAMPLER_VALUE;
 }
 
@@ -67,16 +65,18 @@ int lab_worker_complex_plot(const char *source, const expr_t *expression, const 
 {
     NUM_SCOPE(numbers);
     /* The input axis is real; prove ordinary real output before doing any extra sampling. */
+    const expr_t *coordinates[] = {variable};
+    expr_t *reduced = expr_finite_progression_sample_form(expression, coordinates, 1);
     expr_context_t *assumptions = expr_context_from_expression(expression, variable);
     bool real = assumptions && expr_context_set(assumptions, variable, EXPR_CONTEXT_FREE, EXPR_CONTEXT_REAL, NUM_NAN) &&
-                expr_context_proves(assumptions, expression, EXPR_CONTEXT_REAL);
+                expr_context_proves(assumptions, reduced ? reduced : expression, EXPR_CONTEXT_REAL);
     expr_context_free(assumptions);
+    expr_free(reduced);
     if (real && !force_complex)
         return -1;
     number_t lo = NUM_NAN, hi = NUM_NAN;
     if (!lab_worker_plot_bounds(*lower ? lower : "-10", *upper ? upper : "10", &lo, &hi))
         return force_complex ? lab_worker_plot_output(source, expression, NULL, errno, NULL, NULL, NULL) : -1;
-    complex_sample_t context = {expression, variable, false};
     sampler_options_t options = sampler_options_default();
     options.intervals = preview ? 32 : 64;
     options.max_evaluations = preview ? 2049 : 16385;
@@ -84,7 +84,13 @@ int lab_worker_complex_plot(const char *source, const expr_t *expression, const 
     size_t saved = num_get_default_prec_bits(), required = lab_worker_plot_range_precision(lo, hi);
     if (required > saved)
         num_set_default_prec_bits(required);
-    sampler_t *samples = sampler_new(complex_value, &context, lo, hi, &options);
+    expr_t *axis = expr_new_named_var(NUM_NAN, expr_symbol_name(variable));
+    expr_t *formula = axis ? expr_substitute(expression, variable, axis) : NULL;
+    complex_sample_t context = {.sample = lab_worker_sample_new(formula, &axis, 1, num_get_default_prec_bits())};
+    sampler_t *samples = context.sample ? sampler_new(complex_value, &context, lo, hi, &options) : NULL;
+    lab_worker_sample_free(context.sample);
+    expr_free(formula);
+    expr_free(axis);
     if (!samples || (!context.complex && !force_complex)) {
         sampler_free(samples);
         num_set_default_prec_bits(saved);

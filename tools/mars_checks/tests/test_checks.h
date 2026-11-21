@@ -13,7 +13,9 @@
 
 /**
  * @brief Create an owned private temporary root.
- * @return Owned path, released with test_checks_finish; allocation failures terminate.
+ *
+ * Uses TMPDIR, falling back to /tmp, without consulting application settings or the desktop key store.
+ * @return Owned path, released with test_checks_finish; allocation or directory-creation failure terminates the test.
  */
 string_t *test_checks_root(void);
 
