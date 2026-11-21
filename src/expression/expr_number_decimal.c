@@ -7,6 +7,8 @@
  * Repeating rationals and compact familiar fractions stay fractional. Integer arithmetic preserves every digit;
  * no floating-point approximation or change to the expression graph is involved. Exact-coefficient rendering
  * scopes, such as Taylor equations, suppress decimal alternatives without changing ordinary output.
+ * Display graph preparation also collects these coefficients beside their factors, distributing a numerical
+ * scale over an additive numerator where necessary, without changing the underlying equation or sampling.
  */
 #include <gmp.h>
 #include <stdlib.h>
@@ -14,10 +16,95 @@
 
 #include "number-t.h"
 #include "string-t.h"
+#define MARS_SHARED_EXPR_INTERNAL_ACCESS
+#include "internal/expr_internal.h"
+#define MARS_EXPR_INTERNAL_ACCESS
+#include "expr_internal.h"
 #define MARS_EXPR_STRINGOUT_INTERNAL_ACCESS
 #include "expr_stringout_internal.h"
 
 static _Thread_local bool expr_fractional_numbers = false;
+
+static expr_t *decimal_scaled_body(const expr_t *expression, number_t scale, unsigned depth)
+{
+    if (!expression || depth >= 128)
+        return NULL;
+    number_t inner = NUM_NAN;
+    const expr_t *base = NULL, *left = NULL, *right = NULL;
+    bool subtract = false;
+    if (expr_match_scaled_expr(expression, &inner, &base) && num_is_exact(inner) && num_is_real(inner)) {
+        number_t combined = num_mul(scale, inner);
+        expr_t *result = decimal_scaled_body(base, combined, depth + 1);
+        num_destroy(&combined);
+        num_destroy(&inner);
+        return result;
+    }
+    num_destroy(&inner);
+    if (expr_match_add_sub_expr(expression, &left, &right, &subtract)) {
+        expr_t *a = decimal_scaled_body(left, scale, depth + 1);
+        expr_t *b = decimal_scaled_body(right, scale, depth + 1);
+        expr_t *result = a && b ? subtract ? expr_sub(a, b) : expr_add(a, b) : NULL;
+        expr_free(b);
+        expr_free(a);
+        return result;
+    }
+    if (expr_is_unnamed_const(expression) && num_is_exact(expression->c)) {
+        number_t value = num_mul(scale, expression->c);
+        expr_t *result = expr_new_const(value);
+        num_destroy(&value);
+        return result;
+    }
+    if (num_is_one(scale))
+        return expr_retain_expr(expression);
+    expr_t *coefficient = expr_new_const(scale);
+    expr_t *result = coefficient ? expr_mul(coefficient, expression) : NULL;
+    expr_free(coefficient);
+    return result;
+}
+
+/* Work on one private clone; replacing a scale keeps the unreduced source and all bindings independent. */
+static bool decimal_coefficients_owned(expr_t **slot, unsigned depth)
+{
+    if (!*slot)
+        return true;
+    if (depth >= 128)
+        return false;
+    expr_t *expression = *slot;
+    const expr_t *base = NULL;
+    number_t scale = NUM_NAN;
+    bool scaled = expr_match_scaled_expr(expression, &scale, &base);
+    bool candidate = scaled && (expr_is_div(expression) ||
+                               (expr_is_mul(expression) && expr_is_addsub(base)));
+    string_t *decimal = candidate ? expr_number_preferred_decimal_local(scale) : NULL;
+    if (decimal) {
+        expr_t *replacement = decimal_scaled_body(base, scale, depth + 1);
+        if (replacement) {
+            expr_free(expression);
+            *slot = expression = replacement;
+        }
+        string_free(decimal);
+        num_destroy(&scale);
+        if (!replacement)
+            return false;
+    } else {
+        num_destroy(&scale);
+    }
+    const expr_t *left = NULL, *right = NULL;
+    return !expr_child_exprs(expression, &left, &right) ||
+           ((!left || decimal_coefficients_owned(&expression->a, depth + 1)) &&
+            (!right || decimal_coefficients_owned(&expression->b, depth + 1)));
+}
+
+/* Both plain and semantic notation can render this exact coefficient graph without a fraction through a factor. */
+expr_t *expr_decimal_coefficients_for_display(const expr_t *expression)
+{
+    expr_t *result = expr_clone(expression);
+    if (result && !decimal_coefficients_owned(&result, 0)) {
+        expr_free(result);
+        result = NULL;
+    }
+    return result;
+}
 
 /* A caller's exact-coefficient rendering scope never changes another thread's display choices. */
 bool expr_set_number_fractional_local(bool fractional)

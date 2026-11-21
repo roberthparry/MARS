@@ -2209,14 +2209,24 @@ Exact half order reduces directly to elementary sine/cosine or hyperbolic
 sine/cosine functions, retaining exact rational coefficients. For example:
 
 ```c
-diffequ_t *problem = de_from_string("x^2y'' + xy' + (x^2 - 1/4)y = 0");
-diffequ_solve_result_t *result = problem ? de_solve(problem) : NULL;
-string_t *text = result ? equ_to_text(de_solve_result_at(result, 0u), style_UNBOUND) : NULL;
-if (text)
-    puts(string_c_str(text));
-string_free(text);
-de_solve_result_free(result);
-de_free(problem);
+#include <stdio.h>
+#include <stdlib.h>
+
+#include "diffequation-t.h"
+
+int main(void)
+{
+    diffequ_t *problem = de_from_string("x^2y'' + xy' + (x^2 - 1/4)y = 0");
+    diffequ_solve_result_t *result = problem ? de_solve(problem) : NULL;
+    string_t *text = result ? equ_to_text(de_solve_result_at(result, 0u), style_UNBOUND) : NULL;
+    int status = EXIT_FAILURE;
+    if (text && puts(string_c_str(text)) != EOF)
+        status = EXIT_SUCCESS;
+    string_free(text);
+    de_solve_result_free(result);
+    de_free(problem);
+    return status;
+}
 ```
 
 Output:

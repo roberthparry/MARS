@@ -2460,13 +2460,16 @@ typedef struct _test_equation_zeta_search_t {
     size_t seed_count;
     bool cancel;
     bool window;
+    bool trivial;
 } test_equation_zeta_search_t;
 
 static void test_equation_zeta_progress(const computation_progress_t *progress, void *argument)
 {
     test_equation_zeta_search_t *search = argument;
 
-    if (strcmp(progress->stage, search->window ? "equation.zeta_window_seed" : "equation.zeta_seed") != 0)
+    const char *stage = search->trivial ? "equation.zeta_trivial_window" :
+                        search->window ? "equation.zeta_window_seed" : "equation.zeta_seed";
+    if (strcmp(progress->stage, stage) != 0)
         return;
     search->seed_count++;
     if (search->cancel && search->seed_count == 2u)
@@ -2478,8 +2481,11 @@ static bool test_equation_zeta_solve(void *argument)
     test_equation_zeta_search_t *search = argument;
 
     if (search->window) {
-        number_t lower = num_create_from_long(80), upper = num_create_from_long(100);
-        search->solutions = equ_search_zeta_zeros(search->equation, lower, upper, 64, NULL);
+        number_t lower = num_create_from_long(search->trivial ? -10 : 80);
+        number_t upper = num_create_from_long(search->trivial ? -1 : 100);
+        search->solutions = search->trivial
+            ? equ_search_zeta_trivial_zeros(search->equation, lower, upper, 64, NULL)
+            : equ_search_zeta_zeros(search->equation, lower, upper, 64, NULL);
         num_destroy(&lower);
         num_destroy(&upper);
     } else {
@@ -3170,6 +3176,86 @@ static void test_equation_relation_separators(void)
         test_equation_relation_separators_rejected_row);
 }
 
+static void test_equation_zeta_trivial_window_row(const void *data)
+{
+    const test_database_case_t *row = data;
+    size_t saved = num_get_default_prec_bits();
+    num_set_default_prec_digits(row->precision);
+    json_t *expected = json_from_text(row->expected);
+    const string_t *lo = json_string_value(equation_case_member(expected, "lower"));
+    const string_t *hi = json_string_value(equation_case_member(expected, "upper"));
+    const string_t *error = json_string_value(equation_case_member(expected, "error"));
+    number_t lower = num_create_from_text(lo), upper = num_create_from_text(hi), maximum = NUM_NAN;
+    bool ok = expected && lo && hi &&
+              json_number_value(equation_case_member(expected, "maximum"), &maximum);
+    equation_t *equation = equ_from_text(row->input);
+    string_t *before = equation ? equ_to_text(equation, style_EXPRESSION) : NULL;
+    bool limited = true;
+    errno = 0;
+    equation_solutions_t *solutions = ok ? equ_search_zeta_trivial_zeros(equation, lower, upper,
+                                                  (size_t)num_to_double(maximum), &limited) : NULL;
+    int failure = errno;
+    if (error) {
+        int wanted = !strcmp(string_c_str(error), "EINVAL") ? EINVAL : ENOTSUP;
+        ok = ok && !solutions && failure == wanted && !limited;
+    } else {
+        const json_t *roots = equation_case_member(expected, "roots");
+        bool wanted_limited = false;
+        ok = ok && solutions && json_bool_value(equation_case_member(expected, "limited"), &wanted_limited) &&
+             equ_solutions_count(solutions) == json_array_size(roots) && limited == wanted_limited;
+        for (size_t i = 0; ok && i < json_array_size(roots); ++i) {
+            number_t wanted = NUM_NAN;
+            number_t root = expr_eval(equ_rhs(equ_solutions_at(solutions, i)));
+            ok = json_number_value(json_array_get(roots, i), &wanted) && num_eq(root, wanted) &&
+                 num_is_integer(root) && num_ge(root, lower) && num_le(root, upper);
+            num_destroy(&wanted);
+            num_destroy(&root);
+        }
+    }
+    string_t *after = equation ? equ_to_text(equation, style_EXPRESSION) : NULL;
+    ok = ok && before && after && !strcmp(string_c_str(before), string_c_str(after)) &&
+         num_get_default_prec_digits() == row->precision;
+    if (!ok)
+        fprintf(stderr, "%s: roots=%zu, errno=%d, limited=%d\n", string_c_str(row->name),
+                equ_solutions_count(solutions), failure, limited);
+    TEST_ASSERT_TRUE(ok, "exact trivial-zero windows preserve bounds, limits, domains and authored bindings");
+    string_free(after);
+    string_free(before);
+    equ_solutions_free(solutions);
+    equ_free(equation);
+    num_destroy(&maximum);
+    num_destroy(&upper);
+    num_destroy(&lower);
+    json_free(expected);
+    num_set_default_prec_bits(saved);
+}
+
+static void test_equation_zeta_trivial_window(void)
+{
+    test_run_database_cases(__FILE__, __LINE__, "equation.zeta_trivial_window", NULL,
+                            test_equation_zeta_trivial_window_row);
+}
+
+static void test_equation_zeta_trivial_cancellation(void)
+{
+    test_equation_zeta_search_t search = {
+        .equation = equ_from_string("{zeta(s)=0 | s=1/3+14i}"),
+        .cancel = true, .window = true, .trivial = true
+    };
+    string_t *before = equ_to_text(search.equation, style_EXPRESSION);
+    computation_options_t options = {.progress = test_equation_zeta_progress, .argument = &search};
+    search.control = computation_new(&options);
+    ASSERT_FALSE(computation_run(search.control, test_equation_zeta_solve, &search));
+    ASSERT_EQ_INT(computation_status(search.control), COMPUTATION_CANCELLED);
+    ASSERT_NULL(search.solutions);
+    string_t *after = equ_to_text(search.equation, style_EXPRESSION);
+    ASSERT_TRUE(before && after && !strcmp(string_c_str(before), string_c_str(after)));
+    string_free(after);
+    string_free(before);
+    computation_free(search.control);
+    equ_free(search.equation);
+}
+
 static void test_equation_basics(void)
 {
     TEST_RUN_SUBTEST(test_equation_compact_symmetric_surds, NULL);
@@ -3314,6 +3400,8 @@ int tests_main(void)
     TEST_RUN_IN_GROUP(test_equation_database_cases, tests, "equation,database-cases");
     TEST_RUN_IN_GROUP(test_equation_algebraic_cubics, tests, "equation,exact-cubic");
     TEST_RUN_IN_GROUP(test_equation_rational_relations, tests, "equation,presentation");
+    TEST_RUN_IN_GROUP(test_equation_zeta_trivial_window, tests, "equation,zeta");
+    TEST_RUN_IN_GROUP(test_equation_zeta_trivial_cancellation, tests, "equation,zeta");
     TEST_RUN_IN_GROUP(test_equation_cubic_opaque_coefficients, tests, "equation,numeric-cubic");
     TEST_RUN_IN_GROUP(test_equation_solution_pairs, tests, NULL);
     TEST_RUN_IN_GROUP(test_equation_even_quadratic, tests, NULL);

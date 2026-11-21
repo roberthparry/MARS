@@ -120,8 +120,6 @@ namespace WorksheetContext {
         matrixOperation,
         matrixOperand,
         matrixOperandLabel,
-        equationControls,
-        diffequationControls,
         integratorControls,
         integratorBoundStack,
         integratorIntervalCap,

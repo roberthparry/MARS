@@ -5,6 +5,7 @@
  * Recognises and processes supported zeta-equation cases within the equation solver. Keep these specialised
  * numerical and structural rules separate from general polynomial factorisation. Zero-target searches use
  * Lambert W starting estimates, staged complex Newton refinement and a bounded height-grid fallback.
+ * The separate exact trivial family is enumerated directly in bounded real intervals for interactive plots.
  *
  * This belongs to the equation_t implementation. Public callers work with equations and solution collections;
  * internal matching or numerical attempts are not independent application APIs.
@@ -14,16 +15,49 @@
 #include <math.h>
 #include <stdbool.h>
 
-#define MARS_EQUATION_INTERNAL_ACCESS
-#include "equation_internal.h"
 #define MARS_SHARED_EXPR_INTERNAL_ACCESS
 #include "internal/expr_internal.h"
+#define MARS_EQUATION_INTERNAL_ACCESS
+#include "equation_internal.h"
 
 enum {
     ZETA_ZERO_HEIGHT_LIMIT = 80,
     ZETA_VALUE_HEIGHT_LIMIT = 50,
     ZETA_ZERO_ROOT_LIMIT = 40
 };
+
+/* Freeze supplied constant parameters for recognition without changing the authored binding objects. */
+static expr_t *equ_zeta_bound_residual(const equation_t *equation)
+{
+    expr_t *residual = equ_residual(equation);
+    expr_t *source = residual;
+    expr_retain(source);
+    bool changed = false;
+    expr_bindings_t *bindings = equ_bindings(equation);
+    for (size_t i = 0; residual && i < expr_bindings_count(bindings); ++i) {
+        if (!expr_bindings_is_constant_at(bindings, i))
+            continue;
+        expr_t *symbol = expr_bindings_expr_at(bindings, i);
+        number_t value = expr_eval(symbol);
+        if (num_is_finite(value)) {
+            expr_t *constant = expr_new_const(value);
+            expr_t *bound = constant ? expr_substitute(residual, symbol, constant) : NULL;
+            expr_free(constant);
+            expr_free(residual);
+            residual = bound;
+            changed = true;
+        }
+        num_destroy(&value);
+    }
+    if (changed && residual) {
+        /* Substitution copies unmatched leaves: Newton must still update the original live coordinate. */
+        expr_t *linked = expr_clone_linked_symbols(residual, source);
+        expr_free(residual);
+        residual = linked;
+    }
+    expr_free(source);
+    return residual;
+}
 
 static const expr_t *equ_find_zeta_term(const expr_t *expr, const expr_t *prototype, expr_t *wrt, size_t depth)
 {
@@ -235,7 +269,7 @@ int equ_try_search_zeta_roots(const equation_t *equation, equation_solutions_t *
         num_destroy(&original);
         return -1;
     }
-    residual = equ_residual(equation);
+    residual = equ_zeta_bound_residual(equation);
     if (residual) {
         const expr_t *series = equ_find_zeta_term(residual, NULL, wrt, 0u);
 
@@ -336,20 +370,26 @@ static double equ_zeta_index_at_height(double height)
     return turns > 0 ? 1.375 + turns * (log(turns) - 1.0) : 1.0;
 }
 
-/* Search only the requested finite window; preserve the caller's separately derived high-precision solutions. */
-equation_solutions_t *equ_search_zeta_zeros(const equation_t *equation, number_t lower, number_t upper,
-                                         size_t maximum, bool *limited)
+/* Validate native bounds before converting approximate seed coordinates to binary doubles. */
+static bool equ_zeta_window_arguments(const equation_t *equation, number_t lower, number_t upper, size_t maximum)
 {
-    if (limited)
-        *limited = false;
-    double low = num_to_double(lower), high = num_to_double(upper);
-    if (!equation || !num_is_real(lower) || !num_is_real(upper) || !isfinite(low) || !isfinite(high) ||
-        low >= high || low < -10000 || high > 10000 || !maximum || maximum > 256) {
+    number_t left = num_create_from_long(-10000), right = num_create_from_long(10000);
+    bool valid = equation && num_is_real(lower) && num_is_real(upper) &&
+                 num_is_finite(lower) && num_is_finite(upper) && num_lt(lower, upper) &&
+                 num_ge(lower, left) && num_le(upper, right) && maximum && maximum <= 256;
+    num_destroy(&right);
+    num_destroy(&left);
+    if (!valid)
         errno = EINVAL;
-        return NULL;
-    }
+    return valid;
+}
+
+/* Both viewport searches require an explicit analytic continuation with exactly one free coordinate. */
+static expr_t *equ_zeta_window_variable(const equation_t *equation, expr_t **residual)
+{
     expr_bindings_t *bindings = equ_bindings(equation);
     expr_t *wrt = NULL;
+    *residual = NULL;
     for (size_t i = 0; i < expr_bindings_count(bindings); ++i) {
         if (expr_bindings_is_constant_at(bindings, i))
             continue;
@@ -359,14 +399,31 @@ equation_solutions_t *equ_search_zeta_zeros(const equation_t *equation, number_t
         }
         wrt = expr_bindings_expr_at(bindings, i);
     }
-    expr_t *residual = wrt ? equ_residual(equation) : NULL;
+    *residual = wrt ? equ_zeta_bound_residual(equation) : NULL;
     bool zero_target = false;
-    if (!residual || equ_find_zeta_term(residual, NULL, wrt, 0) ||
-        !equ_is_real_zeta_equation(residual, wrt, &zero_target) || !zero_target) {
-        expr_free(residual);
+    if (!*residual || equ_find_zeta_term(*residual, NULL, wrt, 0) ||
+        !equ_is_real_zeta_equation(*residual, wrt, &zero_target) || !zero_target) {
+        expr_free(*residual);
+        *residual = NULL;
         errno = ENOTSUP;
         return NULL;
     }
+    return wrt;
+}
+
+/* Search only the requested finite window; preserve the caller's separately derived high-precision solutions. */
+equation_solutions_t *equ_search_zeta_zeros(const equation_t *equation, number_t lower, number_t upper,
+                                         size_t maximum, bool *limited)
+{
+    if (limited)
+        *limited = false;
+    if (!equ_zeta_window_arguments(equation, lower, upper, maximum))
+        return NULL;
+    double low = num_to_double(lower), high = num_to_double(upper);
+    expr_t *residual = NULL;
+    expr_t *wrt = equ_zeta_window_variable(equation, &residual);
+    if (!wrt)
+        return NULL;
     equation_solutions_t *solutions = equ_solutions_new();
     if (!solutions) {
         expr_free(residual);
@@ -417,6 +474,58 @@ equation_solutions_t *equ_search_zeta_zeros(const equation_t *equation, number_t
     }
     if (limited)
         *limited = index <= last;
+    solutions->status = solutions->count ? EQUATION_SOLVE_SOLVED : EQUATION_SOLVE_UNSOLVED;
+    return solutions;
+}
+
+/* Enumerate the proved exact family directly; numerical refinement is unnecessary for negative even integers. */
+equation_solutions_t *equ_search_zeta_trivial_zeros(const equation_t *equation, number_t lower, number_t upper,
+                                                 size_t maximum, bool *limited)
+{
+    if (limited)
+        *limited = false;
+    if (!equ_zeta_window_arguments(equation, lower, upper, maximum))
+        return NULL;
+    double low = num_to_double(lower), high = num_to_double(upper);
+    expr_t *residual = NULL;
+    expr_t *wrt = equ_zeta_window_variable(equation, &residual);
+    expr_free(residual);
+    if (!wrt)
+        return NULL;
+    equation_solutions_t *solutions = equ_solutions_new();
+    if (!solutions) {
+        errno = ENOMEM;
+        return NULL;
+    }
+    long first = (long)fmax(1, ceil(-high * 0.5)), last = (long)floor(-low * 0.5);
+    for (long index = first; index <= last; ++index) {
+        if (!equ_computation_step("equation.zeta_trivial_window")) {
+            equ_solutions_free(solutions);
+            errno = ECANCELED;
+            return NULL;
+        }
+        number_t root = num_create_from_long(-2 * index);
+        /* Bounds retain their native precision even when extremely close to an integer. */
+        bool inside = num_ge(root, lower) && num_le(root, upper);
+        bool capped = inside && solutions->count == maximum;
+        int rc = inside && !capped ? equ_append_solution_value(wrt, root, solutions) : 0;
+        num_destroy(&root);
+        if (rc < 0) {
+            equ_solutions_free(solutions);
+            errno = ENOMEM;
+            return NULL;
+        }
+        if (capped) {
+            if (limited)
+                *limited = true;
+            break;
+        }
+    }
+    if (!equ_computation_active()) {
+        equ_solutions_free(solutions);
+        errno = ECANCELED;
+        return NULL;
+    }
     solutions->status = solutions->count ? EQUATION_SOLVE_SOLVED : EQUATION_SOLVE_UNSOLVED;
     return solutions;
 }

@@ -86,8 +86,6 @@ void lab_workspace_dom_references(void)
         {"matrixOperation", "matrixOperation", 0},
         {"matrixOperand", "matrixOperand", 0},
         {"matrixOperandLabel", "matrixOperandLabel", 0},
-        {"equationControls", "equationControls", 0},
-        {"diffequationControls", "diffequationControls", 0},
         {"integratorControls", "integratorControls", 0},
         {"integratorBoundStack", "integratorBoundStack", 0},
         {"integratorIntervalCap", "integratorIntervalCap", 0},
@@ -329,18 +327,14 @@ void lab_workspace_dom_mode(lab_mode_t mode, jsref coverage)
         lab_workspace_dom_status_for_mode(mode, lab_dom_string("Ready"), true);
     }
     lab_workspace_dom_hidden(".precision-toolbar", mode == LAB_MODE_DATETIME || mode == LAB_MODE_ALMANAC);
-    static const char *const panels[] = {"",
-                                         "#equationControls",
-                                         "#diffequationControls",
-                                         "#matrixControls",
-                                         "#integratorControls",
-                                         "#datetimeControls",
-                                         "#almanacControls"};
+    static const char *const panels[] = {
+        "", "", "", "#matrixControls", "#integratorControls", "#datetimeControls", "#almanacControls"};
     static const char *const classes[] = {
         "", "", "diffequation-mode", "matrix-mode", "", "datetime-mode", "almanac-mode"};
     int body = lab_dom_query(0, "body");
     for (lab_mode_t panel = LAB_MODE_EQUATION; panel < LAB_MODE_COUNT; ++panel) {
-        lab_workspace_dom_hidden(panels[panel], panel != mode);
+        if (*panels[panel])
+            lab_workspace_dom_hidden(panels[panel], panel != mode);
         if (*classes[panel])
             lab_dom_class(body, classes[panel], panel == mode);
     }

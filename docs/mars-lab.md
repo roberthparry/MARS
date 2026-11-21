@@ -1188,20 +1188,18 @@ when their native result state calls for them. Copy, zoom and expansion controls
 wrap inside each card. Wide mathematical content and almanac tables scroll
 within their own containers rather than widening the entire page.
 
-Phone layouts omit the introductory Equation and Differential Equation paragraphs;
-their notation, binding and starting-value guidance remains available in Help.
-Larger screens retain the inline hints. Phones also omit the Integrator's
-Bound/Free explanatory paragraph and inline examples without hiding its variable
-rows or work budget.
+Equation, Differential Equation, Integrator and Datetime instructions appear in
+Help rather than as introductory paragraphs within the workspace, on both desktop
+and mobile. Help covers notation, bindings, numerical starting values, Bound/Free
+rows, integration examples and GMT offsets. The workspace retains the controls
+and calculation status messages.
 
 Datetime starts with the selected date, followed by the holiday jurisdiction,
-date range and observer. Its short introduction replaces the decorative banner;
-on narrow screens, lightly separated field groups and rectangular controls avoid
-nested panels and oversized pill-shaped selectors. Julian Day Number and calendar
+date range and observer. On narrow screens, lightly separated field groups and
+rectangular controls avoid nested panels and oversized pill-shaped selectors. Julian Day Number and calendar
 year share a row on tablets; phones hide these secondary inputs and their labels,
 retaining the selected date and every calendar result. Larger screens retain both fields.
-Phone layouts also omit the introductory sentence and GMT offset explanation,
-while keeping the offset control. They use quieter sentence-case labels
+Phones keep the GMT offset control and use quieter sentence-case labels
 and compact From/To rows. Date inputs incorporate a vector calendar button with
 an accessible name. Touch layouts suppress lingering hover tooltips while
 retaining hints for keyboard-focused buttons.
@@ -3412,6 +3410,11 @@ are retained and simplified in both the plain and TeX captions. Thus fixing `z =
 removes `z` from the equation above its two-dimensional cross-section. Clearing
 the binding restores it to the surface caption. This also applies to cached
 plots and exported headings; the worksheet and its symbolic solution remain unchanged.
+Captions use lossless decimal alternatives when they are shorter than an exact fraction. Long decimal
+literals show an explicit ellipsis after their leading digits, in both plain and TeX headings. This is
+caption formatting only: sampling, saved bindings and full-precision result cards retain every digit.
+Editable binding rows preserve authored decimals and symbolic arithmetic across Expression, Equation
+and Matrix modes, rather than replacing them with their evaluated numerical representation.
 
 Up to eight additional unset parameters share a compact vertical slider panel
 to the right of the chart, keeping the curve or surface visible while adjusting a slice.
@@ -3792,7 +3795,10 @@ the [coordinate-volume zoom described above](#3-d-surface-interaction).
 For 2-D plots, **−** and **+** change the sampled ranges, and **Reset** restores the
 range controls and height policy captured before zooming. Pointer coordinates use the
 SVG screen transformation, so nested headings, clipping and fitting do not offset
-hover readings or gesture anchors. Vertical and horizontal hover guides meet at
+hover readings or gesture anchors. Nested SVG viewports use a retained child-coordinate
+basis so their own position is included consistently across browsers; canvas overlays,
+native pointer measurements and settled-curve inspection share that mapping.
+Vertical and horizontal hover guides meet at
 the reported curve point, marked by a small outlined circle. The marker and
 horizontal guide are hidden when no visible curve
 crosses the pointer's x coordinate. The tooltip shows
@@ -3820,11 +3826,15 @@ Adaptive subdivision depth fits the callback allowance even when every interval
 needs refinement. Unresolved edges remain gaps, rather than exhausting the budget
 and discarding the whole curve. Automatic ranges use a recognised finite
 progression's native closed form for value and slope probes, falling back to the
-original sum at removable singularities. This prevents a coarse oscillation
-sample from selecting a window that subsequently produces empty axes.
-Automatic ranges prefer a smaller informative
-window when repeated value jumps contradict the endpoint tangents; explicit
-range endpoints are preserved.
+original sum at removable singularities. This avoids repeated term-by-term
+differentiation during range probes.
+Automatic ranges prefer a smaller informative window when repeated value jumps
+contradict the endpoint tangents, or when tangent excursions between probes exceed
+the complete observed height span. The latter check catches rapid oscillations
+that alias on the coarse grid. Both checks are bounded heuristics; explicit
+range endpoints are preserved. If detailed sampling leaves no resolved curve
+segment, the worker reports a sampling or domain limit instead of returning
+successful empty axes.
 Spread two fingers to zoom in and bring them together to zoom out. Curves track
 the midpoint by changing sampled ranges, with coarse previews and full sampling
 when either finger lifts. Further fingers are ignored.
@@ -3880,8 +3890,13 @@ zooming to expose new imaginary-height bands searches those bands asynchronously
 during a drag preview and 31-digit working precision for the completed view. The original roots are reused;
 newly plotted roots do not change the worksheet solutions. Requests are limited to 96 new roots per band,
 256 retained points and imaginary heights within ±10000; a caption identifies a reached search limit.
-Repeated identical views use the existing plot cache. The separate
-exact family of negative-even trivial zeros remains in the solution notes. Numerical root diagrams are limited
+Repeated identical views use the existing plot cache. The initial diagram also includes the exact trivial
+zeros −2, −4, −6, −8 and −10 and expands its real frame to show them. Panning or zooming along the negative
+real axis enumerates the visible members of this exact family directly in the native equation module;
+there is no repeated numerical solve. Their tooltips use an equality rather than an approximate decimal.
+They appear only when the imaginary viewport includes zero. Enumeration is bounded to real coordinates
+at least −10000 and the shared 256-point budget, with a zoom-in notice when either limit is reached.
+The infinite exact family also remains in the solution notes. Numerical root diagrams are limited
 to 256 roots. Ordinary real-only equations retain their
 curve plots. The completed solve supplies the point data directly, without repeating the solve for plotting
 or viewport changes. Select one equation variable
@@ -4155,6 +4170,9 @@ also use the shared context simplifier in their native workers. Supplied named
 constants can justify sign and domain simplifications; free-variable values remain
 evaluation data, not assumptions. This does not change solver branch selection or
 matrix pivot rules, and unknown restrictions remain visible.
+In Equation mode, the Rendered TeX card includes the dependent solution's complete native domain and
+principal-branch conditions alongside its formula, just as the Solutions card does. It does not replace
+those conditions with a cross-reference to another card.
 The generated integration constant is the last term of the displayed formula,
 before any domain condition; conditions remain after the binding bar in the
 Expression card.

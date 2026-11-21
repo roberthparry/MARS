@@ -206,7 +206,8 @@ static bool equation_evaluation_reuse(const char *directory)
         string_t *drawn = run(plot, 30000, &seconds);
         bool reused = drawn && strstr(string_c_str(drawn), "plot_cache_fixture retained\n") &&
                       strstr(string_c_str(drawn), "data-root-plane=\"true\"") &&
-                      strstr(string_c_str(drawn), "40 verified finite roots") &&
+                      strstr(string_c_str(drawn), "45 verified finite roots") &&
+                      strstr(string_c_str(drawn), "<title>z = -10</title>") &&
                       strstr(string_c_str(drawn), "Re(z)") && strstr(string_c_str(drawn), "Im(z)");
         if (!reused && drawn)
             fprintf(stderr, "Cache replay diagnostic: %.500s\n", string_c_str(drawn));
@@ -277,6 +278,38 @@ static bool zeta_window_checks(const char *directory)
     string_t *path = lab_proc_worker_path("mars_lab");
     string_t *key = path ? lab_proc_plot_key(plot, NULL, path, true) : NULL;
     string_t *before = key ? lab_proc_plot_cache_get(key, true) : NULL;
+    const struct {
+        const char *lower, *upper, *scale, *bottom, *top, *label;
+        size_t visible;
+    } real_windows[] = {
+        {"", "", "auto", "", "", "<title>z = -10</title>", 45},
+        {"-22", "-16", "manual", "-1", "1", "<title>z = -22</title>", 4},
+        {"-40", "-20", "manual", "-1", "1", "<title>z = -40</title>", 11},
+        {"-22", "-16", "manual", "1", "2", NULL, 0},
+        {"-10000", "-1", "manual", "-1", "1", "Trivial-zero display is bounded", 216}
+    };
+    for (size_t i = 0; ok && i < sizeof real_windows / sizeof *real_windows; ++i) {
+        plot[5] = real_windows[i].lower;
+        plot[6] = real_windows[i].upper;
+        plot[7] = real_windows[i].scale;
+        plot[8] = real_windows[i].bottom;
+        plot[9] = real_windows[i].top;
+        string_t *drawn = run(plot, 30000, NULL);
+        ok = drawn && occurrences(drawn, "<circle ") == real_windows[i].visible &&
+             (!real_windows[i].label || strstr(string_c_str(drawn), real_windows[i].label));
+        string_t *after = key ? lab_proc_plot_cache_get(key, true) : NULL;
+        ok = ok && equal(before, after);
+        if (!ok)
+            fprintf(stderr, "Trivial-zero viewport %zu: %zu visible, wanted %zu\n", i,
+                    drawn ? occurrences(drawn, "<circle ") : 0, real_windows[i].visible);
+        string_free(after);
+        string_free(drawn);
+    }
+    plot[5] = "0";
+    plot[6] = "1";
+    plot[7] = "manual";
+    plot[8] = "80";
+    plot[9] = "100";
     for (unsigned pass = 0; ok && pass < 3; ++pass) {
         plot[17] = pass ? "full" : "preview";
         if (pass == 2) {

@@ -401,12 +401,7 @@ static void print_matrix_bindings(mat_bindings_t *bindings)
 
         if (!name || !binding)
             continue;
-        {
-            number_t value = expr_get_val(binding);
-
-            value_text = number_text_dup(value);
-            num_destroy(&value);
-        }
+        value_text = expr_binding_value_to_string(binding);
         printf("%-12s %s\t%s\t%s\n", "binding", mat_bindings_is_constant_at(bindings, i) ? "constant" : "variable", name,
                value_text ? value_text : "(num_to_string failed)");
         free(value_text);
@@ -429,12 +424,7 @@ static void print_additional_matrix_bindings(mat_bindings_t *bindings, mat_bindi
 
         if (!name || !binding || matrix_bindings_contains_name(already_printed, name))
             continue;
-        {
-            number_t value = expr_get_val(binding);
-
-            value_text = number_text_dup(value);
-            num_destroy(&value);
-        }
+        value_text = expr_binding_value_to_string(binding);
         printf("%-12s %s\t%s\t%s\n", "binding", mat_bindings_is_constant_at(bindings, i) ? "constant" : "variable", name,
                value_text ? value_text : "(num_to_string failed)");
         free(value_text);

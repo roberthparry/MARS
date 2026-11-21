@@ -234,6 +234,20 @@ static number_t visible_value(number_t value, number_t ymin, number_t ymax)
     return num_clone(value);
 }
 
+/* A line plot needs a resolved edge; isolated finite samples must not produce a successful empty chart. */
+static int sample_resolution_error(const sampler_t *samples)
+{
+    bool finite = false, previous = false;
+    for (size_t i = 0; i < sampler_count(samples); ++i) {
+        const sampler_point_t *point = sampler_point(samples, i);
+        if (previous && point->valid && !point->break_before)
+            return 0;
+        finite |= point->valid;
+        previous = point->valid;
+    }
+    return finite ? E2BIG : ENODATA;
+}
+
 static bool probes_agree(const sampler_t *low, const sampler_t *high, number_t ymin, number_t ymax)
 {
     NUM_SCOPE(numbers);
@@ -312,6 +326,12 @@ sampler_t *lab_worker_plot_samples_quality(const char *source, const char *varia
             break;
         if (agree) {
             result = sample_at(source, variable, lower, upper, bits, false, preview);
+            int error = result ? sample_resolution_error(result) : 0;
+            if (error) {
+                sampler_free(result);
+                result = NULL;
+                errno = error;
+            }
             if (result)
                 *precision_bits = bits;
             break;

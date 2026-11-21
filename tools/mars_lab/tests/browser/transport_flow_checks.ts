@@ -195,6 +195,39 @@ function checkTransportDomMappings(check: LabTestCheck): void {
             'non-SVG elements have no view-box dimensions');
         for (let kind = 13; kind <= 18; ++kind)
             check(Number.isNaN(bridge.call('lab_measure', field, kind)), 'non-SVG screen coefficients are unavailable');
+        const outer = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        outer.style.cssText = 'position:fixed;left:110px;top:90px;width:320px;height:200px';
+        outer.setAttribute('viewBox', '0 0 320 200');
+        const nested = document.createElementNS(outer.namespaceURI, 'svg') as SVGSVGElement;
+        for (const [name, value] of Object.entries({x: '23', y: '33', width: '240', height: '160',
+                                                   viewBox: '-4 -3 120 80'}))
+            nested.setAttribute(name, value);
+        const stroke = document.createElementNS(outer.namespaceURI, 'path') as SVGPathElement;
+        stroke.setAttribute('d', 'M0 0L20 10');
+        nested.appendChild(stroke);
+        outer.appendChild(nested);
+        document.body.appendChild(outer);
+        try {
+            for (let move = 0; move < 2; ++move) {
+                nested.x.baseVal.value += 19;
+                nested.y.baseVal.value += 7;
+                const drawn = stroke.getScreenCTM()!;
+                const keys = ['a', 'b', 'c', 'd', 'e', 'f'] as const;
+                for (let index = 0; index < keys.length; ++index)
+                    check(Math.abs(bridge.call<number>('lab_measure', nested, 13 + index) - drawn[keys[index]]) < 1e-7,
+                          'nested SVG pointer coordinates include viewport offsets: ' + keys[index]);
+                check(nested.querySelectorAll(':scope > [data-coordinate-basis]').length === 1,
+                      'repeated viewport measurements reuse one coordinate basis');
+            }
+            const restored = nested.cloneNode(true) as SVGSVGElement;
+            nested.replaceWith(restored);
+            const drawn = restored.querySelector('path')!.getScreenCTM()!;
+            check(Math.abs(bridge.call<number>('lab_measure', restored, 18) - drawn.f) < 1e-7 &&
+                  restored.querySelectorAll(':scope > [data-coordinate-basis]').length === 1,
+                  'restored plot markup reuses its coordinate basis without accumulating groups');
+        } finally {
+            outer.remove();
+        }
     } finally {
         svg.remove();
         bridge.dispose();

@@ -239,14 +239,21 @@ static bool test_cfg_database_towns_fixture(const char *directory)
     ok = ok && db && entry && complete_root &&
          sqlite_exec_cstr(db, "PRAGMA cache_size=-16384; PRAGMA temp.cache_size=-512; BEGIN;") &&
          cfg_database_import(db, complete_root, entry) &&
-         test_cfg_database_query(db, "SELECT count(*) FROM jurisdiction_town", "50036") &&
+         test_cfg_database_query(db, "SELECT count(*) FROM jurisdiction_town", "50037") &&
          sqlite_exec_cstr(db,
              "INSERT INTO jurisdiction_town(jurisdiction_id,town_name) VALUES "
              "('DK','Kolindsund (former lake)'),('DK','Tastum Sø (former lake)'),"
              "('DK','Gårdbo Sø (former lake)'),('DK','Sjørring Sø (former lake)'),"
              "('DK','Sperring Sø (former lake)');") &&
          cfg_database_source(db, root, "packaging/jurisdiction-db/location_additions.sql", false) &&
-         test_cfg_database_query(db, "SELECT count(*) FROM jurisdiction_town", "50036") &&
+         test_cfg_database_query(db, "SELECT count(*) FROM jurisdiction_town", "50037") &&
+         test_cfg_database_query(db,
+             "SELECT latitude||'|'||longitude||'|'||elevation_metres||'|'||timezone_name "
+             "FROM jurisdiction_town JOIN jurisdiction_town_latitude USING(jurisdiction_town_id) "
+             "JOIN jurisdiction_town_longitude USING(jurisdiction_town_id) "
+             "JOIN jurisdiction_town_elevation USING(jurisdiction_town_id) "
+             "JOIN jurisdiction_town_timezone USING(jurisdiction_town_id) JOIN timezone_code USING(timezone_code) "
+             "WHERE jurisdiction_id='GB-ENG' AND town_name='Greenwich'", "51.47785|-0.01176|12|Europe/London") &&
          test_cfg_database_query(db,
              "SELECT count(*) FROM jurisdiction_town WHERE jurisdiction_id='DK' "
              "AND town_name LIKE '% (former lake)'", "0") &&
@@ -1172,11 +1179,14 @@ static bool test_cfg_database_update_fixture(const char *directory)
         "('AU-ACT','subdivision','AU','AU'),('AU-NSW','subdivision','AU','AU'),"
         "('AU-NT','subdivision','AU','AU'),('AU-QLD','subdivision','AU','AU'),"
         "('AU-SA','subdivision','AU','AU'),('AU-TAS','subdivision','AU','AU'),"
-        "('AU-VIC','subdivision','AU','AU'),('AU-WA','subdivision','AU','AU');"
+        "('AU-VIC','subdivision','AU','AU'),('AU-WA','subdivision','AU','AU'),"
+        "('GB-ENG','subdivision','GB','GB');"
         "create table jurisdiction_name(jurisdiction_id text primary key,name text not null);"
         "insert into jurisdiction_name select jurisdiction_id,coalesce(name,jurisdiction_id) from jurisdiction;"
         "create table jurisdiction_town_entity(jurisdiction_town_id integer primary key);"
         "create table jurisdiction_town_name(jurisdiction_town_id integer primary key,town_name);"
+        "create trigger jurisdiction_town_name_entity after insert on jurisdiction_town_name begin "
+        "insert or ignore into jurisdiction_town_entity values(new.jurisdiction_town_id);end;"
         "create table jurisdiction_town_jurisdiction_id(jurisdiction_town_id integer primary key,jurisdiction_id);"
         "create view jurisdiction_town as select jurisdiction_town_id,jurisdiction_id,town_name "
         "from jurisdiction_town_name join jurisdiction_town_jurisdiction_id using(jurisdiction_town_id);"
@@ -1192,7 +1202,7 @@ static bool test_cfg_database_update_fixture(const char *directory)
         "create table timezone_canonical(timezone_name text primary key,canonical_timezone_name);"
         "create table timezone_era(timezone_name,sequence_no,gmtoff_minutes,rules_kind,format_text);"
         "insert into timezone_code values('Africa/Johannesburg',24);"
-        "insert into timezone_code values('Europe/Kaliningrad',246),('Europe/Moscow',257);"
+        "insert into timezone_code values('Europe/Kaliningrad',246),('Europe/Moscow',257),('Europe/London',250);"
         "insert into timezone_code values('Australia/Adelaide',221),('Australia/Brisbane',222),"
         "('Australia/Darwin',223),('Australia/Hobart',224),('Australia/Melbourne',225),"
         "('Australia/Perth',226),('Australia/Sydney',227);"
@@ -1237,9 +1247,9 @@ static bool test_cfg_database_update_fixture(const char *directory)
     ok = ok && cfg_databases_update() == 0 &&
          !setenv("MARS_ROOT", directory, 1) && cfg_databases_update() == 0; /* No source access on a current DB. */
     db = test_cfg_database_open(database, "saved-update-key");
-    ok = ok && db && test_cfg_database_query(db, "select revision from mars_database_revision", "21") &&
+    ok = ok && db && test_cfg_database_query(db, "select revision from mars_database_revision", "22") &&
          test_cfg_database_query(db,
-             "SELECT count(*) FROM jurisdiction_area_search WHERE jurisdiction_area_search MATCH '\"GB\"*'", "1") &&
+             "SELECT count(*) FROM jurisdiction_area_search WHERE jurisdiction_area_search MATCH '\"GB\"*'", "2") &&
          test_cfg_database_query(db,
              "SELECT count(*) FROM jurisdiction_town_search WHERE jurisdiction_town_search MATCH '\"Kaliningrad\"*'",
              "1") &&
@@ -1270,7 +1280,7 @@ static bool test_cfg_database_update_fixture(const char *directory)
     sqlite_close(db);
     ok = ok && !setenv("MARS_ROOT", MARS_CONFIG_ROOT_DIR, 1) && cfg_databases_update() == 0;
     db = test_cfg_database_open(database, "saved-update-key");
-    ok = ok && db && test_cfg_database_query(db, "select revision from mars_database_revision", "21") &&
+    ok = ok && db && test_cfg_database_query(db, "select revision from mars_database_revision", "22") &&
          test_cfg_database_query(db, "select count(*) from jurisdiction_town where jurisdiction_id='AU'", "261") &&
          test_cfg_database_query(db, "select count(distinct town_name) from jurisdiction_town "
                                    "where substr(jurisdiction_id,1,2)='AU'", "277") &&
@@ -1294,7 +1304,7 @@ static bool test_cfg_database_update_fixture(const char *directory)
     sqlite_close(db);
     ok = ok && cfg_databases_update() == 0;
     db = test_cfg_database_open(database, "saved-update-key");
-    ok = ok && db && test_cfg_database_query(db, "select revision from mars_database_revision", "21") &&
+    ok = ok && db && test_cfg_database_query(db, "select revision from mars_database_revision", "22") &&
          test_cfg_database_query(db, "SELECT count(*) FROM jurisdiction_place_alias "
              "WHERE name IN ('Sardinia','Sardegna','Corsica','Corse')", "4") &&
          test_cfg_database_query(db, "SELECT count(*) FROM jurisdiction_place_search "
@@ -1317,8 +1327,28 @@ static bool test_cfg_database_update_fixture(const char *directory)
     sqlite_close(db);
     ok = ok && cfg_databases_update() == 0;
     db = test_cfg_database_open(database, "saved-update-key");
-    ok = ok && db && test_cfg_database_query(db, "select revision from mars_database_revision", "21") &&
+    ok = ok && db && test_cfg_database_query(db, "select revision from mars_database_revision", "22") &&
          test_cfg_database_query(db, "SELECT count(*) FROM timezone_code WHERE timezone_name='Etc/UTC'", "1") &&
+         cfg_database_revision(db, "jurisdiction", 21);
+    sqlite_close(db);
+    /* The Greenwich migration also preserves existing references and defaults when repeated. */
+    ok = ok && cfg_databases_update() == 0;
+    db = test_cfg_database_open(database, "saved-update-key");
+    ok = ok && db && test_cfg_database_query(db, "select revision from mars_database_revision", "22") &&
+         test_cfg_database_query(db,
+             "SELECT count(*) FROM jurisdiction_town WHERE jurisdiction_id='GB-ENG' AND town_name='Greenwich'", "1") &&
+         test_cfg_database_query(db,
+             "SELECT latitude||'|'||longitude||'|'||elevation_metres||'|'||timezone_name "
+             "FROM jurisdiction_town JOIN jurisdiction_town_latitude USING(jurisdiction_town_id) "
+             "JOIN jurisdiction_town_longitude USING(jurisdiction_town_id) "
+             "JOIN jurisdiction_town_elevation USING(jurisdiction_town_id) "
+             "JOIN jurisdiction_town_timezone USING(jurisdiction_town_id) JOIN timezone_code USING(timezone_code) "
+             "WHERE jurisdiction_id='GB-ENG' AND town_name='Greenwich'", "51.47785|-0.01176|12|Europe/London") &&
+         test_cfg_database_query(db, "SELECT jurisdiction_town_id FROM jurisdiction_default_town "
+                                   "WHERE jurisdiction_id='AU'", "103") &&
+         test_cfg_database_query(db, "SELECT elevation_metres FROM jurisdiction_town_elevation "
+                                   "WHERE jurisdiction_town_id=103", "999") &&
+         test_cfg_database_query(db, "SELECT value FROM retained", "42") &&
          cfg_database_revision(db, "jurisdiction", 20) && sqlite_exec_cstr(db,
              "delete from jurisdiction_flag_region where code='CY-NCY';"
              "delete from jurisdiction_country_flag where iso_country_code='CY-NCY'");
@@ -1330,11 +1360,11 @@ static bool test_cfg_database_update_fixture(const char *directory)
     sqlite_close(db);
     ok = ok && !setenv("MARS_ROOT", MARS_CONFIG_ROOT_DIR, 1) && cfg_databases_update() == 0;
     db = test_cfg_database_open(database, "saved-update-key");
-    ok = ok && db && test_cfg_database_query(db, "select revision from mars_database_revision", "21") &&
+    ok = ok && db && test_cfg_database_query(db, "select revision from mars_database_revision", "22") &&
          test_cfg_database_query(db, "select parent_code from jurisdiction_flag_region where code='CY-NCY'", "CY") &&
          test_cfg_database_query(db,
              "select count(*) from jurisdiction_country_flag where iso_country_code in ('CY','CY-NCY')", "2") &&
-         cfg_database_revision(db, "jurisdiction", 22);
+         cfg_database_revision(db, "jurisdiction", 23);
     sqlite_close(db);
     ok = ok && cfg_databases_update() == 1 && !setenv("MARS_JURISDICTION_DB_KEY", "wrong-key", 1) &&
          cfg_databases_update() == 1;

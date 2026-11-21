@@ -44,9 +44,12 @@ static number_t coordinate(number_t lo, number_t hi, unsigned index, unsigned co
 static bool candidate(expr_t *formula, expr_t *gradient_formula, expr_t *const axes[2], unsigned dimensions,
                       number_t bounds[4], const bool automatic[4], bool constant)
 {
+    NUM_SCOPE(candidate_numbers);
     unsigned side = dimensions == 2 ? 7 : 33, rows = dimensions == 2 ? side : 1;
     unsigned minimum[] = {side, side}, maximum[] = {0, 0}, finite = 0;
-    double values[49], peak = 0;
+    double values[49], excursions[49], peak = 0;
+    number_t spacing = dimensions == 1u ?
+        num_div(num_sub(bounds[1], bounds[0]), num_create_from_long(side - 1)) : NUM_NAN;
     double previous_value = 0, previous_slope = 0;
     unsigned previous_column = side, reversals = 0;
     expr_t *evaluation = gradient_formula ? gradient_formula : formula;
@@ -72,6 +75,7 @@ static bool candidate(expr_t *formula, expr_t *gradient_formula, expr_t *const a
                 continue;
             if (dimensions == 1u) {
                 double slope = num_to_double(derivative);
+                excursions[finite] = fabs(num_to_double(num_mul(derivative, spacing)));
                 /* Repeated value jumps against both endpoint tangents indicate poles or unresolved oscillations.
                  * Prefer a smaller automatic window; explicit bounds still retain every requested endpoint. */
                 if (col == previous_column + 1u && isfinite(slope) && isfinite(previous_slope) &&
@@ -106,6 +110,15 @@ static bool candidate(expr_t *formula, expr_t *gradient_formula, expr_t *const a
     }
     if (high - low < 1e-10 && !constant)
         return false;
+    if (dimensions == 1u) {
+        unsigned unresolved = 0;
+        /* Repeated tangent excursions beyond the complete observed height span expose oscillations aliased
+         * by the coarse grid. Prefer a narrower window before the detailed sampler exhausts its resolution. */
+        for (unsigned i = 0; i < finite; ++i)
+            unresolved += excursions[i] / peak > high - low;
+        if (unresolved >= (finite + 3u) / 4u)
+            return false;
+    }
     unsigned interior = 0, lower_level = 0, upper_level = 0;
     for (unsigned i = 0; i < finite; ++i) {
         double fraction = constant ? 0.5 : (values[i] - low) / (high - low);
@@ -127,11 +140,11 @@ static bool candidate(expr_t *formula, expr_t *gradient_formula, expr_t *const a
         number_t hi = coordinate(bounds[offset], bounds[offset + 1], maximum[axis], side);
         if (automatic[offset]) {
             num_destroy(&bounds[offset]);
-            bounds[offset] = num_clone(lo);
+            bounds[offset] = num_scope_detach(num_clone(lo));
         }
         if (automatic[offset + 1]) {
             num_destroy(&bounds[offset + 1]);
-            bounds[offset + 1] = num_clone(hi);
+            bounds[offset + 1] = num_scope_detach(num_clone(hi));
         }
         num_destroy(&lo);
         num_destroy(&hi);

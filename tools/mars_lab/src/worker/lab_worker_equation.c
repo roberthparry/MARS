@@ -786,10 +786,6 @@ static void print_solution_TeX_rows(const equation_solutions_t *solutions, expr_
         num_destroy(&pair);
         equation_t *display = solution_with_bound_constants(solution, bindings);
         const equation_t *shown = display ? display : solution;
-        const expr_t *body = dependent ? expr_domain_body(equ_rhs(shown)) : equ_rhs(shown);
-        equation_t *compact = body != equ_rhs(shown) ? equ_new(equ_lhs(shown), body) : NULL;
-        if (compact)
-            shown = compact;
         char *rhs_TeX = expr_TeX_body_dup(equ_rhs(shown));
         char *tex = equ_text_dup(shown, style_LATEX);
 
@@ -798,9 +794,6 @@ static void print_solution_TeX_rows(const equation_solutions_t *solutions, expr_
             print_aligned_equation_fragment(name, rhs_TeX);
         } else
             printf("%s%s", printed++ == 0u ? first_separator : " \\\\\n", tex ? tex : "\\text{null}");
-        if (compact)
-            printf(" \\\\\n&\\text{Conditions in Solutions}");
-        equ_free(compact);
         equ_free(display);
         free(tex);
         free(rhs_TeX);
@@ -1241,16 +1234,14 @@ void lab_worker_equation_bindings(const equation_t *equation)
         if (!name || !binding)
             continue;
 
-        number_t value = expr_get_val(binding);
-        string_t *value_text = num_to_string(value);
+        char *value_text = expr_binding_value_to_string(binding);
         expr_t *named = expr_new_named_var(NUM_NAN, name);
         char *expression_name = named ? expr_to_string(named, style_UNBOUND) : NULL;
         printf("binding     %s\t%s\t%s\n", expr_bindings_is_constant_at(bindings, i) ? "constant" : "variable",
-               expression_name ? expression_name : name, value_text ? string_c_str(value_text) : "NAN");
+               expression_name ? expression_name : name, value_text ? value_text : "NAN");
         free(expression_name);
         expr_free(named);
-        string_free(value_text);
-        num_destroy(&value);
+        free(value_text);
     }
 }
 

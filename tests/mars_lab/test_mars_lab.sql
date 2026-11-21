@@ -22,6 +22,24 @@ INSERT INTO mars_lab_cases(name, operation, input, expected) VALUES
     ('progression_plot_bound_500', 'progression_plot', '{"expression":"{@Z_(k=1)^n sin(kx)|n=500}","action":"plot","wrt":"x","precision":97}', '20')
 ON CONFLICT(name) DO UPDATE SET input=excluded.input, expected=excluded.expected;
 
+INSERT INTO mars_lab_cases(name, operation, input, expected) VALUES
+    ('progression_plot_sine_1000', 'progression_plot', '{"expression":"@Z_(k=1)^1000 sin(kx)","action":"plot","wrt":"x","precision":97}', '20'),
+    ('progression_plot_ellipsis_1000', 'progression_plot', '{"expression":"sin(x)+sin(2x)+sin(3x)+...+sin(1000x)","action":"plot","wrt":"x","precision":97}', '20'),
+    ('progression_plot_cosine_1000', 'progression_plot', '{"expression":"@Z_(k=1)^1000 cos(kx)","action":"plot","wrt":"x","precision":97}', '20'),
+    ('progression_plot_bound_1000', 'progression_plot', '{"expression":"{@Z_(k=1)^n sin(kx)|n=1000}","action":"plot","wrt":"x","precision":97}', '20'),
+    ('progression_plot_closed_1000', 'progression_plot', '{"expression":"sin(500*x)*sin(1001*x/2)/sin(x/2)","action":"plot","wrt":"x","precision":97}', '20'),
+    ('progression_plot_renamed_1000', 'progression_plot', '{"expression":"@Z_(k=1)^1000 sin(kt)","action":"plot","wrt":"t","precision":97}', '20')
+ON CONFLICT(name) DO UPDATE SET input=excluded.input, expected=excluded.expected;
+
+INSERT INTO test_case_runner(module, source, parent, table_name, operation) VALUES (
+    'mars_lab.plot_resolution', 'tools/mars_lab/tests/test_lab_evaluation_extra.c',
+    'tests.test_lab_extra_plot_resolution', 'mars_lab_cases', 'plot_resolution')
+ON CONFLICT(module) DO UPDATE SET table_name=excluded.table_name, operation=excluded.operation;
+INSERT INTO mars_lab_cases(name, operation, input, expected) VALUES
+    ('plot_resolution_sine_sum', 'plot_resolution', '{"expression":"@Z_(k=1)^1000 sin(kx)","action":"plot","wrt":"x","plot_lower":"-10","plot_upper":"10","precision":97}', 'Plot sampling budget exhausted'),
+    ('plot_resolution_cosine', 'plot_resolution', '{"expression":"cos(1000*x)","action":"plot","wrt":"x","plot_lower":"-10","plot_upper":"10","precision":97}', 'Plot sampling budget exhausted')
+ON CONFLICT(name) DO UPDATE SET input=excluded.input, expected=excluded.expected;
+
 INSERT INTO test_case_runner(module, source, parent, table_name, operation) VALUES (
     'mars_lab.progression_samples', 'tools/mars_lab/tests/test_lab_evaluation_extra.c',
     'tests.test_lab_extra_progression_samples', 'mars_lab_cases', 'progression_sample')
@@ -249,6 +267,25 @@ INSERT OR IGNORE INTO mars_lab_cases(name, operation, input, expected) VALUES
      '{"expression":"x=-(2*atanh(sqrt(C+2*exp(y))/sqrt(C)))/sqrt(C)+D","wrt":"x","action":"plot","plot_source_mode":"equation","precision":40}',
      '{"status":"200","parameters":{"C":"-1","D":"1"},"plot_marker":"data-series","bindings":{"x":"variable","y":"variable","C":"constant","D":"constant"}}');
 
+-- Retain the complete native domain and branch restrictions in the dependent-coordinate TeX card.
+UPDATE mars_lab_cases SET expected =
+    '{"route":"/equation-eval","status":"200","parameters":{},"display_contains":"y &=","display_excludes":"Conditions in Solutions","display_fragments":["\\quad (","\\sqrt{C}\\ne 0","\\operatorname{sgn}","\\mathfrak{Re}","\\mathfrak{Im}","\\frac{\\pi}{2}\\ge",">-\\frac{\\pi}{2}"],"solutions_contains":"where","horizontal":"x","bindings":{"x":"variable","y":"variable","C":"constant","D":"constant"}}'
+WHERE name = 'equation_unwrapped_inverse_display';
+INSERT INTO mars_lab_cases(name, operation, input, expected) VALUES
+    ('equation_display_inverse_conditions_renamed', 'equation_parameters',
+     '{"equation":"t=-(2*atanh(sqrt(A+2*exp(x))/sqrt(A)))/sqrt(A)+B","precision":40}',
+     '{"route":"/equation-eval","status":"200","parameters":{},"display_contains":"x &=","display_excludes":"Conditions in Solutions","display_fragments":["\\quad (","\\sqrt{A}\\ne 0","\\operatorname{sgn}","\\frac{\\pi}{2}\\ge",">-\\frac{\\pi}{2}"],"solutions_contains":"where","horizontal":"t"}'),
+    ('equation_display_square_root_conditions', 'equation_parameters',
+     '{"equation":"x=sqrt(y)","precision":32}',
+     '{"route":"/equation-eval","status":"200","parameters":{},"display_contains":"y &=","display_excludes":"Conditions in Solutions","display_fragments":["\\quad (","\\mathfrak{Re}","\\operatorname{sgn}"],"solutions_contains":"where","horizontal":"x"}'),
+    ('equation_display_logarithm_conditions', 'equation_parameters',
+     '{"equation":"a+2*ln(y)=x","precision":32}',
+     '{"route":"/equation-eval","status":"200","parameters":{},"display_contains":"y &=","display_excludes":"Conditions in Solutions","display_fragments":["\\quad (","\\mathfrak{Im}","\\pi"],"solutions_contains":"where","horizontal":"x"}'),
+    ('equation_display_reciprocal_conditions', 'equation_parameters',
+     '{"equation":"x=atanh(y)/a","precision":32}',
+     '{"route":"/equation-eval","status":"200","parameters":{},"display_contains":"y &=","display_excludes":"Conditions in Solutions","display_fragments":["\\quad (","a\\ne 0"],"solutions_contains":"where","horizontal":"x"}')
+ON CONFLICT(name) DO UPDATE SET operation=excluded.operation, input=excluded.input, expected=excluded.expected;
+
 -- Fixing any coordinate, including the selected first one, changes the plot dimension without changing its role.
 INSERT OR IGNORE INTO mars_lab_cases(name, operation, input, expected) VALUES
     ('equation_torus_equatorial_circles', 'equation_parameters',
@@ -313,6 +350,34 @@ INSERT OR IGNORE INTO mars_lab_cases(name, operation, input, expected) VALUES
     ('equation_caption_selected_parameter', 'equation_parameters',
      '{"expression":"{y=a*x+b | x=?, y=?; a=?, b=?}","wrt":"x","action":"plot","plot_source_mode":"equation","precision":32,"plot_slices":"a\t-2\t2\t1\t250\nb\t-2\t2\t1\t-1"}',
      '{"status":"200","parameters":{"a":"-1","b":"1"},"title_contains":"y = 1 - x","title_excludes":"b - x","title_TeX_contains":"y &= 1 - x","bindings":{"a":"constant","b":"constant"}}')
+ON CONFLICT(name) DO UPDATE SET operation=excluded.operation, input=excluded.input, expected=excluded.expected;
+
+-- Editable bindings retain authored decimals; captions abbreviate only long display literals.
+INSERT INTO mars_lab_cases(name, operation, input, expected) VALUES
+    ('equation_caption_decimal_kepler', 'equation_parameters',
+     '{"expression":"{M=E-e*sin(E)|E=?;e=0.0167,M=1.047197551196597746154214461093167628065723133125035273658314}","wrt":"E","action":"plot","plot_source_mode":"equation","precision":98}',
+     '{"status":"200","parameters":{},"plot_marker":"data-series","title_contains":"0.0167","title_TeX_contains":"1.0471975511965977\\ldots{}","title_TeX_excludes":"\\frac","values":{"e":"0.0167","M":"1.047197551196597746154214461093167628065723133125035273658314"}}'),
+    ('equation_caption_decimal_renamed', 'equation_parameters',
+     '{"expression":"{q=t-c*sin(t)|t=?;c=0.0167,q=1.047197551196597746154214461093167628065723133125035273658314}","wrt":"t","action":"plot","plot_source_mode":"equation","precision":32}',
+     '{"status":"200","parameters":{},"plot_marker":"data-series","title_contains":"0.0167","title_TeX_contains":"1.0471975511965977\\ldots{}","title_TeX_excludes":"\\frac","values":{"c":"0.0167","q":"1.047197551196597746154214461093167628065723133125035273658314"}}'),
+    ('equation_caption_decimal_short', 'equation_parameters',
+     '{"expression":"{M=E-e*sin(E)|E=?;e=0.0167,M=1.0472}","wrt":"E","action":"plot","plot_source_mode":"equation","precision":32}',
+     '{"status":"200","parameters":{},"plot_marker":"data-series","title_contains":"1.0472","title_TeX_contains":"0.0167","title_TeX_excludes":"\\ldots","values":{"e":"0.0167","M":"1.0472"}}'),
+    ('equation_binding_authored_decimal', 'equation_parameters',
+     '{"equation":"{y=a*x|x=?,y=?;a=0.0167}","precision":32}',
+     '{"route":"/equation-eval","status":"200","parameters":{},"values":{"a":"0.0167"}}'),
+    ('expression_binding_authored_decimal', 'equation_parameters',
+     '{"expression":"{a*x|x=?;a=0.0167}","precision":32}',
+     '{"status":"200","parameters":{},"values":{"a":"0.0167"}}'),
+    ('expression_binding_decimal_half', 'equation_parameters',
+     '{"expression":"{a*x|x=?;a=0.5}","precision":32}',
+     '{"status":"200","parameters":{},"values":{"a":"0.5"}}'),
+    ('matrix_binding_authored_decimal', 'equation_parameters',
+     '{"matrix":"{(a 0;0 a)|;a=0.0167}","operation":"eval","precision":32}',
+     '{"route":"/matrix-eval","status":"200","parameters":{},"values":{"a":"0.0167"}}'),
+    ('equation_binding_authored_radical', 'equation_parameters',
+     '{"equation":"{y=a*x|x=?,y=?;a=sqrt(2)}","precision":32}',
+     '{"route":"/equation-eval","status":"200","parameters":{},"values":{"a":"√(2)"}}')
 ON CONFLICT(name) DO UPDATE SET operation=excluded.operation, input=excluded.input, expected=excluded.expected;
 
 -- Weather failures retain actionable status without publishing raw provider or transport text.

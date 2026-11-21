@@ -130,8 +130,6 @@ interface WorksheetReferences {
     matrixOperation: WorksheetSelect;
     matrixOperand: HTMLTextAreaElement;
     matrixOperandLabel: HTMLElement;
-    equationControls: HTMLElement;
-    diffequationControls: HTMLElement;
     integratorControls: HTMLElement;
     integratorBoundStack: HTMLElement;
     integratorIntervalCap: HTMLInputElement;

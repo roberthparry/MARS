@@ -48,7 +48,7 @@ window.checkLabPlotWheelGeometry = (): void => {
                       'empty corners inside the rectangular screen bounds remain outside the rotated volume');
             for (const transform of ['none', 'scale(.65)', 'rotate(23deg) scale(.8)']) {
                 chart.style.transform = transform;
-                const screen = chart.getScreenCTM()!;
+                const screen = marsTransportSVGScreen(chart)!;
                 const event = (x: number, y: number) => ({clientX: screen.a * x + screen.c * y + screen.e,
                     clientY: screen.b * x + screen.d * y + screen.f});
                 check(labDOM.call('lab_plot_pointer_inside', chart, event(200, 150)),
@@ -63,7 +63,7 @@ window.checkLabPlotWheelGeometry = (): void => {
         delete chart.dataset.surface;
         chart.dataset.plotLeft = '60'; chart.dataset.plotTop = '40';
         chart.dataset.plotWidth = '280'; chart.dataset.plotHeight = '200';
-        const screen = chart.getScreenCTM()!;
+        const screen = marsTransportSVGScreen(chart)!;
         const event = (x: number, y: number) => ({clientX: screen.a * x + screen.c * y + screen.e,
             clientY: screen.b * x + screen.d * y + screen.f});
         check(labDOM.call('lab_plot_pointer_inside', chart, event(200, 150)) &&
@@ -106,7 +106,7 @@ window.checkLabPlotWheel = async (chart: SVGSVGElement): Promise<void> => {
     };
     const modifiers: WheelEventInit[] = [{}, {shiftKey: true}, {altKey: true}, {ctrlKey: true}];
     const send = (x: number, y: number, modifier: WheelEventInit): WheelEvent => {
-        const screen = chart.getScreenCTM()!;
+        const screen = marsTransportSVGScreen(chart)!;
         const event = new WheelEvent('wheel', {clientX: screen.a * x + screen.c * y + screen.e,
             clientY: screen.b * x + screen.d * y + screen.f,
             deltaY: -100, bubbles: true, cancelable: true, ...modifier});

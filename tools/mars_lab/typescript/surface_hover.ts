@@ -172,7 +172,7 @@ class MarsSurfaceHover {
             return;
         }
         const view = this.view(pointer.chart);
-        const screen = pointer.chart.getScreenCTM();
+        const screen = marsTransportSVGScreen(pointer.chart);
         if (!view || !screen) {
             this.hide();
             return;

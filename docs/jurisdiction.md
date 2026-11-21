@@ -350,6 +350,13 @@ Queensland (`AU-QLD`), with the `Australia/Brisbane` timezone. GeoNames classifi
 these as urban sections (`PPLX`), normally excluded by the worldwide generator;
 explicit seeds retain these useful coastal locations without importing every
 suburb. The existing Sunshine Coast entry and all other towns are retained.
+
+Greenwich in London is also retained explicitly under England (`GB-ENG`),
+with the `Europe/London` timezone and its GeoNames locality coordinates and
+12-metre reference elevation. Its `PPLX` classification excludes it from bulk
+town generation. Managed-data revision 22 adds it to existing catalogues without
+changing saved towns, observer defaults or namesakes in other countries.
+
 The Azores (`PT-20`) and Madeira (`PT-30`) also have explicit regional lists,
 selected from Portugal's towns by their respective `Atlantic/Azores` and
 `Atlantic/Madeira` timezones. Their defaults are Ponta Delgada and Funchal, not

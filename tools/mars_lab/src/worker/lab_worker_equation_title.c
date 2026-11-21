@@ -5,16 +5,56 @@
  * Copies the displayed equation and substitutes finite bindings outside the
  * selected plotting coordinates. Exact authored values remain native expression
  * graphs, so radicals and rational values simplify without a rounded text round trip.
- * The same graph supplies plain and TeX captions. Sampling, worksheet bindings and
+ * The same graph supplies plain and TeX captions. Lossless decimal alternatives stay readable; long decimal
+ * literals are abbreviated with an explicit ellipsis in captions only. Sampling, worksheet bindings and
  * variable or constant roles are unchanged; no client-side mathematics is required.
  */
+#include <ctype.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "equation-t.h"
 #define MARS_SHARED_EXPR_INTERNAL_ACCESS
 #include "internal/expr_internal.h"
 #define MARS_LAB_WORKER_INTERNAL_ACCESS
 #include "lab_worker_internal.h"
+
+/* Shorten only decimal tokens in an already native-rendered caption; integer indices and algebra stay intact. */
+static string_t *caption_numbers(const char *source, bool TeX)
+{
+    size_t length = source ? strlen(source) : 0, position = 0, copied = 0;
+    string_t *out = source ? string_new() : NULL;
+    bool ok = out != NULL;
+    while (ok && position < length) {
+        unsigned char byte = (unsigned char)source[position];
+        if (!isdigit(byte)) {
+            ++position;
+            continue;
+        }
+        size_t start = position;
+        while (position < length && isdigit((unsigned char)source[position]))
+            ++position;
+        bool decimal = position < length && source[position] == '.' && position + 1 < length &&
+                       isdigit((unsigned char)source[position + 1]);
+        if (decimal) {
+            ++position;
+            while (position < length && isdigit((unsigned char)source[position]))
+                ++position;
+        }
+        bool identifier = start && (isalnum((unsigned char)source[start - 1]) || source[start - 1] == '_');
+        if (!decimal || identifier || position - start <= 20)
+            continue;
+        ok = !string_append_bytes(out, source + copied, start + 18 - copied) &&
+             !string_append_cstr(out, TeX ? "\\ldots{}" : "...");
+        copied = position;
+    }
+    ok = ok && !string_append_bytes(out, source + copied, length - copied);
+    if (!ok) {
+        string_free(out);
+        out = NULL;
+    }
+    return out;
+}
 
 /* Build both caption styles from the exact equation being sampled, retaining only its free coordinates. */
 bool lab_worker_equation_plot_titles(const equation_t *equation, const expr_t *first, const expr_t *second,
@@ -61,8 +101,20 @@ bool lab_worker_equation_plot_titles(const equation_t *equation, const expr_t *f
     equation_t *source = ok ? equ_new(sides[0], sides[1]) : NULL;
     equation_t *display = source ? equ_simplify_with_context(source, NULL) : NULL;
     if (display) {
-        *plain = equ_to_text(display, style_UNBOUND);
-        *TeX = equ_to_TeX_body_wrapped(display, LAB_WORKER_EQUATION_LINE_LIMIT_LATEX);
+        expr_t *left = expr_decimal_coefficients_for_display(equ_lhs(display));
+        expr_t *right = expr_decimal_coefficients_for_display(equ_rhs(display));
+        equation_t *caption = left && right ? equ_new(left, right) : NULL;
+        string_t *full = caption ? equ_to_text(caption, style_UNBOUND) : NULL;
+        char *full_TeX = caption ? equ_to_TeX_body_wrapped(caption, LAB_WORKER_EQUATION_LINE_LIMIT_LATEX) : NULL;
+        *plain = full ? caption_numbers(string_c_str(full), false) : NULL;
+        string_t *compact_TeX = caption_numbers(full_TeX, true);
+        *TeX = compact_TeX ? strdup(string_c_str(compact_TeX)) : NULL;
+        string_free(compact_TeX);
+        free(full_TeX);
+        string_free(full);
+        equ_free(caption);
+        expr_free(right);
+        expr_free(left);
     }
     ok = *plain && *TeX;
     if (!ok) {

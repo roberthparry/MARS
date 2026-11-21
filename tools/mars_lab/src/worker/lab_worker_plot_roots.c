@@ -2,7 +2,7 @@
  * @file lab_worker_plot_roots.c
  * @brief Native complex-plane diagrams of finite numerical equation solutions.
  *
- * Draws retained roots and extends supported zero searches outside their height range at display precision.
+ * Draws retained roots, enumerates exact trivial zeros and extends supported searches outside their height range.
  * Real and imaginary coordinates remain independent axes; a minimum unit-wide horizontal frame avoids round-off around
  * a shared real part. Viewport changes clip points rather than joining them into an invented curve.
  */
@@ -17,6 +17,54 @@
 #include "string-t.h"
 #define MARS_LAB_WORKER_INTERNAL_ACCESS
 #include "lab_worker_internal.h"
+
+/* Ask the equation module for the exact family; a plot worker does not reinterpret the authored mathematics. */
+static bool trivial_roots(const equation_t *equation, const number_t *roots, size_t root_count,
+                          number_t bounds[4], bool xmanual, size_t capacity,
+                          number_t *extra, size_t *count, bool *limited)
+{
+    *count = 0;
+    if (num_gt(bounds[2], NUM_ZERO) || num_lt(bounds[3], NUM_ZERO))
+        return true;
+    double low = xmanual ? num_to_double(bounds[0]) : -10;
+    double high = xmanual ? num_to_double(bounds[1]) : 0;
+    double clipped_low = fmax(-10000, low), clipped_high = fmin(10000, high);
+    bool outside = clipped_low >= clipped_high;
+    number_t lower = num_create_from_double(outside ? -1 : clipped_low);
+    number_t upper = num_create_from_double(outside ? 0 : clipped_high);
+    bool capped = false;
+    errno = 0;
+    equation_solutions_t *solutions = equ_search_zeta_trivial_zeros(equation, lower, upper,
+                                                                   capacity ? capacity : 1, &capped);
+    num_destroy(&lower);
+    num_destroy(&upper);
+    if (!solutions)
+        return errno == ENOTSUP;
+    *limited |= capped || low < -10000;
+    for (size_t i = 0; !outside && i < equ_solutions_count(solutions); ++i) {
+        number_t root = expr_eval(equ_rhs(equ_solutions_at(solutions, i)));
+        bool retained = false;
+        /* At most 256 retained roots: only a seeded real root can overlap this separate exact family. */
+        for (size_t j = 0; !retained && j < root_count; ++j)
+            retained = num_is_real(roots[j]) && num_eq(roots[j], root);
+        if (!retained && *count < capacity)
+            extra[(*count)++] = root;
+        else {
+            *limited |= !retained;
+            num_destroy(&root);
+        }
+    }
+    equ_solutions_free(solutions);
+    if (!xmanual && *count) {
+        double left = fmin(num_to_double(bounds[0]), num_to_double(extra[*count - 1]));
+        double right = num_to_double(bounds[1]), pad = (right - left) * 0.05;
+        num_destroy(&bounds[0]);
+        num_destroy(&bounds[1]);
+        bounds[0] = num_create_from_double(left - pad);
+        bounds[1] = num_create_from_double(right + pad);
+    }
+    return true;
+}
 
 /* Keep the original roots untouched; a viewport request searches only newly exposed upper and lower bands. */
 static bool extend_roots(const equation_t *equation, const double original[4], const number_t bounds[4],
@@ -63,7 +111,7 @@ static bool extend_roots(const equation_t *equation, const double original[4], c
 }
 
 /* Tooltips describe plot coordinates, with an ellipsis wherever the numerical spelling is abbreviated. */
-static string_t *root_label(const char *axis, number_t root)
+static string_t *root_label(const char *axis, number_t root, bool exact)
 {
     size_t bits = num_get_prec_bits(root);
     unsigned digits = bits && bits < 100 ? 15 : 30;
@@ -79,7 +127,7 @@ static string_t *root_label(const char *axis, number_t root)
             return NULL;
         }
     }
-    string_t *label = string_sprintf("%s ≈ %s", axis, string_c_str(value));
+    string_t *label = string_sprintf("%s %s %s", axis, exact ? "=" : "≈", string_c_str(value));
     string_free(value);
     return label;
 }
@@ -123,11 +171,15 @@ int lab_worker_plot_roots(const number_t *roots, size_t count, const equation_t 
         ok = lab_worker_plot_bounds(argv[8], argv[9], &bounds[2], &bounds[3]);
     }
     number_t extra[256];
-    size_t extra_count = 0;
-    bool limited = false;
+    size_t extra_count = 0, trivial_count = 0;
+    bool limited = false, trivial_limited = false;
+    if (ok)
+        ok = trivial_roots(equation, roots, count, bounds, xmanual, 256 - count,
+                            extra, &trivial_count, &trivial_limited);
     if (ok && ymanual)
-        ok = extend_roots(equation, limits, bounds, !strcmp(argv[17], "preview"), 256 - count,
-                            extra, &extra_count, &limited);
+        ok = extend_roots(equation, limits, bounds, !strcmp(argv[17], "preview"), 256 - count - trivial_count,
+                            extra + trivial_count, &extra_count, &limited);
+    extra_count += trivial_count;
     for (size_t i = 0; ok && i < extra_count; ++i) {
         points[count + i] = (plot_point_t){num_real_part(extra[i]), num_imag_part(extra[i]), false};
         ++filled;
@@ -147,7 +199,7 @@ int lab_worker_plot_roots(const number_t *roots, size_t count, const equation_t 
     ok = ok && plot && xlabel && ylabel;
     for (size_t i = 0; ok && i < count + extra_count; ++i) {
         number_t root = i < count ? roots[i] : extra[i - count];
-        string_t *label = root_label(axis, root);
+        string_t *label = root_label(axis, root, i >= count && i < count + trivial_count);
         ok = label && plot_add_points(plot, points + i, 1, string_c_str(label), PLOT_POINTS, 0x78d8cb);
         string_free(label);
     }
@@ -158,10 +210,13 @@ int lab_worker_plot_roots(const number_t *roots, size_t count, const equation_t 
         printf("input %s\nexpression %s\nplot_title %s\nplot_title_TeX %s\nplot_svg %s\n"
                "plot_notice Complex solutions: %zu verified finite roots, including any real roots. "
                "Points are not joined; completeness is not certified. "
-               "Worksheet solutions retain their selected precision.%s%s\ndifferentiable no\n",
+               "Worksheet solutions retain their selected precision.%s%s%s%s\ndifferentiable no\n",
                argv[1], argv[1], title ? title : "", TeX ? TeX : "", string_c_str(svg), count + extra_count,
-               extra_count ? " Newly visible roots are calculated at display precision." : "",
-               limited ? " Additional search is bounded to 96 roots per band and imaginary heights ±10000; zoom in." : "");
+               extra_count > trivial_count ? " Newly visible non-trivial roots are calculated at display precision." : "",
+               trivial_count ? " Trivial negative-even zeros are included as exact real points." : "",
+               limited ? " Additional search is bounded to 96 roots per band and imaginary heights ±10000; zoom in." : "",
+               trivial_limited ? " Trivial-zero display is bounded to 256 total points and "
+                                 "real coordinates ≥ -10000; zoom in." : "");
     } else {
         ok = false;
         printf("error Unable to draw the complex solutions; check the real and imaginary axis limits.\n");

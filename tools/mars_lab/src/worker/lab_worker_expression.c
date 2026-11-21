@@ -1726,7 +1726,7 @@ cleanup:
     num_destroy(&seed);
 }
 
-static void print_bindings(const char *label, expr_bindings_t *bindings, int precision)
+static void print_bindings(const char *label, expr_bindings_t *bindings)
 {
     size_t count = expr_bindings_count(bindings);
 
@@ -1738,7 +1738,7 @@ static void print_bindings(const char *label, expr_bindings_t *bindings, int pre
         if (!name || !binding)
             continue;
 
-        value_text = owned_number_text(expr_get_val(binding), precision);
+        value_text = expr_binding_value_to_string(binding);
         expr_t *named = expr_new_named_var(NUM_NAN, name);
         char *expression_name = named ? expr_text_dup(named, style_UNBOUND) : NULL;
         char *function_name = named ? expr_to_function_body(named) : NULL;
@@ -1761,11 +1761,11 @@ static bool expression_evaluation_ready(const expr_t *expr)
     return expr != NULL;
 }
 
-static void print_expression_tree_bindings(const char *label, const expr_t *expr, int precision)
+static void print_expression_tree_bindings(const char *label, const expr_t *expr)
 {
     expr_bindings_t *bindings = expr_bindings_from_expr_internal(expr);
 
-    print_bindings(label, bindings, precision);
+    print_bindings(label, bindings);
     expr_bindings_free(bindings);
 }
 
@@ -1937,7 +1937,7 @@ static int run_goal_seek(int argc, char **argv)
     printf("unbound     %s\n", unbound_text ? unbound_text : "(null)");
     printf("function    %s\n", func_text ? func_text : "(null)");
     printf("tex         %s\n", TeX_text ? TeX_text : "(null)");
-    print_bindings("binding", bindings, precision);
+    print_bindings("binding", bindings);
     print_owned_number("value", num_clone(result.value), precision);
     print_owned_number("residual", num_clone(result.residual), precision);
     printf("iterations  %zu\n", result.iterations);
@@ -2046,7 +2046,7 @@ int lab_worker_expression(int argc, char **argv)
     wrt_is_variable = wrt && expr_is_variable(wrt);
     if (!strcmp(action, "plot")) {
         printf("input       %s\n", raw_input);
-        print_bindings("binding", bindings, precision);
+        print_bindings("binding", bindings);
         rc = lab_worker_plot_request(raw_input, expr, bindings, wrt, argc, argv);
         goto cleanup;
     }
@@ -2129,7 +2129,7 @@ int lab_worker_expression(int argc, char **argv)
     free(conditioned_expression);
     printf("algebraic_specialisation  %s\n",
            specialised_transform ? "native-result" : domain_specialised ? "domain-required" : "none");
-    print_bindings("binding", bindings, precision);
+    print_bindings("binding", bindings);
     printf("differentiable  %s\n", expr_is_differentiable(display_expr) ? "yes" : "no");
     printf("evaluation_ready  %s\n", expression_evaluation_ready(expr) ? "yes" : "no");
     printf("plot_available  %s\n", expr_has_numeric_form(display_expr) ? "yes" : "no");
@@ -2272,7 +2272,7 @@ int lab_worker_expression(int argc, char **argv)
         printf("derivative  d/d%s = %s\n", wrt_name, deriv_text ? deriv_text : "(null)");
         printf("derivative_function  %s\n", deriv_func_text ? deriv_func_text : "(null)");
         printf("derivative_TeX  %s\n", deriv_TeX_text ? deriv_TeX_text : "");
-        print_expression_tree_bindings("derivative_binding", deriv, precision);
+        print_expression_tree_bindings("derivative_binding", deriv);
         if (deriv_values_text)
             printf("d values     %s\n", deriv_values_text);
         else {
@@ -2354,7 +2354,7 @@ int lab_worker_expression(int argc, char **argv)
                 printf("integral  ∫d%s = %s\n", wrt_name, integral_text ? integral_text : "(null)");
                 printf("integral_function  %s\n", integral_func_text ? integral_func_text : "(null)");
                 printf("integral_TeX  %s\n", integral_TeX_text ? integral_TeX_text : "");
-                print_expression_tree_bindings("integral_binding", integral, precision);
+                print_expression_tree_bindings("integral_binding", integral);
                 print_owned_number("i value", expr_eval(integral), precision);
             }
         } else {

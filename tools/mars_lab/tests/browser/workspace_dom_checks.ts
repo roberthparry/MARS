@@ -52,8 +52,8 @@ window.checkLabWorkspaceDom = function checkLabWorkspaceDom() {
     }
     try {
         const panels = [
-            null, WorksheetContext.equationControls, WorksheetContext.diffequationControls, WorksheetContext.matrixControls, WorksheetContext.integratorControls, WorksheetContext.datetimeControls,
-            WorksheetContext.almanacControls
+            null, null, null, WorksheetContext.matrixControls, WorksheetContext.integratorControls,
+            WorksheetContext.datetimeControls, WorksheetContext.almanacControls
         ];
         const calculus = [true, true, true, true, false, false, false];
         const valueVisible = [false, true, true, false, true, true, false];
@@ -94,7 +94,7 @@ window.checkLabWorkspaceDom = function checkLabWorkspaceDom() {
             WorksheetContext.rightPaneTitle.textContent = 'x plot RESULT';
             labDOM.call('lab_workspace_dom_mode', mode, 'fixture coverage');
             check(WorksheetContext.rightPaneTitle.textContent === 'Result', 'mode projection clears the previous operation heading');
-            for (let index = 1; index < panels.length; ++index)
+            for (let index = 3; index < panels.length; ++index)
                 check(hidden(panels[index]!) === (index !== mode), 'only selected mode panel is shown');
             for (const name of classes)
                 check(

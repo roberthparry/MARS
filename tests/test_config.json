@@ -1012,7 +1012,9 @@
         "enabled": true,
         "guarded_root_polynomial_branches": true,
         "linear_root": true,
-        "quadratic_roots": true
+        "quadratic_roots": true,
+        "zeta_affine_bound_offset": true,
+        "zeta_affine_bound_parameter": true
       },
       "test_equation_even_quadratic": {
         "enabled": true,
@@ -1104,6 +1106,30 @@
         "solution_pair_scaled_ellipsoid": true,
         "solution_pair_shifted_ellipse": true,
         "solution_pair_sphere": true
+      },
+      "test_equation_zeta_trivial_cancellation": true,
+      "test_equation_zeta_trivial_window": {
+        "enabled": true,
+        "trivial_window_affine_seeded": true,
+        "trivial_window_boundary": true,
+        "trivial_window_constants": true,
+        "trivial_window_default": true,
+        "trivial_window_exact_capacity": true,
+        "trivial_window_gap_empty": true,
+        "trivial_window_invalid_budget": true,
+        "trivial_window_invalid_complex": true,
+        "trivial_window_invalid_order": true,
+        "trivial_window_multiple_coordinates": true,
+        "trivial_window_narrow_excluded": true,
+        "trivial_window_narrow_included": true,
+        "trivial_window_narrow_outside_limit": true,
+        "trivial_window_near_endpoints": true,
+        "trivial_window_nonzero_target": true,
+        "trivial_window_other_equation": true,
+        "trivial_window_outside_limit": true,
+        "trivial_window_pole_control": true,
+        "trivial_window_positive_empty": true,
+        "trivial_window_series_domain": true
       }
     }
   },
@@ -6202,7 +6228,19 @@
         "equation_torus_equatorial_circles": true,
         "equation_torus_manual_inner_circle": true,
         "equation_unwrapped_inverse_display": true,
-        "equation_unwrapped_inverse_plot": true
+        "equation_unwrapped_inverse_plot": true,
+        "equation_binding_authored_decimal": true,
+        "equation_binding_authored_radical": true,
+        "equation_caption_decimal_kepler": true,
+        "equation_caption_decimal_renamed": true,
+        "equation_caption_decimal_short": true,
+        "equation_display_inverse_conditions_renamed": true,
+        "equation_display_logarithm_conditions": true,
+        "equation_display_reciprocal_conditions": true,
+        "equation_display_square_root_conditions": true,
+        "expression_binding_authored_decimal": true,
+        "expression_binding_decimal_half": true,
+        "matrix_binding_authored_decimal": true
       }
     }
   },
@@ -6311,8 +6349,36 @@
       "test_lab_extra_plot_tangent_bounds": true,
       "test_lab_extra_plot_title_fallback": true,
       "test_lab_extra_plot_turning_points": true,
-      "test_lab_extra_progression_plots": true,
-      "test_lab_extra_progression_samples": true,
+      "test_lab_extra_progression_plots": {
+        "enabled": true,
+        "progression_plot_bound_1000": true,
+        "progression_plot_bound_500": true,
+        "progression_plot_closed_1000": true,
+        "progression_plot_cosine_1000": true,
+        "progression_plot_cosine_500": true,
+        "progression_plot_cosine_literal": true,
+        "progression_plot_ellipsis_1000": true,
+        "progression_plot_renamed_1000": true,
+        "progression_plot_sine_1000": true,
+        "progression_plot_sine_500": true,
+        "progression_plot_sine_bound": true,
+        "progression_plot_sine_literal": true
+      },
+      "test_lab_extra_progression_samples": {
+        "enabled": true,
+        "progression_sample_coordinate_upper": true,
+        "progression_sample_cosh_zero": true,
+        "progression_sample_cosine_zero_double": true,
+        "progression_sample_cosine_zero_precise": true,
+        "progression_sample_empty": true,
+        "progression_sample_exp_zero": true,
+        "progression_sample_negative_upper": true,
+        "progression_sample_noninteger_upper": true,
+        "progression_sample_sine_zero_double": true,
+        "progression_sample_sine_zero_precise": true,
+        "progression_sample_sinh_zero": true,
+        "progression_sample_tiny_sine": true
+      },
       "test_lab_extra_projection_fonts": true,
       "test_lab_extra_render_TeX": true,
       "test_lab_extra_repeated_gaussian_integral": true,
@@ -6327,7 +6393,12 @@
       "test_lab_extra_surface_slices": true,
       "test_lab_extra_unsafe_TeX_environment": true,
       "test_lab_extra_unsafe_TeX_escape": true,
-      "test_lab_extra_unsafe_TeX_input": true
+      "test_lab_extra_unsafe_TeX_input": true,
+      "test_lab_extra_plot_resolution": {
+        "enabled": true,
+        "plot_resolution_cosine": true,
+        "plot_resolution_sine_sum": true
+      }
     }
   },
   "tools/mars_lab/tests/test_lab_forms.c": {
@@ -7009,7 +7080,21 @@
   "tools/mars_lab/tests/test_lab_presentation.c": {
     "tests": {
       "enabled": true,
-      "test_lab_presentation_calculation_time": true,
+      "test_lab_presentation_calculation_time": {
+        "calculation_time_absent": true,
+        "calculation_time_microsecond": true,
+        "calculation_time_microseconds": true,
+        "calculation_time_millisecond": true,
+        "calculation_time_nanoseconds": true,
+        "calculation_time_negative": true,
+        "calculation_time_nonfinite": true,
+        "calculation_time_overflow": true,
+        "calculation_time_second": true,
+        "calculation_time_seconds": true,
+        "calculation_time_trailing_junk": true,
+        "calculation_time_zero": true,
+        "enabled": true
+      },
       "test_lab_presentation_calculus_cards": true,
       "test_lab_presentation_compaction": true,
       "test_lab_presentation_condition_boundary": true,

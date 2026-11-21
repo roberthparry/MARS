@@ -32,8 +32,6 @@ window.checkLabMobileLayout = async function checkLabMobileLayout(state: string,
     }
 
     const selectors = '.result-card, .help-card, #datetimeLocal, .datetime-section, #functionRunResult';
-    const originals = [...document.querySelectorAll<HTMLElement>(selectors)];
-    const expected = originals.map(visible);
     const frame = document.createElement('iframe');
     frame.style.cssText = 'position:fixed;left:-10000px;top:0;width:390px;height:844px;border:0';
     try {
@@ -49,6 +47,8 @@ window.checkLabMobileLayout = async function checkLabMobileLayout(state: string,
         document.body.appendChild(frame);
         await loaded;
         const doc = frame.contentDocument!;
+        const originals = [...document.querySelectorAll<HTMLElement>(selectors)];
+        const expected = originals.map(visible);
         doc.body.className = document.body.className;
         for (const source of document.querySelectorAll<HTMLElement>('body > header, body > main, body > #marsDatePicker'))
             doc.body.appendChild(source.cloneNode(true));
@@ -447,15 +447,12 @@ window.checkLabMobileLayout = async function checkLabMobileLayout(state: string,
                               `${width}px: calendar selector text should be compact`);
                 }
             }
-            for (const id of ['equationControls', 'diffequationControls']) {
-                const hint = doc.getElementById(id)!;
-                if (hint.classList.contains('hidden'))
-                    continue;
-                check(visible(hint) === (width > 560 && visible(document.getElementById(id)!)),
-                      `${width}px: introductory equation hint should appear only on larger screens`);
-                const mode = id.replace('Controls', '');
+            check(!doc.querySelector('#equationControls, #diffequationControls, .integrator-bound-guidance, ' +
+                                     '.integrator-examples, .datetime-intro, .datetime-offset-hint'),
+                  `${width}px: workspace guidance belongs in Help`);
+            for (const mode of ['equation', 'diffequation', 'integrator', 'datetime']) {
                 check(doc.querySelector<HTMLElement>(`.help-card[data-help-modes="${mode}"]`)?.textContent?.trim().length! > 0,
-                      `${width}px: equation guidance must remain in Help`);
+                      `${width}px: ${mode} guidance must remain in Help`);
             }
             if (width <= 560) {
                 for (const box of doc.querySelectorAll<HTMLElement>('.variable-value-box')) {
@@ -472,10 +469,6 @@ window.checkLabMobileLayout = async function checkLabMobileLayout(state: string,
             }
             const integrator = doc.getElementById('integratorControls')!;
             if (visible(integrator)) {
-                check(visible(integrator.querySelector<HTMLElement>('.integrator-bound-guidance')!) === (width > 560),
-                      `${width}px: Bound/Free guidance should appear only on larger screens`);
-                check(visible(integrator.querySelector<HTMLElement>('.integrator-examples')!) === (width > 560),
-                      `${width}px: integrator examples should appear only on larger screens`);
                 check(visible(doc.getElementById('integratorBoundStack')!),
                       `${width}px: integrator rows must remain available`);
                 check(visible(integrator.querySelector<HTMLElement>('label[for="integratorIntervalCap"]')!),
@@ -483,8 +476,6 @@ window.checkLabMobileLayout = async function checkLabMobileLayout(state: string,
             }
             const calendar = doc.getElementById('datetimeControls')!;
             if (visible(calendar)) {
-                check(visible(calendar.querySelector<HTMLElement>('.datetime-offset-hint')!) === (width > 560),
-                      `${width}px: GMT offset explanation should appear only on larger screens`);
                 check(visible(doc.getElementById('datetimeGmtOffset')!),
                       `${width}px: GMT offset control must remain available`);
                 const date = doc.getElementById('datetimeDate')!.getBoundingClientRect();

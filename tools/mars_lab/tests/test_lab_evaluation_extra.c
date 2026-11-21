@@ -1648,6 +1648,24 @@ static void test_lab_extra_progression_plots(void)
     test_run_database_cases(__FILE__, __LINE__, "mars_lab.progression_plots", NULL, progression_plot_row);
 }
 
+static void plot_resolution_row(const void *data)
+{
+    const test_database_case_t *row = data;
+    unsigned status = 0u;
+    json_t *response = request("/eval", string_c_str(row->input), &status);
+    bool ok = status == 422u && test_lab_ok(response, false) && !*lab_eval_text(response, "plot_svg") &&
+              contains(response, "error", string_c_str(row->expected));
+    if (!ok)
+        show_failure(response);
+    json_free(response);
+    TEST_ASSERT_TRUE(ok, "unresolved explicit curve ranges report their sampling limit instead of empty axes");
+}
+
+static void test_lab_extra_plot_resolution(void)
+{
+    test_run_database_cases(__FILE__, __LINE__, "mars_lab.plot_resolution", NULL, plot_resolution_row);
+}
+
 static void progression_sample_row(const void *data)
 {
     NUM_SCOPE(numbers);
@@ -3472,6 +3490,7 @@ void test_lab_evaluation_extra_cases(void)
     TEST_RUN_IN_GROUP(test_lab_extra_nested_root_equation, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_plot_precision, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_progression_plots, tests, NULL);
+    TEST_RUN_IN_GROUP(test_lab_extra_plot_resolution, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_progression_samples, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_plot_title_fallback, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_native_records, tests, NULL);

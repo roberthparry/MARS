@@ -188,6 +188,16 @@ int expr_set_number_precision_local(int precision);
 bool expr_set_number_fractional_local(bool fractional);
 
 /**
+ * @brief Build an exact display graph with shorter terminating decimal coefficients beside their factors.
+ * @param[in] expression Borrowed source graph, left unchanged with all supplied binding metadata intact.
+ * @return Independent owned graph released with expr_free(), or NULL for missing input, excessive nesting or
+ * allocation failure. Only finite, non-zero rational scales whose lossless decimal spelling is shorter are
+ * collected or distributed over additive terms; symbolic denominators and domain restrictions are preserved.
+ * The calling thread's fraction preference is respected. Concurrent mutation of the source is unsupported.
+ */
+expr_t *expr_decimal_coefficients_for_display(const expr_t *expression);
+
+/**
  * @brief Initialise a temporary naming table.
  * @param table Caller-owned naming table to initialise before assigning temporary names.
  * autoname_restore.
@@ -1134,6 +1144,16 @@ bool expr_set_binding_value_text(expr_t *expr, const string_t *text);
  * @return True when the requested operation succeeds; false when unavailable, invalid or unsuccessful.
  */
 bool expr_copy_binding_value(expr_t *destination, const expr_t *source);
+
+/**
+ * @brief Format a scalar binding's authored value without replacing it by its numerical evaluation.
+ * @param[in] binding Borrowed binding node, whose value and metadata are neither modified nor retained.
+ * @return Owned Expression-style UTF-8 text, released with free(), or NULL for a missing binding or allocation
+ * failure. Preserved decimal literals and symbolic arithmetic retain their native spelling; a binding without
+ * authored metadata uses its stored numerical value. Unset values use NAN. Concurrent mutation
+ * of the binding is unsupported; the returned text is independent of its lifetime.
+ */
+char *expr_binding_value_to_string(const expr_t *binding);
 
 /**
  * @brief Capture a supplied scalar binding as an independently owned value expression.

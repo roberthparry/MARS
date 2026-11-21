@@ -120,6 +120,11 @@ static void equation_parameter_row(const void *data)
         if (*fragment)
             ok = ok && (strstr(lab_eval_text(response, fields[i].response), fragment) != NULL) != fields[i].excluded;
     }
+    const json_t *fragments = lab_eval_get(expected, "display_fragments");
+    for (size_t i = 0; i < json_array_size(fragments); ++i) {
+        const string_t *fragment = json_string_value(json_array_get(fragments, i));
+        ok = ok && fragment && strstr(lab_eval_text(response, "display_TeX"), string_c_str(fragment));
+    }
     const char *excluded = lab_eval_text(expected, "plot_excludes"), *svg = lab_eval_text(response, "plot_svg");
     if (*excluded) ok = ok && !strstr(svg, excluded);
     ok = ok && contour_radii(svg, expected);
@@ -161,6 +166,7 @@ static void equation_parameter_row(const void *data)
                lab_eval_text(response, "plot_slices"), lab_eval_text(response, "error"),
                lab_eval_text(response, "display_TeX"), lab_eval_text(response, "plot_title"),
                lab_eval_text(response, "plot_title_TeX"));
+        printf("Bindings: %s\n", lab_eval_text(response, "bindings"));
     }
     string_split_free(lines, count);
     string_free(records);

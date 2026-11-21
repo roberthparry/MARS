@@ -304,6 +304,14 @@ char *binding_rhs_expr_string_local(const expr_t *expr)
     return out;
 }
 
+/* Editable values retain authored decimals and algebra instead of their evaluated rational representation. */
+char *expr_binding_value_to_string(const expr_t *binding)
+{
+    if (binding_rhs_is_unset(binding))
+        return expr_tostring_xstrdup("NAN");
+    return binding ? binding_rhs_expr_string_local(binding) : NULL;
+}
+
 char *binding_rhs_c_string_local(const expr_t *expr)
 {
     string_t *text;

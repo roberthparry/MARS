@@ -576,7 +576,7 @@ class MarsSurfacePreview {
     private positionOverlay(view: MarsSurfaceView): boolean {
         // Map the native chart's coordinate system into the HTML scroll content,
         // including nested SVG headings, mobile fitting, borders and scroll offsets.
-        const screen = view.chart.getScreenCTM(), box = view.host.getBoundingClientRect();
+        const screen = marsTransportSVGScreen(view.chart), box = view.host.getBoundingClientRect();
         if (!screen) return false;
         this.resizeBacking(view, screen);
         const tx = screen.e - box.left - view.host.clientLeft + view.host.scrollLeft;

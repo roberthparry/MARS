@@ -5,8 +5,8 @@
  * The opaque equation_t type represents two expressions joined by equality, with
  * optional symbol bindings. The API supports constructing and parsing equations,
  * inspecting their sides, formatting them and obtaining solution collections.
- * A separate bounded zeta-zero search supports interactive imaginary-height windows at the current precision
- * without replacing an independently derived solution collection.
+ * Separate bounded zeta-zero searches support interactive imaginary-height windows at the current precision
+ * and exact negative-even real zeros without replacing an independently derived solution collection.
  *
  * Use this module to solve algebraic constraints rather than merely evaluate an
  * expression. Supported symbolic and polynomial paths retain exact values and
@@ -229,6 +229,24 @@ equation_solutions_t *equ_derive_solutions_with_context(const equation_t *equati
  */
 equation_solutions_t *equ_search_zeta_zeros(const equation_t *equation, number_t lower, number_t upper,
                                          size_t maximum, bool *limited);
+
+/**
+ * @brief Enumerate exact trivial zeros in a finite real interval of an affine Riemann-zeta equation.
+ * @param[in] equation Borrowed equation with one variable and a real affine zero target in zeta(variable).
+ * @param[in] lower Borrowed finite real lower coordinate, at least -10000.
+ * @param[in] upper Borrowed finite real upper coordinate, at most 10000 and greater than lower.
+ * @param maximum Maximum number of returned roots, from one to 256.
+ * @param[out] limited Optional flag set when more trivial zeros lie in the interval than the budget permits.
+ * @return Owned solutions, ordered from the greatest real coordinate downwards; release with equ_solutions_free().
+ * Returns NULL with EINVAL for invalid arguments, ENOTSUP for unsupported equations or uncontinued series,
+ * ENOMEM on allocation failure, or ECANCELED when the active computation scope stops. Partial results are discarded.
+ * Roots are exact negative even integers, including endpoints within the interval. An empty collection means only
+ * that this interval contains no trivial zeros; it makes no claim about non-trivial roots. This does not perform
+ * Newton iteration or change any authored bindings, retained solutions or the default precision. As with other
+ * equation operations, callers must not concurrently mutate the borrowed graph.
+ */
+equation_solutions_t *equ_search_zeta_trivial_zeros(const equation_t *equation, number_t lower, number_t upper,
+                                                 size_t maximum, bool *limited);
 
 /**
  * @brief Return the number of solutions currently stored in @p solutions.

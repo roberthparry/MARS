@@ -90,7 +90,7 @@ window.checkLabSurfaceHoverDOM = async function checkLabSurfaceHoverDOM(chart: S
     check(view.settled && !view.frame, 'initial curve layout reaches an idle state');
     labSurfacePreview.draw(chart, view.angles);
     await settle();
-    const frame = view.framePlan, screen = chart.getScreenCTM();
+    const frame = view.framePlan, screen = marsTransportSVGScreen(chart);
     check(frame && screen, 'retained projection is ready');
     if (!frame || !screen) return;
     const figure = chart.closest<SVGSVGElement>('svg[data-plot-figure]')!;
@@ -132,7 +132,7 @@ window.checkLabSurfaceHoverDOM = async function checkLabSurfaceHoverDOM(chart: S
     /** @brief Compare the visible marker centre with the current native screen-space hit. */
     function markerAligned(): boolean {
         const marker = view!.host.querySelector<HTMLElement>('.surface-pointer-marker');
-        const currentScreen = chart.getScreenCTM();
+        const currentScreen = marsTransportSVGScreen(chart);
         if (!marker || !currentScreen) return false;
         const hit = labDOM.call<MarsSurfaceHoverHit | null>('lab_surface_hover', {chart, primitives: view!.primitives},
             view!.framePlan, currentScreen, point.x, point.y, null);
@@ -156,7 +156,7 @@ window.checkLabSurfaceHoverDOM = async function checkLabSurfaceHoverDOM(chart: S
         const tip = view.host.querySelector<HTMLElement>('.surface-pointer-tip');
         if (!marker || !tip || !tip.textContent.includes('Approximate sample') ||
             !tip.textContent.includes('Re ≈') || !tip.textContent.includes('Im ≈')) {
-            const currentScreen = chart.getScreenCTM();
+            const currentScreen = marsTransportSVGScreen(chart);
             const plot = document.getElementById('plotRendered') as MarsSurfaceHoverPlot;
             const drag = plot.marsPlotDrag;
             const hit = currentScreen && view.framePlan ? labDOM.call<MarsSurfaceHoverHit | null>('lab_surface_hover',
@@ -183,7 +183,7 @@ window.checkLabSurfaceHoverDOM = async function checkLabSurfaceHoverDOM(chart: S
         if (marker) {
             const bounds = marker.getBoundingClientRect(), style = getComputedStyle(marker);
             const hit = labDOM.call<MarsSurfaceHoverHit>('lab_surface_hover', {chart, primitives: view.primitives},
-                view.framePlan, chart.getScreenCTM(), point.x, point.y, null);
+                view.framePlan, marsTransportSVGScreen(chart), point.x, point.y, null);
             check(bounds.width >= 9 && bounds.height >= 9 && style.position === 'absolute' &&
                 style.visibility === 'visible' && style.display !== 'none', 'marker has a visible, non-zero CSS box');
             check(hit && Math.abs(bounds.left + bounds.width / 2 - hit.x) < 1 &&
@@ -261,7 +261,7 @@ async function checkLabSurfaceHoverLifetime(chart: SVGSVGElement, view: MarsSurf
 
     const settle = LabTestBrowser.paint;
     const sample = labDOM.call<MarsSurfaceHoverHit>('lab_surface_hover', {chart, primitives: view.primitives},
-        view.framePlan, chart.getScreenCTM(), point.x, point.y, null);
+        view.framePlan, marsTransportSVGScreen(chart), point.x, point.y, null);
     check(sample, 'real sample is available for presentation checks');
     let hit: MarsSurfaceHoverHit | null = sample;
     let calls = 0, available = true;

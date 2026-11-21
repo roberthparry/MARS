@@ -306,6 +306,13 @@ are restored. The search excludes the separate trivial real family and does not 
 It is useful for bounded interactive exploration at double or double-double-equivalent precision while
 retaining a separately computed high-precision solution set.
 
+`equ_search_zeta_trivial_zeros(equation, lower, upper, maximum, &limited)` enumerates the separate exact
+negative-even real family within an inclusive real-coordinate window, using the same argument limits and
+ownership rules. Results run from the greatest coordinate downwards. This uses direct integer enumeration,
+with no Newton iteration or change to starting bindings. The optional flag reports additional trivial zeros
+beyond the point budget. Unsupported equations, non-zero targets and uncontinued series return `ENOTSUP`;
+an empty window does not imply the original equation has no other roots.
+
 The Lab combines verified numerical conjugates into one `±` row in both the
 Rendered TeX and Solutions cards. Inexact real and imaginary components round to the
 selected significant-digit precision in both cards; extra solver working digits remain
@@ -785,7 +792,8 @@ Stopped: 1
 
 This README example searches only heights 80 to 100, independently of any completed high-precision solve.
 The returned collection owns its roots; no input binding is changed. The count is numerical evidence,
-not a certificate of completeness.
+not a certificate of completeness. It then enumerates the exact trivial zeros between real coordinates
+−10 and 0 directly, without a numerical search.
 
 ```c
 #include <stdio.h>
@@ -805,6 +813,15 @@ int main(void)
     equ_solutions_free(roots);
     num_destroy(&lower);
     num_destroy(&upper);
+    lower = num_create_from_long(-10);
+    upper = num_create_from_long(0);
+    roots = equ_search_zeta_trivial_zeros(equation, lower, upper, 64, &limited);
+    if (roots)
+        printf("Trivial zeros in [-10, 0]: %zu; limited: %d\n", equ_solutions_count(roots), limited);
+    ok = ok && roots && equ_solutions_count(roots) == 5 && !limited;
+    equ_solutions_free(roots);
+    num_destroy(&lower);
+    num_destroy(&upper);
     equ_free(equation);
     return ok ? 0 : 1;
 }
@@ -814,6 +831,7 @@ Output:
 
 ```text
 Roots in [80, 100]: 8; limited: 0
+Trivial zeros in [-10, 0]: 5; limited: 0
 ```
 
 <style data-mars-formula-preview>

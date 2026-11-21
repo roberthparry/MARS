@@ -7,6 +7,56 @@ CREATE TABLE IF NOT EXISTS equation_cases (
 CREATE INDEX IF NOT EXISTS equation_cases_operation ON equation_cases(operation, name);
 
 INSERT INTO test_case_runner(module, source, parent, table_name, operation) VALUES (
+    'equation.zeta_trivial_window', 'tests/equation/test_equation.c',
+    'tests.test_equation_zeta_trivial_window', 'equation_cases', 'zeta_trivial_window')
+ON CONFLICT(module) DO UPDATE SET table_name=excluded.table_name, operation=excluded.operation;
+INSERT INTO equation_cases(name, operation, input, expected, precision) VALUES
+    ('trivial_window_default', 'zeta_trivial_window', 'zeta(z)=0',
+     '{"lower":"-10","upper":"1","maximum":256,"roots":[-2,-4,-6,-8,-10],"limited":false}', 78),
+    ('trivial_window_affine_seeded', 'zeta_trivial_window', '{3*zeta(s)+2=2 | s=0.5+14i}',
+     '{"lower":"-22","upper":"-16","maximum":256,"roots":[-16,-18,-20,-22],"limited":false}', 78),
+    ('trivial_window_constants', 'zeta_trivial_window', '{a*zeta(s)=0 | s=?; a=sqrt(2)}',
+     '{"lower":"-8","upper":"-1","maximum":3,"roots":[-2,-4,-6],"limited":true}', 78),
+    ('trivial_window_exact_capacity', 'zeta_trivial_window', '0=zeta(s)',
+     '{"lower":"-6","upper":"-1","maximum":3,"roots":[-2,-4,-6],"limited":false}', 32),
+    ('trivial_window_positive_empty', 'zeta_trivial_window', 'zeta(s)=0',
+     '{"lower":"0","upper":"100","maximum":256,"roots":[],"limited":false}', 32),
+    ('trivial_window_gap_empty', 'zeta_trivial_window', 'zeta(s)=0',
+     '{"lower":"-3","upper":"-2.1","maximum":256,"roots":[],"limited":false}', 32),
+    ('trivial_window_near_endpoints', 'zeta_trivial_window', 'zeta(s)=0',
+     '{"lower":"-3.9999999999999999999999999999999999","upper":"-2.0000000000000000000000000000000001","maximum":256,"roots":[],"limited":false}', 78),
+    ('trivial_window_narrow_included', 'zeta_trivial_window', 'zeta(s)=0',
+     '{"lower":"-2.0000000000000000000000000000000001","upper":"-1.9999999999999999999999999999999999","maximum":256,"roots":[-2],"limited":false}', 78),
+    ('trivial_window_narrow_excluded', 'zeta_trivial_window', 'zeta(s)=0',
+     '{"lower":"-1.9999999999999999999999999999999999","upper":"-1.9999999999999999999999999999999998","maximum":256,"roots":[],"limited":false}', 78),
+    ('trivial_window_boundary', 'zeta_trivial_window', 'zeta(s)=0',
+     '{"lower":"-10000","upper":"-9995","maximum":256,"roots":[-9996,-9998,-10000],"limited":false}', 78),
+    ('trivial_window_nonzero_target', 'zeta_trivial_window', 'zeta(s)=1',
+     '{"lower":"-10","upper":"1","maximum":256,"error":"ENOTSUP"}', 32),
+    ('trivial_window_series_domain', 'zeta_trivial_window', 'sum(n,1,inf,1/n^s)=0',
+     '{"lower":"-10","upper":"1","maximum":256,"error":"ENOTSUP"}', 32),
+    ('trivial_window_pole_control', 'zeta_trivial_window', '1/zeta(s)=0',
+     '{"lower":"-10","upper":"1","maximum":256,"error":"ENOTSUP"}', 32),
+    ('trivial_window_other_equation', 'zeta_trivial_window', 'sin(s)=0',
+     '{"lower":"-10","upper":"1","maximum":256,"error":"ENOTSUP"}', 32),
+    ('trivial_window_multiple_coordinates', 'zeta_trivial_window', 'zeta(s)+t=0',
+     '{"lower":"-10","upper":"1","maximum":256,"error":"ENOTSUP"}', 32),
+    ('trivial_window_invalid_order', 'zeta_trivial_window', 'zeta(s)=0',
+     '{"lower":"1","upper":"-10","maximum":256,"error":"EINVAL"}', 32),
+    ('trivial_window_invalid_complex', 'zeta_trivial_window', 'zeta(s)=0',
+     '{"lower":"-10+i","upper":"1","maximum":256,"error":"EINVAL"}', 32),
+    ('trivial_window_invalid_budget', 'zeta_trivial_window', 'zeta(s)=0',
+     '{"lower":"-10","upper":"1","maximum":0,"error":"EINVAL"}', 32),
+    ('trivial_window_outside_limit', 'zeta_trivial_window', 'zeta(s)=0',
+     '{"lower":"-10001","upper":"1","maximum":256,"error":"EINVAL"}', 32),
+    ('trivial_window_narrow_outside_limit', 'zeta_trivial_window', 'zeta(s)=0',
+     '{"lower":"-10000.0000000000000000000000000000000001","upper":"-9999","maximum":256,"error":"EINVAL"}', 78),
+    ('zeta_affine_bound_parameter', 'solve_count', '{a*zeta(s)=0 | s=?; a=sqrt(2)}', '40', 32),
+    ('zeta_affine_bound_offset', 'solve_count', '{a*zeta(s)+b=b | s=?; a=sqrt(2),b=3}', '40', 32)
+ON CONFLICT(name) DO UPDATE SET operation=excluded.operation, input=excluded.input,
+    expected=excluded.expected, precision=excluded.precision;
+
+INSERT INTO test_case_runner(module, source, parent, table_name, operation) VALUES (
     'equation.rational_relations', 'tests/equation/test_equation.c',
     'tests.test_equation_rational_relations', 'equation_cases', 'rational_relation')
 ON CONFLICT(module) DO UPDATE SET table_name=excluded.table_name, operation=excluded.operation;

@@ -147,9 +147,13 @@ void example_diffequation_bessel(void)
     diffequ_t *problem = de_from_string("x^2y'' + xy' + (x^2 - 1/4)y = 0");
     diffequ_solve_result_t *result = problem ? de_solve(problem) : NULL;
     string_t *text = result ? equ_to_text(de_solve_result_at(result, 0u), style_UNBOUND) : NULL;
-    bool ok = text && !strcmp(string_c_str(text),
-        "y = (C₁·cos(x) + C₂·sin(x))·1/√(|x|) where (x ∈ ℝ; x ≠ 0)") &&
-        puts(string_c_str(text)) != EOF;
-    string_free(text); de_solve_result_free(result); de_free(problem);
+    int status = EXIT_FAILURE;
+    if (text && puts(string_c_str(text)) != EOF)
+        status = EXIT_SUCCESS;
+    bool ok = status == EXIT_SUCCESS && !strcmp(string_c_str(text),
+        "y = (C₁·cos(x) + C₂·sin(x))·1/√(|x|) where (x ∈ ℝ; x ≠ 0)");
+    string_free(text);
+    de_solve_result_free(result);
+    de_free(problem);
     TEST_ASSERT_TRUE(ok, "README Bessel example prints the native elementary solution");
 }

@@ -364,6 +364,12 @@
                 !WorksheetContext.rendered.dataset.displayTex?.includes('D &=') &&
                 root.querySelector('legend')!.textContent === 'Parameter',
                 'the unwrapped inverse equation displays y(x), with a real contour and two constant parameters');
+            const displayed = WorksheetContext.rendered.dataset.displayTex || '';
+            check(displayed.includes('\\quad (') && displayed.includes('\\sqrt{C}\\ne 0') &&
+                displayed.includes('\\operatorname{sgn}') && displayed.includes('>-\\frac{\\pi}{2}') &&
+                !displayed.includes('Conditions in Solutions') && WorksheetContext.rendered.querySelector('svg'),
+                'Rendered TeX shows the complete native domain and branch restrictions with its solution: ' +
+                displayed + '; SVG: ' + Boolean(WorksheetContext.rendered.querySelector('svg')));
             const symbolic_source = WorksheetBindings.editor.currentExpressionText();
             const coefficient = root.querySelector<HTMLElement>('.plot-slice[data-name="C"]')!;
             root.querySelector<HTMLInputElement>('.slice-choice[value="C"]')!.click();
@@ -525,16 +531,22 @@
             check(chart && chart.querySelectorAll('circle').length >= 40,
                   'The initial zeta plot reuses the completed worksheet batch');
             const initialCount = chart.querySelectorAll('circle').length;
+            const trivialCount = [...chart.querySelectorAll('[data-series] > title')].filter(title =>
+                /^z = -\d+$/.test(title.textContent!)).length;
+            check(trivialCount === 5 && Number(chart.dataset.xMin) < -10 &&
+                  Number(chart.dataset.xMax) > 0.5,
+                  'The initial zeta plot includes five exact trivial zeros on the negative real axis');
             check([...chart.querySelectorAll('[data-series] > title')].every(title =>
-                      title.textContent!.includes('…') && title.textContent!.length < 110),
-                  'Root tooltips use shortened coordinates with an ellipsis');
+                      (title.textContent!.includes('…') || /^z = -\d+$/.test(title.textContent!)) &&
+                      title.textContent!.length < 110),
+                  'Root tooltips use exact integers or shortened coordinates with an ellipsis');
             for (const [id, value] of [['plotLower', '0'], ['plotUpper', '1'], ['plotScale', 'manual'],
                                        ['plotYLower', '80'], ['plotYUpper', '100']])
                 (document.getElementById(id)! as HTMLInputElement).value = value;
             await WorksheetRequests.plots.takePlot('z');
             const expanded = host.querySelector<SVGSVGElement>('[data-root-plane][data-plot-chart]');
             check(expanded && expanded.querySelectorAll('circle').length === 8 &&
-                  host.textContent!.includes(`${initialCount + 8} verified finite roots`),
+                  host.textContent!.includes(`${initialCount - trivialCount + 8} verified finite roots`),
                   'Changing the imaginary viewport reveals eight newly calculated roots beyond height 80');
             check(WorksheetContext.rendered.innerHTML === original,
                   'Exploring further roots preserves the high-precision worksheet result');
@@ -1428,7 +1440,7 @@
             const initial = chart();
             initial.closest<HTMLElement>('.complex-panel')!.querySelector('button')!.click();
             await LabTestBrowser.nextFrame();
-            const matrix = initial.getScreenCTM()!;
+            const matrix = marsTransportSVGScreen(initial)!;
             const x = matrix.e + (Number(initial.dataset.plotLeft) + Number(initial.dataset.plotWidth) * 0.75) * matrix.a;
             const y = matrix.f + (Number(initial.dataset.plotTop) + Number(initial.dataset.plotHeight) * 0.9) * matrix.d;
             const span = Number(initial.dataset.xMax) - Number(initial.dataset.xMin);
@@ -1523,7 +1535,7 @@
             check([...initial.querySelectorAll<SVGTextElement>('[data-plot-grid], [data-plot-tick]')]
                 .every(element => getComputedStyle(element).fill === 'none'),
                   'Grid and tick paths cannot inherit text fill');
-            const matrix = initial.getScreenCTM()!;
+            const matrix = marsTransportSVGScreen(initial)!;
             const pw = Number(initial.dataset.plotWidth) * matrix.a;
             const ph = Number(initial.dataset.plotHeight) * matrix.d;
             const x = matrix.e + Number(initial.dataset.plotLeft) * matrix.a + pw / 2;
@@ -2206,7 +2218,7 @@
             await LabTestBrowser.paint();
         }
         for (const factor of [0.5, 2]) {
-            const before = chart(), matrix = before.getScreenCTM()!, view = before.viewBox.baseVal;
+            const before = chart(), matrix = marsTransportSVGScreen(before)!, view = before.viewBox.baseVal;
             const camera = ['azimuth', 'elevation', 'roll'].map(key => before.dataset[key]);
             const heightPolicy = (document.getElementById('plotScale')! as HTMLInputElement).value;
             const cx = Math.round(matrix.e + (surface ? view.width / 2 :
@@ -2281,7 +2293,7 @@
         const card = rendered.closest<HTMLElement>('.result-card')!;
         const chart = () => rendered.querySelector<SVGSVGElement>('[data-plot-chart][data-x-min]:not([data-surface])')!;
         const before = chart(), width = rendered.querySelector('svg')!.getBoundingClientRect().width;
-        const matrix = before.getScreenCTM()!;
+        const matrix = marsTransportSVGScreen(before)!;
         const left = matrix.e + Number(before.dataset.plotLeft) * matrix.a;
         const top = matrix.f + Number(before.dataset.plotTop) * matrix.d;
         const plotWidth = Number(before.dataset.plotWidth) * matrix.a;
@@ -2398,7 +2410,7 @@
               Math.abs(Number(chart().dataset.xMax) - x1) < 1e-8,
               'Reset restores the original pre-zoom view');
         for (const pointerType of ['mouse', 'touch']) {
-            const initial = chart(), transform = initial.getScreenCTM()!;
+            const initial = chart(), transform = marsTransportSVGScreen(initial)!;
             const pw = Number(initial.dataset.plotWidth) * transform.a;
             const ph = Number(initial.dataset.plotHeight) * transform.d;
             const cx = Math.round(transform.e + Number(initial.dataset.plotLeft) * transform.a + pw / 2);
@@ -2429,7 +2441,7 @@
                   Math.abs(Number(chart().dataset.yMin) - y0) < 1e-8, 'Reset restores the pre-pan view');
         }
         const cancelled = chart();
-        const cancelMatrix = cancelled.getScreenCTM()!;
+        const cancelMatrix = marsTransportSVGScreen(cancelled)!;
         const cx = Math.round(cancelMatrix.e + (Number(cancelled.dataset.plotLeft) +
                               Number(cancelled.dataset.plotWidth) / 2) * cancelMatrix.a);
         const cy = Math.round(cancelMatrix.f + (Number(cancelled.dataset.plotTop) +
@@ -2476,19 +2488,14 @@
               sampledUnits.every((v, i) => Math.abs(v / sampledSpans[i] - unitScale) < 1e-10),
               'Native sampled surfaces preserve equal coordinate units, including unequal height ranges: ' +
               JSON.stringify({units: sampledUnits, sampledSpans, displayBounds: initial.volume.bounds}));
-        const projected: number[] = [];
-        for (let row = 0; row < 2; ++row) {
-            let span = 0;
-            for (let column = 0; column < 3; ++column)
-                span += Math.abs(frame.rows[row * 3 + column]);
-            projected.push(span * frame.fit);
-        }
-        const margin = Math.min(Math.max(Number(initial.volume.labelWidth) + 25, 45), (frame.width - 80)/2);
-        check(projected[0] <= frame.width - 2*margin + 1e-7 &&
-              projected[1] <= frame.height - 100 + 1e-7 &&
-              (Math.abs(projected[0] - (frame.width - 2*margin)) < 1e-7 ||
-               Math.abs(projected[1] - (frame.height - 100)) < 1e-7),
-              'The projected volume fills an available dimension without stretching or clipping');
+        // Perspective framing reserves actual arrow and label extents; orthographic span sums are inapplicable.
+        const corners = Array.from({length: 8}, (_, corner) => labDOM.call<number[]>('lab_surface_project', frame,
+            [Number(Boolean(corner & 1)), Number(Boolean(corner & 2)), Number(Boolean(corner & 4))]));
+        const centre = labDOM.call<number[]>('lab_surface_project', frame, [0.5, 0.5, 0.5]);
+        check(corners.every(point => point.every(Number.isFinite) && point[0] >= 0 && point[0] <= frame.width &&
+                              point[1] >= 0 && point[1] <= frame.height) &&
+              centre.every((value, index) => Math.abs(value - frame.centre![index]) < 1e-7),
+              'The perspective volume fits inside its viewport and shares the renderer coordinate centre');
         const lowControl = (document.getElementById('plotLower')! as HTMLInputElement), highControl = (document.getElementById('plotUpper')! as HTMLInputElement);
         const lowBefore = lowControl.value, highBefore = highControl.value;
         lowControl.value = 'pi-1'; highControl.value = 'pi+1';
@@ -2554,7 +2561,7 @@
         const axisPoints: MarsSurfacePoint3[] = [[0, 0, 0], [1, 0, 0], [0, 1, 0], [0, 0, 1]];
         const axes = axisPoints.map(view.project!);
         const wheel = (deltaY: number) => {
-            const drawing = chart(), matrix = drawing.getScreenCTM()!;
+            const drawing = chart(), matrix = marsTransportSVGScreen(drawing)!;
             const frame = labSurfacePreview.prepare(drawing)!.framePlan!;
             return drawing.dispatchEvent(new WheelEvent('wheel', {
                 deltaY, ctrlKey: true, bubbles: true, cancelable: true,
@@ -3723,6 +3730,7 @@
             }
             initialiseLabTestAdapters();
             if (new URLSearchParams(location.search).get('appearance-check') === '1') {
+                await runBrowserGroup('checkLabWorkspaceDom', window.checkLabWorkspaceDom);
                 await runBrowserGroup('mode-entry result reuse', check_mode_entry_results);
                 await runBrowserGroup('binding commit policy', window.checkLabBindingCommit);
                 await runBrowserGroup('appearance skins', window.checkLabAppearance);
@@ -4783,12 +4791,15 @@
                               Number(mesh.dataset.zMin) > -1.3 && Number(mesh.dataset.zMax) < 1.3,
                               'The sphere stays round inside a tightly fitted equal-unit box');
                         const axesBox = mesh.querySelector<SVGGElement>('[data-plot-axes]')!.getBBox();
+                        const left = Math.min(silhouette.x, axesBox.x);
+                        const right = Math.max(silhouette.x + silhouette.width, axesBox.x + axesBox.width);
                         const top = Math.min(silhouette.y, axesBox.y);
                         const bottom = Math.max(silhouette.y + silhouette.height, axesBox.y + axesBox.height);
-                        check(silhouette.width > mesh.viewBox.baseVal.width * 0.36 &&
-                              top < mesh.viewBox.baseVal.height * 0.12 &&
-                              bottom > mesh.viewBox.baseVal.height * 0.88,
-                              'The surface and axes fill the plot without large empty top and bottom margins');
+                        const heading = Math.min(48, Math.max(0, mesh.viewBox.baseVal.height - 240) / 4);
+                        check(silhouette.width > 0 && silhouette.height > 0 && left >= 0 &&
+                              right <= mesh.viewBox.baseVal.width && top >= heading && bottom <= mesh.viewBox.baseVal.height,
+                              'The projected sphere and axes stay visible inside the viewport below the title: ' +
+                              JSON.stringify({silhouette, axesBox, heading, viewport: mesh.viewBox.baseVal}));
                     }
                     if (source === 'x^2+y^2=1') {
                         const chart = plotRendered.querySelector<SVGSVGElement>('[data-plot-chart]')!;
@@ -4838,7 +4849,7 @@
                           'Family constants must not clutter the plot with a visible legend');
                     const curves = [...plotRendered.querySelectorAll<HTMLElement>('[data-series]')];
                     const chart = plotRendered.querySelector<SVGSVGElement>('[data-x-min]')!;
-                    const transform = chart.getScreenCTM()!;
+                    const transform = marsTransportSVGScreen(chart)!;
                     const point = {
                         clientX: transform.e + (Number(chart.dataset.plotLeft) + Number(chart.dataset.plotWidth) / 2) * transform.a,
                         clientY: transform.f + (Number(chart.dataset.plotTop) + Number(chart.dataset.plotHeight) / 2) * transform.d,

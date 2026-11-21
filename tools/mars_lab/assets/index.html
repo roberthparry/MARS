@@ -157,17 +157,8 @@
         <label class="hidden" for="matrixOperand" id="matrixOperandLabel">Right-hand side matrix</label>
         <textarea class="hidden secondary-editor" id="matrixOperand" spellcheck="false" placeholder="(1; 0)"></textarea>
       </div>
-      <div class="mode-panel hidden" id="equationControls">
-        <p class="mode-hint">Enter an equation such as <code>{ M = E - e*sin(E) | E = 1.5; M = 1.5, e = 0.0167 }</code>. Bindings after <code>|</code> decide which symbols are variables, which are constants, and which starting values numeric fallback should use.</p>
-      </div>
-      <div class="mode-panel hidden" id="diffequationControls">
-        <p class="mode-hint">Enter an ODE such as <code>Dx(y) = x*y; y(0) = 1</code>. Derivatives, polynomial differential operators, differential forms, and optional conditions are supported; choose <code>Help</code> for the accepted notation and examples.</p>
-      </div>
       <div class="mode-panel hidden" id="integratorControls">
         <div class="integrator-bound-stack" id="integratorBoundStack"></div>
-        <div class="integrator-bound-actions integrator-bound-guidance">
-          <span class="integrator-bound-summary">Use <code>Bound</code> rows for variables you actually want to integrate. Use <code>Free</code> only for symbols that appear in the integrand but should stay as parameters.</span>
-        </div>
         <label for="integratorIntervalCap">Work budget ceiling</label>
         <select id="integratorIntervalCap">
           <option value="500">Up to 500</option>
@@ -176,10 +167,8 @@
           <option value="50000">Up to 50,000</option>
           <option value="100000">Up to 100,000</option>
         </select>
-        <p class="mode-hint integrator-examples">Examples: use <code>x = 0 .. 1</code> for a definite integral, leave only <code>x</code> with both bounds blank for an antiderivative, or use <code>Free</code> for a parameter such as <code>a</code> in <code>exp(-a*x^2)</code>. Blank spare rows are ignored unless their variable appears in the integrand.</p>
       </div>
       <div class="mode-panel hidden datetime-controls" id="datetimeControls">
-        <p class="mode-hint datetime-intro">Calendar, holidays and solar times for your date and location.</p>
         <div class="datetime-field-groups">
           <div class="datetime-field-group">
             <div class="datetime-field-group-title">Selected date</div>
@@ -263,7 +252,6 @@ __HOLIDAY_JURISDICTION_OPTIONS__
             </div>
           </div>
         </div>
-        <p class="mode-hint datetime-offset-hint">Blank GMT offset uses the selected jurisdiction's local offset for the selected date. Enter a value yourself only if you want to override that, including daylight saving where applicable.</p>
         <div class="datetime-local hidden" id="datetimeLocal">
           <div class="datetime-local-title">Local</div>
           <div class="datetime-local-body" id="datetimeLocalBody"></div>
@@ -746,7 +734,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
             <li><code>Julian Day Number</code> provides another way to select the civil date. <code>Calendar year</code> selects the observance year; <code>Date</code> supplies the current-date conversions.</li>
             <li><code>Calendar</code> groups Christian, Chinese, Hindu, Buddhist, Muslim, Jewish, Cherokee, Mayan, Aztec and Ethiopian dates and observances. Expand a section to see its entries.</li>
             <li><code>Holiday country or jurisdiction</code> supplies local holidays, the town list and local clock rules from the configured jurisdiction database. Selecting a town fills observer coordinates and altitude.</li>
-            <li><code>GMT offset</code> should include daylight saving. Leave it blank to use the selected jurisdiction's local offset for the selected date.</li>
+            <li><code>GMT offset</code> should include daylight saving. Leave it blank to use the selected jurisdiction's local offset for the selected date, or enter a value to override it.</li>
             <li>Ramadan, Eid al-Fitr, and Muslim New Year use the civil Islamic calendar; Hindu and Buddhist observances are estimated from India-window lunar events, so observed dates can differ locally.</li>
             <li>MARS supplies no shared weather account or key. Optional weather loads separately after the calendar results, using your configured WeatherAPI account. Its absence does not mean the calendar calculation failed.</li>
             <li>When enabled, the local server sends that key, the selected date, and the observer coordinates to WeatherAPI.com over HTTPS. The key is not sent to the browser, and MARS does not retain the returned weather response.</li>

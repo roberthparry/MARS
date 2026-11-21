@@ -271,7 +271,10 @@ void expr_set_val(expr_t *expr, number_t value)
         abort();
     if (expr->ops != &ops_var && !(expr->ops == &ops_const && expr->name && *expr->name))
         abort();
-    if (expr->binding_expr && expr_binding_expr_is_numeric_literal(expr->binding_expr)) {
+    /* Restoring the cached value must preserve authored arithmetic without recalculating a special function. */
+    if (expr->binding_expr && num_eq(expr->c, value)) {
+        preserve_binding_expr = true;
+    } else if (expr->binding_expr && expr_binding_expr_is_numeric_literal(expr->binding_expr)) {
         number_t binding_value = expr_binding_expr_eval(expr->binding_expr);
 
         preserve_binding_expr = num_eq(binding_value, value);

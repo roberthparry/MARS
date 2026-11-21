@@ -2,6 +2,7 @@
 -- Shared by fresh installations and managed updates; retain existing town IDs and defaults.
 create temporary table location_addition(jurisdiction_id text, town_name text, latitude text, longitude text, elevation text, timezone_name text);
 insert into location_addition values
+    ('GB-ENG', 'Greenwich', '51.47785', '-0.01176', '12', 'Europe/London'),
     ('ZA', 'Robben Island', '-33.8064', '18.3688', '17', 'Africa/Johannesburg'),
     ('ZA', 'Seal Island', '-34.1375', '18.5825', null, 'Africa/Johannesburg'),
     ('ZA', 'Duiker Island', '-34.05861', '18.32694', null, 'Africa/Johannesburg');

@@ -151,6 +151,9 @@ typesets it as a product with a power of ten and preserves the grouping of any e
 Every decimal digit is exact: display selection neither rounds the rational nor changes the stored value,
 and a long numerical coefficient is never approximated by a nearby simple fraction. Rational exponents
 still retain their mathematical role when root notation is appropriate.
+Editable binding output retains authored decimal literals and symbolic arithmetic rather than replacing
+them with an evaluated fraction or decimal approximation. Native applications can display these values
+independently of numerical evaluation; this does not change their exact stored algebra.
 Finite real decimal literals use the same exact reader as binding values, including scientific notation,
 so symbolic coefficient arithmetic does not introduce repeating floating-point approximations. Extremely
 large decimal exponents retain the number module's range handling instead of allocating unbounded integer padding.

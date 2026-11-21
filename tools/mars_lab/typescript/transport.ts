@@ -44,6 +44,28 @@ function marsTransportIsDOM<K extends keyof MarsTransportDOMTypes>(
     return typeof constructor === 'function' && value instanceof constructor;
 }
 
+/** @brief Retain one empty coordinate basis per nested SVG without retaining detached charts. */
+const marsTransportSVGBases = new WeakMap<SVGSVGElement, SVGGElement>();
+
+/**
+ * @brief Read the transform of SVG user coordinates, including a nested viewport's own x/y offset.
+ * Some browsers omit that offset from the SVG element's matrix. An untransformed child supplies the
+ * same coordinate basis as its drawn paths; one empty group is reused for each nested viewport.
+ */
+function marsTransportSVGScreen(node: SVGGraphicsElement): DOMMatrix | null {
+    if (!marsTransportIsDOM(node, 'SVGSVGElement') || !node.ownerSVGElement) return node.getScreenCTM();
+    let basis = marsTransportSVGBases.get(node) ??
+        node.querySelector<SVGGElement>(':scope > g[data-coordinate-basis]') ?? undefined;
+    if (!basis || basis.parentNode !== node) {
+        basis = node.ownerDocument.createElementNS('http://www.w3.org/2000/svg', 'g');
+        basis.setAttribute('data-coordinate-basis', '');
+        basis.setAttribute('aria-hidden', 'true');
+        node.appendChild(basis);
+    }
+    marsTransportSVGBases.set(node, basis);
+    return basis.getScreenCTM();
+}
+
 /** @brief Shared numeric field kinds for lab_dom_read/write, matching wasm/include/lab_dom.h. */
 const enum LabDOMFieldKind {
     textContent = 0,
@@ -251,7 +273,7 @@ class LabDOMBridge {
 
     /** @brief Read one SVG screen-transform coefficient; non-SVG or unavailable transforms yield NaN. */
     private screenCoefficient(node: Element, key: 'a' | 'b' | 'c' | 'd' | 'e' | 'f'): number {
-        return marsTransportIsDOM(node, 'SVGGraphicsElement') ? node.getScreenCTM()?.[key] ?? NaN : NaN;
+        return marsTransportIsDOM(node, 'SVGGraphicsElement') ? marsTransportSVGScreen(node)?.[key] ?? NaN : NaN;
     }
 
     /** @brief Execute registered native service calls after handle release; reject nested-scope dispatch and unknown own-property keys. */

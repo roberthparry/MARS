@@ -242,6 +242,19 @@ Their source coordinates and DEM elevations are retained, using the existing
 Australia/Brisbane timezone code. Each appears in both `AU` and `AU-QLD`;
 the existing supplement is unchanged, giving 50,004 packaged catalogue records.
 
+## GeoNames Greenwich addition
+
+Greenwich (GeoNames 2647937) uses the
+[British extract](https://download.geonames.org/export/dump/GB.zip), downloaded
+on 21 November 2026, under Creative Commons Attribution 4.0. Credit: GeoNames;
+no endorsement is implied. The extracted `GB.txt` SHA-256 is
+`76a5b278221bce488c98b646034c77463f49b1f729151963f11e6f4089f30192`.
+The WGS84 coordinates `51.47785, -0.01176`, recorded elevation of 12 metres and
+`Europe/London` timezone are retained under England (`GB-ENG`). This is the
+Greenwich locality reference, rather than the Royal Observatory or the wider
+borough's administrative centre. GeoNames classifies it as an urban section
+(`PPLX`), so it is included explicitly in both fresh and managed catalogues.
+
 ## GeoNames Fishguard and Llanfairpwllgwyngyll additions
 
 Fishguard (GeoNames 2649372; alternative name Abergwaun) uses the
