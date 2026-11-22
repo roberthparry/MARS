@@ -44,6 +44,9 @@ static TeX_t *wrap_domain(TeX_node_ref_t root, const TeX_node_view_t *view, size
     string_t *source = body ? string_new_with("\\begin{aligned}[t]\n") : NULL;
     bool valid = source && append_aligned_body(source, body);
     TeX_free(body);
+    const string_t *definitions = provider && provider->definitions ? provider->definitions(state) : NULL;
+    if (valid && definitions && string_length(definitions))
+        valid = string_append_format(source, " \\\\\n%S", definitions) >= 0;
     if (valid)
         valid = string_append_cstr(source, " \\\\\n&\\text{provided that}") == 0;
     for (size_t i = 1u; valid && i < view->child_count; ++i) {
@@ -75,6 +78,10 @@ TeX_t *TeX_wrap_sum(const TeX_context_t *context, size_t line_limit,
         if (wrapped) {
             TeX_free(body);
             return wrapped;
+        }
+        if (provider && provider->definitions && provider->definitions(state)) {
+            TeX_free(body);
+            return NULL;
         }
         return body;
     }

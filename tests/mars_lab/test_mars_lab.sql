@@ -289,6 +289,11 @@ ON CONFLICT(name) DO UPDATE SET operation=excluded.operation, input=excluded.inp
 UPDATE mars_lab_cases SET expected = json_set(expected, '$.display_min_condition_rows', '4')
 WHERE name IN ('equation_unwrapped_inverse_display', 'equation_display_inverse_conditions_renamed');
 
+UPDATE mars_lab_cases SET expected = json_set(expected, '$.display_fragments',
+    json_insert(json_extract(expected, '$.display_fragments'), '$[#]', 'u &=', '$[#]', 'v &=',
+        '$[#]', '\operatorname{arg}\left(v\right)', '$[#]', '\left\{u\right\}'))
+WHERE name IN ('equation_unwrapped_inverse_display', 'equation_display_inverse_conditions_renamed');
+
 -- Fixing any coordinate, including the selected first one, changes the plot dimension without changing its role.
 INSERT OR IGNORE INTO mars_lab_cases(name, operation, input, expected) VALUES
     ('equation_torus_equatorial_circles', 'equation_parameters',

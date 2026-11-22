@@ -368,6 +368,9 @@
             const formula_svg = WorksheetContext.rendered.querySelector('svg');
             check(displayed.includes('\\\\\n&\\text{provided that}') && displayed.includes('C\\ne 0') &&
                 displayed.includes('\\operatorname{arg}') && displayed.includes('\\text{or}') &&
+                displayed.includes('u &=') && displayed.includes('v &=') &&
+                displayed.includes('\\operatorname{arg}\\left(v\\right)') &&
+                displayed.includes('\\left\\{u\\right\\}') &&
                 displayed.includes('\\le \\frac{\\pi}{2}') && !displayed.includes('\\operatorname{sgn}') &&
                 (displayed.match(/\\\\\n&\\quad /g) || []).length === 4 &&
                 !displayed.includes('Conditions in Solutions') && formula_svg &&

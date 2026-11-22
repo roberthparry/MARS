@@ -280,6 +280,9 @@ INSERT OR IGNORE INTO equation_cases(name, operation, input, expected, precision
     ('guarded_inverse_complex_parameters', 'guarded_inverse',
      'x=-(2*atanh(sqrt(C+2*exp(y))/sqrt(C)))/sqrt(C)+D',
      '{"coordinate":"y","constants":["C","D"],"formula":"ln(-C/(2*cosh(sqrt(C)*(x-D)/2)^2))","samples":[{"bindings":{"C":"4","D":"0","x":"-1"},"valid":true},{"bindings":{"C":"4","D":"0","x":"0"},"valid":true},{"bindings":{"C":"4","D":"0","x":"1"},"valid":false},{"bindings":{"C":"1+i","D":"2-i","x":"2-i-2*(1+i/4)/sqrt(1+i)"},"valid":true},{"bindings":{"C":"1+i","D":"2-i","x":"2-i"},"valid":true},{"bindings":{"C":"1+i","D":"2-i","x":"2-i-2*(1+2*i)/sqrt(1+i)"},"valid":false}]}', 64),
+    ('guarded_inverse_definition_collision', 'guarded_inverse',
+     't=-(2*atanh(sqrt(C+2*exp(u))/sqrt(C)))/sqrt(C)+D',
+     '{"coordinate":"u","constants":["C","D"],"formula":"ln(-C/(2*cosh(sqrt(C)*(t-D)/2)^2))","display_fragments":["v &=","w &=","\\operatorname{arg}\\left(w\\right)"],"samples":[{"bindings":{"C":"-1","D":"1","t":"2"},"valid":true},{"bindings":{"C":"-1","D":"1","t":"0"},"valid":false}]}', 64),
     ('guarded_root_polynomial_branches', 'solve_count', '{sqrt(y^2)=a | y=?; a=?}', '2', 64);
 
 INSERT OR IGNORE INTO equation_cases(name, operation, input, expected, precision) VALUES

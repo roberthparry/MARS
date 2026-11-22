@@ -4178,6 +4178,9 @@ keeps the same conditions in parseable native notation.
 The native formatter combines matching interval bounds, simplifies non-zero tests
 and replaces square-root branch indicators with a standard argument condition,
 including its zero case. No real-valued assumptions are inferred from a plot.
+When repeated coordinates make those restrictions unwieldy, the native display
+introduces at most two short definitions beside the answer. The conditions remain
+visible and refer to those definitions; their full numerical checks remain active.
 The generated integration constant is the last term of the displayed formula,
 before any domain condition; conditions remain after the binding bar in the
 Expression card.

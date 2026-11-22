@@ -2271,6 +2271,9 @@ char *expr_to_TeX_operation_body(const expr_t *expr);
  * rows below their formula, even when the formula is short. Conditions on nested
  * operands retain their local scope; no restriction is added, removed or moved
  * onto an enclosing expression.
+ * Lengthy repeated coordinates in a small domain may use up to two explicit local
+ * definitions. Names avoid existing bindings; the expression and its ordinary
+ * serialisation remain unchanged.
  *
  * The returned C string is allocated with malloc() and must be released with
  * free(). Returns NULL on invalid input or allocation failure.

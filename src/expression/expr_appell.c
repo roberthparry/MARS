@@ -8,13 +8,14 @@
  * remain formal; reverse-mode argument derivatives use the same symbolic partials. Affine antiderivatives are
  * constructed where the inverse contiguous relation has non-zero numerical factors and valid lower parameters.
  * Finite summation uses the ordinary expression evaluator, including its index-dependent bindings and caches.
+ * Operator descriptors are registered centrally in expr_maths_ops.c through the private maths callback interface.
  */
 #include <stdlib.h>
 
 #include "expression-t.h"
 #include "number-t.h"
 #define MARS_EXPR_INTERNAL_ACCESS
-#include "expr_internal.h"
+#include "expr_maths.h"
 
 /* Entries follow F1--F4; family numbers become zero-based indices at each lookup. */
 static const unsigned char appell_shifts[4][2][3] = {
@@ -92,7 +93,8 @@ static expr_t *appell_build(unsigned family, const expr_t *const *arguments)
     return result;
 }
 
-static number_t appell_eval(expr_t *expression)
+/* Evaluate the packed F2, F3 or F4 arguments through the corresponding number operation. */
+number_t appell_eval(expr_t *expression)
 {
     NUM_SCOPE(scope);
     const expr_t *arguments[7];
@@ -142,7 +144,8 @@ static bool appell_depends(const expr_t *expression, const expr_t *wrt)
     return !expr_collect_var_usage(expression, 1, &variable, &used) || used;
 }
 
-static expr_t *appell_derivative(expr_t *expression)
+/* Differentiate F2--F4 using contiguous relations and the active coordinate's chain rule. */
+expr_t *appell_derivative(expr_t *expression)
 {
     const expr_t *arguments[7];
     size_t count = 0;
@@ -169,7 +172,8 @@ static expr_t *appell_derivative(expr_t *expression)
     return sum;
 }
 
-static int appell_reverse(const expr_t *expression, const number_t *out_bar,
+/* Accumulate packed Appell argument sensitivities without manufacturing parameter derivatives. */
+int appell_reverse(const expr_t *expression, const number_t *out_bar,
                            expr_reverse_accumulate_fn accumulate, void *context)
 {
     NUM_SCOPE(scope);
@@ -218,17 +222,20 @@ expr_t *expr_integrate_appell(const expr_t *expression, const expr_t *wrt)
     return NULL;
 }
 
-static expr_t *appell_F2_rebuild(const expr_t *parameters, const expr_t *variables)
+/* Rebuild an F2 node while retaining its two borrowed argument packs. */
+expr_t *appell_F2_rebuild(const expr_t *parameters, const expr_t *variables)
 {
     return appell_rebuild(2, parameters, variables);
 }
 
-static expr_t *appell_F3_rebuild(const expr_t *parameters, const expr_t *variables)
+/* Rebuild an F3 node while retaining its two borrowed argument packs. */
+expr_t *appell_F3_rebuild(const expr_t *parameters, const expr_t *variables)
 {
     return appell_rebuild(3, parameters, variables);
 }
 
-static expr_t *appell_F4_rebuild(const expr_t *parameters, const expr_t *variables)
+/* Rebuild an F4 node while retaining its two borrowed argument packs. */
+expr_t *appell_F4_rebuild(const expr_t *parameters, const expr_t *variables)
 {
     return appell_rebuild(4, parameters, variables);
 }
@@ -246,7 +253,8 @@ bool expr_appell_F1_unpack(const expr_t *expr, const expr_t **a, const expr_t **
     return valid;
 }
 
-static number_t eval_appell_F1(expr_t *expr)
+/* Evaluate the six packed F1 arguments through the number-layer implementation. */
+number_t eval_appell_F1(expr_t *expr)
 {
     const expr_t *a = NULL;
     const expr_t *b1 = NULL;
@@ -261,7 +269,8 @@ static number_t eval_appell_F1(expr_t *expr)
                          expr_eval_num_internal(c), expr_eval_num_internal(x), expr_eval_num_internal(y));
 }
 
-static expr_t *deriv_appell_F1(expr_t *expr)
+/* Preserve F1's existing Lauricella-based differentiation and parameter handling. */
+expr_t *deriv_appell_F1(expr_t *expr)
 {
     const expr_t *a = NULL;
     const expr_t *b1 = NULL;
@@ -286,7 +295,8 @@ static expr_t *deriv_appell_F1(expr_t *expr)
     return out ? out : expr_new_const(NUM_NAN);
 }
 
-static expr_t *expr_appell_F1_from_packs(const expr_t *params, const expr_t *vars)
+/* Rebuild an F1 node while retaining its two borrowed argument packs. */
+expr_t *expr_appell_F1_from_packs(const expr_t *params, const expr_t *vars)
 {
     return appell_rebuild(1, params, vars);
 }
@@ -299,50 +309,12 @@ expr_t *expr_appell_F1(const expr_t *a, const expr_t *b1, const expr_t *b2, cons
     return appell_build(1, arguments);
 }
 
-const expr_ops_t ops_appell_F1 = {.eval = eval_appell_F1,
-                                  .deriv = deriv_appell_F1,
-                                  .reverse = expr_reverse_not_differentiable,
-                                  .reverse_many = expr_reverse_appell_F1_many,
-                                  .kind = EXPR_KIND_APPELL_F1,
-                                  .arity = EXPR_OP_BINARY,
-                                  .expression_name = "F₁",
-                                  .function_name = "appellf1",
-                                  .apply_unary = NULL,
-                                  .apply_binary = expr_appell_F1_from_packs,
-                                  .integrate = expr_integrate_dispatch_primitive,
-                                  .simplify = expr_simplify_rebuild_binary_operator,
-                                  .fold_const_unary = NULL};
-
 /* Preserve the existing reverse-mode entry point within the owning Appell implementation. */
 int expr_reverse_appell_F1_many(const expr_t *expression, const number_t *out_bar,
                                 expr_reverse_accumulate_fn accumulate, void *context)
 {
     return appell_reverse(expression, out_bar, accumulate, context);
 }
-
-const expr_ops_t ops_appell_F2 = {
-    .eval = appell_eval, .deriv = appell_derivative, .reverse = expr_reverse_not_differentiable,
-    .reverse_many = appell_reverse, .kind = EXPR_KIND_APPELL_F2, .arity = EXPR_OP_BINARY,
-    .expression_name = "F₂", .function_name = "appellf2", .apply_binary = appell_F2_rebuild,
-    .integrate = expr_integrate_dispatch_primitive,
-    .simplify = expr_simplify_rebuild_binary_operator
-};
-
-const expr_ops_t ops_appell_F3 = {
-    .eval = appell_eval, .deriv = appell_derivative, .reverse = expr_reverse_not_differentiable,
-    .reverse_many = appell_reverse, .kind = EXPR_KIND_APPELL_F3, .arity = EXPR_OP_BINARY,
-    .expression_name = "F₃", .function_name = "appellf3", .apply_binary = appell_F3_rebuild,
-    .integrate = expr_integrate_dispatch_primitive,
-    .simplify = expr_simplify_rebuild_binary_operator
-};
-
-const expr_ops_t ops_appell_F4 = {
-    .eval = appell_eval, .deriv = appell_derivative, .reverse = expr_reverse_not_differentiable,
-    .reverse_many = appell_reverse, .kind = EXPR_KIND_APPELL_F4, .arity = EXPR_OP_BINARY,
-    .expression_name = "F₄", .function_name = "appellf4", .apply_binary = appell_F4_rebuild,
-    .integrate = expr_integrate_dispatch_primitive,
-    .simplify = expr_simplify_rebuild_binary_operator
-};
 
 /* Construct the second Appell function, retaining each borrowed argument. */
 expr_t *expr_appell_F2(const expr_t *a, const expr_t *b1, const expr_t *b2, const expr_t *c1, const expr_t *c2,

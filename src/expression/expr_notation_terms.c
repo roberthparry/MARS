@@ -35,6 +35,8 @@ typedef struct {
     size_t count;
     size_t capacity;
     bool prepared;
+    expr_function_temporaries_t *plan;
+    string_t *definitions;
 } expr_wrap_state_t;
 
 static bool append_term(expr_wrap_state_t *state, const expr_t *expression, int sign)
@@ -117,15 +119,21 @@ static TeX_context_t *wrapped_term(void *context, size_t index, int *sign)
     *sign = state->terms[index].sign;
     const expr_t *term = state->terms[index].expression;
     if (!state->factor)
-        return expr_TeX_result_context(term);
+        return state->plan ? expr_temporaries_result_context(state->plan, term) : expr_TeX_result_context(term);
     expr_t *product = expr_mul(state->factor, term);
-    TeX_context_t *result = product ? expr_TeX_result_context(product) : NULL;
+    TeX_context_t *result = product ? (state->plan ? expr_temporaries_result_context(state->plan, product)
+                                                : expr_TeX_result_context(product)) : NULL;
     expr_free(product);
     return result;
 }
 
+static const string_t *wrapped_definitions(void *context)
+{
+    return ((expr_wrap_state_t *)context)->definitions;
+}
+
 /* Keep expression selection and temporary names native while TeX owns every line-break command. */
-char *expr_to_TeX_body_wrapped(const expr_t *expression, size_t line_limit)
+char *expr_to_TeX_body_wrapped_reserved(const expr_t *expression, size_t line_limit, const expr_t *reserved)
 {
     if (!expression)
         return NULL;
@@ -138,8 +146,18 @@ char *expr_to_TeX_body_wrapped(const expr_t *expression, size_t line_limit)
     expr_t *display = expr_notation_primitive_display(expression, &initial);
     const expr_t *selected = display ? display : expression;
     expr_wrap_state_t state = {.expression = expr_domain_body(selected)};
-    static const TeX_sum_provider_t provider = {.count = wrapped_term_count, .term = wrapped_term};
-    TeX_context_t *context = expr_TeX_result_context(selected);
+    if (!expr_distribution_has_qualification(selected))
+        state.plan = expr_domain_temporaries_new(selected, reserved);
+    state.definitions = state.plan ? expr_temporaries_math_definitions(state.plan, style_LATEX) : NULL;
+    if (state.plan && !state.definitions) {
+        expr_function_temporaries_free(state.plan);
+        state.plan = NULL;
+    }
+    static const TeX_sum_provider_t provider = {
+        .count = wrapped_term_count, .term = wrapped_term, .definitions = wrapped_definitions
+    };
+    TeX_context_t *context = state.plan ? expr_temporaries_result_context(state.plan, selected)
+                                      : expr_TeX_result_context(selected);
     TeX_t *body = TeX_wrap_sum(context, line_limit,
         expr_distribution_has_qualification(selected) ? NULL : &provider, &state);
     TeX_context_free(context);
@@ -147,8 +165,16 @@ char *expr_to_TeX_body_wrapped(const expr_t *expression, size_t line_limit)
     char *result = body ? strdup(TeX_source(body)) : NULL;
     TeX_free(body);
     free(state.terms);
+    string_free(state.definitions);
+    expr_function_temporaries_free(state.plan);
     expr_free(display);
     expr_free(initial);
     autoname_restore(&names);
     return result;
+}
+
+/* Render a standalone body without reserving symbols from a companion equation. */
+char *expr_to_TeX_body_wrapped(const expr_t *expression, size_t line_limit)
+{
+    return expr_to_TeX_body_wrapped_reserved(expression, line_limit, NULL);
 }

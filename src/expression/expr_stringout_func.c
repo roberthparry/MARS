@@ -4,14 +4,19 @@
  *
  * Constructs function representations for expressions, transforms and calculus requests, including parameters and
  * initialisations. It preserves executable syntax while sharing the same native algebra as other result styles.
+ * Shared naming plans also select a bounded pair of local definitions for lengthy domain coordinates, keeping
+ * mathematical snapshots concise without changing source expressions or numerical restrictions.
  *
  * This is part of the expr_t implementation. Preserve expression ownership, symbol identity and mathematical
  * domain restrictions when extending these operations.
  */
 
 #include <stdio.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+
+#include "dictionary-t.h"
 
 #define MARS_SHARED_EXPR_INTERNAL_ACCESS
 #include "internal/expr_internal.h"
@@ -1085,6 +1090,121 @@ expr_function_temporaries_t *expr_mathematical_temporaries_new(const expr_t *con
     return plan;
 }
 
+static size_t domain_projection_hash(const void *key)
+{
+    return expr_struct_hash(*(const expr_t *const *)key);
+}
+
+static int domain_projection_compare(const void *left, const void *right)
+{
+    const expr_t *a = *(const expr_t *const *)left, *b = *(const expr_t *const *)right;
+    return expr_struct_eq(a, b) ? 0 : (uintptr_t)a < (uintptr_t)b ? -1 : 1;
+}
+
+/* A bounded DAG index identifies projection operands without repeatedly scanning the condition list. */
+static bool domain_projection_index(const expr_t *node, dictionary_t *index, unsigned depth, size_t *visited,
+                                     size_t *candidates)
+{
+    if (!node)
+        return true;
+    if (depth >= 128u)
+        return false;
+    unsigned char flags = 0u;
+    if (dictionary_get(index, &node, &flags) && (flags & 2u))
+        return true;
+    if (++*visited > 256u)
+        return false;
+    flags |= 2u;
+    if (!dictionary_set(index, &node, &flags))
+        return false;
+    if (expr_is_op(node, &ops_real_bound) || expr_is_op(node, &ops_imag_coordinate)) {
+        const expr_t *operand = node->a;
+        flags = 0u;
+        dictionary_get(index, &operand, &flags);
+        if (!(flags & 1u) && !expr_is_const(operand) && !expr_is_var(operand)) {
+            char *text = expr_to_string(operand, style_UNBOUND);
+            bool lengthy = text && strlen(text) >= 18u;
+            free(text);
+            if (lengthy) {
+                flags |= 1u;
+                ++*candidates;
+                if (!dictionary_set(index, &operand, &flags))
+                    return false;
+            }
+        }
+    }
+    return domain_projection_index(node->a, index, depth + 1u, visited, candidates) &&
+           domain_projection_index(node->b, index, depth + 1u, visited, candidates);
+}
+
+/* Abbreviate only long repeated coordinates in a small domain, rather than introducing many trivial definitions. */
+expr_function_temporaries_t *expr_domain_temporaries_new(const expr_t *expression, const expr_t *reserved)
+{
+    if (!expr_is_op(expression, &ops_real_domain))
+        return NULL;
+    dictionary_t *index = dictionary_create(sizeof(expr_t *), sizeof(unsigned char), domain_projection_hash,
+        domain_projection_compare, NULL, NULL, NULL, NULL, NULL);
+    size_t visited = 0u, candidates = 0u;
+    bool ready = index && domain_projection_index(expression, index, 0u, &visited, &candidates) && candidates;
+    const expr_t *roots[] = {expression, reserved};
+    expr_function_temporaries_t *plan = ready ? expr_mathematical_temporaries_new(roots, 2u) : NULL;
+    bool selected[26] = {false};
+    size_t count = 0u;
+    for (size_t i = 0u; plan && i < plan->temporaries.count; ++i) {
+        unsigned char flags = 0u;
+        const expr_t *node = plan->temporaries.nodes[i];
+        if (!dictionary_get(index, &node, &flags) || !(flags & 1u))
+            continue;
+        selected[i] = true;
+        ++count;
+    }
+    dictionary_destroy(index);
+    if (!plan || !count || count > 2u) {
+        expr_function_temporaries_free(plan);
+        return NULL;
+    }
+    size_t next = 0u;
+    for (size_t i = 0u; i < plan->temporaries.count; ++i) {
+        if (!selected[i]) {
+            free(plan->temporaries.names[i]);
+            continue;
+        }
+        plan->temporaries.nodes[next] = plan->temporaries.nodes[i];
+        plan->temporaries.names[next] = plan->temporaries.names[i];
+        plan->temporaries.constants[next++] = plan->temporaries.constants[i];
+    }
+    plan->temporaries.count = next;
+    expr_bindings_t *bindings = expr_bindings_from_expr_internal(expression);
+    expr_bindings_t *reserved_bindings = expr_bindings_from_expr_internal(reserved);
+    unsigned ordinal = 0u;
+    for (size_t i = 0u; i < next; ++i) {
+        char name[2] = {0};
+        do {
+            name[0] = (char)('a' + (20u + ordinal++) % 26u);
+        } while (ordinal <= 26u && (expr_bindings_get(bindings, name) || expr_bindings_get(reserved_bindings, name) ||
+                                    name[0] == 'e' || name[0] == 'i'));
+        char *copy = ordinal <= 26u ? expr_tostring_xstrdup(name) : NULL;
+        if (!copy) {
+            expr_bindings_free(bindings);
+            expr_bindings_free(reserved_bindings);
+            expr_function_temporaries_free(plan);
+            return NULL;
+        }
+        free(plan->temporaries.names[i]);
+        plan->temporaries.names[i] = copy;
+    }
+    expr_bindings_free(bindings);
+    expr_bindings_free(reserved_bindings);
+    return plan;
+}
+
+/* Snapshot all numerical guards while replacing selected expressions by their mathematical display names. */
+TeX_context_t *expr_temporaries_result_context(const expr_function_temporaries_t *plan, const expr_t *expression)
+{
+    return plan ? expr_notation_temporaries_context(expression, plan->temporaries.nodes,
+        (const char *const *)plan->temporaries.names, plan->temporaries.count, true) : NULL;
+}
+
 /* Render declarations from a shared function-temporary plan. */
 string_t *expr_function_temporaries_declarations_text(const expr_function_temporaries_t *plan)
 {
@@ -1141,7 +1261,7 @@ string_t *expr_temporaries_math_definitions(const expr_function_temporaries_t *p
         for (size_t i = 0u; ok && i < count; ++i) {
             names[i] = string_new_with(plan->temporaries.names[i]);
             TeX_context_t *context = expr_notation_temporaries_context(plan->temporaries.nodes[i],
-                plan->temporaries.nodes, (const char *const *)plan->temporaries.names, i);
+                plan->temporaries.nodes, (const char *const *)plan->temporaries.names, i, false);
             values[i] = context ? TeX_from_context(context) : NULL;
             TeX_context_free(context);
             ok = names[i] && values[i];
@@ -1180,7 +1300,7 @@ string_t *expr_temporaries_math_expression(const expr_function_temporaries_t *pl
         return NULL;
     if (style == style_LATEX) {
         TeX_context_t *context = expr_notation_temporaries_context(expr, plan->temporaries.nodes,
-            (const char *const *)plan->temporaries.names, plan->temporaries.count);
+            (const char *const *)plan->temporaries.names, plan->temporaries.count, false);
         TeX_t *notation = context ? TeX_from_context(context) : NULL;
         string_t *result = notation ? TeX_render(notation) : NULL;
         TeX_free(notation);

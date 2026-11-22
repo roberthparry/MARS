@@ -428,11 +428,12 @@ static string_t *equ_to_text_TeX(const equation_t *equation)
     return out;
 }
 
-static char *equ_side_TeX_body_dup(const expr_t *side, const string_t *display_TeX, size_t line_limit)
+static char *equ_side_TeX_body_dup(const expr_t *side, const string_t *display_TeX, size_t line_limit,
+                                  const expr_t *reserved)
 {
     if (display_TeX)
         return strdup(string_c_str(display_TeX));
-    return expr_to_TeX_body_wrapped(side, line_limit);
+    return expr_to_TeX_body_wrapped_reserved(side, line_limit, reserved);
 }
 
 /* Render an equation as an aligned TeX body using its native display metadata. */
@@ -442,8 +443,8 @@ char *equ_to_TeX_body_wrapped(const equation_t *equation, size_t line_limit)
         return NULL;
     bool fractional = equ_fractional_coefficients(equation);
     bool previous = fractional ? expr_set_number_fractional_local(true) : false;
-    char *lhs = equ_side_TeX_body_dup(equ_lhs(equation), equ_lhs_display_TeX(equation), line_limit);
-    char *rhs = equ_side_TeX_body_dup(equ_rhs(equation), equ_rhs_display_TeX(equation), line_limit);
+    char *lhs = equ_side_TeX_body_dup(equ_lhs(equation), equ_lhs_display_TeX(equation), line_limit, equ_rhs(equation));
+    char *rhs = equ_side_TeX_body_dup(equ_rhs(equation), equ_rhs_display_TeX(equation), line_limit, equ_lhs(equation));
     TeX_builder_t *builder = TeX_builder_new();
     TeX_raw(builder, lhs);
     TeX_raw(builder, rhs);

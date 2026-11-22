@@ -281,6 +281,30 @@ INSERT INTO TeX_cases(name, operation, input, expected) VALUES
 ON CONFLICT(name) DO UPDATE SET operation=excluded.operation, input=excluded.input, expected=excluded.expected;
 
 INSERT INTO TeX_cases(name, operation, input, expected) VALUES
+    ('wrapped_domain_compact_definition', 'wrapped_domain',
+     '{sin(sqrt(a)*(x+b+c+d)) | x=?, a=?, b=?, c=?, d=?; Im(sqrt(a)*(x+b+c+d))>-1; Im(sqrt(a)*(x+b+c+d))<1}',
+     '\begin{aligned}[t]
+&\sin(u) \\
+u &= \sqrt{a}\mkern-2mu \left(x + b + c + d\right) \\
+&\text{provided that} \\
+&\quad -1 < \mathfrak{Im}\mathopen{}\left\{u\right\} < 1
+\end{aligned}'),
+    ('wrapped_domain_name_collision', 'wrapped_domain',
+     '{sin(sqrt(a)*(x+b+c+d))+u | x=?, a=?, b=?, c=?, d=?, u=?; Im(sqrt(a)*(x+b+c+d))>-1; Im(sqrt(a)*(x+b+c+d))<1}',
+     '\begin{aligned}[t]
+&\sin(v) + u \\
+v &= \sqrt{a}\mkern-2mu \left(x + b + c + d\right) \\
+&\text{provided that} \\
+&\quad -1 < \mathfrak{Im}\mathopen{}\left\{v\right\} < 1
+\end{aligned}'),
+    ('wrapped_domain_multiple_name_collisions', 'wrapped_domain',
+     '{sin(sqrt(a)*(x+b+c+d))+u+v | x=?, a=?, b=?, c=?, d=?, u=?, v=?; Im(sqrt(a)*(x+b+c+d))>-1; Im(sqrt(a)*(x+b+c+d))<1}',
+     '\begin{aligned}[t]
+&\sin(w) + u + v \\
+w &= \sqrt{a}\mkern-2mu \left(x + b + c + d\right) \\
+&\text{provided that} \\
+&\quad -1 < \mathfrak{Im}\mathopen{}\left\{w\right\} < 1
+\end{aligned}'),
     ('wrapped_domain_nonzero', 'wrapped_domain', '{x | x=?; x ≠ 0}', '\begin{aligned}[t]
 &x \\
 &\text{provided that} \\

@@ -105,6 +105,21 @@ number_t eval_legendre_chi(expr_t *expr);
 number_t eval_bessel_J(expr_t *expr);
 number_t eval_bessel_Y(expr_t *expr);
 number_t eval_lommel_S(expr_t *expr);
+
+/**
+ * @brief Evaluate an Appell F1 node using its six packed arguments.
+ * @param expr Borrowed F1 expression; its arguments are evaluated without consuming their graph.
+ * @return Numerical result released with num_destroy(), or NAN for malformed arguments or numerical failure.
+ */
+number_t eval_appell_F1(expr_t *expr);
+
+/**
+ * @brief Evaluate a packed Appell F2, F3 or F4 node through the number layer.
+ * @param expression Borrowed family node; its arguments and bindings remain owned by the caller.
+ * @return Numerical result released with num_destroy(), or NAN for malformed arguments or numerical failure.
+ */
+number_t appell_eval(expr_t *expression);
+
 number_t eval_lauricella_F(expr_t *expr);
 number_t eval_hypergeometric_pFq(expr_t *expr);
 number_t eval_gammainv(expr_t *expr);
@@ -232,6 +247,23 @@ expr_t *deriv_legendre_chi(expr_t *expr);
 expr_t *deriv_bessel_J(expr_t *expr);
 expr_t *deriv_bessel_Y(expr_t *expr);
 expr_t *deriv_lommel_S(expr_t *expr);
+
+/**
+ * @brief Differentiate Appell F1 with respect to the active expression coordinate.
+ * @param expr Borrowed F1 expression; its graph is not consumed or changed.
+ * @return Owned derivative released with expr_free(), a NAN expression for invalid input, or NULL on allocation
+ * failure. Unsupported parameter derivatives remain formal through the Lauricella implementation.
+ */
+expr_t *deriv_appell_F1(expr_t *expr);
+
+/**
+ * @brief Differentiate F2--F4 using contiguous relations and the active coordinate's chain rule.
+ * @param expression Borrowed packed Appell node; its graph and binding roles remain unchanged.
+ * @return Owned derivative released with expr_free(), a formal derivative for parameter dependence, a NAN
+ * expression for invalid input, or NULL on allocation failure.
+ */
+expr_t *appell_derivative(expr_t *expression);
+
 expr_t *deriv_lauricella_F(expr_t *expr);
 expr_t *deriv_hypergeometric_pFq(expr_t *expr);
 expr_t *deriv_gammainv(expr_t *expr);
@@ -245,6 +277,50 @@ bool expr_hypergeometric_pFq_unpack(const expr_t *expr, const expr_t ***upper, s
                                     const expr_t ***lower, size_t *lower_count, const expr_t **argument);
 expr_t *expr_hypergeometric_pFq_from_args(size_t argument_count, expr_t *const *arguments);
 expr_t *expr_lauricella_F_from_args(size_t argument_count, expr_t *const *arguments);
+
+/**
+ * @brief Accumulate Appell argument sensitivities using the native contiguous partial derivatives.
+ * @param expression Borrowed packed Appell node, retained by the caller throughout the operation.
+ * @param out_bar Borrowed incoming adjoint; never consumed or modified.
+ * @param accumulate Borrowed callback receiving each argument and a temporary contribution; neither is transferred.
+ * @param context Caller-owned state passed unchanged to accumulate.
+ * @return Zero on success, or -1 for malformed input, unavailable partials or callback failure. Parameter
+ * sensitivities are explicitly NAN; contribution pointers remain valid only during their callback.
+ */
+int appell_reverse(const expr_t *expression, const number_t *out_bar,
+                    expr_reverse_accumulate_fn accumulate, void *context);
+
+/**
+ * @brief Rebuild an Appell F1 node from its existing parameter and variable packs.
+ * @param params Borrowed parameter pack, retained by the returned expression.
+ * @param vars Borrowed two-variable pack, retained by the returned expression.
+ * @return Owned node released with expr_free(), or NULL for an absent pack or allocation failure.
+ */
+expr_t *expr_appell_F1_from_packs(const expr_t *params, const expr_t *vars);
+
+/**
+ * @brief Rebuild an Appell F2 node from its existing parameter and variable packs.
+ * @param parameters Borrowed parameter pack, retained by the returned expression.
+ * @param variables Borrowed two-variable pack, retained by the returned expression.
+ * @return Owned node released with expr_free(), or NULL for an absent pack or allocation failure.
+ */
+expr_t *appell_F2_rebuild(const expr_t *parameters, const expr_t *variables);
+
+/**
+ * @brief Rebuild an Appell F3 node from its existing parameter and variable packs.
+ * @param parameters Borrowed parameter pack, retained by the returned expression.
+ * @param variables Borrowed two-variable pack, retained by the returned expression.
+ * @return Owned node released with expr_free(), or NULL for an absent pack or allocation failure.
+ */
+expr_t *appell_F3_rebuild(const expr_t *parameters, const expr_t *variables);
+
+/**
+ * @brief Rebuild an Appell F4 node from its existing parameter and variable packs.
+ * @param parameters Borrowed parameter pack, retained by the returned expression.
+ * @param variables Borrowed two-variable pack, retained by the returned expression.
+ * @return Owned node released with expr_free(), or NULL for an absent pack or allocation failure.
+ */
+expr_t *appell_F4_rebuild(const expr_t *parameters, const expr_t *variables);
 
 /* Derivatives: distributions and multi-argument special functions. */
 expr_t *deriv_normal_pdf(expr_t *expr);

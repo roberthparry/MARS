@@ -3047,6 +3047,15 @@ static void test_equation_guarded_inverse_row(const void *data)
     expr_bindings_t *reference_bindings = NULL;
     expr_t *reference = expr_from_string(equation_case_text(expected, "formula"), &reference_bindings);
     bool ok = family && reference && before && after && !string_compare(before, after);
+    const json_t *display_fragments = equation_case_member(expected, "display_fragments");
+    if (json_array_size(display_fragments)) {
+        char *display = equ_to_TeX_body_wrapped(family, 4096u);
+        for (size_t i = 0u; ok && i < json_array_size(display_fragments); ++i) {
+            const string_t *fragment = json_string_value(json_array_get(display_fragments, i));
+            ok = display && fragment && strstr(display, string_c_str(fragment));
+        }
+        free(display);
+    }
     const json_t *constants = equation_case_member(expected, "constants");
     expr_bindings_t *bindings = equ_bindings(problem);
     for (size_t i = 0; i < json_array_size(constants); ++i) {

@@ -33,10 +33,11 @@
  * @param nodes Borrowed temporary expressions, in dependency order.
  * @param names Borrowed names corresponding to nodes.
  * @param count Number of temporary expressions and names.
+ * @param result_mode Resolve result semantics and domain presentation when true; otherwise retain formal notation.
  * @return Independently owned context released with TeX_context_free, or NULL on failure.
  */
 TeX_context_t *expr_notation_temporaries_context(const expr_t *expression, const expr_t *const *nodes,
-                                                 const char *const *names, size_t count);
+                                                 const char *const *names, size_t count, bool result_mode);
 
 typedef struct {
     const expr_t *expr;

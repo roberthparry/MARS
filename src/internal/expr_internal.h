@@ -1585,6 +1585,33 @@ expr_function_temporaries_t *expr_function_temporaries_new(const expr_t *const *
 expr_function_temporaries_t *expr_mathematical_temporaries_new(const expr_t *const *roots, size_t count);
 
 /**
+ * @brief Select at most two lengthy repeated projection operands for a compact domain display.
+ * @param expression Borrowed guarded expression, kept alive until the returned plan is freed.
+ * @param reserved Optional borrowed companion expression whose symbol names must remain available.
+ * @return Owned plan released with expr_function_temporaries_free, or NULL when unnecessary or on failure.
+ * @note Definitions use collision-free lower-case names. Selection is bounded to a small domain graph;
+ * no expression, numerical guard or binding role is changed, and ordinary serialisation remains expanded.
+ */
+expr_function_temporaries_t *expr_domain_temporaries_new(const expr_t *expression, const expr_t *reserved);
+
+/**
+ * @brief Render a wrapped mathematical body while reserving the companion equation's symbol names.
+ * @param expression Borrowed source expression; its algebra, bindings and numerical guards remain unchanged.
+ * @param line_limit Soft line budget, or zero for the standard display budget.
+ * @param reserved Optional borrowed companion expression whose names must not become local definitions.
+ * @return Owned NUL-terminated TeX text released with free(), or NULL on invalid input or allocation failure.
+ */
+char *expr_to_TeX_body_wrapped_reserved(const expr_t *expression, size_t line_limit, const expr_t *reserved);
+
+/**
+ * @brief Snapshot a result with the selected native temporary names, retaining all domain semantics.
+ * @param plan Borrowed live temporary-name plan; neither consumed nor changed.
+ * @param expression Borrowed expression to snapshot while its source graph remains valid.
+ * @return Independently owned context released with TeX_context_free, or NULL on invalid input or failure.
+ */
+TeX_context_t *expr_temporaries_result_context(const expr_function_temporaries_t *plan, const expr_t *expression);
+
+/**
  * @brief Return owned Function-style declarations selected by a borrowed temporary-name plan.
  * @param plan Borrowed temporary-name plan used across related renderings.
  * @return Owned text released with string_free, or NULL when no representation is available or allocation fails.

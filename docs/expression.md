@@ -3895,6 +3895,11 @@ Formatting combines lower and upper bounds with their own open or closed
 endpoints. Principal-square-root range tests include zero explicitly and otherwise
 use the corresponding argument interval, replacing sign-function indicator sums.
 These rules retain complex-valued parameters and the original branch boundaries.
+Long coordinates repeated in a small set of domain restrictions can use up to two
+short local definitions. They appear between the formula and its conditions, with
+names chosen to avoid existing bindings and the companion equation's coordinate.
+The ordinary Expression and Function representations remain expanded, and no
+numerical guard or source binding changes.
 
 ```c
 char *expr_to_TeX_body_wrapped(const expr_t *expr, size_t line_limit);

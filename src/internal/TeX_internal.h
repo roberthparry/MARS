@@ -208,6 +208,13 @@ typedef struct _TeX_sum_provider_t {
      */
     TeX_context_t *(*term)(void *state, size_t index, int *sign);
 
+    /**
+     * @brief Borrow optional local definitions produced by TeX_format_definitions for a guarded result.
+     * @param state Borrowed caller-owned state, valid throughout TeX_wrap_sum.
+     * @return Borrowed TeX definition rows, or NULL when absent; the caller retains ownership throughout rendering.
+     */
+    const string_t *(*definitions)(void *state);
+
 } TeX_sum_provider_t;
 
 /**

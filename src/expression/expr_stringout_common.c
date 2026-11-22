@@ -35,6 +35,8 @@
 #include "expr_stringout.h"
 #define MARS_EXPR_STRINGOUT_INTERNAL_ACCESS
 #include "expr_stringout_internal.h"
+#define MARS_EXPR_INTERNAL_ACCESS
+#include "expr_notation_internal.h"
 #define MARS_SHARED_NUMBER_INTERNAL_ACCESS
 #include "internal/number_internal.h"
 
@@ -1146,7 +1148,7 @@ void emit_math_with_temporaries(const expr_t *f, sbuf_t *b, const expr_t *const 
 
 /* Capture native temporary substitutions before returning the independent semantic context. */
 TeX_context_t *expr_notation_temporaries_context(const expr_t *expression, const expr_t *const *nodes,
-                                                 const char *const *names, size_t count)
+                                                 const char *const *names, size_t count, bool result_mode)
 {
     if (!expression || (count && (!nodes || !names)))
         return NULL;
@@ -1157,7 +1159,7 @@ TeX_context_t *expr_notation_temporaries_context(const expr_t *expression, const
         return NULL;
     function_temporary_context = (function_temporary_context_t){nodes, names, count, NULL, lookup};
     mathematical_temporaries_active = true;
-    TeX_context_t *context = expr_TeX_context(expression);
+    TeX_context_t *context = result_mode ? expr_TeX_result_context(expression) : expr_TeX_context(expression);
     mathematical_temporaries_active = previous_active;
     function_temporary_context = previous;
     dictionary_destroy(lookup);
