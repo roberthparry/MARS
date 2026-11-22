@@ -207,9 +207,9 @@ window.checkLabSelectEvents = function checkLabSelectEvents() {
 
         const jurisdictions = create('selectEventJurisdictionAliases', true);
         const countryRows = [
-            ['Britain (UK) – England', 'GB-ENG'], ['Britain (UK) – Wales', 'GB-WLS'],
-            ['Britain (UK) – Scotland', 'GB-SCT'], ['Britain (UK) – Northern Ireland', 'GB-NIR'],
-            ['South Africa', 'ZA'], ['Isle of Man', 'IM']
+            ['United Kingdom – England', 'GB-ENG'], ['United Kingdom – Wales', 'GB-WLS'],
+            ['United Kingdom – Scotland', 'GB-SCT'], ['United Kingdom – Northern Ireland', 'GB-NIR'],
+            ['South Africa', 'ZA'], ['Isle of Man', 'IM'], ['Guernsey', 'GG'], ['Jersey', 'JE'], ['Ireland', 'IE']
         ].map(([label, code]) => {
             const option = new Option(label, code);
             option.dataset.countryOption = '1';
@@ -219,6 +219,20 @@ window.checkLabSelectEvents = function checkLabSelectEvents() {
         jurisdictions.select.replaceChildren(...countryRows);
         labDOM.call('lab_select_rebuild', jurisdictions.select, 0);
         open(jurisdictions);
+        for (const [query, codes] of [
+            ['great britain', ['GB-ENG', 'GB-WLS', 'GB-SCT']],
+            ['british isles', ['GB-ENG', 'GB-WLS', 'GB-SCT', 'GB-NIR', 'IM', 'GG', 'JE', 'IE']],
+            ['uk', ['GB-ENG', 'GB-WLS', 'GB-SCT', 'GB-NIR']]
+        ] as [string, string[]][]) {
+            jurisdictions.search.value = query;
+            jurisdictions.search.dispatchEvent(new Event('input', {bubbles: true}));
+            const visible = jurisdictions.items().filter(item => !item.classList.contains('hidden'));
+            equal(visible.length, codes.length, `${query} has the correct geographical membership`);
+            for (const code of codes) {
+                const option = countryRows.findIndex(row => row.value === code);
+                check(!jurisdictions.items()[option].classList.contains('hidden'), `${query} includes ${code}`);
+            }
+        }
         jurisdictions.search.value = 'united king';
         jurisdictions.search.dispatchEvent(new Event('input', {bubbles: true}));
         equal(jurisdictions.items().filter(item => !item.classList.contains('hidden')).length, 4,

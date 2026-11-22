@@ -7,6 +7,18 @@ CREATE TABLE IF NOT EXISTS plot_cases (
 CREATE INDEX IF NOT EXISTS plot_cases_operation ON plot_cases(operation, name);
 
 INSERT INTO test_case_runner(module, source, parent, table_name, operation) VALUES (
+    'plot.real_complex_coordinates', 'tests/plot/test_plot.c', 'tests.test_plot_real_complex_coordinates',
+    'plot_cases', 'real_complex_coordinates')
+ON CONFLICT(module) DO UPDATE SET source=excluded.source, parent=excluded.parent,
+    table_name=excluded.table_name, operation=excluded.operation;
+
+INSERT INTO plot_cases(name, operation, input, expected) VALUES
+    ('real_complex_symmetric', 'real_complex_coordinates', '["-4515152.5","4515152.5"]', 'same'),
+    ('real_complex_positive', 'real_complex_coordinates', '["100.25","200.5"]', 'same'),
+    ('real_complex_small', 'real_complex_coordinates', '["-0.0009765625","0.001953125"]', 'same')
+ON CONFLICT(name) DO UPDATE SET input=excluded.input, expected=excluded.expected;
+
+INSERT INTO test_case_runner(module, source, parent, table_name, operation) VALUES (
     'plot.occlusion', 'tests/plot/test_plot.c', 'tests.test_plot_occlusion', 'plot_cases', 'occlusion')
 ON CONFLICT(module) DO UPDATE SET table_name=excluded.table_name, operation=excluded.operation;
 

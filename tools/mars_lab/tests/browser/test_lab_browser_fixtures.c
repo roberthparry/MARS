@@ -34,10 +34,11 @@ static json_t *lab_browser_flag_fixture(void)
         "insert into calendar_local_settings values(1,'GB-ENG','Shrewsbury',52.7077,-2.7541,'Europe/London');"
         "insert into jurisdiction values('FR',null,'country','France'),('ES',null,'country','Spain'),"
         "('IT',null,'country','Italy'),('DE',null,'country','Germany'),('FI',null,'country','Finland'),"
-        "('PL',null,'country','Poland'),('MN',null,'country','Mongolia')");
+        "('PL',null,'country','Poland'),('MN',null,'country','Mongolia'),"
+        "('IM',null,'country','Isle of Man'),('JE',null,'country','Jersey'),('GG',null,'country','Guernsey')");
     sqlite_stmt_t *insert = ok ? sqlite_stmt_prepare(db, "insert into jurisdiction_country_flag values(?1,?2)") : NULL;
-    const char *codes[] = {"GB-CON", "GB-ENG", "GB", "FR", "ES", "IT", "DE", "FI", "PL", "MN"};
-    const char *files[] = {"gb-con", "gb-eng", "gb", "fr", "es", "it", "de", "fi", "pl", "mn"};
+    const char *codes[] = {"GB-CON", "GB-ENG", "GB", "FR", "ES", "IT", "DE", "FI", "PL", "MN", "IM", "JE", "GG"};
+    const char *files[] = {"gb-con", "gb-eng", "gb", "fr", "es", "it", "de", "fi", "pl", "mn", "im", "je", "gg"};
     for (unsigned i = 0; ok && i < sizeof codes / sizeof *codes; ++i) {
         string_t *filename = string_sprintf("packaging/jurisdiction-db/flags/%s.svg", files[i]);
         file_t *image = file_new(filename);
@@ -50,7 +51,7 @@ static json_t *lab_browser_flag_fixture(void)
     ok = ok && test_lab_offshore_database();
     const struct { const char *country, *parent; } parents[] = {
         {"GB-ENG", "GB"}, {"GB-WLS", "GB"}, {"GB-SCT", "GB"}, {"GB-CON", "GB"}, {"GB-NIR", "GB"},
-        {"IM", "GB"}, {"JE", "GB"}, {"GG", "GB"}, {"FR", "FR"}, {"ES", "ES"}, {"IT", "IT"},
+        {"IM", "IM"}, {"JE", "JE"}, {"GG", "GG"}, {"FR", "FR"}, {"ES", "ES"}, {"IT", "IT"},
         {"DE", "DE"}, {"FI", "FI"}, {"PL", "PL"}, {"MN", "MN"}, {"", ""}, {"ZZ-SEA", ""}
     };
     for (unsigned i = 0; ok && i < sizeof parents / sizeof *parents; ++i) {

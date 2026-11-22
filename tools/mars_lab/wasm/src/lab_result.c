@@ -649,6 +649,7 @@ void lab_result_pane_clear(void)
 /* Clear card metadata and pending identities together; no stale copy source survives. */
 void lab_result_details_clear(jsref caches, jsref mode)
 {
+    lab_dom_remove(lab_dom_id("plotRange"), "data-calculus-source");
     lab_result_calculation_time(0);
     lab_layout_plot_camera(1);
     lab_dom_write(lab_dom_id("plotRendered"), LAB_DOM_TEXT, "", lab_dom_string(""));

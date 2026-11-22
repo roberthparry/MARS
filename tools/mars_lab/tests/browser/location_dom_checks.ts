@@ -588,8 +588,8 @@ window.checkLabLocationDom = async function checkLabLocationDom() {
             options: [['GB', 'United <Kingdom>'], ['IE', 'Ireland'],
                       ['AU', 'Australia'], ['AU-ACT', 'Australia - Australian Capital Territory'],
                       ['AU-QLD', 'Australia - Queensland'],
-                      ['GB-ENG', 'Britain (UK) - England'], ['GB-WLS', 'Britain (UK) - Wales'],
-                      ['GB-SCT', 'Britain (UK) - Scotland'], ['GB-NIR', 'Britain (UK) - Northern Ireland']],
+                      ['GB-ENG', 'United Kingdom - England'], ['GB-WLS', 'United Kingdom - Wales'],
+                      ['GB-SCT', 'United Kingdom - Scotland'], ['GB-NIR', 'United Kingdom - Northern Ireland']],
             towns: {}
         };
         equal(labDOM.call('lab_location_catalogue', bootstrapCatalogue), 1, 'valid bootstrap catalogue accepted');
@@ -607,7 +607,7 @@ window.checkLabLocationDom = async function checkLabLocationDom() {
                 WorksheetLocations.selects.rebuild(jurisdiction);
                 equal(jurisdiction.selectedOptions[0].hidden, false, `${name} is a visible country`);
                 equal(jurisdiction.closest('.select-shell')!.querySelector('.select-button')!.textContent,
-                      `Britain (UK) - ${name}`, `${name} retains its own selected label`);
+                      `United Kingdom - ${name}`, `${name} retains its own selected label`);
                 equal(jurisdiction.selectedOptions[0].dataset.countryParent, code,
                       `${name} retains its own country menu identity`);
                 const local = {name, value: code};

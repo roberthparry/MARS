@@ -530,6 +530,41 @@ static void test_plot_decimal_ticks(void)
     TEST_ASSERT_TRUE(ok, "both axes use rounded decimal steps even with recurring fractional bounds");
 }
 
+static void real_complex_coordinates_row(const void *data)
+{
+    const test_database_case_t *row = data;
+    NUM_SCOPE(scope);
+    json_t *input = json_from_text(row->input);
+    number_t low = num_create_from_string(string_c_str(json_string_value(json_array_get(input, 0))));
+    number_t high = num_create_from_string(string_c_str(json_string_value(json_array_get(input, 1))));
+    bool ok = true;
+    /* Exercise public rendering across real and exactly real complex backend representations. */
+    for (unsigned backend = 0; ok && backend < 3; ++backend) {
+        number_t a = backend == 0 ? num_clone(low) : backend == 1 ?
+            num_create_from_cdouble(num_to_double(low)) :
+            num_create_from_qcomplex((qcomplex_t){.re = qf_from_double(num_to_double(low)), .im = QF_ZERO});
+        number_t b = backend == 0 ? num_clone(high) : backend == 1 ?
+            num_create_from_cdouble(num_to_double(high)) :
+            num_create_from_qcomplex((qcomplex_t){.re = qf_from_double(num_to_double(high)), .im = QF_ZERO});
+        plot_point_t points[] = {{NUM_ZERO, a, true}, {NUM_ONE, b, false}};
+        plot_t *plot = plot_new(NULL);
+        string_t *svg = plot && plot_add_points(plot, points, 2, "", PLOT_LINES, 0) ? plot_to_svg(plot) : NULL;
+        xml_t *document = svg ? xml_from_text(svg) : NULL;
+        ok = document && strstr(string_c_str(svg), "data-plot-label=\"1\"") &&
+             strstr(string_c_str(svg), "<path d=\"M ") && !strstr(string_c_str(svg), "0i");
+        xml_free(document);
+        string_free(svg);
+        plot_free(plot);
+    }
+    json_free(input);
+    TEST_ASSERT_TRUE(ok, "real and exactly real complex coordinates retain a valid curve and readable decimal axis labels");
+}
+
+static void test_plot_real_complex_coordinates(void)
+{
+    test_run_database_cases(__FILE__, __LINE__, "plot.real_complex_coordinates", NULL, real_complex_coordinates_row);
+}
+
 static void test_plot_extreme_ticks(void)
 {
     size_t precision = num_get_default_prec_bits();
@@ -1613,6 +1648,7 @@ int tests_main(void)
     TEST_RUN_CASE(test_plot_sampler_ownership, NULL);
     TEST_RUN_CASE(test_plot_label_notation, NULL);
     TEST_RUN_CASE(test_plot_decimal_ticks, NULL);
+    TEST_RUN_CASE(test_plot_real_complex_coordinates, NULL);
     TEST_RUN_CASE(test_plot_extreme_ticks, NULL);
     TEST_RUN_CASE(test_plot_extreme_clipping, NULL);
     TEST_RUN_CASE(test_plot_smart_range, NULL);

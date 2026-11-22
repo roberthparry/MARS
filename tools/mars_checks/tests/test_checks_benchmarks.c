@@ -138,6 +138,8 @@ static void test_benchmarks_precision(void)
         benchmark_test_environment(root, limited, 5, 3, NULL, NULL, 0, &diagnostics) &&
         diagnostics && strstr(string_c_str(diagnostics), "does not preserve the requested precision");
     string_free(diagnostics);
+    const char *infinite[] = {"measure", "lambert_S", "mpfr", "256", "3"};
+    ok = benchmark_test_command(root, infinite, 5, 0, NULL) && ok;
     ok = test_checks_finish(root) && ok;
     TEST_ASSERT_TRUE(ok, "benchmark timings reject finite results produced by a narrower numeric backend");
 }
@@ -1074,6 +1076,7 @@ static void test_benchmarks_expression_coverage(void)
                          !strcmp(name, "sincos") || !strcmp(name, "sinhcosh");
         const char *callable = !strcmp(name, "zatahp_integral") ? "zatahp" : name;
         if (!strncmp(name, "lerch_phi_", 10)) callable = "lerch_phi";
+        if (!strcmp(name, "lambert_S_finite")) callable = "lambert_S";
         string_t *source = string_sprintf("%s(%s%s)", callable, sqlite_stmt_column_text(rows, 1),
                                            component ? ",0" : "");
         if (!strcmp(name, "hypergeometric_pFq")) {

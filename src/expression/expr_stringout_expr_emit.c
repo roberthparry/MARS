@@ -849,6 +849,17 @@ static void emit_expr_inner(const expr_t *f, sbuf_t *b, int parent_prec)
             emit_expr_lommel_S(f, b);
             return;
         }
+        if (f->ops->kind == EXPR_KIND_LAMBERT_S) {
+            const expr_t *args[6];
+            if (!expr_lambert_unpack(f, args)) return;
+            sbuf_puts(b, "lambert_S(");
+            for (unsigned j = 0; j < 6; ++j) {
+                if (j) sbuf_puts(b, ", ");
+                emit_expr(args[j], b, 0);
+            }
+            sbuf_putc(b, ')');
+            return;
+        }
         if (expr_is_op(f, &ops_appell_F1)) {
             emit_expr_appell_F1(f, b);
             return;

@@ -238,7 +238,10 @@ uint32_t lab_request_begin(lab_mode_t mode, lab_request_operation_t operation, b
          (operation == LAB_REQUEST_LAND_TOTALITY && parent)) &&
         (!parent || parent != lab_request_slots[LAB_REQUEST_MAIN].token ||
          lab_request_slots[LAB_REQUEST_MAIN].mode != mode ||
-         lab_request_slots[LAB_REQUEST_MAIN].operation != LAB_REQUEST_EVALUATE))
+         (lab_request_slots[LAB_REQUEST_MAIN].operation != LAB_REQUEST_EVALUATE &&
+          !(operation == LAB_REQUEST_PLOT &&
+            (lab_request_slots[LAB_REQUEST_MAIN].operation == LAB_REQUEST_DERIVATIVE ||
+             lab_request_slots[LAB_REQUEST_MAIN].operation == LAB_REQUEST_INTEGRAL)))))
         return 0;
     lab_request_channel_t channel = lab_request_operation_channels[operation];
     if (channel == LAB_REQUEST_MAIN)

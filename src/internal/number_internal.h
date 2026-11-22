@@ -23,6 +23,34 @@
 
 #include "number-t.h"
 
+/**
+ * @brief Evaluate the private weighted polylogarithmic Lambert kernel used by q-function calculus.
+ * @param a Borrowed polylogarithm multiplier.
+ * @param q Borrowed non-zero base, with principal powers.
+ * @param z Borrowed initial coordinate.
+ * @param weight Non-negative integer polynomial weight, at most 64.
+ * @param order Integer polylogarithm order in [-32,32].
+ * @param count Number of terms, at most 100000, or SIZE_MAX for the infinite section.
+ * @return Owned sum of (n+z)^weight Li_order(a q^(n+z)), starting at n=0; release with num_destroy().
+ * Infinite sections require |q|<1. Invalid input, poles, exhausted work and non-convergence
+ * return NaN. This private kernel also implements the explicitly defined public num_lambert_S() convention.
+ * Inputs are unchanged; local scratch and temporary precision follow the calling thread.
+ */
+number_t number_lambert_series(number_t a, number_t q, number_t z, unsigned weight, long order, size_t count);
+
+/**
+ * @brief Evaluate analytic mixed q-base and argument partials of q-digamma without finite differences.
+ * @param q Borrowed base; real q>1 uses reciprocal-base continuation.
+ * @param z Borrowed argument on the principal branch, away from poles.
+ * @param q_order Ordinary derivative order in q, at most 16.
+ * @param z_order Ordinary derivative order in z, at most 16.
+ * @return Owned partial derivative, released with num_destroy(), or NaN outside supported convergence
+ * domains, at poles or on exhaustion of the current computation control. At q=1, real-base extension
+ * derivatives use exact Bernoulli jets; isolated points elsewhere on the unit circle remain undefined.
+ * Scratch state is call-local and inputs are unchanged.
+ */
+number_t number_qdigamma_partial(number_t q, number_t z, unsigned q_order, unsigned z_order);
+
 /** @brief Symbolic identities carried by number's shared mathematical and physical constants. */
 typedef enum number_const_id_t {
     NUMBER_CONST_ZERO,

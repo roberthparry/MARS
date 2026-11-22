@@ -110,10 +110,10 @@ window.checkLabPlaceSearch = async function checkLabPlaceSearch(): Promise<void>
                    new Option('Svalbard & Jan Mayen', 'SJ'), new Option('Portugal', 'PT'));
     const azores = new Option('Região Autónoma dos Açores', 'PT-20');
     azores.hidden = true; country.append(azores);
-    const wales = new Option('Britain (UK) - Wales', 'GB-WLS');
+    const wales = new Option('United Kingdom - Wales', 'GB-WLS');
     wales.dataset.countryParent = 'GB-WLS';
     country.append(wales);
-    const england = new Option('Britain (UK) - England', 'GB-ENG');
+    const england = new Option('United Kingdom - England', 'GB-ENG');
     england.dataset.countryParent = 'GB-ENG';
     country.append(england, new Option('Singapore', 'SG'));
     const westernAustralia = new Option('Western Australia', 'AU-WA');
@@ -122,8 +122,8 @@ window.checkLabPlaceSearch = async function checkLabPlaceSearch(): Promise<void>
     country.value = 'GB'; town.append(new Option('Previous town', 'previous'));
     Reflect.set(country, 'labJurisdictionLabels', {
         NA: 'Namibia', GB: 'United Kingdom', SJ: 'Svalbard & Jan Mayen', PT: 'Portugal',
-        'PT-20': 'Portugal — Região Autónoma dos Açores', 'GB-WLS': 'Britain (UK) - Wales',
-        'GB-ENG': 'Britain (UK) - England', SG: 'Singapore', AU: 'Australia',
+        'PT-20': 'Portugal — Região Autónoma dos Açores', 'GB-WLS': 'United Kingdom - Wales',
+        'GB-ENG': 'United Kingdom - England', SG: 'Singapore', AU: 'Australia',
         'AU-WA': 'Australia - Western Australia', ZA: 'South Africa'
     });
     root.append(country, town, select); document.body.append(root);
@@ -249,7 +249,7 @@ window.checkLabPlaceSearch = async function checkLabPlaceSearch(): Promise<void>
               'regional flag metadata survives replacement of the search results');
         const region = shell.querySelector<HTMLButtonElement>('.select-option:not(.hidden)')!;
         await flagVisible(region, cornishFlag);
-        check(region.textContent?.includes('Cornwall — Newquay') && region.textContent.includes('Britain (UK) - England'),
+        check(region.textContent?.includes('Cornwall — Newquay') && region.textContent.includes('United Kingdom - England'),
               'regional artwork preserves both the named place and its country label');
         const welshFlag = 'data:image/svg+xml;base64,' + btoa(
             '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 18"><path fill="#c23" d="M0 0h24v18H0z"/></svg>');

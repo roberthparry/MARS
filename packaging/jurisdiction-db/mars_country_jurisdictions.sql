@@ -1,5 +1,6 @@
 -- Generated from /usr/share/zoneinfo/iso3166.tab
 -- Source date in file header: current as of ISO/TC 46 N1127 (2024-02-29).
+-- Maintained GB display name: United Kingdom, including Northern Ireland.
 
 insert into jurisdiction(
     jurisdiction_id,
@@ -84,7 +85,7 @@ insert into jurisdiction(
     ('FO', 'country', 'FO', 'FO', 'Faroe Islands'),
     ('FR', 'country', 'FR', 'FR', 'France'),
     ('GA', 'country', 'GA', 'GA', 'Gabon'),
-    ('GB', 'country', 'GB', 'GB', 'Britain (UK)'),
+    ('GB', 'country', 'GB', 'GB', 'United Kingdom'),
     ('GD', 'country', 'GD', 'GD', 'Grenada'),
     ('GE', 'country', 'GE', 'GE', 'Georgia'),
     ('GF', 'country', 'GF', 'GF', 'French Guiana'),

@@ -18,6 +18,12 @@
 void test_expr_numeric_callables(void);
 
 /**
+ * @brief Run database-backed Lambert-sum value, calculus, notation and matrix regressions.
+ * @return No value; failures are recorded by the sequential harness. Fixtures remain locally owned.
+ */
+void test_expr_lambert(void);
+
+/**
  * @brief Run the exact-integer callable programme synchronised with docs/expression.md.
  * @return No value; prints documented output and records failures. Run after ordinary tests.
  */

@@ -344,8 +344,14 @@ coordinate/town-country metadata in a native dictionary, with FIFO eviction at
 
 The Country picker offers one visible entry per country, covering all its
 states and provinces. The four UK countries also have separate visible entries:
-**Britain (UK) - England**, **Britain (UK) - Wales**, **Britain (UK) - Scotland** and
-**Britain (UK) - Northern Ireland**. Each keeps its own town list and selected label.
+**United Kingdom - England**, **United Kingdom - Wales**, **United Kingdom - Scotland** and
+**United Kingdom - Northern Ireland**. Each keeps its own town list and selected label.
+Great Britain comprises England, Scotland and Wales; Northern Ireland is in the
+United Kingdom but not Great Britain. Guernsey, Jersey and the Isle of Man retain
+their own entries and flags: they are Crown Dependencies, outside both the UK and
+Great Britain. The British Isles grouping is geographical, not a country or a
+holiday-rule parent. Existing calendar histories resolve these names from the
+current catalogue without changing their saved worksheets, dates or locations.
 Country town requests include regional memberships in
 bounded database pages. The native town store combines that country's directly
 indexed lists, removes repeated town selection keys and sorts the resulting menu.
@@ -403,10 +409,11 @@ is asynchronous, and textual controls remain usable while flags arrive. Database
 lookups use the existing indexed country code, without a separate BLOB-offset format.
 Hidden row images are released. Missing artwork
 leaves text-only labels; subdivision entries use the catalogue's flag fallback.
-Jurisdiction search indexes the aliases “United Kingdom” and “UK” for the British
-constituent-country entries, even where the displayed label uses “Britain”. Partial
-searches match these aliases through the existing suffix index; labels and selection
-codes remain unchanged. Crown Dependencies are not included in that alias.
+Jurisdiction search indexes “United Kingdom” and “UK” for the four UK constituent
+countries. “Great Britain” finds England, Scotland and Wales. “British Isles” also
+finds Northern Ireland, Ireland and the three Crown Dependencies. These geographic
+search aliases retain each entry's own jurisdiction code; UK aliases exclude the
+Crown Dependencies and Ireland. Partial searches use the existing suffix index.
 The bounded index and its allocation/size-limit fallback share the same native
 search-text builder, so aliases remain available when an index cannot be retained.
 
@@ -1191,6 +1198,10 @@ when their native result state calls for them. Copy, zoom and expansion controls
 wrap inside each card. Wide mathematical content and almanac tables scroll
 within their own containers rather than widening the entire page.
 
+Each result card displays its own content magnification beside its zoom controls.
+Changing that magnification preserves the worksheet status and precision in the
+page header; the card percentage does not represent browser zoom.
+
 Equation, Differential Equation, Integrator and Datetime instructions appear in
 Help rather than as introductory paragraphs within the workspace, on both desktop
 and mobile. Help covers notation, bindings, numerical starting values, Bound/Free
@@ -1350,9 +1361,9 @@ Click or tap the Location flag to open a large modal artwork viewer. **Zoom in**
 individual details, or choose **Fit** to see the entire flag. **Close** or Escape returns
 to the worksheet. Keyboard activation and flag animation remain available.
 Hold **Alt** to show the jurisdiction flag in the Almanac Location card, its hover
-preview and its open detail viewer. England, Wales, Scotland, Cornwall, Northern
-Ireland, the Isle of Man, Jersey and Guernsey show the Union Jack. Other regional
-flags show the country resolved for that location. Release Alt, or switch away
+preview and its open detail viewer. England, Wales, Scotland, Cornwall and Northern
+Ireland show the Union Jack. The Isle of Man, Jersey and Guernsey retain their own
+flags. Other regional flags show the country resolved for that location. Release Alt, or switch away
 from the window, to restore the ordinary artwork. The card's regional animation
 continues underneath; names, jurisdiction selections and other flag displays do
 not change. Offshore artwork remains unchanged.
@@ -3200,6 +3211,17 @@ Angles are in radians. Lab's Help includes this distinction; the
 
 ### Native function plots
 
+Derivative and antiderivative actions automatically plot the displayed native result
+without replacing the input editor. Range changes and restored mode views retain that
+result as their plotting source; ordinary evaluation returns to plotting the input.
+Finite Lambert forms of real trigonometric derivatives, including repeated derivatives,
+retain real-valued samples and use frequency-aware automatic ranges that avoid the nearest poles.
+Entering the expanded derivative sum directly uses the same native recognition:
+`sum(k,1,N,k*(tan(k*x)^2+1))` retains its summation on the left of the TeX identity
+and uses the corresponding Lambert form for the result cards and plotting.
+For this input the closed result is `-4*lambert_S(-1,exp(2i*x),1,1,-1,N)`;
+the rendered answer also includes the definition of `Λ`.
+
 Nested roots and powers use the expression module's guarded native sampler on
 their positive real branches. Uncertain points and branch boundaries retain
 ordinary native evaluation, and non-real surface regions remain gaps. When
@@ -4484,13 +4506,14 @@ identity, bindings and value.
 
 The derivative action differentiates this closed form, retaining the differentiated
 sum on the left of the rendered equality. Its q-digamma base depends on the
-coordinate, so the result includes base partial derivatives and their chain-rule
-factors. Ordinary trigamma differentiates the other argument and cannot replace
-these partials. Expression and Function retain the same closed derivative;
-recognised finite combinations evaluate through the differentiated finite terms,
-without evaluating separate q-digamma values on the unit circle. This also applies
-to cotangent, secant, cosecant and their hyperbolic counterparts, with fixed upper
-bounds and scaled or renamed coordinates.
+coordinate, so ordinary trigamma, which differentiates the other argument, cannot
+replace the required base derivative. MARS expresses the result using its evaluable
+`lambert_S` convention, displayed as capital `Λ` with its defining equation beneath
+the answer. Analytic chain rules also support repeated derivatives within the
+[documented numerical limits](expression.md#mars-defined-lambert-sum), without
+leaving unevaluated partial derivatives. This also applies to cotangent, secant,
+cosecant and their hyperbolic counterparts, with fixed upper bounds and scaled or
+renamed coordinates.
 
 Automatic plotting accounts for the largest frequency before sampling these
 circular pole families. With an affine step `a*x+b`, the initial window is centred
@@ -4556,6 +4579,14 @@ $\quad\begin{array}{l}\displaystyle \sum_{k=1}^{n}\frac{k}{1+k^2x^2}=\frac{\psi(
 Rendered TeX retains the differentiated sum on the left of the equality and
 shows this closed form on the right. Expression and Function use the same
 simplified closed form, with the supplied bindings kept separate.
+
+Derivatives of finite tangent, cotangent, secant, cosecant and their hyperbolic
+counterparts use the evaluable MARS-defined `lambert_S` function. Native TeX
+shows capital `Λ` and always includes its [defining sum](expression.md#mars-defined-lambert-sum)
+beneath the identity. For example, the tangent derivative is
+`-4*lambert_S(-1,exp(2ix),1,1,-1,n)`. This is an explicitly defined convention,
+not an assertion that `lambert_S` is a standard special-function name. The sigma
+on the left stays visible; no unresolved base partials are required on the right.
 
 MARS evaluates its complex digamma terms through the active arbitrary-precision
 backend and returns the mathematically real result. At 386 requested digits,
@@ -5408,7 +5439,7 @@ The native presentation layer supplies and escapes these tooltips for fresh and
 cached results alike; copied text, dates and estimation qualifiers are unchanged.
 No database migration is needed, and unknown names receive no guessed translation.
 
-[![MARS Lab datetime mode showing Shrewsbury calendar and astronomical results for 12 November 2026](images/mars-lab/datetime.png?v=20261122-earth-full)](images/mars-lab/datetime.png?v=20261122-earth-full)
+[![MARS Lab datetime mode showing Shrewsbury calendar and astronomical results for 12 November 2026](images/mars-lab/datetime.png?v=20261122-uk-labels)](images/mars-lab/datetime.png?v=20261122-uk-labels)
 
 MARS supplies no shared WeatherAPI account or key. Weather is shown only when
 the person installing MARS Lab creates their own WeatherAPI account, configures
@@ -5721,7 +5752,7 @@ is disabled in the capture session. A configured WeatherAPI response instead sho
 both the estimated observer pressure used for refraction and the supplied sea-level
 pressure. Weather values may vary when the request is repeated.
 
-[![Full-page MARS Lab Almanac showing the London observer globe, land classification, weather inputs, corrected body altitudes and upcoming events](images/mars-lab/almanac.png?v=20261122-earth-full)](images/mars-lab/almanac.png?v=20261122-earth-full)
+[![Full-page MARS Lab Almanac showing the London observer globe, land classification, weather inputs, corrected body altitudes and upcoming events](images/mars-lab/almanac.png?v=20261122-uk-labels)](images/mars-lab/almanac.png?v=20261122-uk-labels)
 
 ### Almanac history
 
@@ -5730,7 +5761,7 @@ names, flag, date and GMT time; **Current** identifies the open worksheet. Drag 
 row's grip to reorder it, select its location to open the worksheet, or use
 **Earlier**, **Later** and **Remove**.
 
-[![Complete desktop MARS Lab Almanac History viewport in Earth, showing loaded location flags, the current worksheet and drag handles](images/mars-lab/almanac-history.png?v=20261122-earth-full)](images/mars-lab/almanac-history.png?v=20261122-earth-full)
+[![Complete desktop MARS Lab Almanac History viewport in Earth, showing loaded location flags, the current worksheet and drag handles](images/mars-lab/almanac-history.png?v=20261122-uk-labels)](images/mars-lab/almanac-history.png?v=20261122-uk-labels)
 
 This uncropped viewport capture shows completed worksheets for several locations,
 with every flag loaded. The dialog and its backdrop belong to the same settled
@@ -5741,9 +5772,9 @@ scrollable directly beneath its heading, omitting the introduction and help sect
 These captures show the complete portrait and landscape
 viewports, without cropping:
 
-[![Phone portrait History with flags, place names and grouped touch controls](images/mars-lab/history-mobile.png?v=20261122-earth-full)](images/mars-lab/history-mobile.png?v=20261122-earth-full)
+[![Phone portrait History with flags, place names and grouped touch controls](images/mars-lab/history-mobile.png?v=20261122-uk-labels)](images/mars-lab/history-mobile.png?v=20261122-uk-labels)
 
-[![Phone landscape History with entry actions alongside the place names](images/mars-lab/history-mobile-landscape.png?v=20261122-earth-full)](images/mars-lab/history-mobile-landscape.png?v=20261122-earth-full)
+[![Phone landscape History with entry actions alongside the place names](images/mars-lab/history-mobile-landscape.png?v=20261122-uk-labels)](images/mars-lab/history-mobile-landscape.png?v=20261122-uk-labels)
 
 ## Mobile and private remote access
 

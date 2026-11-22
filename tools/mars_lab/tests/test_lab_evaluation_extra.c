@@ -1672,8 +1672,10 @@ static void progression_plot_row(const void *data)
     }
     num_destroy(&actual);
     num_destroy(&minimum);
-    if (!ok)
+    if (!ok) {
         string_printf("Progression plot %S: status %u, visible path segments %zu\n", row->name, status, paths);
+        show_failure(response);
+    }
     json_free(response);
     json_free(expected);
     TEST_ASSERT_TRUE(ok, "automatic finite-progression views retain a non-empty curve instead of empty axes");

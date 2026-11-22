@@ -30,6 +30,7 @@ static int benchmark_workload_label_compare(const void *key, const void *entry)
 static const char *benchmark_workload_label(const char *key)
 {
     static const benchmark_workload_label_t labels[] = {
+        {"lambert_S_finite", "lambert_S (finite section)"},
         {"lerch_phi_integer_order", "lerch_phi (integer order)"},
         {"lerch_phi_negative_order", "lerch_phi (negative order)"},
         {"zatahp_integral", "zatahp (integer order)"}

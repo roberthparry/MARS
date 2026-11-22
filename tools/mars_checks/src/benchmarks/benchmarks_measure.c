@@ -270,7 +270,11 @@ static bool benchmark_prepare(benchmark_state_t *state, const char *backend, uns
                 (!state->integer && !i && num_is_integer(state->number[i]))) ok = false;
             continue;
         }
-        state->real[i] = qf_from_string(argument);
+        /* Use the same scalar literal grammar for every backend, including infinity.
+         * Decimal-only fixed parsers must not silently turn an infinite series count into zero. */
+        number_t literal_value = num_create_from_string(argument);
+        state->real[i] = num_to_qfloat(literal_value);
+        num_destroy(&literal_value);
         bool has_imaginary = (op->complex_mask & (1u << i)) != 0;
         qfloat_t imaginary = has_imaginary ? qf_from_string(benchmark_imaginary_literal) : QF_ZERO;
         state->complex_values[i] = qc_make(state->real[i], imaginary);
@@ -285,7 +289,9 @@ static bool benchmark_prepare(benchmark_state_t *state, const char *backend, uns
             num_destroy(&parsed);
             num_destroy(&zero);
             string_free(literal);
-            if (!num_is_finite(state->number[i])) ok = false;
+            /* Infinity is a legitimate scalar parameter, for example an infinite series count.
+             * The measured operation must still return a finite result. */
+            if (num_is_nan(state->number[i])) ok = false;
         }
     }
     string_split_free(parts, count);

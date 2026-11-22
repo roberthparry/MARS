@@ -628,6 +628,7 @@ their existing backend-specific precision and representation.
 | `num_digamma(x)` | Evaluates `ψ(x)`, the logarithmic derivative of gamma; arbitrary-precision complex inputs retain the active precision and use recurrence and reflection across the complex plane. |
 | `number_qdigamma(q, x)` | Evaluates the q-digamma `ψ_q(x)` while preserving the active real or complex backend. |
 | `num_qdigamma(q, x)` | Compatibility spelling for `number_qdigamma(q, x)`. |
+| `num_lambert_S(a, q, z, r, s, N)` | MARS-defined generalised Lambert sum; all six arguments are `number_t`. See the definition, domains and calculus in [the expression guide](expression.md#mars-defined-lambert-sum). Finite sections and convergent infinite sums preserve the selected real or complex precision. |
 | `num_trigamma(x)` | Evaluates `ψ⁽¹⁾(x)`, the derivative of digamma. |
 | `num_tetragamma(x)` | Evaluates `ψ⁽²⁾(x)`, the derivative of trigamma. |
 | `num_polygamma(m, x)` | Evaluates the order-`m` polygamma function `ψ⁽ᵐ⁾(x)`. |
@@ -1991,6 +1992,21 @@ remains stored and excluded from baseline statistics. The other 19 observations 
 slowdown flags. Independent full-width series references cover both precision
 crossovers, complex orders, negative-axis branches, derivative weights and
 fallbacks; accepted and rejected attempts also check output aliases.
+
+### MARS-defined Lambert sum timings
+
+Focused benchmark run **254**, measured on 22 November 2026 on the Intel N95,
+records three warm samples per case. These are timings for the explicitly
+[defined Lambert sum](expression.md#mars-defined-lambert-sum), not for Lambert W.
+The infinite workload uses `(a,q,z,r,s,N) = (0.5,0.25,1.25,1,-1,inf)`;
+the finite workload uses `(-1,0.7,1,1,-1,1000)`. Complex profiles add `0.125i`
+to each of the first three arguments. All 30 supported cases passed, without
+timing-outlier flags; all precision profiles remain in the benchmark database.
+
+| Workload | Real, 106 bits | Complex, 106 bits | Real, 4096 bits | Complex, 4096 bits |
+|---|---:|---:|---:|---:|
+| `lambert_S` (infinite) | 65.2 µs | 92.4 µs | 29.019 ms | 303.228 ms |
+| `lambert_S` (finite section) | 238.9 µs | 332.7 µs | 20.452 ms | 121.330 ms |
 
 ### Full catalogue, warm protocol
 

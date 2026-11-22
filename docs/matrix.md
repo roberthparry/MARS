@@ -1358,6 +1358,7 @@ For `MAT_TYPE_EXPR`, the story is different:
 | `mat_lgamma(A)` | Matrix log gamma function |
 | `mat_digamma(A)` | Matrix digamma function (psi) |
 | `mat_qdigamma(A, q)` | Matrix q-digamma function ψ_q(A), using the convergent Lambert matrix series and reciprocal-q continuation |
+| `mat_lambert_S(Z, a, q, r, s, N)` | MARS-defined Lambert function of square matrix `Z`, with five scalar `number_t` parameters. Uses Taylor or spectral functional calculus, including supported non-diagonal matrices, rather than entrywise evaluation. See [the scalar definition and limits](expression.md#mars-defined-lambert-sum). The result is owned; release it with `mat_free()`. |
 | `mat_trigamma(A)` | Matrix trigamma function |
 | `mat_tetragamma(A)` | Matrix tetragamma function |
 | `mat_zeta(A)` | Analytically continued Riemann zeta matrix function |

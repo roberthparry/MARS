@@ -47,6 +47,54 @@ static const TeX_model_node_t *size_node(notation_build_t *build, size_t count)
     return result;
 }
 
+static const TeX_model_node_t *lambert(notation_build_t *build, const expr_t *expression)
+{
+    const expr_t *args[6];
+    if (!expr_lambert_unpack(expression, args)) return NULL;
+    const expr_t *indices[] = {args[3], args[4]};
+    const TeX_model_node_t *subscript[] = {
+        notation_build_literal(build, TeX_NODE_IDENTIFIER, "Λ"), parameter_list(build, indices, 2)
+    };
+    const TeX_model_node_t *limit = notation_build_expr(build, args[5]);
+    const TeX_model_node_t *bracketed = notation_build_node(build,
+        (TeX_node_view_t){.kind = TeX_NODE_FENCED, .child_count = 1, .fence = TeX_FENCE_BRACKETS}, &limit);
+    const TeX_model_node_t *superscript[] = {node(build, TeX_NODE_SUBSCRIPT, 2, subscript), bracketed};
+    const TeX_model_node_t *children[] = {
+        node(build, TeX_NODE_POWER, 2, superscript), notation_build_expr(build, args[0]),
+        notation_build_expr(build, args[1]), notation_build_expr(build, args[2])
+    };
+    return node(build, TeX_NODE_APPLY, 4, children);
+}
+
+const TeX_model_node_t *expr_notation_lambert_definition(notation_build_t *build)
+{
+    expr_t *a = expr_new_named_var(NUM_NAN, "a"), *q = expr_new_named_var(NUM_NAN, "q");
+    expr_t *z = expr_new_named_var(NUM_NAN, "z"), *r = expr_new_named_var(NUM_NAN, "r");
+    expr_t *s = expr_new_named_var(NUM_NAN, "s"), *n = expr_new_named_var(NUM_NAN, "N");
+    expr_t *function = expr_lambert_S(a, q, z, r, s, n);
+    const TeX_model_node_t *polylog_index[] = {
+        notation_build_literal(build, TeX_NODE_FUNCTION_NAME, "polylog"), notation_build_expr(build, s)
+    };
+    const TeX_model_node_t *polylog_args[] = {
+        node(build, TeX_NODE_SUBSCRIPT, 2, polylog_index), notation_build_formula(build, "a*q^(j+z)")
+    };
+    const TeX_model_node_t *factors[] = {
+        notation_build_formula(build, "(j+z)^r"), node(build, TeX_NODE_APPLY, 2, polylog_args)
+    };
+    const TeX_model_node_t *sum_args[] = {
+        node(build, TeX_NODE_PRODUCT, 2, factors), notation_build_literal(build, TeX_NODE_IDENTIFIER, "j"),
+        notation_build_literal(build, TeX_NODE_NUMBER, "0"), notation_build_formula(build, "N-1")
+    };
+    const TeX_model_node_t *sides[] = {
+        function ? lambert(build, function) : NULL,
+        node(build, TeX_NODE_SUMMATION, 4, sum_args)
+    };
+    const TeX_model_node_t *definition = sides[0] && sides[1] ? notation_build_node(build,
+        (TeX_node_view_t){.kind = TeX_NODE_RELATION, .relation = TeX_RELATION_DEFINITION, .child_count = 2}, sides) : NULL;
+    expr_free(function); expr_free(n); expr_free(s); expr_free(r); expr_free(z); expr_free(q); expr_free(a);
+    return definition;
+}
+
 static const TeX_model_node_t *lerch(notation_build_t *build, const expr_t *expression)
 {
     const expr_t *z, *s, *a;
@@ -188,6 +236,7 @@ const TeX_model_node_t *expr_notation_packed_function(notation_build_t *build, c
 {
     typedef const TeX_model_node_t *(*unpack_fn)(notation_build_t *, const expr_t *);
     static const unpack_fn unpackers[EXPR_KIND_COUNT] = {
+        [EXPR_KIND_LAMBERT_S]          = lambert,
         [EXPR_KIND_LERCH_PHI]          = lerch,
         [EXPR_KIND_POWMOD]             = integer_function,
         [EXPR_KIND_DIVMOD]             = integer_function,

@@ -147,6 +147,7 @@ static const expr_integrate_dispatch_rule_t integrate_dispatch_rules[EXPR_KIND_C
     [EXPR_KIND_BESSEL_Y] = {.primitive = integrate_bessel_Y_rule},
     [EXPR_KIND_LOMMEL_S] = {.primitive = integrate_lommel_S_rule},
     [EXPR_KIND_HYPERGEOMETRIC_PFQ] = {.primitive = integrate_hypergeometric_pFq_rule},
+    [EXPR_KIND_LAMBERT_S] = {.primitive = expr_integrate_lambert},
     [EXPR_KIND_APPELL_F2] = {.primitive = expr_integrate_appell},
     [EXPR_KIND_APPELL_F1] = {.primitive = expr_integrate_appell},
     [EXPR_KIND_APPELL_F3] = {.primitive = expr_integrate_appell},

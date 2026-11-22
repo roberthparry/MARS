@@ -658,38 +658,16 @@ void expr_reverse_qdigamma(const expr_t *expr, const number_t *out_bar, number_t
 {
     number_t q = expr_eval_num_internal(expr->a);
     number_t z = expr_eval_num_internal(expr->b);
-    number_t h = num_create_from_string("1e-8");
-    number_t two_h = num_mul_long(h, 2L);
-    number_t q_plus = num_add(q, h);
-    number_t q_minus = num_sub(q, h);
-    number_t z_plus = num_add(z, h);
-    number_t z_minus = num_sub(z, h);
-    number_t q_forward = num_qdigamma(q_plus, z);
-    number_t q_backward = num_qdigamma(q_minus, z);
-    number_t z_forward = num_qdigamma(q, z_plus);
-    number_t z_backward = num_qdigamma(q, z_minus);
-    number_t q_difference = num_sub(q_forward, q_backward);
-    number_t z_difference = num_sub(z_forward, z_backward);
-    number_t q_partial = num_div(q_difference, two_h);
-    number_t z_partial = num_div(z_difference, two_h);
+    number_t q_partial = number_qdigamma_partial(q, z, 1, 0);
+    number_t z_partial = number_qdigamma_partial(q, z, 0, 1);
     number_t q_bar = num_mul(*out_bar, q_partial);
     number_t z_bar = num_mul(*out_bar, z_partial);
 
     expr_reverse_binary(q_bar, z_bar, a_bar, b_bar);
     num_destroy(&z_partial);
     num_destroy(&q_partial);
-    num_destroy(&z_difference);
-    num_destroy(&q_difference);
-    num_destroy(&z_backward);
-    num_destroy(&z_forward);
-    num_destroy(&q_backward);
-    num_destroy(&q_forward);
-    num_destroy(&z_minus);
-    num_destroy(&z_plus);
-    num_destroy(&q_minus);
-    num_destroy(&q_plus);
-    num_destroy(&two_h);
-    num_destroy(&h);
+    num_destroy(&z);
+    num_destroy(&q);
 }
 
 void expr_reverse_trigamma(const expr_t *expr, const number_t *out_bar, number_t *a_bar, number_t *b_bar)

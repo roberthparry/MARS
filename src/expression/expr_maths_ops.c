@@ -583,12 +583,29 @@ static expr_t *deriv_indexed_symbol(expr_t *expr)
 
 static expr_t *deriv_summation(expr_t *expr)
 {
+    const expr_t *wrt = expr_current_wrt_internal();
+    expr_t *closed = wrt ? expr_finite_qdigamma_progression_derivative_form(expr, wrt) : NULL;
+    if (closed)
+        return closed;
     expr_t *raw_derivative = expr_get_dx_internal(expr->a);
     expr_t *term_derivative = raw_derivative ? expr_simplify(raw_derivative) : NULL;
     expr_t *out = term_derivative ? expr_new_summation(term_derivative, expr->b) : NULL;
 
     expr_free(raw_derivative);
     expr_free(term_derivative);
+    return out;
+}
+
+/* Retain an authored sigma for derivation display even when its public derivative has a shorter closed form. */
+expr_t *expr_summation_derivative_source(const expr_t *expr, const expr_t *wrt)
+{
+    if (!expr || !wrt || expr->ops->kind != EXPR_KIND_SUMMATION) return NULL;
+    expr_t *coordinate = (expr_t *)wrt;
+    bool dependent_bounds = false;
+    if (!expr_collect_var_usage(expr->b, 1, &coordinate, &dependent_bounds) || dependent_bounds) return NULL;
+    expr_t *term = expr_create_deriv(expr->a, wrt);
+    expr_t *out = term ? expr_new_summation(term, expr->b) : NULL;
+    expr_free(term);
     return out;
 }
 
@@ -2718,7 +2735,7 @@ expr_t *expr_finite_progression_from_qdigamma_form(const expr_t *expr)
     return sum ? sum : expr_recover_qdigamma_pair(expr, &scan, scan.alternate_first, scan.alternate_second, NULL);
 }
 
-/* Only finite quotient families need partial derivatives with respect to a changing q base. */
+/* Finite quotient derivatives have explicit Lambert-sum forms, including on the unit circle. */
 expr_t *expr_finite_qdigamma_progression_derivative_form(const expr_t *expr, const expr_t *wrt)
 {
     const expr_t *upper = NULL;
@@ -2731,12 +2748,10 @@ expr_t *expr_finite_qdigamma_progression_derivative_form(const expr_t *expr, con
     unsigned slot = expr_trig_slot(function->kind);
     bool quotient = slot < 12u && slot % 6u >= 2u;
     expr_t *upper_derivative = quotient ? expr_create_deriv(upper, wrt) : NULL;
-    expr_t *closed = upper_derivative && expr_is_exact_zero(upper_derivative)
-                         ? function->finite_progression(upper, step) : NULL;
-    expr_t *derivative = closed ? expr_create_deriv(closed, wrt) : NULL;
+    expr_t *derivative = upper_derivative && expr_is_exact_zero(upper_derivative)
+                            ? expr_lambert_progression_derivative(upper, step, function->kind, wrt) : NULL;
     expr_t *linked = derivative ? expr_clone_linked_symbols(derivative, expr) : NULL;
     expr_free(derivative);
-    expr_free(closed);
     expr_free(upper_derivative);
     expr_free(step);
     return linked;
@@ -4005,6 +4020,8 @@ expr_t *expr_finite_progression_closed_form(const expr_t *expr)
         out = expr_finite_progression_scaled_closed_form(expr);
     if (!out)
         out = expr_finite_weighted_progression_closed_form(expr, NULL);
+    if (!out)
+        out = expr_finite_quotient_derivative_closed_form(expr, NULL);
     return expr_simplify_owned(out);
 }
 
@@ -4020,6 +4037,8 @@ expr_t *expr_finite_progression_sample_form(const expr_t *expr, const expr_t *co
     bool ordinary = expr_finite_progression_parts(expr, &upper, &step, &function);
     if (!ordinary)
         closed = expr_finite_weighted_progression_closed_form(expr, &upper);
+    if (!ordinary && !closed)
+        closed = expr_finite_quotient_derivative_closed_form(expr, &upper);
     bool entire = closed || function == &ops_sin || function == &ops_cos || function == &ops_sinh ||
                   function == &ops_cosh || function == &ops_exp;
     bool fixed = entire && expr_summation_bound_to_long(upper, &terms) && terms >= 0;
@@ -4993,6 +5012,18 @@ const expr_ops_t ops_digamma = {.eval = eval_digamma,
                                 .apply_binary = NULL,
                                 .simplify = expr_simplify_unary_operator,
                                 .fold_const_unary = NULL};
+const expr_ops_t ops_lambert_S = {.eval = lambert_eval,
+                                .deriv = lambert_derivative,
+                                .reverse = expr_reverse_not_differentiable,
+                                .reverse_many = lambert_reverse,
+                                .kind = EXPR_KIND_LAMBERT_S,
+                                .arity = EXPR_OP_BINARY,
+                                .expression_name = "Λ",
+                                .function_name = "lambert_S",
+                                .apply_binary = lambert_rebuild,
+                                .integrate = expr_integrate_dispatch_primitive,
+                                .simplify = expr_simplify_rebuild_binary_operator};
+
 const expr_ops_t ops_qdigamma = {.eval = eval_qdigamma,
                                  .deriv = deriv_qdigamma,
                                  .reverse = expr_reverse_qdigamma,

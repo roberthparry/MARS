@@ -1677,6 +1677,125 @@
             WorksheetWorkspace.presentation.syncModeUI();
         }
     }
+    /** @brief Plot actual calculus results and keep their source through redraws and mode restoration. */
+    async function checkCalculusResultPlots(): Promise<void> {
+        const originalMode = WorksheetWorkspace.mode.currentMode();
+        const originalSource = WorksheetBindings.editor.currentExpressionText();
+        const originalFetch = WorksheetRequests.evaluationTransport.fetchEvaluation;
+        const inputs: string[] = [];
+        const range = document.getElementById('plotRange')!;
+        const plot = document.getElementById('plotRendered')!;
+        WorksheetRequests.evaluationTransport.fetchEvaluation = (...args) => {
+            if (args[2] === 'plot') inputs.push(args[0]);
+            return originalFetch(...args);
+        };
+        async function plotted(): Promise<void> {
+            await waitForAutomaticPlot();
+            check(!document.getElementById('plotCard')!.classList.contains('hidden') &&
+                  plot.querySelectorAll('[data-series] path').length > 20 && !plot.classList.contains('error'),
+                  'A calculus result automatically produces a visible native curve: ' + plot.textContent);
+        }
+        try {
+            await WorksheetWorkspace.mode.selectWorksheetMode('expression');
+            await WorksheetRequests.presentation.prepareLabEditor('x^3');
+            WorksheetBindings.controller.setExpressionEditor('x^3');
+            await WorksheetRequests.evaluation.evaluateExpression();
+            await waitForAutomaticPlot();
+            const authored = WorksheetBindings.editor.currentExpressionText();
+            inputs.length = 0;
+            await WorksheetRequests.plots.takeDerivative('x');
+            await plotted();
+            const derivative = range.dataset.calculusSource;
+            check(!!derivative && inputs.length === 1 && inputs[0].includes('3') && inputs[0] !== 'x^3' &&
+                  WorksheetContext.rightPaneTitle.textContent.toLowerCase().includes('derivative') &&
+                  WorksheetBindings.editor.currentExpressionText() === authored,
+                  'Derivative plotting uses the native result while retaining the authored editor and result title: ' +
+                  JSON.stringify({derivative, inputs, title: WorksheetContext.rightPaneTitle.textContent,
+                                  authored, current: WorksheetBindings.editor.currentExpressionText()}));
+            WorksheetWorkspace.presentation.saveCurrentModeResultState('expression');
+            WorksheetWorkspace.mode.setMode('matrix');
+            WorksheetWorkspace.presentation.restoreModeResultState('matrix');
+            check(!range.dataset.calculusSource, 'Another mode does not inherit the derivative plot source');
+            WorksheetWorkspace.mode.setMode('expression');
+            WorksheetWorkspace.presentation.restoreModeResultState('expression');
+            check(range.dataset.calculusSource === derivative, 'Restoring a calculus result restores its plot source');
+            inputs.length = 0;
+            await WorksheetRequests.plots.takePlot('x');
+            await plotted();
+            check(inputs.length === 1 && inputs[0].includes('3') && inputs[0] !== 'x^3',
+                  'Viewport redraws continue to plot the derivative rather than the original input');
+            await WorksheetRequests.evaluation.evaluateExpression();
+            await waitForAutomaticPlot();
+            check(!range.dataset.calculusSource, 'Ordinary evaluation clears the calculus plot source');
+            inputs.length = 0;
+            await WorksheetRequests.plots.takeIntegral('x');
+            await plotted();
+            check(!!range.dataset.calculusSource && inputs.length === 1 &&
+                  inputs[0].includes('C') && inputs[0] !== derivative && range.dataset.calculusSource !== derivative,
+                  'Antiderivatives use the same automatic result-plot policy: ' +
+                  JSON.stringify({source: range.dataset.calculusSource, inputs}));
+            const source = '@Z_(k=1)^1000 tan(kx)';
+            await WorksheetRequests.presentation.prepareLabEditor(source);
+            WorksheetBindings.controller.setExpressionEditor(source);
+            inputs.length = 0;
+            await WorksheetRequests.plots.takeDerivative('x');
+            await plotted();
+            check(inputs.length === 1 && inputs[0].includes('lambert_S(') &&
+                  WorksheetWorkspace.presentation.state.lastTex.includes('\\Lambda') &&
+                  WorksheetWorkspace.presentation.state.lastTex.includes(':=') &&
+                  WorksheetBindings.editor.currentExpressionText().includes('tan('),
+                  'The 1000-term tangent derivative plots its evaluable Lambert form and retains the defining identity');
+            const chart = plot.querySelector<SVGSVGElement>('[data-plot-chart]')!;
+            check(Math.abs(Number(chart.dataset.xMin) + Math.PI / 4000) < 1e-12 &&
+                  Math.abs(Number(chart.dataset.xMax) - Math.PI / 4000) < 1e-12,
+                  'The tangent derivative uses a frequency-aware pole-free real window');
+            await WorksheetResults.reuse.sendResultExpressionToInput();
+            const x = document.querySelector<HTMLInputElement>('.binding-value-input[data-binding-name="x"]')!;
+            check(!!x, 'The native Lambert result retains its x binding');
+            x.value = '1';
+            inputs.length = 0;
+            await WorksheetRequests.plots.takeDerivative('x');
+            await plotted();
+            check(inputs.length === 1 && inputs[0].includes('lambert_S(') &&
+                  inputs[0].includes('-2') && inputs[0].includes('x = 1') &&
+                  WorksheetWorkspace.presentation.state.lastTex.includes('\\Lambda'),
+                  'Differentiating the Lambert result again with x bound plots the second derivative: ' +
+                  JSON.stringify({inputs, source: range.dataset.calculusSource}));
+            const expanded = '{@Z_(k=1)^1000 k(tan^2(kx)+1)|x=1}';
+            await WorksheetRequests.presentation.prepareLabEditor(expanded);
+            WorksheetBindings.controller.setExpressionEditor(expanded);
+            await WorksheetRequests.evaluation.evaluateExpression();
+            await plotted();
+            check(WorksheetWorkspace.presentation.state.lastTex.includes('\\sum') &&
+                  WorksheetWorkspace.presentation.state.lastTex.includes(' = ') &&
+                  WorksheetWorkspace.presentation.state.lastTex.includes('\\Lambda') &&
+                  WorksheetWorkspace.presentation.state.lastTex.includes(':=') &&
+                  !range.dataset.calculusSource,
+                  'Evaluating the expanded derivative recovers the native Lambert identity and its plot');
+            const derivativeButton = document.querySelector<HTMLButtonElement>(
+                '#derivativeButtons button[data-variable="x"][data-calculus-action="0"]');
+            const integralButton = document.querySelector<HTMLButtonElement>(
+                '#derivativeButtons button[data-variable="x"][data-calculus-action="1"]');
+            check(!!derivativeButton && !!integralButton && !derivativeButton.disabled && !integralButton.disabled,
+                  'Evaluating a native Lambert identity retains visible x derivative and integral actions');
+            inputs.length = 0;
+            derivativeButton!.click();
+            await wait_for_mode_evaluation();
+            await plotted();
+            check(inputs.length === 1 && inputs[0].includes('lambert_S(') && inputs[0].includes('-2') &&
+                  WorksheetContext.rightPaneTitle.textContent.toLowerCase().includes('derivative') &&
+                  WorksheetWorkspace.presentation.state.lastTex.includes('\\Lambda'),
+                  'The visible x derivative button differentiates the recognised sum and plots its closed form');
+        } finally {
+            WorksheetRequests.evaluationTransport.fetchEvaluation = originalFetch;
+            await WorksheetWorkspace.mode.selectWorksheetMode(originalMode);
+            await WorksheetRequests.presentation.prepareLabEditor(originalSource);
+            WorksheetBindings.controller.setExpressionEditor(originalSource);
+            await WorksheetWorkspace.mode.evaluateCurrentMode();
+            await waitForAutomaticPlot();
+        }
+    }
+
     /** @brief Wait for a mode's asynchronous calculation before inspecting its replacement plot. */
     async function wait_for_mode_evaluation() {
         await LabTestBrowser.paint();
@@ -3662,6 +3781,7 @@
                 await runBrowserGroup('checkLabSelects', window.checkLabSelects);
                 await runBrowserGroup('checkLabSelectEvents', window.checkLabSelectEvents);
                 await runBrowserGroup('checkLabCountryTowns', window.checkLabCountryTowns);
+                await runBrowserGroup('checkLabHistoryGeography', window.checkLabHistoryGeography);
                 await report('PASS: worldwide search, country-only menus, regional town lists and local rules');
                 return;
             }
@@ -3773,6 +3893,13 @@
                 await report('PASS: native ODE parameters, sliders, symbolic source and numeric binding edits');
                 return;
             }
+            if (new URLSearchParams(location.search).get('calculus-check') === '1') {
+                await runBrowserGroup('calculus result plots', checkCalculusResultPlots, 90000);
+                await runBrowserGroup('native evaluation workflows', window.checkLabEvaluation);
+                await runBrowserGroup('native calculus request ownership', window.checkLabRequests);
+                await report('PASS: calculus result plots, redraw sources and native request ownership');
+                return;
+            }
             if (new URLSearchParams(location.search).get('evaluation-check') === '1') {
                 await runBrowserGroup('mode-entry result reuse', check_mode_entry_results);
                 await runBrowserGroup('literal function-series endpoints', checkLiteralFunctionSeries);
@@ -3790,6 +3917,7 @@
                 await runBrowserGroup('checkLabLocationDom', window.checkLabLocationDom);
                 await runBrowserGroup('checkLabRequests', window.checkLabRequests);
                 await runBrowserGroup('checkAsynchronousPlot', checkAsynchronousPlot);
+                await runBrowserGroup('calculus result plots', checkCalculusResultPlots, 90000);
                 await runBrowserGroup('zeta root viewport expansion', checkZetaPlotExpansion);
                 await runBrowserGroup('incremental solution card', checkIncrementalSolutionCard, 120000);
                 await report('PASS: asynchronous result installation, drawing opportunities and stale-request rejection');
@@ -4250,6 +4378,7 @@
             await runBrowserGroup('checkComplexGrid', checkComplexGrid);
             await runBrowserGroup('checkLogarithmicCurveZoom', checkLogarithmicCurveZoom);
             await runBrowserGroup('checkAsynchronousPlot', checkAsynchronousPlot);
+            await runBrowserGroup('calculus result plots', checkCalculusResultPlots, 90000);
             const plotRendered = (document.getElementById('plotRendered')! as LabTestPlotHost);
             WorksheetBindings.controller.setExpressionEditor('asin(x)');
             await WorksheetRequests.evaluation.evaluateExpression();

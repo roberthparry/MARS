@@ -823,6 +823,7 @@ void lab_workspace_dom_result_save(jsref metadata)
         lab_dom_release(mark);
     }
     lab_dom_set(state, "resultInputText", lab_dom_read(lab_dom_query(0, "#resultUseInput"), LAB_DOM_DATASET, "inputText"));
+    lab_dom_set(state, "calculusPlotSource", lab_dom_read(lab_dom_id("plotRange"), LAB_DOM_DATASET, "calculusSource"));
     lab_dom_set(state, "plotSlices", lab_dom_get(lab_dom_id("plotSlices"), "marsSliceRecords"));
     lab_dom_set(state, "plotSliceSelected", lab_dom_get(lab_dom_id("plotSlices"), "marsSliceSelected"));
     lab_dom_set(state, "plotSliceModes", lab_dom_get(lab_dom_id("plotSlices"), "marsSliceModes"));
@@ -833,6 +834,7 @@ void lab_workspace_dom_result_save(jsref metadata)
 /* Restore cards and reusable input before returning fresh globals for calculus controls and fitting. */
 void lab_workspace_dom_result_restore(jsref state)
 {
+    lab_dom_remove(lab_dom_id("plotRange"), "data-calculus-source");
     lab_result_calculation_time(0);
     lab_layout_plot_camera(1);
     lab_plot_slices_clear();
@@ -848,6 +850,9 @@ void lab_workspace_dom_result_restore(jsref state)
         lab_dom_return(0);
         return;
     }
+    int plot_source = lab_dom_get(state, "calculusPlotSource");
+    if (lab_dom_length(plot_source))
+        lab_dom_write(lab_dom_id("plotRange"), LAB_DOM_DATASET, "calculusSource", plot_source);
     int titles = lab_dom_get(state, "titles");
     for (unsigned i = 0; i < sizeof lab_workspace_dom_result_titles / sizeof *lab_workspace_dom_result_titles; ++i) {
         int text = lab_dom_item(titles, i);

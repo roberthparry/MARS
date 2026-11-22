@@ -700,6 +700,7 @@ window.checkLabEvents = function checkLabEvents(): boolean {
         })!;
         check(!!card, 'a registered card has expansion and zoom controls');
         const cardId = WorksheetContext.resultCardIds.get(card)!, initialZoom = native.lab_view_zoom_index(NaN);
+        const statusBeforeZoom = WorksheetContext.statusEl.textContent;
         native.lab_view_card_set_zoom(cardId, initialZoom);
         check(send(card, new WheelEvent('wheel', {deltaY: -1, cancelable: true}), ''), 'plain wheel is not captured');
         check(native.lab_view_card_zoom(cardId) === initialZoom, 'plain wheel does not zoom');
@@ -711,6 +712,8 @@ window.checkLabEvents = function checkLabEvents(): boolean {
             !send(card, new WheelEvent('wheel', {deltaY: 1, metaKey: true, cancelable: true}), ''),
             'meta wheel is cancelled');
         check(native.lab_view_card_zoom(cardId) === initialZoom, 'positive wheel zooms downwards');
+        check(WorksheetContext.statusEl.textContent === statusBeforeZoom,
+            'card wheel magnification preserves the worksheet status');
         const zoom = card.querySelector('[data-zoom-step]'), reset = card.querySelector('[data-zoom-reset]');
         check(zoom && reset, 'zoom controls are present');
         let bubbled = false;
@@ -722,11 +725,15 @@ window.checkLabEvents = function checkLabEvents(): boolean {
         try {
             check(!send(zoom, new MouseEvent('click', {bubbles: true, cancelable: true}), ''), 'zoom cancels click');
             check(!bubbled, 'zoom prevents ancestor click propagation');
+            check(WorksheetContext.statusEl.textContent === statusBeforeZoom,
+                'card zoom buttons preserve the worksheet status');
         } finally {
             card.removeEventListener('click', observe);
         }
         send(reset, click(), '');
         check(native.lab_view_card_zoom(cardId) === initialZoom, 'reset restores native default zoom');
+        check(reset?.textContent === '100%' && WorksheetContext.statusEl.textContent === statusBeforeZoom,
+            'reset reports card magnification locally without presenting it as page zoom');
         native.lab_view_cards_collapse();
         const expand = card.querySelector('[data-expand-card]')!;
         send(expand, click(), '');

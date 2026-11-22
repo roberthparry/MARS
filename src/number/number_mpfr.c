@@ -664,7 +664,13 @@ qfloat_t number_to_qfloat_mpfr(const number_t *number)
 
     if (!value)
         return QF_NAN;
+    if (mpfr_nan_p(value))
+        return QF_NAN;
+    if (mpfr_inf_p(value))
+        return mpfr_sgn(value) < 0 ? QF_NINF : QF_INF;
     out.hi = mpfr_get_d(value, MPFR_RNDN);
+    if (!isfinite(out.hi))
+        return out.hi < 0 ? QF_NINF : QF_INF;
     mpfr_init2(residual, mpfr_get_prec(value));
     mpfr_set(residual, value, MPFR_RNDN);
     mpfr_sub_d(residual, residual, out.hi, MPFR_RNDN);

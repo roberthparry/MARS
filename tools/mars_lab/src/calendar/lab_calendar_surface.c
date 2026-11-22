@@ -61,8 +61,6 @@ string_t *lab_cal_jurisdiction_flag(const json_t *options)
     if (strlen(country) < 2 || country[0] < 'A' || country[0] > 'Z' || country[1] < 'A' || country[1] > 'Z' ||
         !strncmp(country, "ZZ", 2)) return string_new();
     char code[3] = {country[0], country[1], 0};
-    /* The requested display convention also includes the Crown Dependencies. */
-    if (!strcmp(code, "IM") || !strcmp(code, "JE") || !strcmp(code, "GG")) memcpy(code, "GB", 3);
     json_t *parent = json_new_object();
     lab_country_catalogue(parent, code);
     string_t *flag = string_new_with(lab_cal_text(parent, "country_flag"));

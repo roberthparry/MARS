@@ -1015,11 +1015,11 @@ bool expr_finite_qdigamma_progression_value(const expr_t *expr, number_t *value_
 expr_t *expr_finite_atan_progression_derivative_form(const expr_t *expr, const expr_t *wrt);
 
 /**
- * @brief Differentiate a finite q-digamma progression's closed form using both argument and base chain rules.
+ * @brief Differentiate a finite q-digamma progression into evaluable, explicitly defined Lambert sums.
  * @param expr Borrowed finite sum; its index and bounds must be independent of wrt.
  * @param wrt Borrowed differentiation variable, retained through linked source bindings.
  * @return Owned simplified derivative released with expr_free(), or NULL for another progression or failure.
- * Base partial derivatives remain explicit mathematical operations. Neither source nor bindings are changed.
+ * No unevaluated base partials remain. Native TeX includes the Lambert definition; source and bindings are unchanged.
  * Mutable expression graphs must be accessed on their owning thread or with external synchronisation.
  */
 expr_t *expr_finite_qdigamma_progression_derivative_form(const expr_t *expr, const expr_t *wrt);
@@ -1051,6 +1051,16 @@ char *expr_finite_progression_identity_TeX(const expr_t *expr);
  * The caller establishes the identity; this helper only combines their semantic notation on one equality line.
  */
 char *expr_summation_identity_TeX(const expr_t *summation, const expr_t *result);
+
+/**
+ * @brief Differentiate a summand while retaining its authored sigma for native derivation display.
+ * @param summation Borrowed source sum with bounds independent of the differentiation coordinate.
+ * @param wrt Borrowed continuous differentiation coordinate.
+ * @return Owned differentiated sum, released with expr_free(), or NULL for unsupported input,
+ * dependent bounds or construction failure. Source graphs and live bindings are retained without substitution.
+ * Unlike expr_create_deriv(), this presentation helper does not replace the outer sigma by a closed form.
+ */
+expr_t *expr_summation_derivative_source(const expr_t *summation, const expr_t *wrt);
 
 /**
  * @brief Borrow the argument of a unary expression; return false for another expression kind.

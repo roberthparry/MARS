@@ -1349,6 +1349,22 @@ expr_t *expr_digamma(const expr_t *expr);
 expr_t *expr_qdigamma(const expr_t *q, const expr_t *z);
 
 /**
+ * @brief Construct MARS's defined Lambert sum, sum (n+z)^weight Li_order(a q^(n+z)), starting at n=0.
+ * @param a Borrowed polylogarithm multiplier.
+ * @param q Borrowed base, using principal powers.
+ * @param z Borrowed initial coordinate.
+ * @param weight Borrowed non-negative integer polynomial weight.
+ * @param order Borrowed integer polylogarithm order.
+ * @param count Borrowed non-negative integer term count, or positive infinity.
+ * @return Owned retained-argument expression, released with expr_free(), or NULL for invalid pointers
+ * or allocation failure. Numerical limits follow num_lambert_S(). Chain rules cover the three continuous
+ * arguments; weight, order and count are discrete. Native TeX output always includes the definition of
+ * this MARS convention; it is not presented as a universally standard named special function.
+ */
+expr_t *expr_lambert_S(const expr_t *a, const expr_t *q, const expr_t *z, const expr_t *weight,
+                       const expr_t *order, const expr_t *count);
+
+/**
  * @brief Construct a trigamma function expression.
  * @param expr Borrowed input expression; not consumed. Its evaluation caches may be updated.
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
@@ -2085,6 +2101,9 @@ expr_t *expr_E1(const expr_t *expr);
  * This is intended for front-ends such as MARS Lab, so they can hide
  * derivative controls for value-only functions such as gcd(), partition(),
  * factorial(), and primality helpers.
+ * Internal argument lists are traversed as operand storage, so supported
+ * multi-argument functions retain their calculus controls. Value-only operations
+ * nested inside those arguments still make the complete expression unsupported.
  *
  * @param expr Borrowed input expression; not consumed. Its evaluation caches may be updated.
  * @return True when the expression consists of supported differentiable operations; false otherwise.

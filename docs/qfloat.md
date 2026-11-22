@@ -348,6 +348,13 @@ All declarations are in `include/qfloat-t.h`.
 - `qfloat_t qf_gammainc_P(qfloat_t s, qfloat_t x)` — regularised P(s, x) = γ(s,x)/Γ(s)
 - `qfloat_t qf_gammainc_Q(qfloat_t s, qfloat_t x)` — regularised Q(s, x) = Γ(s,x)/Γ(s)
 
+**MARS-defined Lambert sum**
+
+- `qfloat_t qf_lambert_S(a, q, z, r, s, N)` — MARS-defined Lambert sum; all arguments
+  are `qfloat_t`. Uses the native double-double complex kernel and returns NaN
+  when the principal result is non-real. See [the definition, calculus and
+  parameter limits](expression.md#mars-defined-lambert-sum).
+
 **Zeta family**
 
 - `qfloat_t qf_zeta(qfloat_t s)` — Riemann zeta ζ(s), analytically continued away from its pole at `s = 1`
@@ -905,6 +912,11 @@ Failures and timeouts remain visible. † marks a retained slowdown outlier.
 | zetap | 2.345 | 311.5 µs |
 
 <!-- MARS-BENCHMARKS:END -->
+
+The MARS-defined `lambert_S` workloads were added in focused benchmark run
+**254** on 22 November 2026, with three warm samples at 106 bits: **65.2 µs**
+for the infinite sum and **238.9 µs** for the finite section. See the
+[stored operands and multiprecision timings](number.md#mars-defined-lambert-sum-timings).
 
 For a broader benchmark overview, see
 [`docs/benchmarks.md`](./benchmarks.md).

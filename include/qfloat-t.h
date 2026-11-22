@@ -1150,6 +1150,20 @@ qfloat_t qf_digamma(qfloat_t x);
 qfloat_t qf_qdigamma(qfloat_t q, qfloat_t z);
 
 /**
+ * @brief Evaluate the real member of MARS's explicitly defined Lambert sum.
+ * @param a Polylogarithm multiplier.
+ * @param q Non-zero base, using its principal logarithm.
+ * @param z Initial coordinate; the index starts at zero.
+ * @param weight Integer polynomial weight in [0,64].
+ * @param order Integer polylogarithm order in [-32,32].
+ * @param count Integer term count in [0,100000], or positive infinity.
+ * @return Double-double sum (n+z)^weight Li_order(a q^(n+z)), or NaN for non-real results, poles,
+ * invalid inputs or non-convergence. Infinite series require |q|<1. The parameter convention is a
+ * MARS definition, not a standard named special function. No ownership transfer or shared state is involved.
+ */
+qfloat_t qf_lambert_S(qfloat_t a, qfloat_t q, qfloat_t z, qfloat_t weight, qfloat_t order, qfloat_t count);
+
+/**
  * @brief Compute the trigamma function (psi'(x), the first derivative of
  *        digamma) for a qfloat_t argument.
  *

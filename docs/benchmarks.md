@@ -133,6 +133,10 @@ comparison; retained outlier flags are never reset to establish a new baseline.
 ### Measurement and reporting
 
 Both `run` and `stats` accept `--operation NAME`, `--backend NAME` and `--bits N`.
+The catalogue includes the MARS-defined `lambert_S` and `lambert_S_finite`
+workloads, reported as `lambert_S` and `lambert_S (finite section)`. Their
+[definition](expression.md#mars-defined-lambert-sum) and
+[initial timings](number.md#mars-defined-lambert-sum-timings) identify the convention explicitly.
 For example, `make bench-db ARGS='stats --operation zeta' | less -R` displays only
 zeta measurements from the latest run. Add `--run ID` to inspect a particular saved run;
 add `--backend mpc --bits 4096` to select its 4096-bit complex measurements.

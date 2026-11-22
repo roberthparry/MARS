@@ -122,16 +122,70 @@ individual unit-circle q-digamma terms. Recognition also accepts exact numerical
 arguments such as `1001` in place of `1000 + 1` and equivalent Gaussian coefficients.
 
 The controlled `expr_finite_qdigamma_progression_derivative_form()` interface
-differentiates the closed forms of all eight circular and hyperbolic quotient
-progressions. Both q-digamma arguments follow the chain rule: a changing base
-requires a base partial derivative, distinct from the ordinary argument
-derivative. Expression and Function output preserve the complete differentiation
-coordinate, including compound coordinates, so reading the result back does not
-introduce a second chain-rule factor. Recognised differentiated finite
-combinations evaluate through their finite terms at the active precision,
-including removable points. Individual base partials on the unit circle are
-not assigned numerical values. The upper bound must be independent of the
-differentiation coordinate; other bounds retain ordinary differentiation rules.
+differentiates all eight circular and hyperbolic quotient progressions into
+evaluable `lambert_S` expressions. It does not leave unevaluated q-digamma base
+partials. The upper bound must be independent of the differentiation coordinate;
+other bounds retain ordinary differentiation rules. Individual q-digamma
+partials use analytic Lambert series for `abs(q)<1`, reciprocal continuation for
+`abs(q)>1`, and real-extension jets at `q=1`; they are not assigned arbitrary
+values elsewhere on the unit circle.
+
+### MARS-defined Lambert sum
+
+For finite negative-integer-order sums with integer coordinate offsets, real phases
+and amplitude `1`, `-1`, `i` or `-i`, odd negative orders are real and even negative
+orders are purely imaginary. Native evaluation preserves this exact parity, so
+the chain-rule factors yield real repeated trigonometric derivatives. These
+derivatives retain the original progression's pole-aware plotting windows.
+The same recognition applies when a derivative is entered as an expanded finite
+sum, for example `sum(k,1,N,k*(tan(k*x)^2+1))`. It also recognises cotangent and the
+hyperbolic counterparts, expanded derivative polynomials through order 32, and
+polynomial index weights through degree 64. Coefficients are checked symbolically;
+similar-looking polynomials with different constants or phases are not replaced.
+The displayed identity for the first tangent derivative is
+
+$\quad\begin{array}{l}\displaystyle \sum_{k=1}^{N}k\bigl(1+\tan^2(kx)\bigr)=-4\Lambda_{1,-1}^{[N]}\!\left(-1,e^{2ix},1\right).\end{array}$
+
+General complex inputs retain both components; numerical closeness to the unit
+circle alone does not justify projecting a value onto either axis.
+
+`expr_lambert_S(a,q,z,r,s,N)` and the parser spellings `lambert_S`, `lambertS`,
+`LambertS` and `Λ` construct the following explicitly defined function:
+
+$\quad\begin{array}{l}\displaystyle \Lambda_{r,s}^{[N]}(a,q,z):=\sum_{n=0}^{N-1}(n+z)^r\operatorname{Li}_s\!\left(aq^{n+z}\right).\end{array}$
+
+This is MARS's convention for a generalised Lambert sum, rather than a claim
+that `lambert_S` is a standard special-function name. The six-argument form
+uses a term count; omitting `N` selects infinity. The existing one-argument
+`Λ(x)` triangle-wave alias remains available. Native TeX always uses capital
+`Λ` and includes the defining equation once beneath the result, including in
+MARS Lab. Expression and Function styles retain the parseable `lambert_S` name.
+
+The numerical domains are integer `0 <= r <= 64`, integer `-32 <= s <= 32`,
+and integer `0 <= N <= 100000` or positive infinity. Principal powers are used
+with `q != 0`. Infinite sums require `abs(q)<1`; finite sections also support
+the unit circle away from poles. Non-positive polylogarithm orders use rational
+Eulerian polynomials. An absolute tail bound controls convergence, independently
+of cancellation. Invalid parameters, poles or exhausted convergence limits
+return NaN. This definition supplies no additional analytic continuation in `q`.
+
+With fixed discrete parameters, analytic partials and the full chain rule give
+
+$\quad\begin{array}{l}\displaystyle \partial_a\Lambda_{r,s}=a^{-1}\Lambda_{r,s-1},\qquad\partial_q\Lambda_{r,s}=q^{-1}\Lambda_{r+1,s-1},\qquad\partial_z\Lambda_{r,s}=r\Lambda_{r-1,s}+(\log q)\Lambda_{r,s-1}.\end{array}$
+
+The first rule is written for `a != 0`; its removable limit must be taken at
+zero. The term with `r-1` is omitted when `r=0`. Repeated derivatives use the
+same index shifts, subject to the numerical parameter limits. Discrete indices
+are not differentiation coordinates. For affine `z` with other arguments fixed,
+the integration rule, divided by the affine slope, is
+
+$\quad\begin{array}{l}\displaystyle \int\Lambda_{r,s}\,dz=\sum_{j=0}^{r}\frac{(-1)^j r!}{(r-j)!(\log q)^{j+1}}\Lambda_{r-j,s+j+1}.\end{array}$
+
+At `q=1` this becomes `Λ(r+1,s)/(r+1)`. Ordinary outer sums retain their index
+bindings and numerical evaluation. The [complete example](#lambert-sum-example)
+evaluates a four-term finite section.
+
+### Growth windows and weighted progressions
 
 Finite `sinh`, `cosh` and exponential progressions use the controlled
 `expr_finite_growth_progression_sample_bounds()` interface. For a fixed positive
@@ -828,6 +882,7 @@ additional special functions, parameter conditions or continuation machinery.
 | `lambert_w`, `lambert_Wn`, `lambert_W0`, `lambert_Wm1` | Branch-specific transforms are not currently represented in closed form. |
 | `dilog`, `polylog1`, `polylog`, `legendre_chi` | Source on a branch cut needs explicit boundary-value conventions. Exponentially composed arguments are a separate potentially convergent family. |
 | `qdigamma` | Depends on the base, poles and the source's position; a direct zero argument can be singular. |
+| `lambert_S` | No dedicated Laplace transform rule. Growth, cuts and poles depend on the parameters and argument placement; unsupported cases retain their symbolic transform. |
 | `zetah`, `zatahp` | Varying the order or the offset gives different convergence and pole conditions. |
 | `lerch_phi`, `lommel_S`, `appell_F1`, `appell_F2`, `appell_F3`, `appell_F4`, `lauricella_F`, `hypergeometric_pFq` | Parameter-dependent growth, cuts and singularities prevent a universal formula for arbitrary argument placement. |
 | `beta`, `logbeta`, `beta_pdf`, `logbeta_pdf`, `binomial`, `harmonic_poly` | Parameter positions matter. Polynomial specialisations may reduce to existing rules. The current beta-density constructor is an analytic expression, not an automatically compactly supported density. |
@@ -3022,7 +3077,10 @@ apply real Fourier identities to unproved complex bindings.
 
 These functions evaluate through `number_t` and can be parsed by MARS Lab, but
 they are not differentiable. Front-ends can call `expr_is_differentiable(...)` to
-decide whether derivative controls should be shown.
+decide whether derivative controls should be shown. This check follows the actual
+arguments of supported multi-argument functions, including `lambert_S`, Lerch Φ
+and Appell F₁–F₄. Internal argument storage does not disable calculus controls;
+a value-only operation nested in an argument still does.
 
 - `expr_t *expr_factorial(const expr_t *n)` — exact factorial; parser shorthand `n!` lowers to `gamma(n + 1)` for differentiable symbolic inputs
 - `expr_t *expr_fibonacci(const expr_t *n)` — exact Fibonacci number
@@ -4129,6 +4187,33 @@ through a private callback only when wrapping is necessary. It has no access to
 expression graphs or operation tables, and does not reparse rendered fragments.
 Parsing, evaluation, simplification, naming scopes and mathematical display
 selection remain expression responsibilities; callers need no rendering context.
+
+## Lambert sum example
+
+This example evaluates the MARS-defined Lambert sum introduced above.
+
+```c
+#include <stdio.h>
+
+#include "expression-t.h"
+#include "number-t.h"
+
+int main(void)
+{
+    expr_t *expression = expr_from_string("lambert_S(-1,1,1,1,-1,4)", NULL);
+    number_t value = expr_eval(expression);
+    printf("%.1f\n", num_to_double(value));
+    num_destroy(&value);
+    expr_free(expression);
+    return 0;
+}
+```
+
+Output:
+
+```text
+-2.5
+```
 
 <style data-mars-formula-preview>
 /* Formula placement belongs to the preview container, not to the alignment

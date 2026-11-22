@@ -832,7 +832,9 @@ static void quotient_derivative_row(const void *data)
     expr_bindings_t *bindings = NULL;
     expr_t *source = expr_from_text(row->input, &bindings);
     expr_t *axis = name ? expr_bindings_get(bindings, string_c_str(name)) : NULL;
-    expr_t *reference = source && axis ? expr_create_deriv(source, axis) : NULL;
+    expr_t *term_derivative = source && axis ? expr_create_deriv(source->a, axis) : NULL;
+    expr_t *reference = term_derivative ? expr_new_summation(term_derivative, source->b) : NULL;
+    expr_free(term_derivative);
     expr_t *closed = source && axis ? expr_finite_qdigamma_progression_derivative_form(source, axis) : NULL;
     expr_t *point_expr = point_text ? expr_from_text(point_text, NULL) : NULL;
     number_t point = point_expr ? expr_eval(point_expr) : num_clone(NUM_NAN);
@@ -844,11 +846,13 @@ static void quotient_derivative_row(const void *data)
     char *function = closed ? expr_to_string(closed, style_FUNCTION) : NULL;
     char *TeX = closed ? expr_to_TeX_body(closed) : NULL;
     bool ok = closed && num_is_finite(want) && num_is_finite(got) && plain && function && TeX &&
-              strstr(plain, "derivative(") && strstr(function, "derivative(qdigamma(");
+              strstr(plain, "lambert_S(") && strstr(function, "lambert_S(") &&
+              !strstr(plain, "derivative(") && !strstr(function, "derivative(") &&
+              strstr(TeX, "\\Lambda") && strstr(TeX, ":=") && strstr(TeX, "\\operatorname{Li}");
     if (!ok)
         string_printf("Quotient derivative %S: got %.17g, expected %.17g\n%s\n", row->name,
                       num_to_double(got), num_to_double(want), plain);
-    TEST_ASSERT_TRUE(ok, "closed q-digamma derivatives remain evaluable with both base and argument chain rules");
+    TEST_ASSERT_TRUE(ok, "Lambert forms evaluate the quotient derivative and always define Lambda in TeX");
     if (ok) {
         TEST_ASSERT_EXPR_NUMBER_CLOSE(got, want);
         expr_t *parsed = expr_from_string(plain, NULL);
@@ -858,7 +862,7 @@ static void quotient_derivative_row(const void *data)
             string_printf("Readback %S: %s\nsource: %s\n", row->name, readback, plain);
             free(readback);
         }
-        TEST_ASSERT_TRUE(parsed && num_is_finite(parsed_value), "compound partial coordinates survive round trips");
+        TEST_ASSERT_TRUE(parsed && num_is_finite(parsed_value), "Lambert forms and bindings survive round trips");
         TEST_ASSERT_EXPR_NUMBER_CLOSE(parsed_value, want);
         num_destroy(&parsed_value);
         expr_free(parsed);

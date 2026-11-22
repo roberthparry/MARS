@@ -223,6 +223,13 @@ const TeX_model_node_t *expr_notation_name(notation_build_t *build, const char *
 const TeX_model_node_t *expr_notation_packed_function(notation_build_t *build, const expr_t *expression);
 
 /**
+ * @brief Build the defining equation for MARS's Lambert sum, using generic local mathematical parameters.
+ * @param build Borrowed notation builder, owning every returned node.
+ * @return Model-owned definition, or NULL on allocation failure; no ownership transfers to the caller.
+ */
+const TeX_model_node_t *expr_notation_lambert_definition(notation_build_t *build);
+
+/**
  * @brief Interpret a scalar operation over already prepared semantic operands.
  * @param build Borrowed semantic snapshot builder; it owns all nodes added by this call.
  * @param operation Borrowed native operation descriptor; its semantics remain owned by expression.

@@ -5763,6 +5763,12 @@ expr_t *expr_simplify_pow_d_operator(const expr_t *expr, expr_t *a, expr_t *b)
     (void)b;
     number_t exponent = expr->c;
 
+    if (expr_is_exact_zero(a) && expr_simplify_allows_const_identity_fold(a) &&
+        num_is_real(exponent) && num_is_integer(exponent) && num_gt(exponent, NUM_ZERO)) {
+        expr_free(a);
+        return expr_const_zero();
+    }
+
     if (num_eq(exponent, NUM_ONE)) {
         return a;
     }
@@ -5960,6 +5966,12 @@ expr_t *expr_simplify_pow_d_operator(const expr_t *expr, expr_t *a, expr_t *b)
 expr_t *expr_simplify_pow_operator(const expr_t *expr, expr_t *a, expr_t *b)
 {
     (void)expr;
+    if (expr_is_exact_zero(a) && expr_simplify_allows_const_identity_fold(a) &&
+        expr_simplify_is_plain_real_const(b) && num_is_integer(b->c) && num_gt(b->c, NUM_ZERO)) {
+        expr_free(a);
+        expr_free(b);
+        return expr_const_zero();
+    }
     if (expr_simplify_is_plain_real_const(b)) {
         expr_t *exact_root = expr_try_simplify_exact_rational_power_local(a, b->c);
         if (exact_root) {

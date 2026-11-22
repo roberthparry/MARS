@@ -171,6 +171,7 @@ typedef enum {
     EXPR_KIND_INVERSE_LAPLACE,              /**< Native inverse laplace expression operation. */
     EXPR_KIND_ISQRT,                        /**< Native isqrt expression operation. */
     EXPR_KIND_IS_PRIME,                     /**< Native is prime expression operation. */
+    EXPR_KIND_LAMBERT_S,                    /**< MARS-defined weighted Lambert sum. */
     EXPR_KIND_LAMBERT_W,                    /**< Native lambert w expression operation. */
     EXPR_KIND_LAMBERT_W0,                   /**< Native lambert w0 expression operation. */
     EXPR_KIND_LAMBERT_WM1,                  /**< Native lambert wm1 expression operation. */
@@ -682,6 +683,53 @@ extern const expr_ops_t ops_erfcinv;
 extern const expr_ops_t ops_gamma;
 extern const expr_ops_t ops_digamma;
 extern const expr_ops_t ops_qdigamma;
+
+/** @brief MARS-defined Lambert-sum operator, with ordinary argument-list storage. */
+extern const expr_ops_t ops_lambert_S;
+
+/**
+ * @brief Borrow the six Lambert-sum arguments in public API order.
+ * @param expression Borrowed expression to inspect.
+ * @param args Output array of six borrowed pointers, valid while expression lives.
+ * @return True for a valid application, or false for another operation or malformed arguments.
+ */
+bool expr_lambert_unpack(const expr_t *expression, const expr_t **args);
+
+/**
+ * @brief Parse a five- or six-argument Lambert sum, defaulting to infinite limits.
+ * @param count Number of borrowed arguments.
+ * @param args Borrowed argument array in public API order.
+ * @return Owned expression, released with expr_free(), or NULL for invalid arity or allocation failure.
+ */
+expr_t *expr_lambert_args(size_t count, expr_t *const *args);
+
+/**
+ * @brief Preserve unary capital-lambda triangle notation while admitting the Lambert-sum alias.
+ * @param count Number of borrowed arguments.
+ * @param args Borrowed arguments; one selects tri, and five or six select lambert_S.
+ * @return Owned expression, released with expr_free(), or NULL for another arity or allocation failure.
+ */
+expr_t *expr_lambda_args(size_t count, expr_t *const *args);
+
+/**
+ * @brief Construct a Lambert form for a finite quotient progression's derivative.
+ * @param upper Borrowed upper limit, starting at one.
+ * @param step Borrowed progression step.
+ * @param kind Native trigonometric operation.
+ * @param wrt Borrowed differentiation coordinate, independent of upper.
+ * @return Owned derivative-free expression, released with expr_free(), or NULL for unsupported input.
+ */
+expr_t *expr_lambert_progression_derivative(const expr_t *upper, const expr_t *step,
+                                           expr_op_kind_t kind, const expr_t *wrt);
+
+/**
+ * @brief Construct an affine initial-coordinate primitive of a Lambert-sum application.
+ * @param expression Borrowed Lambert application.
+ * @param wrt Borrowed integration coordinate.
+ * @return Owned primitive, released with expr_free(), or NULL when the contiguous rule does not apply.
+ */
+expr_t *expr_integrate_lambert(const expr_t *expression, const expr_t *wrt);
+
 extern const expr_ops_t ops_trigamma;
 extern const expr_ops_t ops_zeta;
 extern const expr_ops_t ops_zetap;
@@ -983,13 +1031,14 @@ expr_t *expr_deriv_cosine_harmonic_antiderivative(const expr_t *expr, const expr
 expr_t *expr_finite_progression_closed_form(const expr_t *expr);
 
 /**
- * @brief Build a sampling identity for a fixed finite progression of an entire elementary function.
+ * @brief Build a sampling identity for a fixed finite entire progression or expanded quotient derivative.
  * @param expr Borrowed authored sum; not modified or consumed.
  * @param axes Borrowed array of count coordinate nodes, kept live by the caller during sampling.
  * @param count Number of coordinates, from one to three.
  * @return Owned graph with linked source bindings, released with expr_free(), or NULL for unsupported sums,
  * coordinate-dependent or invalid bounds, invalid arguments or allocation failure. Rebuild after changing
- * non-coordinate bindings. Non-finite evaluations must fall back to expr to preserve removable points.
+ * non-coordinate bindings. Entire-function identities fall back to expr at removable points; quotient
+ * derivatives retain their native poles and use the separate pole-aware interval classification.
  * Access to mutable linked graphs must remain confined to their owning thread.
  */
 expr_t *expr_finite_progression_sample_form(const expr_t *expr, const expr_t *const *axes, size_t count);
@@ -1068,6 +1117,18 @@ expr_t *expr_finite_progression_scaled_closed_form(const expr_t *expr);
  * Mutable source bindings and the returned graph must remain confined to their owning thread.
  */
 expr_t *expr_finite_weighted_progression_closed_form(const expr_t *expression, const expr_t **upper_out);
+
+/**
+ * @brief Recognise weighted expanded derivatives of tangent, cotangent and their hyperbolic counterparts.
+ * @param expression Borrowed finite sum beginning at one; no bindings or source nodes are modified.
+ * @param upper_out Optional output for the borrowed inclusive upper bound; cleared on failure.
+ * @return Owned Lambert expression with linked source symbols, released with expr_free(), or NULL for
+ * unsupported structure, a non-polynomial weight, inconsistent derivative coefficients or allocation failure.
+ * Supports derivative orders one to 32 and index-polynomial weights through degree 64. Bounds must be
+ * independent of the index; sampling also requires fixed non-negative integer bounds independent of its axes.
+ * The returned mutable graph must remain on its owning thread or be externally synchronised.
+ */
+expr_t *expr_finite_quotient_derivative_closed_form(const expr_t *expression, const expr_t **upper_out);
 
 expr_t *expr_finite_weighted_sinh_from_lerch_form(const expr_t *expr);
 expr_t *expr_finite_weighted_cosh_from_lerch_form(const expr_t *expr);
@@ -1597,8 +1658,10 @@ bool expr_match_reapplicable_unary_function(const expr_t *expr, const expr_t **a
 expr_t *expr_apply_reapplicable_unary_function(const expr_t *prototype, const expr_t *argument);
 
 /**
- * @brief Validate the parser function-name perfect hash for regression checks.
- * @return True when the requested operation succeeds; false when unavailable, invalid or unsuccessful.
+ * @brief Validate the packed parser function-name perfect hash for regression checks.
+ * @return True when every slot contains a keyword that resolves to its own entry, keyword lengths respect
+ * the parser limit and unused buckets have zero displacement; false on a violation or allocation failure.
+ * No expression ownership transfers. This exhaustive audit is intended for tests, not parser lookups.
  */
 bool expr_stringin_function_hash_is_valid(void);
 

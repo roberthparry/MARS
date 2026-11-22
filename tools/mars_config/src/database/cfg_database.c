@@ -158,6 +158,7 @@ static bool cfg_database_jurisdiction_refresh(sqlite_t *db, const string_t *root
            cfg_database_source(db, root, "packaging/jurisdiction-db/location_additions.sql", false) &&
            (revision >= 18 ||
             cfg_database_source(db, root, "packaging/jurisdiction-db/location_subdivisions.sql", false)) &&
+           cfg_database_source(db, root, "packaging/jurisdiction-db/country_labels.sql", false) &&
            cfg_database_source(db, root, "packaging/jurisdiction-db/town_search.sql", false);
 }
 
@@ -247,7 +248,7 @@ static int cfg_databases_prepare(bool install_missing)
          CFG_GLOBE_DATA_REVISION, cfg_database_globe_refresh, NULL, true},
         {"almanac", "MARS_ALMANAC_DB_PATH", "MARS_ALMANAC_DB_KEY", "almanac/almanac.db", 0, NULL, &cfg_database_almanac, false},
         {"jurisdiction", "MARS_JURISDICTION_DB_PATH", "MARS_JURISDICTION_DB_KEY",
-         "jurisdiction/mars_jurisdiction_rules.db", 22, cfg_database_jurisdiction_refresh, &cfg_database_jurisdiction, false},
+         "jurisdiction/mars_jurisdiction_rules.db", 23, cfg_database_jurisdiction_refresh, &cfg_database_jurisdiction, false},
     };
     /* Three independent stores, in installation order; stop before later stores on failure. */
     for (size_t i = 0; i < sizeof(migrations) / sizeof(migrations[0]); ++i)
@@ -537,6 +538,7 @@ static const cfg_database_source_label_t *cfg_database_source_label(const string
         {"packaging/almanac-db/mars_almanac_frame_rotation.sql", "Installing almanac frame rotations"},
         {"packaging/globe-db/jurisdiction_subdivisions.sql", "Updating globe country and subdivision identifiers"},
         {"packaging/globe-db/mapped_water.sql", "Installing mapped lakes, riverbanks and survey coverage"},
+        {"packaging/jurisdiction-db/country_labels.sql", "Correcting jurisdiction names"},
         {"packaging/jurisdiction-db/flag_emblems.sql", "Installing flag emblems"},
         {"packaging/jurisdiction-db/flag_regions.sql", "Installing regional flag definitions"},
         {"packaging/jurisdiction-db/location_additions.sql", "Adding named reference locations"},

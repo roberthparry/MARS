@@ -1097,13 +1097,13 @@ static bool test_cfg_country_flags_fixture(const char *directory)
     jurisdiction_t *j = ok ? jurisdict_open("FR") : NULL;
     string_t *name = NULL, *svg = NULL;
     ok = ok && jurisdict_country(j, "GB", &name, &svg) && name && svg &&
-         strstr(string_c_str(svg), "<svg") && !strcmp(string_c_str(name), "Britain (UK)");
+         strstr(string_c_str(svg), "<svg") && !strcmp(string_c_str(name), "United Kingdom");
     string_free(name); string_free(svg);
-    const char *const codes[] = {"GB-WLS", "GB-SCT", "IM", "GB-ENG", "GB-NIR", "JE", "RU-KGD"};
-    const char *const names[] = {"Wales", "Scotland", "Isle of Man", "England", "Northern Ireland", "Jersey",
+    const char *const codes[] = {"GB-WLS", "GB-SCT", "IM", "GB-ENG", "GB-NIR", "JE", "GG", "RU-KGD"};
+    const char *const names[] = {"Wales", "Scotland", "Isle of Man", "England", "Northern Ireland", "Jersey", "Guernsey",
                                "Kaliningrad Oblast"};
     const char *const artwork[] = {"flag-icons-gb-wls", "flag-icons-gb-sct", "flag-icons-im",
-                                    "flag-icons-gb-eng", "flag-icons-gb-nir", "flag-icons-je", "flag-icons-ru"};
+                                    "flag-icons-gb-eng", "flag-icons-gb-nir", "flag-icons-je", "flag-icons-gg", "flag-icons-ru"};
     for (unsigned i = 0; i < sizeof codes / sizeof *codes; ++i) {
         name = NULL; svg = NULL;
         ok = ok && jurisdict_country(j, codes[i], &name, &svg) && name && svg &&
@@ -1183,6 +1183,9 @@ static bool test_cfg_database_update_fixture(const char *directory)
         "('GB-ENG','subdivision','GB','GB');"
         "create table jurisdiction_name(jurisdiction_id text primary key,name text not null);"
         "insert into jurisdiction_name select jurisdiction_id,coalesce(name,jurisdiction_id) from jurisdiction;"
+        /* Mirror the installed jurisdiction view's name projection in this reduced fixture. */
+        "create trigger jurisdiction_name_update after update on jurisdiction_name begin "
+        "update jurisdiction set name=new.name where jurisdiction_id=new.jurisdiction_id;end;"
         "create table jurisdiction_town_entity(jurisdiction_town_id integer primary key);"
         "create table jurisdiction_town_name(jurisdiction_town_id integer primary key,town_name);"
         "create trigger jurisdiction_town_name_entity after insert on jurisdiction_town_name begin "
@@ -1247,9 +1250,11 @@ static bool test_cfg_database_update_fixture(const char *directory)
     ok = ok && cfg_databases_update() == 0 &&
          !setenv("MARS_ROOT", directory, 1) && cfg_databases_update() == 0; /* No source access on a current DB. */
     db = test_cfg_database_open(database, "saved-update-key");
-    ok = ok && db && test_cfg_database_query(db, "select revision from mars_database_revision", "22") &&
+    ok = ok && db && test_cfg_database_query(db, "select revision from mars_database_revision", "23") &&
          test_cfg_database_query(db,
-             "SELECT count(*) FROM jurisdiction_area_search WHERE jurisdiction_area_search MATCH '\"GB\"*'", "2") &&
+             "SELECT count(*) FROM jurisdiction_area_search WHERE jurisdiction_area_search MATCH '\"GB\"*'", "1") &&
+         test_cfg_database_query(db, "SELECT jurisdiction_id FROM jurisdiction_area_search "
+                                    "WHERE jurisdiction_area_search MATCH '\"United Kingdom\"'", "GB") &&
          test_cfg_database_query(db,
              "SELECT count(*) FROM jurisdiction_town_search WHERE jurisdiction_town_search MATCH '\"Kaliningrad\"*'",
              "1") &&
@@ -1280,7 +1285,7 @@ static bool test_cfg_database_update_fixture(const char *directory)
     sqlite_close(db);
     ok = ok && !setenv("MARS_ROOT", MARS_CONFIG_ROOT_DIR, 1) && cfg_databases_update() == 0;
     db = test_cfg_database_open(database, "saved-update-key");
-    ok = ok && db && test_cfg_database_query(db, "select revision from mars_database_revision", "22") &&
+    ok = ok && db && test_cfg_database_query(db, "select revision from mars_database_revision", "23") &&
          test_cfg_database_query(db, "select count(*) from jurisdiction_town where jurisdiction_id='AU'", "261") &&
          test_cfg_database_query(db, "select count(distinct town_name) from jurisdiction_town "
                                    "where substr(jurisdiction_id,1,2)='AU'", "277") &&
@@ -1304,7 +1309,7 @@ static bool test_cfg_database_update_fixture(const char *directory)
     sqlite_close(db);
     ok = ok && cfg_databases_update() == 0;
     db = test_cfg_database_open(database, "saved-update-key");
-    ok = ok && db && test_cfg_database_query(db, "select revision from mars_database_revision", "22") &&
+    ok = ok && db && test_cfg_database_query(db, "select revision from mars_database_revision", "23") &&
          test_cfg_database_query(db, "SELECT count(*) FROM jurisdiction_place_alias "
              "WHERE name IN ('Sardinia','Sardegna','Corsica','Corse')", "4") &&
          test_cfg_database_query(db, "SELECT count(*) FROM jurisdiction_place_search "
@@ -1327,14 +1332,14 @@ static bool test_cfg_database_update_fixture(const char *directory)
     sqlite_close(db);
     ok = ok && cfg_databases_update() == 0;
     db = test_cfg_database_open(database, "saved-update-key");
-    ok = ok && db && test_cfg_database_query(db, "select revision from mars_database_revision", "22") &&
+    ok = ok && db && test_cfg_database_query(db, "select revision from mars_database_revision", "23") &&
          test_cfg_database_query(db, "SELECT count(*) FROM timezone_code WHERE timezone_name='Etc/UTC'", "1") &&
          cfg_database_revision(db, "jurisdiction", 21);
     sqlite_close(db);
     /* The Greenwich migration also preserves existing references and defaults when repeated. */
     ok = ok && cfg_databases_update() == 0;
     db = test_cfg_database_open(database, "saved-update-key");
-    ok = ok && db && test_cfg_database_query(db, "select revision from mars_database_revision", "22") &&
+    ok = ok && db && test_cfg_database_query(db, "select revision from mars_database_revision", "23") &&
          test_cfg_database_query(db,
              "SELECT count(*) FROM jurisdiction_town WHERE jurisdiction_id='GB-ENG' AND town_name='Greenwich'", "1") &&
          test_cfg_database_query(db,
@@ -1349,6 +1354,30 @@ static bool test_cfg_database_update_fixture(const char *directory)
          test_cfg_database_query(db, "SELECT elevation_metres FROM jurisdiction_town_elevation "
                                    "WHERE jurisdiction_town_id=103", "999") &&
          test_cfg_database_query(db, "SELECT value FROM retained", "42") &&
+         cfg_database_revision(db, "jurisdiction", 22) && sqlite_exec_cstr(db,
+             "UPDATE jurisdiction_name SET name='Britain (UK)' WHERE jurisdiction_id='GB';"
+             "INSERT INTO jurisdiction VALUES('IM','country','IM',NULL,NULL,'IM','Isle of Man'),"
+             "('GG','country','GG',NULL,NULL,'GG','Guernsey'),('JE','country','JE',NULL,NULL,'JE','Jersey');"
+             "INSERT INTO jurisdiction_name SELECT jurisdiction_id,name FROM jurisdiction "
+             "WHERE jurisdiction_id IN ('IM','GG','JE');"
+             "INSERT INTO jurisdiction_place_alias(name,context,jurisdiction_town_id) "
+             "VALUES('Legacy place','England, Britain (UK)',103),('Legacy place','England, United Kingdom',103)");
+    sqlite_close(db);
+    ok = ok && cfg_databases_update() == 0 && cfg_databases_update() == 0;
+    db = test_cfg_database_open(database, "saved-update-key");
+    ok = ok && db && test_cfg_database_query(db, "select revision from mars_database_revision", "23") &&
+         test_cfg_database_query(db, "SELECT name FROM jurisdiction WHERE jurisdiction_id='GB'", "United Kingdom") &&
+         test_cfg_database_query(db, "SELECT count(*) FROM jurisdiction WHERE jurisdiction_id IN ('IM','GG','JE') "
+                                   "AND parent_jurisdiction_id IS NULL AND iso_country_code=jurisdiction_id", "3") &&
+         test_cfg_database_query(db, "SELECT count(*) FROM jurisdiction_area_search "
+                                   "WHERE jurisdiction_area_search MATCH '\"Britain\"'", "0") &&
+         test_cfg_database_query(db, "SELECT count(*) FROM jurisdiction_place_alias WHERE name='Legacy place' "
+                                   "AND context='England, United Kingdom' AND jurisdiction_town_id=103", "1") &&
+         test_cfg_database_query(db, "SELECT count(*) FROM jurisdiction_place_alias "
+                                   "WHERE instr(context,'Britain (UK)')>0", "0") &&
+         test_cfg_database_query(db, "SELECT jurisdiction_town_id FROM jurisdiction_default_town "
+                                   "WHERE jurisdiction_id='AU'", "103") &&
+         test_cfg_database_query(db, "SELECT value FROM retained", "42") &&
          cfg_database_revision(db, "jurisdiction", 20) && sqlite_exec_cstr(db,
              "delete from jurisdiction_flag_region where code='CY-NCY';"
              "delete from jurisdiction_country_flag where iso_country_code='CY-NCY'");
@@ -1360,11 +1389,11 @@ static bool test_cfg_database_update_fixture(const char *directory)
     sqlite_close(db);
     ok = ok && !setenv("MARS_ROOT", MARS_CONFIG_ROOT_DIR, 1) && cfg_databases_update() == 0;
     db = test_cfg_database_open(database, "saved-update-key");
-    ok = ok && db && test_cfg_database_query(db, "select revision from mars_database_revision", "22") &&
+    ok = ok && db && test_cfg_database_query(db, "select revision from mars_database_revision", "23") &&
          test_cfg_database_query(db, "select parent_code from jurisdiction_flag_region where code='CY-NCY'", "CY") &&
          test_cfg_database_query(db,
              "select count(*) from jurisdiction_country_flag where iso_country_code in ('CY','CY-NCY')", "2") &&
-         cfg_database_revision(db, "jurisdiction", 23);
+         cfg_database_revision(db, "jurisdiction", 24);
     sqlite_close(db);
     ok = ok && cfg_databases_update() == 1 && !setenv("MARS_JURISDICTION_DB_KEY", "wrong-key", 1) &&
          cfg_databases_update() == 1;

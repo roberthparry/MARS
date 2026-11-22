@@ -7,6 +7,141 @@ CREATE TABLE IF NOT EXISTS expression_cases (
 CREATE INDEX IF NOT EXISTS expression_cases_operation ON expression_cases(operation, name);
 
 INSERT INTO test_case_runner(module, source, parent, table_name, operation) VALUES (
+    'expression.differentiability', 'tests/expression/test_expr_numeric.c', 'tests.test_expr_numeric_callables',
+    'expression_cases', 'differentiability')
+ON CONFLICT(module) DO UPDATE SET source=excluded.source, parent=excluded.parent,
+    table_name=excluded.table_name, operation=excluded.operation;
+
+INSERT INTO expression_cases(name, operation, input, expected) VALUES
+    ('differentiability_lambert', 'differentiability', 'lambert_S(-1,exp(2i*x),1,1,-1,1000)', 'yes'),
+    ('differentiability_nested_lambert', 'differentiability', '-4*lambert_S(-1,exp(2i*x),1,1,-1,1000)', 'yes'),
+    ('differentiability_lerch', 'differentiability', 'lerch_phi(x,2,1)', 'yes'),
+    ('differentiability_lommel', 'differentiability', 'lommel_S(1,0,x)', 'yes'),
+    ('differentiability_appell_f1', 'differentiability', 'appell_F1(1,2,3,4,x,y)', 'yes'),
+    ('differentiability_appell_f2', 'differentiability', 'appell_F2(1,2,3,4,5,x,y)', 'yes'),
+    ('differentiability_appell_f3', 'differentiability', 'appell_F3(1,2,3,4,5,x,y)', 'yes'),
+    ('differentiability_appell_f4', 'differentiability', 'appell_F4(1,2,3,4,x,y)', 'yes'),
+    ('differentiability_nested_value_only', 'differentiability', 'lambert_S(-1,exp(2i*x),gcd(x,2),1,-1,4)', 'no'),
+    ('differentiability_nested_pack_value_only', 'differentiability', 'appell_F1(1,gcd(x,2),3,4,x,y)', 'no'),
+    ('differentiability_gcd', 'differentiability', 'gcd(x,2)', 'no')
+ON CONFLICT(name) DO UPDATE SET input=excluded.input, expected=excluded.expected;
+
+INSERT INTO test_case_runner(module, source, parent, table_name, operation) VALUES (
+    'expression.quotient_recognition', 'tests/expression/test_expr_lambert.c',
+    'tests.test_expr_lambert.test_quotient_recognition', 'expression_cases', 'quotient_recognition')
+ON CONFLICT(module) DO UPDATE SET source=excluded.source, parent=excluded.parent,
+    table_name=excluded.table_name, operation=excluded.operation;
+
+INSERT INTO expression_cases(name, operation, input, expected, precision) VALUES
+    ('quotient_recognition_tan', 'quotient_recognition', 'sum(k,1,4,k*(tan(k*x)^2+1))', '["x","0.1",true]', 320),
+    ('quotient_recognition_authored_notation', 'quotient_recognition', '@Z_(k=1)^4 k(tan^2(kx)+1)',
+     '["x","0.1",true]', 320),
+    ('quotient_recognition_expanded', 'quotient_recognition', 'sum(k,1,4,k*tan(k*x)^2+k)', '["x","0.1",true]', 320),
+    ('quotient_recognition_negative', 'quotient_recognition', '-sum(k,1,4,k*(1+tan(k*x)^2))', '["x","0.1",true]', 320),
+    ('quotient_recognition_second', 'quotient_recognition', 'sum(k,1,4,2*k^2*(tan(k*x)+tan(k*x)^3))',
+     '["x","0.1",true]', 320),
+    ('quotient_recognition_third', 'quotient_recognition', 'sum(k,1,4,2*k^3*(1+4*tan(k*x)^2+3*tan(k*x)^4))',
+     '["x","0.1",true]', 320),
+    ('quotient_recognition_fourth', 'quotient_recognition', 'sum(k,1,4,8*k^4*(2*tan(k*x)+5*tan(k*x)^3+3*tan(k*x)^5))',
+     '["x","0.1",true]', 320),
+    ('quotient_recognition_sixth', 'quotient_recognition',
+     'sum(k,1,3,k^6*(272*tan(k*x)+1232*tan(k*x)^3+1680*tan(k*x)^5+720*tan(k*x)^7))',
+     '["x","0.1",true]', 320),
+    ('quotient_recognition_cot', 'quotient_recognition', 'sum(k,1,4,-k*(1+cot(k*x)^2))', '["x","0.1",true]', 320),
+    ('quotient_recognition_tanh', 'quotient_recognition', 'sum(k,1,4,k*(1-tanh(k*x)^2))', '["x","0.1",true]', 320),
+    ('quotient_recognition_coth', 'quotient_recognition', 'sum(k,1,4,k*(1-coth(k*x)^2))', '["x","0.1",true]', 320),
+    ('quotient_recognition_affine', 'quotient_recognition', 'sum(j,1,4,2*j*(tan(j*(2*t+1))^2+1))',
+     '["t","0.1",true]', 320),
+    ('quotient_recognition_polynomial_weight', 'quotient_recognition',
+     '{sum(k,1,4,(a*k+b)*(1+tan(k*x)^2))|a=2;b=3}', '["x","0.1",true]', 320),
+    ('quotient_recognition_wrong_constant', 'quotient_recognition', 'sum(k,1,4,k*(tan(k*x)^2-1))',
+     '["x","0.1",false]', 320),
+    ('quotient_recognition_mixed_phases', 'quotient_recognition', 'sum(k,1,4,k*(tan(k*x)^2+tan(2*k*x)^2+1))',
+     '["x","0.1",false]', 320),
+    ('quotient_recognition_nonlinear_index', 'quotient_recognition', 'sum(k,1,4,k*(tan(k^2*x)^2+1))',
+     '["x","0.1",false]', 320),
+    ('quotient_recognition_nonpolynomial_weight', 'quotient_recognition', 'sum(k,1,4,exp(k)*(tan(k*x)^2+1))',
+     '["x","0.1",false]', 320),
+    ('quotient_recognition_different_lower', 'quotient_recognition', 'sum(k,2,4,k*(tan(k*x)^2+1))',
+     '["x","0.1",false]', 320)
+ON CONFLICT(name) DO UPDATE SET input=excluded.input, expected=excluded.expected, precision=excluded.precision;
+
+INSERT INTO test_case_runner(module, source, parent, table_name, operation) VALUES
+    ('expression.lambert_value', 'tests/expression/test_expr_lambert.c',
+     'tests.test_expr_lambert.test_lambert_values', 'expression_cases', 'lambert_value'),
+    ('expression.lambert_calculus', 'tests/expression/test_expr_lambert.c',
+     'tests.test_expr_lambert.test_lambert_calculus', 'expression_cases', 'lambert_calculus'),
+    ('expression.lambert_qpartial', 'tests/expression/test_expr_lambert.c',
+     'tests.test_expr_lambert.test_lambert_qpartials', 'expression_cases', 'lambert_qpartial'),
+    ('expression.lambert_real', 'tests/expression/test_expr_lambert.c',
+     'tests.test_expr_lambert.test_lambert_real', 'expression_cases', 'lambert_real')
+ON CONFLICT(module) DO UPDATE SET source=excluded.source, parent=excluded.parent,
+    table_name=excluded.table_name, operation=excluded.operation;
+
+INSERT INTO expression_cases(name,operation,input,expected,precision) VALUES
+    ('lambert_real_tangent','lambert_real','{-4*lambert_S(-1,exp(2i*x),1,1,-1,4)|x=1/10}',
+     '["{sum(k,1,4,k/cos(k*x)^2)|x=1/10}",true]',320),
+    ('lambert_real_cotangent','lambert_real','{4*lambert_S(1,exp(2i*x),1,1,-1,4)|x=1/10}',
+     '["{-sum(k,1,4,k/sin(k*x)^2)|x=1/10}",true]',320),
+    ('lambert_real_quarter_phase','lambert_real','{lambert_S(i,exp(i*x),1,2,-1,4)|x=1/10}',
+     '["{-sum(k,1,4,k^2/(4*sin(pi/4+k*x/2)^2))|x=1/10}",true]',320),
+    ('lambert_real_second_tangent','lambert_real','{-8i*lambert_S(-1,exp(2i*x),1,2,-2,4)|x=1}',
+     '["{2*sum(k,1,4,k^2*tan(k*x)/cos(k*x)^2)|x=1}",true]',320),
+    ('lambert_real_third_tangent','lambert_real','{16*lambert_S(-1,exp(2i*x),1,3,-3,4)|x=1/10}',
+     '["{2*sum(k,1,4,k^3*(1+3*tan(k*x)^2)/cos(k*x)^2)|x=1/10}",true]',320),
+    ('lambert_imaginary_even_order','lambert_real','{lambert_S(-1,exp(2i*x),1,2,-2,4)|x=1/10}',
+     '["{i*sum(k,1,4,k^2*tan(k*x)/cos(k*x)^2)/4|x=1/10}",false,true]',320),
+    ('lambert_imaginary_fourth_order','lambert_real','{lambert_S(-1,exp(2i*x),1,4,-4,4)|x=1/10}',
+     '["{-i*sum(k,1,4,k^4*(2*tan(k*x)+3*tan(k*x)^3)/cos(k*x)^2)/4|x=1/10}",false,true]',320),
+    ('lambert_even_order_preserves_complex','lambert_real',
+     '{lambert_S(-1,exp(2i*x),1,2,-2,4)|x=(1+i)/10}',
+     '["{sum(k,1,4,k^2*(-exp(2i*k*x))*(1-exp(2i*k*x))/(1+exp(2i*k*x))^3)|x=(1+i)/10}",false,false]',320),
+    ('lambert_preserves_complex','lambert_real','{-4*lambert_S(-1,exp(2i*x),1,1,-1,4)|x=(1+i)/10}',
+     '["{-4*sum(k,1,4,k*(-exp(2i*k*x))/(1+exp(2i*k*x))^2)|x=(1+i)/10}",false]',320),
+    ('lambert_finite_unit','lambert_value','["-1","1","1","1","-1","4"]','-5/2',320),
+    ('lambert_finite_zero','lambert_value','["1","0.5","1","0","0","0"]','0',320),
+    ('lambert_finite_weight','lambert_value','["0.5","0.25","1","2","0","4"]',
+     'sum(k,1,4,k^2*(0.5*0.25^k)/(1-0.5*0.25^k))',320),
+    ('lambert_finite_negative_order','lambert_value','["0.5","0.25","1","1","-3","4"]',
+     'sum(k,1,4,k*(0.5*0.25^k)*(1+4*(0.5*0.25^k)+(0.5*0.25^k)^2)/(1-0.5*0.25^k)^4)',320),
+    ('lambert_finite_positive_order','lambert_value','["0.5","0.25","1","2","1","4"]',
+     '-sum(k,1,4,k^2*ln(1-0.5*0.25^k))',320),
+    ('lambert_finite_complex','lambert_value','["0.5+0.125i","0.25+0.0625i","1","1","-1","4"]',
+     'sum(k,1,4,k*((0.5+0.125i)*(0.25+0.0625i)^k)/(1-(0.5+0.125i)*(0.25+0.0625i)^k)^2)',320),
+    ('lambert_infinite_real','lambert_value','["0.5","0.25","1","1","-1","inf"]','dual',320),
+    ('lambert_infinite_complex','lambert_value','["0.5+0.125i","0.25+0.0625i","1","2","1","inf"]','dual',320),
+    ('lambert_infinite_precision','lambert_value','["0.5","0.25","1","2","-2","inf"]','dual',1024),
+    ('lambert_derivative_a','lambert_calculus','lambert_S(x,0.25,1,1,0,8)',
+     '["0.5","sum(k,1,8,k*(x*0.25^k)/(1-x*0.25^k))",1]',320),
+    ('lambert_derivative_q_second','lambert_calculus','lambert_S(0.5,x,1,1,-1,8)',
+     '["0.25","sum(k,1,8,k*(0.5*x^k)/(1-0.5*x^k)^2)",2]',320),
+    ('lambert_derivative_z_second','lambert_calculus','lambert_S(0.5,0.25,x,2,-1,8)',
+     '["1.25","sum(k,0,7,(k+x)^2*(0.5*0.25^(k+x))/(1-0.5*0.25^(k+x))^2)",2]',320),
+    ('lambert_derivative_z_weight_zero','lambert_calculus','lambert_S(0.5,0.25,x,0,0,8)',
+     '["1.25","sum(k,0,7,(0.5*0.25^(k+x))/(1-0.5*0.25^(k+x)))",1]',320),
+    ('lambert_derivative_chain','lambert_calculus','lambert_S(x/2,exp(-x),1+x,2,0,8)',
+     '["0.25","sum(k,0,7,(k+1+x)^2*(x/2*exp(-x*(k+1+x)))/(1-x/2*exp(-x*(k+1+x))))",2]',320),
+    ('lambert_integral_z','lambert_calculus','lambert_S(0.5,0.25,x,2,-1,8)',
+     '["1.25","sum(k,0,7,(k+x)^2*(0.5*0.25^(k+x))/(1-0.5*0.25^(k+x))^2)",-1]',320),
+    ('lambert_integral_unit','lambert_calculus','lambert_S(-1,1,x,2,-1,8)',
+     '["1.25","-sum(k,0,7,(k+x)^2)/4",-1]',320),
+    ('lambert_repeated_tangent','lambert_calculus','sum(k,1,13,tan(k*x))',
+     '["0.1","sum(k,1,13,tan(k*x))",3]',320),
+    ('lambert_qpartial_second','lambert_qpartial','qdigamma(x,9/4)-qdigamma(x,5/4)',
+     '["0.25","-ln(x)*x^(5/4)/(1-x^(5/4))",2]',320),
+    ('lambert_qpartial_complex','lambert_qpartial','qdigamma(x,9/4)-qdigamma(x,5/4)',
+     '["0.25+0.0625i","-ln(x)*x^(5/4)/(1-x^(5/4))",2]',320),
+    ('lambert_qpartial_reciprocal','lambert_qpartial','qdigamma(x,9/4)-qdigamma(x,5/4)',
+     '["2","-ln(x)*x^(5/4)/(1-x^(5/4))",2]',320),
+    ('lambert_qpartial_chain','lambert_qpartial','qdigamma(exp(-x),9/4)-qdigamma(exp(-x),5/4)',
+     '["1.25","x*exp(-5*x/4)/(1-exp(-5*x/4))",2]',320),
+    ('lambert_qpartial_mixed','lambert_qpartial','qdigamma(exp(-x),x+2)-qdigamma(exp(-x),x+1)',
+     '["1.25","x*exp(-x*(x+1))/(1-exp(-x*(x+1)))",2]',320),
+    ('lambert_qpartial_unit','lambert_qpartial','qdigamma(x,9/4)-qdigamma(x,5/4)',
+     '["1","-7/24",2]',320)
+ON CONFLICT(name) DO UPDATE SET input=excluded.input, expected=excluded.expected, precision=excluded.precision;
+
+INSERT INTO test_case_runner(module, source, parent, table_name, operation) VALUES (
     'expression.quotient_derivative', 'tests/expression/test_expr_from_string.c',
     'tests.test_expr_t_from_string.test_from_string_quotient_progression_derivatives', 'expression_cases',
     'quotient_derivative')
@@ -131,6 +266,29 @@ INSERT INTO expression_cases(name, operation, input, expected) VALUES
     ('circular_sample_nonlinear', 'circular_sample', '@Z_(k=1)^1000 tan(k*x^2)',
      '["x",null,null,"-0.1","0.1",false]'),
     ('circular_sample_sine_unchanged', 'circular_sample', '@Z_(k=1)^1000 sin(kx)',
+     '["x",null,null,"-0.1","0.1",false]'),
+    ('circular_sample_lambert_tangent', 'circular_sample', '-4*lambert_S(-1,exp(2i*x),1,1,-1,1000)',
+     '["x","-pi/4000","pi/4000","-pi/4000","pi/4000",true]'),
+    ('circular_sample_lambert_second', 'circular_sample', '-8i*lambert_S(-1,exp(2i*x),1,2,-2,1000)',
+     '["x","-pi/4000","pi/4000","-pi/4000","pi/4000",true]'),
+    ('circular_sample_lambert_third', 'circular_sample', '16*lambert_S(-1,exp(2i*x),1,3,-3,1000)',
+     '["x","-pi/4000","pi/4000","-pi/4000","pi/4000",true]'),
+    ('circular_sample_lambert_fourth', 'circular_sample', '32i*lambert_S(-1,exp(2i*x),1,4,-4,1000)',
+     '["x","-pi/4000","pi/4000","-pi/4000","pi/4000",true]'),
+    ('circular_sample_lambert_positive_order', 'circular_sample', 'lambert_S(-1,exp(2i*x),1,1,1,1000)',
+     '["x",null,null,"-0.1","0.1",false]'),
+    ('circular_sample_lambert_affine', 'circular_sample', '-8*lambert_S(-1,exp(2i*(2t+1)),1,1,-1,13)',
+     '["t","-1/2-pi/104","-1/2+pi/104","-1/2-pi/104","-1/2+pi/104",true]'),
+    ('circular_sample_lambert_secant', 'circular_sample',
+     'lambert_S(i,exp(i*x),1,1,-1,10)-lambert_S(-i,exp(i*x),1,1,-1,10)',
+     '["x","-pi/40","pi/40","-pi/40","pi/40",true]'),
+    ('circular_sample_lambert_cosecant', 'circular_sample',
+     'lambert_S(-1,exp(i*x),1,1,-1,10)-lambert_S(1,exp(i*x),1,1,-1,10)',
+     '["x","-pi/20","pi/20","pi/1000","pi/100",true]'),
+    ('circular_sample_lambert_mixed_base', 'circular_sample',
+     'lambert_S(i,exp(i*x),1,1,-1,10)-lambert_S(-i,exp(2i*x),1,1,-1,10)',
+     '["x",null,null,"-0.1","0.1",false]'),
+    ('circular_sample_lambert_complex_amplitude', 'circular_sample', 'lambert_S(0.5,exp(2i*x),1,1,-1,10)',
      '["x",null,null,"-0.1","0.1",false]'),
     ('circular_sample_q_identity', 'circular_sample',
      '1000*i+(qdigamma(exp(4*i*x),1)-qdigamma(exp(4*i*x),1001)-qdigamma(exp(2*i*x),1)+qdigamma(exp(2*i*x),1001))/x',
@@ -945,6 +1103,13 @@ INSERT OR IGNORE INTO expression_cases(name, operation, input, expected) VALUES 
 INSERT OR IGNORE INTO expression_cases(name, operation, input, expected) VALUES ('unparenthesised chained powers are left associative', 'test_from_string_arithmetic_check_parse_simplified_expr_4', '{ a^x^2 | x = NAN; a = NAN }', '{ a^(2x) | x = ?; a = ? }');
 INSERT OR IGNORE INTO expression_cases(name, operation, input, expected) VALUES ('explicit exponent power stays inside exponent', 'test_from_string_arithmetic_check_parse_simplified_expr_4', '{ a^((ix)^2) | x = NAN; a = NAN }', '{ a^(-x²) | x = ?; a = ? }');
 INSERT OR IGNORE INTO expression_cases(name, operation, input, expected) VALUES ('power of symbolic power folds integer exponent', 'test_from_string_arithmetic_check_parse_simplified_expr_4', '{ (a^(-x))² | x = NAN; a = NAN }', '{ a^(-2x) | x = ?; a = ? }');
+INSERT INTO expression_cases(name, operation, input, expected) VALUES
+    ('literal_zero_positive_power', 'test_from_string_arithmetic_check_parse_simplified_expr_4', '0^2', '0'),
+    ('literal_zero_binary_power', 'test_from_string_arithmetic_check_parse_simplified_expr_4', 'pow(0,2)', '0'),
+    ('literal_zero_in_polynomial', 'test_from_string_arithmetic_check_parse_simplified_expr_4', '(0^4+1)*k-k', '0'),
+    ('bound_zero_remains_symbolic', 'test_from_string_arithmetic_check_parse_simplified_expr_4',
+     '{x^2|x=0}', '{ x² | x = 0 }')
+ON CONFLICT(name) DO UPDATE SET input=excluded.input, expected=excluded.expected;
 
 INSERT INTO test_case_runner(module, source, parent, table_name, operation) VALUES (
     'expression.test_from_string_functions_check_parse_TeX_1', 'tests/expression/test_expr_from_string.c', 'tests.test_expr_t_from_string.test_from_string_functions', 'expression_cases', 'test_from_string_functions_check_parse_TeX_1')

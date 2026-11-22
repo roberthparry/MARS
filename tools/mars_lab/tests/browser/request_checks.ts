@@ -134,6 +134,16 @@ window.checkLabRequests = async function checkLabRequests() {
         begin(0, 0);
         check(!native.lab_request_live(plotChannel, plot), 'new evaluation invalidates its old plot');
         check(!begin(0, 14, 0, evaluation), 'obsolete evaluation cannot start a plot');
+        for (const operation of [1, 2]) {
+            const calculus = begin(0, operation);
+            const child = begin(0, 14, 0, calculus);
+            check(!!child, 'Derivative and integral results may own automatic plots');
+            native.lab_request_finish(0, calculus);
+            check(native.lab_request_live(plotChannel, child), 'Completing calculus retains its background plot');
+            begin(0, 0);
+            check(!native.lab_request_live(plotChannel, child) && !begin(0, 14, 0, calculus),
+                  'Replacing a calculus result cancels its old plot and rejects stale children');
+        }
         clear();
         const endpoints = [1, 3, 4, 2, 5, 6, 7];
         for (let mode = 0; mode < 7; ++mode) {

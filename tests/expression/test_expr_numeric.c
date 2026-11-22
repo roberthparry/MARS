@@ -141,8 +141,23 @@ static void render_row(const void *data)
     TEST_ASSERT_TRUE(ok, "native, Function and TeX output retain complete operands and round-trip correctly");
 }
 
+static void differentiability_row(const void *data)
+{
+    const test_database_case_t *row = data;
+    expr_t *expression = expr_from_text(row->input, NULL);
+    bool expected = !strcmp(string_c_str(row->expected), "yes");
+    bool actual = expr_is_differentiable(expression);
+    if (!expression || actual != expected)
+        string_printf("Differentiability %S: expected %s, got %s\n", row->name,
+                      expected ? "yes" : "no", actual ? "yes" : "no");
+    TEST_ASSERT_TRUE(expression && actual == expected,
+                     "calculus capability checks argument values without treating their storage as an operation");
+    expr_free(expression);
+}
+
 void test_expr_numeric_callables(void)
 {
+    test_run_database_cases(__FILE__, __LINE__, "expression.differentiability", NULL, differentiability_row);
     test_run_database_cases(__FILE__, __LINE__, "expression.numeric_callables", NULL, numeric_row);
     test_run_database_cases(__FILE__, __LINE__, "expression.numeric_rendering", NULL, render_row);
     test_run_database_cases(__FILE__, __LINE__, "expression.integral_exp_root", NULL, integral_root_row);

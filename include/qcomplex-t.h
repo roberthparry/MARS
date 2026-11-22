@@ -482,6 +482,22 @@ qcomplex_t qc_digamma(qcomplex_t z);                       /**< digamma */
  *         defining continuation is unavailable.
  */
 qcomplex_t qc_qdigamma(qcomplex_t q, qcomplex_t z);
+
+/**
+ * @brief Evaluate MARS's defined Lambert sum, sum (n+z)^weight Li_order(a q^(n+z)), from n=0.
+ * @param a Polylogarithm multiplier.
+ * @param q Non-zero base, using its principal logarithm.
+ * @param z Initial coordinate.
+ * @param weight Real integer polynomial weight in [0,64].
+ * @param order Real integer polylogarithm order in [-32,32].
+ * @param count Real integer term count in [0,100000], or positive infinity.
+ * @return Double-double complex value, or NaN at poles, outside supported ranges or on non-convergence.
+ * Infinite series require |q|<1. This parameter convention is a MARS definition, not a standard named
+ * special function. There is no ownership transfer or shared mutable state.
+ */
+qcomplex_t qc_lambert_S(qcomplex_t a, qcomplex_t q, qcomplex_t z, qcomplex_t weight,
+                       qcomplex_t order, qcomplex_t count);
+
 qcomplex_t qc_trigamma(qcomplex_t z);                      /**< trigamma */
 qcomplex_t qc_tetragamma(qcomplex_t z);                    /**< tetragamma */
 qcomplex_t qc_polygamma(unsigned int order, qcomplex_t z); /**< polygamma ψ⁽ⁿ⁾ */

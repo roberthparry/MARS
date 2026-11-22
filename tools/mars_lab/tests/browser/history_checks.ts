@@ -10,7 +10,38 @@ interface Window {
     checkLabHistoryPersistence(): Promise<void>;
     /** @brief Check stalled local-cache requests, late callbacks and ordinary successful recovery. */
     checkLabHistoryCacheDeadlines(): Promise<void>;
+    /** @brief Verify current jurisdiction labels in legacy calendar histories without changing saved snapshots. */
+    checkLabHistoryGeography(): void;
 }
+
+window.checkLabHistoryGeography = (): void => {
+    const preview = document.createElement('div');
+    for (const mode of ['almanac', 'datetime']) {
+        const select = document.getElementById(`${mode}Jurisdiction`) as HTMLSelectElement & {
+            labJurisdictionLabels?: Record<string, string>;
+        };
+        const labels = select.labJurisdictionLabels;
+        try {
+            select.labJurisdictionLabels = {...labels, 'GB-NIR': 'United Kingdom - Northern Ireland',
+                IM: 'Isle of Man', GG: 'Guernsey', JE: 'Jersey'};
+            for (const [code, town, country] of [
+                ['GB-NIR', 'Belfast', 'United Kingdom - Northern Ireland'],
+                ['IM', 'Douglas', 'Isle of Man'], ['GG', 'St Peter Port', 'Guernsey'], ['JE', 'St Helier', 'Jersey']
+            ]) {
+                const legacy = {mode, text: `${town} — Britain (UK)`, [mode]: {
+                    date: '2026-10-30', time: '10:22:22', latitude: '0', longitude: '0',
+                    jurisdiction: code, town: `${town}|0|0|0`}};
+                const saved = JSON.stringify(legacy);
+                preview.replaceChildren();
+                labDOM.call('lab_workspace_dom_history_row', preview, legacy, 0, 0, 1);
+                const entry = preview.querySelector<HTMLButtonElement>('[data-history-location]')!;
+                if (!entry.textContent?.includes(`${town} — ${country}`) ||
+                    entry.textContent.includes('Britain') || JSON.stringify(legacy) !== saved)
+                    throw new Error(`${mode} history must resolve ${code} without rewriting its saved worksheet`);
+            }
+        } finally { select.labJurisdictionLabels = labels; }
+    }
+};
 
 window.checkLabHistoryCacheDeadlines = async (): Promise<void> => {
     const check = (condition: unknown, message: string): void => {
@@ -324,6 +355,7 @@ window.checkLabHistoryPersistence = async (): Promise<void> => {
                 town: 'Shrewsbury (GeoNames 2637891)|52.7077|-2.7541|75', latitude: '52.7077', longitude: '-2.7541'
             }};
             const savedPlace = JSON.stringify(place);
+            window.checkLabHistoryGeography();
             preview.replaceChildren();
             labDOM.call('lab_workspace_dom_history_row', preview, place, 0, 0, 1);
             const placeButton = preview.querySelector<HTMLButtonElement>('[data-history-location]')!;

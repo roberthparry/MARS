@@ -280,6 +280,7 @@ static jsref lab_flow_evaluation_weather_state(struct lab_flow_evaluation_contex
         lab_dom_truth(lab_dom_get(lab_dom_get(ctx->frame, "responsePlan"), "install")) &&
         lab_dom_truth(lab_dom_get(ctx->frame, "current"))) {
         int range = lab_dom_id("plotRange"), source = lab_dom_get(ctx->context, "text");
+        lab_dom_remove(range, "data-calculus-source");
         int previous = lab_dom_read(range, LAB_DOM_DATASET, "plotSource");
         if (lab_dom_length(previous) && !lab_dom_equal(source, previous)) {
             static const char *const limits[] = {"plotLower",       "plotUpper",  "plotSecondLower",

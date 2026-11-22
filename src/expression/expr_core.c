@@ -188,6 +188,18 @@ static expr_t *expr_build_dx(expr_t *expr)
     return dx; /* borrowed */
 }
 
+/* Argument-list nodes only store operands; check their values under the owning operation's calculus rule. */
+static bool expr_arguments_are_differentiable(const expr_t *expr)
+{
+    if (expr && expr->ops && expr->ops->kind == EXPR_KIND_ARGUMENT_LIST) {
+        if (!expr_computation_step("expression.derivative"))
+            return false;
+        return expr_arguments_are_differentiable(expr->a) && expr_arguments_are_differentiable(expr->b);
+    }
+    return expr_is_differentiable(expr);
+}
+
+/* Report native calculus support without classifying internal argument storage as a scalar operation. */
 bool expr_is_differentiable(const expr_t *expr)
 {
     if (!expr_computation_step("expression.derivative"))
@@ -206,9 +218,9 @@ bool expr_is_differentiable(const expr_t *expr)
         return expr_is_differentiable(expr->a);
     if (expr->ops == &ops_polygamma)
         return expr_is_differentiable(expr->b);
-    if (expr->ops && expr->ops->arity != EXPR_OP_ATOM && !expr_is_differentiable(expr->a))
+    if (expr->ops && expr->ops->arity != EXPR_OP_ATOM && !expr_arguments_are_differentiable(expr->a))
         return false;
-    if (expr->ops && expr->ops->arity == EXPR_OP_BINARY && !expr_is_differentiable(expr->b))
+    if (expr->ops && expr->ops->arity == EXPR_OP_BINARY && !expr_arguments_are_differentiable(expr->b))
         return false;
     return true;
 }

@@ -44,6 +44,7 @@ struct _notation_build_t {
     bool source_order;
     bool operator_order;
     bool resolve_transforms;
+    bool lambert_definition;
 };
 
 typedef struct {
@@ -639,7 +640,8 @@ static const TeX_model_node_t *build_expression(notation_build_t *build, const e
         return notation_build_node(build, (TeX_node_view_t){.kind = TeX_NODE_TRANSFORM,
             .child_count = 3u, .transform = transforms[kind]}, children);
     }
-    if (kind == EXPR_KIND_POWMOD || kind == EXPR_KIND_DIVMOD || kind == EXPR_KIND_GCDEXT ||
+    if (kind == EXPR_KIND_LAMBERT_S) build->lambert_definition = true;
+    if (kind == EXPR_KIND_LAMBERT_S || kind == EXPR_KIND_POWMOD || kind == EXPR_KIND_DIVMOD || kind == EXPR_KIND_GCDEXT ||
         kind == EXPR_KIND_LERCH_PHI || kind == EXPR_KIND_LOMMEL_S || kind == EXPR_KIND_APPELL_F1 ||
         kind == EXPR_KIND_LAURICELLA_F || kind == EXPR_KIND_HYPERGEOMETRIC_PFQ || expr_appell_family(expression))
         return expr_notation_packed_function(build, expression);
@@ -714,6 +716,11 @@ const TeX_model_node_t *notation_build_formula(notation_build_t *build, const ch
 /* Give the semantic context sole ownership of the prepared snapshot. */
 TeX_context_t *notation_build_context(notation_build_t *build, const TeX_model_node_t *root)
 {
+    if (build && root && build->lambert_definition) {
+        const TeX_model_node_t *rows[] = {root, expr_notation_lambert_definition(build)};
+        root = rows[1] ? notation_build_node(build,
+            (TeX_node_view_t){.kind = TeX_NODE_LINES, .child_count = 2}, rows) : NULL;
+    }
     TeX_context_t *context = build && root ? TeX_model_context(build->model, root) : NULL;
     if (context)
         build->model = NULL;

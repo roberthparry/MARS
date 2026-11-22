@@ -151,9 +151,17 @@ jsref lab_menu_index_search_text(node_jsref option, bool details)
         char code[7] = {0};
         int length = lab_dom_utf8_copy(lab_dom_read(option, LAB_DOM_DATASET, "countryCode"),
                                        (unsigned char *)code, sizeof code - 1);
-        if (length >= 0 && (!strcmp(code, "GB") || !strcmp(code, "GB-ENG") ||
-                            !strcmp(code, "GB-WLS") || !strcmp(code, "GB-SCT") || !strcmp(code, "GB-NIR")))
+        bool great_britain = length >= 0 && (!strcmp(code, "GB-ENG") || !strcmp(code, "GB-WLS") ||
+                                            !strcmp(code, "GB-SCT"));
+        bool united_kingdom = great_britain || (length >= 0 && (!strcmp(code, "GB") || !strcmp(code, "GB-NIR")));
+        bool british_isles = united_kingdom || (length >= 0 && (!strcmp(code, "IE") || !strcmp(code, "IM") ||
+                                                              !strcmp(code, "JE") || !strcmp(code, "GG")));
+        if (united_kingdom)
             text = lab_dom_join(text, lab_dom_string("United Kingdom UK"), " ");
+        if (great_britain)
+            text = lab_dom_join(text, lab_dom_string("Great Britain"), " ");
+        if (british_isles)
+            text = lab_dom_join(text, lab_dom_string("British Isles"), " ");
     }
     return lab_dom_normalize(text);
 }

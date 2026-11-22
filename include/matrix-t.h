@@ -1618,6 +1618,23 @@ matrix_t *mat_digamma(const matrix_t *A);
  * @return A newly allocated result matrix, or NULL outside implemented convergence coverage.
  */
 matrix_t *mat_qdigamma(const matrix_t *Z, const number_t *q);
+
+/**
+ * @brief Apply MARS's defined lambert_S to a matrix's initial-coordinate argument.
+ * @param Z Borrowed square matrix, interpreted through functional calculus, not entrywise evaluation.
+ * @param a Borrowed scalar polylogarithm multiplier.
+ * @param q Borrowed non-zero scalar base with principal powers.
+ * @param weight Borrowed scalar integer polynomial weight in [0,64].
+ * @param order Borrowed scalar integer polylogarithm order in [-32,32].
+ * @param count Borrowed integer term count in [0,100000], or positive infinity.
+ * @return Owned matrix, released with mat_free(), or NULL for invalid shapes, unsupported spectra,
+ * scalar domain failure or allocation failure. Diagonalisable numeric matrices use spectral evaluation;
+ * equal-diagonal triangular matrices admit analytic Taylor evaluation. Symbolic support follows the
+ * matrix engine. The definition is sum (nI+Z)^weight Li_order(a q^(nI+Z)), starting at n=0.
+ * This is a MARS parameter convention, not a claimed standard function name. Inputs are unchanged.
+ */
+matrix_t *mat_lambert_S(const matrix_t *Z, number_t a, number_t q, number_t weight, number_t order, number_t count);
+
 matrix_t *mat_trigamma(const matrix_t *A);
 matrix_t *mat_tetragamma(const matrix_t *A);
 

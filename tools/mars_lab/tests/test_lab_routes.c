@@ -824,7 +824,7 @@ static bool route_place_search(const char *directory)
     static const struct { const char *text; size_t count; } cases[] = {
         {"Luderitz", 1}, {"lüDER", 1}, {"  Luderitz  ", 1}, {"Bre", 2},
         {"Brest OR Shrewsbury", 0}, {"\" OR \"", 0}, {"NoSuchTown", 0},
-        {"Svalbard", 1}, {"United Kingdom", 1}, {"Wales", 2}, {"Namibia", 1},
+        {"Svalbard", 1}, {"United Kingdom", 6}, {"Britain", 0}, {"Wales", 2}, {"Namibia", 1},
         {"England", 6}, {"Scotland", 1}, {"Northern Ireland", 1}, {"Cornwall", 1},
         {"Perth", 2}, {"perth", 2}, {"Pretoria", 1}, {"pretoria", 1},
         {"Greenwich", 2}, {"greenwich", 2},
@@ -1107,8 +1107,23 @@ static bool route_catalogue_country(const char *directory)
         "INSERT INTO jurisdiction_country_flag VALUES('GB-CON','<svg xmlns=\"http://www.w3.org/2000/svg\" "
         "viewBox=\"0 0 10 10\"><path d=\"M0 0h10v10H0z\"/></svg>'),"
         "('GB-ENG','<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 10 10\">"
-        "<path fill=\"red\" d=\"M0 0h10v10H0z\"/></svg>');");
+        "<path fill=\"red\" d=\"M0 0h10v10H0z\"/></svg>');"
+        "INSERT INTO jurisdiction(jurisdiction_id,jurisdiction_type,name) "
+        "VALUES('IM','country','Isle of Man'),('GG','country','Guernsey'),('JE','country','Jersey');"
+        "INSERT INTO jurisdiction_country_flag VALUES('GB','<svg id=\"uk\"/>'),('IM','<svg id=\"man\"/>'),"
+        "('GG','<svg id=\"guernsey\"/>'),('JE','<svg id=\"jersey\"/>');");
     sqlite_close(db); string_free(path); string_free(key);
+    const char *const independent[] = {"IM", "GG", "JE"};
+    for (size_t i = 0; ok && i < sizeof independent / sizeof *independent; ++i) {
+        json_t *location = json_new_object();
+        lab_cal_set(location, "country_code", independent[i]);
+        unsigned country_status = 200;
+        json_t *metadata = lab_cal_country(location, &country_status);
+        string_t *flag = lab_cal_jurisdiction_flag(location);
+        ok = country_status == 200 && flag && string_length(flag) > 0 &&
+             !strcmp(string_c_str(flag), test_lab_text(metadata, "country_flag"));
+        string_free(flag); json_free(metadata); json_free(location);
+    }
     json_t *catalogue = ok ? lab_page_town_jurisdiction_batch(0, "GB") : NULL;
     const json_t *towns = test_lab_member(test_lab_member(catalogue, "towns"), "GB");
     if (!ok || json_array_size(towns) != 3) {

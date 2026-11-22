@@ -146,7 +146,9 @@ with `smart_y = false` restores Fit all. No data is discarded or changed.
 
 Coordinates stay as `number_t` values through clipping, subtraction and normalisation;
 only the resulting drawing fractions become doubles. Large offsets therefore
-do not erase representable small differences. Both axes always label ticks in
+do not erase representable small differences. Exactly real coordinates held in a
+complex backend also support decimal ticks; non-zero imaginary components remain
+outside the real coordinate domain. Both axes always label ticks in
 decimal notation, never as fractions, rounded to six significant digits. This
 display rounding does not change the coordinates. Scientific exponents appear
 as `×10` followed by superscript digits rather than `e` notation. Label conversion

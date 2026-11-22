@@ -2205,7 +2205,7 @@ int lab_worker_expression(int argc, char **argv)
         }
         derivative_progression_closed_form = expr_finite_progression_closed_form(deriv);
         if (!derivative_progression_source && used_progression_derivative_form)
-            derivative_progression_source = expr_create_deriv(derivative_source, wrt);
+            derivative_progression_source = expr_summation_derivative_source(derivative_source, wrt);
         if (!derivative_progression_closed_form && (derivative_progression_source || used_progression_derivative_form))
             derivative_progression_closed_form = expr_clone(deriv);
         display_deriv = derivative_progression_closed_form

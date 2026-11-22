@@ -927,6 +927,22 @@ number_t number_qdigamma(const number_t q, const number_t z);
  * @return An owning number containing @f$\psi_q(z)@f$, or NaN outside the implemented domain.
  */
 number_t num_qdigamma(const number_t q, const number_t z);
+
+/**
+ * @brief Evaluate MARS's explicitly defined generalised Lambert sum, lambert_S.
+ * @param a Borrowed polylogarithm multiplier.
+ * @param q Borrowed non-zero base; powers use its principal logarithm.
+ * @param z Borrowed initial coordinate.
+ * @param weight Borrowed integer polynomial weight in [0,64].
+ * @param order Borrowed integer polylogarithm order in [-32,32].
+ * @param count Borrowed integer term count in [0,100000], or positive infinity.
+ * @return Owned sum of (n+z)^weight Li_order(a q^(n+z)), starting at n=0. Infinite sections require
+ * |q|<1. Invalid inputs, poles, exhausted work or non-convergence return NaN. Release with num_destroy(),
+ * or use an enclosing NUM_SCOPE. The parameter convention is a MARS definition, not a standard named
+ * special function. Inputs are unchanged; scratch storage and temporary precision are thread-local.
+ */
+number_t num_lambert_S(number_t a, number_t q, number_t z, number_t weight, number_t order, number_t count);
+
 /**
  * @brief Evaluate trigamma with guarded multiprecision real and complex asymptotics.
  * @param number Argument, retained by the caller; non-positive integers are poles.

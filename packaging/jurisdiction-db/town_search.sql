@@ -110,6 +110,14 @@ AFTER DELETE ON jurisdiction_place_alias BEGIN
     DELETE FROM jurisdiction_place_search WHERE rowid=old.id;
 END;
 
+-- Update earlier managed aliases in place; discard only a duplicate of an already corrected alias.
+UPDATE OR IGNORE jurisdiction_place_alias SET context = replace(context, 'Britain (UK)', 'United Kingdom')
+WHERE instr(context, 'Britain (UK)') > 0;
+DELETE FROM jurisdiction_place_alias AS old WHERE instr(old.context, 'Britain (UK)') > 0
+AND EXISTS (SELECT 1 FROM jurisdiction_place_alias AS current
+            WHERE current.name = old.name AND current.jurisdiction_town_id = old.jurisdiction_town_id
+              AND current.context = replace(old.context, 'Britain (UK)', 'United Kingdom'));
+
 -- Island/town associations: official Azores guide, https://www.visitazores.com/storage/media/2022/03/feel-alive-en.pdf
 -- Coordinates identify existing catalogue references; no new town, height, time zone or jurisdiction is invented.
 -- Sardinian and Corsican references use Cagliari and Ajaccio from the packaged GeoNames core catalogue.
@@ -127,11 +135,11 @@ WITH seeds(name, context, code, latitude, longitude) AS (
            ('Sardegna', 'Italy', 'IT', 39.23054, 9.11917),
            ('Corsica', 'France', 'FR', 41.91886, 8.73812),
            ('Corse', 'France', 'FR', 41.91886, 8.73812),
-           ('Cornwall', 'England, Britain (UK)', 'GB-ENG', 50.41557, -5.07319),
-           ('Isle of Wight', 'Isle of White, England, Britain (UK)', 'GB-ENG', 50.70146, -1.29124),
-           ('Mersea Island', 'Essex, England, Britain (UK)', 'GB-ENG', 51.77798, 0.91873),
-           ('Hayling Island', 'Hampshire, England, Britain (UK)', 'GB-ENG', 50.78773, -0.97697),
-           ('Wales, Sheffield', 'South Yorkshire, England, Britain (UK)', 'GB-ENG', 53.34061, -1.28162)
+           ('Cornwall', 'England, United Kingdom', 'GB-ENG', 50.41557, -5.07319),
+           ('Isle of Wight', 'Isle of White, England, United Kingdom', 'GB-ENG', 50.70146, -1.29124),
+           ('Mersea Island', 'Essex, England, United Kingdom', 'GB-ENG', 51.77798, 0.91873),
+           ('Hayling Island', 'Hampshire, England, United Kingdom', 'GB-ENG', 50.78773, -0.97697),
+           ('Wales, Sheffield', 'South Yorkshire, England, United Kingdom', 'GB-ENG', 53.34061, -1.28162)
 )
 INSERT OR IGNORE INTO jurisdiction_place_alias(name, context, jurisdiction_town_id)
 SELECT seed.name, seed.context, town.jurisdiction_town_id

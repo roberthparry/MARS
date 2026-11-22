@@ -269,6 +269,7 @@ while `qc_acos(2)` is
 | `qc_lgamma(z)` | ln Γ(z) |
 | `qc_digamma(z)` | ψ(z) = Γ′(z)/Γ(z) |
 | `qc_qdigamma(q, z)` | q-digamma ψ_q(z), defined by its principal complex series for `abs(q) < 1`, reciprocal-q continuation for `abs(q) > 1`, and ordinary digamma at `q = 1` |
+| `qc_lambert_S(a, q, z, r, s, N)` | MARS-defined Lambert sum, evaluated natively at double-double precision; every argument is `qcomplex_t`. Discrete parameters must be real integers. See [the definition and limits](expression.md#mars-defined-lambert-sum); invalid inputs or poles return NaN. |
 | `qc_trigamma(z)` | ψ₁(z) = ψ′(z) |
 | `qc_tetragamma(z)` | ψ₂(z) = −ψ^(2)(z) (positive, = +2Σ 1/(z+k)³) |
 | `qc_polygamma(n, z)` | ψ⁽ⁿ⁾(z) |
@@ -781,6 +782,11 @@ Failures and timeouts remain visible. † marks a retained slowdown outlier.
 | zetap | 2.345+0.125i | 480.6 µs |
 
 <!-- MARS-BENCHMARKS:END -->
+
+The MARS-defined `lambert_S` workloads were added in focused benchmark run
+**254** on 22 November 2026, with three warm samples at 106 bits: **92.4 µs**
+for the infinite sum and **332.7 µs** for the finite section. See the
+[stored operands and multiprecision timings](number.md#mars-defined-lambert-sum-timings).
 
 For a broader benchmark overview, see
 [`docs/benchmarks.md`](./benchmarks.md).

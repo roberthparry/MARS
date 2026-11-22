@@ -126,13 +126,23 @@ accepts half a millionth of a degree of coordinate rounding on each axis and
 visits at most one borrowed record. Towns take precedence over representative
 jurisdiction locations. A successful query with no matching position makes no
 callback; this API does not infer a nearby town or determine geographic ownership.
-The offline town generator resolves British GeoNames administrative codes to
+The offline town generator resolves UK GeoNames administrative codes to
 England (`GB-ENG`), Northern Ireland (`GB-NIR`), Scotland (`GB-SCT`) and Wales
 (`GB-WLS`). These nation identifiers must be available in its staging catalogue,
 even though their installed definitions come from the holiday seed rather than
 the target-subdivision supplement. Colchester and West Mersea belong to England,
-not the generic Britain list. Existing installations need a jurisdiction database
+not the generic United Kingdom list. Existing installations need a jurisdiction database
 reinstallation to receive corrected packaged assignments.
+
+The country catalogue uses **United Kingdom** for `GB`, including Northern Ireland
+(`GB-NIR`). Great Britain comprises England, Scotland and Wales. Guernsey (`GG`),
+Jersey (`JE`) and the Isle of Man (`IM`) are separate Crown Dependencies: they are
+in the British Isles geographical grouping but not in the UK or Great Britain.
+They keep their own flags and are not children of `GB`. The geographical grouping
+does not determine political membership or holiday-rule inheritance. Managed
+database revision 23 corrects older UK names and search contexts in place,
+preserving town identifiers, location defaults and references from saved histories.
+Use `make update-mars-db` to apply this correction to an existing installation.
 
 `jurisdict_place_t` supplies the jurisdiction code, locality name, latitude,
 longitude, elevation, IANA timezone and default marker. Coordinate fields remain

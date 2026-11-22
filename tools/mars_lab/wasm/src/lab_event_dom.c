@@ -221,10 +221,6 @@ static void lab_event_zoom(lab_event_action_t action, event_jsref event, jsref p
         return;
     lab_layout_set_zoom(card, reset ? lab_view_zoom_index(NAN) : direction,
                         reset ? LAB_LAYOUT_ZOOM_ABSOLUTE : LAB_LAYOUT_ZOOM_STEP);
-    if (action == LAB_EVENT_ZOOM_CLICK) {
-        double percent = lab_view_zoom(lab_view_card_zoom(lab_dom_card_id(card))) * 100;
-        lab_workspace_dom_status(lab_dom_format((unsigned)(percent + 0.5), "Zoom ", "%"));
-    }
 }
 
 static void lab_event_visibility(lab_event_action_t action, event_jsref event, jsref plan, jsref calls)

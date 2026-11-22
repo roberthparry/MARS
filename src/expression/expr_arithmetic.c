@@ -46,6 +46,18 @@ static number_t eval_var(expr_t *expr)
 
 static number_t eval_formal_derivative(expr_t *expr)
 {
+    if (expr->a && expr->a->ops->kind == EXPR_KIND_QDIGAMMA) {
+        NUM_SCOPE(scope);
+        unsigned orders[2] = {0, 0};
+        for (size_t j = 0; j < expr->formal_wrt_count; ++j) {
+            bool q_axis = expr_struct_eq(expr->formal_wrts[j], expr->a->a);
+            bool z_axis = expr_struct_eq(expr->formal_wrts[j], expr->a->b);
+            if (q_axis == z_axis) return num_clone(NUM_NAN);
+            ++orders[z_axis ? 1 : 0];
+        }
+        number_t q = expr_eval_num_internal(expr->a->a), z = expr_eval_num_internal(expr->a->b);
+        return num_scope_detach(number_qdigamma_partial(q, z, orders[0], orders[1]));
+    }
     return expr_distribution_derivative_eval(expr);
 }
 
@@ -669,6 +681,26 @@ static expr_t *deriv_formal_derivative(expr_t *expr)
 
     if (!wrt)
         return NULL;
+
+    if (expr->a && expr->a->ops->kind == EXPR_KIND_QDIGAMMA) {
+        const expr_t *arguments[] = {expr->a->a, expr->a->b};
+        expr_t *sum = expr_const_zero();
+        expr_t **coordinates = calloc(expr->formal_wrt_count + 1, sizeof *coordinates);
+        if (!coordinates) { expr_free(sum); return NULL; }
+        for (size_t j = 0; j < expr->formal_wrt_count; ++j) coordinates[j] = expr->formal_wrts[j];
+        for (unsigned axis = 0; sum && axis < 2; ++axis) {
+            expr_t *dx = expr_get_dx_internal(arguments[axis]);
+            if (dx && !expr_is_exact_zero(dx)) {
+                coordinates[expr->formal_wrt_count] = (expr_t *)arguments[axis];
+                expr_t *partial = expr_new_formal_derivative(expr->a, expr->formal_wrt_count + 1, coordinates);
+                expr_t *term = partial ? expr_mul(partial, dx) : NULL, *next = term ? expr_add(sum, term) : NULL;
+                expr_free(sum); sum = next; expr_free(term); expr_free(partial);
+            }
+            expr_free(dx);
+        }
+        free(coordinates);
+        return sum;
+    }
 
     /* An explicitly parameterised unknown function is constant in coordinates absent from its arguments. */
     if (expr->a && expr->a->ops == &ops_arbitrary_function) {

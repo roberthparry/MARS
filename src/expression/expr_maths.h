@@ -90,6 +90,40 @@ number_t eval_erfcinv(expr_t *expr);
 number_t eval_gamma(expr_t *expr);
 number_t eval_digamma(expr_t *expr);
 number_t eval_qdigamma(expr_t *expr);
+
+/**
+ * @brief Evaluate a packed Lambert application at the active numerical precision.
+ * @param expression Borrowed application; ordinary numerical caches may be updated.
+ * @return Owned value, released with num_destroy(), or NaN for invalid inputs or non-convergence.
+ */
+number_t lambert_eval(expr_t *expression);
+
+/**
+ * @brief Apply Lambert-sum continuous chain rules through contiguous relations.
+ * @param expression Borrowed application, with fixed discrete parameters.
+ * @return Owned derivative, released with expr_free(), or NaN for varying discrete parameters.
+ */
+expr_t *lambert_derivative(expr_t *expression);
+
+/**
+ * @brief Rebuild a Lambert application from its packed first five arguments and term count.
+ * @param left Borrowed packed arguments.
+ * @param right Borrowed count.
+ * @return Owned retained-argument expression, released with expr_free(), or NULL on failure.
+ */
+expr_t *lambert_rebuild(const expr_t *left, const expr_t *right);
+
+/**
+ * @brief Accumulate analytic Lambert-sum reverse sensitivities.
+ * @param expression Borrowed application.
+ * @param out_bar Borrowed output sensitivity.
+ * @param accumulate Callback borrowing each argument and sensitivity during its call.
+ * @param context Borrowed callback context.
+ * @return Zero on success or -1 on invalid input or callback failure; no ownership transfers.
+ */
+int lambert_reverse(const expr_t *expression, const number_t *out_bar,
+                    expr_reverse_accumulate_fn accumulate, void *context);
+
 number_t eval_trigamma(expr_t *expr);
 number_t eval_polygamma(expr_t *expr);
 number_t eval_zeta(expr_t *expr);

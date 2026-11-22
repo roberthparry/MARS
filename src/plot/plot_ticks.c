@@ -14,6 +14,12 @@
 size_t plot_ticks(number_t low, number_t high, number_t values[12])
 {
     NUM_SCOPE(scope);
+    if (!num_is_real(low) || !num_is_real(high) || !num_is_finite(low) || !num_is_finite(high) || !num_lt(low, high))
+        return 0;
+    /* A real coordinate may retain complex storage after cancellation. Decimal tick arithmetic
+     * needs its real component, without discarding any non-zero imaginary part. */
+    low = num_real_part(low);
+    high = num_real_part(high);
     number_t span = num_sub(high, low), five = num_create_from_long(5), raw = num_div(span, five);
     number_t logarithm = num_log10(raw), exponent = num_floor(logarithm);
     double power = num_to_double(exponent);

@@ -653,6 +653,17 @@ static void example_indexed_roots(void)
     }
 }
 
+/* README example: MARS's explicitly defined Lambert sum in docs/expression.md. */
+static void example_lambert_sum(void)
+{
+    expr_t *expression = expr_from_string("lambert_S(-1,1,1,1,-1,4)", NULL);
+    number_t value = expr_eval(expression);
+    printf("%.1f\n", num_to_double(value));
+    TEST_ASSERT_TRUE(num_to_double(value) == -2.5, "README Lambert sum output");
+    num_destroy(&value);
+    expr_free(expression);
+}
+
 /* ------------------------------------------------------------------------- */
 /* Arithmetic tests                                                          */
 /* ------------------------------------------------------------------------- */
@@ -844,6 +855,7 @@ int tests_main(void)
 
     TEST_SECTION("expr_t from_string Tests");
     TEST_RUN_IN_GROUP(test_expr_t_from_string, tests, NULL);
+    TEST_RUN_IN_GROUP(test_expr_lambert, tests, "expression,lambert,calculus");
 
     TEST_SECTION("Goal seek");
     TEST_RUN_IN_GROUP(test_expr_t_goal_seek, tests, NULL);
@@ -880,6 +892,7 @@ int tests_main(void)
     TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_indexed_roots, readme_examples, "expression,readme,output");
     TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_round, readme_examples, "expression,readme,round");
     TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_exact_factorisation, readme_examples, "expression,readme,factors");
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_lambert_sum, readme_examples, "expression,readme,lambert");
 
     return TESTS_EXIT_CODE();
 }

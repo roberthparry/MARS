@@ -53,6 +53,7 @@ enum {
     flow_request_calculus_stage_error_digits,
     flow_request_calculus_stage_error_status,
     flow_request_calculus_stage_input_accept,
+    flow_request_calculus_stage_plot_result,
     flow_request_calculus_stage_return = 999
 };
 
@@ -125,6 +126,11 @@ static jsref lab_flow_request_calculus_assembled(struct lab_flow_request_calculu
 {
     if (lab_flow_request_truth(ctx->frame, "solverPlot"))
         return lab_flow_request_current(ctx->frame, flow_request_calculus_stage_input_accept);
+    if (ctx->plot && !ctx->matrix) {
+        int source = lab_dom_read(lab_dom_id("plotRange"), LAB_DOM_DATASET, "calculusSource");
+        if (lab_dom_length(source))
+            lab_dom_set(ctx->frame, "source", source);
+    }
     if (!ctx->matrix)
         return lab_flow_call(ctx->frame, flow_request_calculus_stage_input, "expressionWithVisibleBindings", "source",
                              1, 2, lab_dom_get(ctx->frame, "source"),
@@ -149,6 +155,9 @@ static jsref lab_flow_request_calculus_show(struct lab_flow_request_calculus_con
 {
     if (!lab_flow_request_truth(ctx->frame, "accepted"))
         return lab_flow_done(0);
+    /* A plot supplements the installed mathematical result; it must not replace its title or close Help. */
+    if (ctx->plot)
+        return lab_flow_request_current(ctx->frame, flow_request_calculus_stage_fetch);
     return lab_flow_call(ctx->frame, flow_request_calculus_stage_title, "showResults", 0, 0, 0);
 }
 
@@ -327,7 +336,23 @@ static jsref lab_flow_request_calculus_commit_state(struct lab_flow_request_calc
 {
     if (ctx->matrix && !ctx->scalar)
         return lab_flow_call(ctx->frame, flow_request_calculus_stage_ready, "commitModeState", 0, 0, 0);
-    return lab_flow_call(ctx->frame, flow_request_calculus_stage_done, "setStatus", 0, 0, 1, lab_dom_string("Ready"));
+    return lab_flow_call(ctx->frame, flow_request_calculus_stage_plot_result, "setStatus", 0, 0, 1,
+                         lab_dom_string("Ready"));
+}
+
+static jsref lab_flow_request_calculus_plot_result(struct lab_flow_request_calculus_context *ctx)
+{
+    int mode = lab_dom_get(lab_dom_get(ctx->frame, "initial"), "mode");
+    int source = lab_dom_get(ctx->result, "expression");
+    int range = lab_dom_id("plotRange");
+    if (!lab_dom_equal(mode, lab_dom_string("expression")) || !lab_dom_length(source) ||
+        !lab_dom_count(lab_dom_get(range, "marsPlotNames")))
+        return lab_flow_done(0);
+    /* Keep the native result opaque, including its bindings, for automatic plots and later viewport changes. */
+    lab_dom_write(range, LAB_DOM_DATASET, "calculusSource", source);
+    lab_plot_slices_clear();
+    lab_layout_plot(0, 0);
+    return lab_flow_call(ctx->frame, flow_request_calculus_stage_done, "automaticPlot", 0, 0, 1, ctx->request);
 }
 
 static jsref lab_flow_request_calculus_ready(struct lab_flow_request_calculus_context *ctx)
@@ -467,6 +492,7 @@ jsref lab_flow_request_calculus(frame_jsref frame)
         [flow_request_calculus_stage_error_render]         = lab_flow_request_calculus_error_render,
         [flow_request_calculus_stage_error_digits]         = lab_flow_request_calculus_error_digits,
         [flow_request_calculus_stage_error_status]         = lab_flow_request_calculus_error_status,
+        [flow_request_calculus_stage_plot_result]          = lab_flow_request_calculus_plot_result,
     };
     unsigned selected = lab_flow_request_stage(frame);
     if (selected == flow_request_calculus_stage_return)
