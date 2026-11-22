@@ -680,6 +680,24 @@ static void test_TeX_sum_wrapping(void)
                      "an unavailable multiline alternative retains the complete ordinary body");
     TeX_free(notation);
     TeX_context_free(context);
+    context_test_node_t restriction = {.kind = TeX_NODE_TEXT, .text = "local restriction"};
+    context_test_node_t domain = {.kind = TeX_NODE_DOMAIN, .children = {&difference, &restriction}, .count = 2u};
+    context = TeX_context_new((TeX_node_ref_t){&context_test_provider, &state, &domain});
+    selection.fail = false;
+    notation = TeX_wrap_sum(context, 1u, &provider, &selection);
+    TEST_ASSERT_TRUE(notation && !strcmp(TeX_source(notation),
+        "\\begin{aligned}[t]\n&x \\\\\n&{} - 2 \\\\\n&\\text{provided that} \\\\\n&\\quad \\text{local restriction}\n\\end{aligned}"),
+        "a wrapped sum and its own domain share one alignment without losing signed terms");
+    TeX_free(notation);
+    TeX_context_free(context);
+    context_test_node_t outer_sum = {.kind = TeX_NODE_SUM, .children = {&domain, &two}, .count = 2u};
+    context = TeX_context_new((TeX_node_ref_t){&context_test_provider, &state, &outer_sum});
+    notation = TeX_wrap_sum(context, 4096u, NULL, NULL);
+    TEST_ASSERT_TRUE(notation && strstr(TeX_source(notation), "\\quad (\\text{local restriction}) + 2") &&
+        !strstr(TeX_source(notation), "provided that"),
+        "an operand's restriction is not promoted to a condition on the entire surrounding expression");
+    TeX_free(notation);
+    TeX_context_free(context);
     string_free(selection.state.scratch);
     string_free(state.scratch);
 }
@@ -1092,11 +1110,71 @@ static void test_TeX_real_interval_domains_cases_row(const void *data)
     expr_free(expression);
 }
 
+static void test_TeX_wrapped_domain_cases_row(const void *data)
+{
+    const test_database_case_t *row = data;
+    expr_t *expression = expr_from_string(string_c_str(row->input), NULL);
+    char *before = expression ? expr_to_string(expression, style_UNBOUND) : NULL;
+    char *wrapped = expression ? expr_to_TeX_body_wrapped(expression, 4096u) : NULL;
+    char *after = expression ? expr_to_string(expression, style_UNBOUND) : NULL;
+    bool ok = wrapped && !strcmp(wrapped, string_c_str(row->expected)) && before && after && !strcmp(before, after);
+    if (!ok)
+        printf("Wrapped domain input: %s\nActual: %s\nExpected: %s\n", string_c_str(row->input),
+               wrapped ? wrapped : "NULL", string_c_str(row->expected));
+    TEST_ASSERT_TRUE(ok, "display conditions occupy separate rows without changing their algebraic scope");
+    free(after);
+    free(wrapped);
+    free(before);
+    expr_free(expression);
+}
+
+static void test_TeX_optimised_domain_cases_row(const void *data)
+{
+    const test_database_case_t *row = data;
+    expr_bindings_t *bindings = NULL;
+    expr_t *expression = expr_from_string(string_c_str(row->input), &bindings);
+    expr_t *simplified = expression ? expr_simplify(expression) : NULL;
+    expr_bindings_t *simplified_bindings = expr_bindings_from_expr_internal(simplified);
+    char *before = simplified ? expr_to_string(simplified, style_UNBOUND) : NULL;
+    TeX_context_t *context = simplified ? expr_TeX_result_context(simplified) : NULL;
+    TeX_t *notation = context ? TeX_from_context(context) : NULL;
+    char *after = simplified ? expr_to_string(simplified, style_UNBOUND) : NULL;
+    bool ok = notation && !strcmp(TeX_source(notation), string_c_str(row->expected)) && before && after &&
+              !strcmp(before, after);
+    const char *values[] = {"0", "1", "-1", "2", "-2", "i", "-i", "2i", "-2i", "1+i", "1-i", "-1+i"};
+    for (size_t i = 0u; ok && i < sizeof values / sizeof *values; ++i) {
+        number_t value = num_create_from_string(values[i]);
+        expr_t *nodes[] = {expr_bindings_get(bindings, "x"), expr_bindings_get(simplified_bindings, "x")};
+        for (size_t j = 0u; j < sizeof nodes / sizeof *nodes; ++j)
+            if (nodes[j])
+                expr_set_val(nodes[j], value);
+        number_t original = expr_eval(expression), result = expr_eval(simplified);
+        ok = (num_is_nan(original) && num_is_nan(result)) || num_eq(original, result);
+        num_destroy(&result);
+        num_destroy(&original);
+        num_destroy(&value);
+    }
+    if (!ok)
+        printf("Optimised domain: %s\nActual: %s\nExpected: %s\n", string_c_str(row->input),
+               notation ? TeX_source(notation) : "NULL", string_c_str(row->expected));
+    TEST_ASSERT_TRUE(ok, "compact conditions preserve numerical guards, complex values and source expressions");
+    free(after);
+    free(before);
+    TeX_free(notation);
+    TeX_context_free(context);
+    expr_bindings_free(simplified_bindings);
+    expr_free(simplified);
+    expr_free(expression);
+    expr_bindings_free(bindings);
+}
+
 static void test_TeX_real_interval_domains(void)
 {
     test_run_database_cases(__FILE__, __LINE__,
         "TeX.test_TeX_real_interval_domains_cases", NULL,
         test_TeX_real_interval_domains_cases_row);
+    test_run_database_cases(__FILE__, __LINE__, "TeX.wrapped_domain", NULL, test_TeX_wrapped_domain_cases_row);
+    test_run_database_cases(__FILE__, __LINE__, "TeX.optimised_domain", NULL, test_TeX_optimised_domain_cases_row);
 }
 
 static void test_TeX_rational_quotient_coefficients(void)

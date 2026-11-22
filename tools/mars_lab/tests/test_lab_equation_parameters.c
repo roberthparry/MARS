@@ -125,6 +125,19 @@ static void equation_parameter_row(const void *data)
         const string_t *fragment = json_string_value(json_array_get(fragments, i));
         ok = ok && fragment && strstr(lab_eval_text(response, "display_TeX"), string_c_str(fragment));
     }
+    const char *condition_count = lab_eval_text(expected, "display_min_condition_rows");
+    if (*condition_count) {
+        const char *display = lab_eval_text(response, "display_TeX"), *cursor = display;
+        size_t rows = 0u;
+        while ((cursor = strstr(cursor, "\\\\\n&\\quad "))) {
+            ++rows;
+            cursor += strlen("\\\\\n&\\quad ");
+        }
+        const char *conditions = strstr(display, "\\\\\n&\\text{provided that}");
+        const char *formula = strstr(display, " &=");
+        ok = ok && conditions && formula && formula < conditions &&
+             rows >= strtoul(condition_count, NULL, 10);
+    }
     const char *excluded = lab_eval_text(expected, "plot_excludes"), *svg = lab_eval_text(response, "plot_svg");
     if (*excluded) ok = ok && !strstr(svg, excluded);
     ok = ok && contour_radii(svg, expected);

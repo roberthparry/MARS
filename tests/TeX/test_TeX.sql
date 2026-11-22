@@ -240,6 +240,66 @@ INSERT OR IGNORE INTO TeX_cases(name, operation, input, expected) VALUES ('case_
 INSERT OR IGNORE INTO TeX_cases(name, operation, input, expected) VALUES ('case_1c3acd19e4ffd1e6', 'test_TeX_real_interval_domains_cases', '{x | x=?; x ∈ ℝ; Re(x)>0}', 'x\quad (x>0)');
 INSERT OR IGNORE INTO TeX_cases(name, operation, input, expected) VALUES ('case_31e36633964153f7', 'test_TeX_real_interval_domains_cases', '{x | x=?, a=?; a ∈ ℝ; x ∈ ℝ; Re(a)>0; Re(x)>a; Re(1)>x}', 'x\quad (a>0,\;x>a,\;1>x)');
 
+INSERT INTO TeX_cases(name, operation, input, expected) VALUES
+    ('domain_interval_closed_lower', 'test_TeX_real_interval_domains_cases',
+     '{x | x=?; x ∈ ℝ; x >= -1; x < 2}', 'x\quad (-1 \le x < 2)'),
+    ('domain_interval_closed_upper', 'test_TeX_real_interval_domains_cases',
+     '{x | x=?; x ∈ ℝ; x > -1; x <= 2}', 'x\quad (-1 < x \le 2)'),
+    ('domain_interval_closed_both', 'test_TeX_real_interval_domains_cases',
+     '{x | x=?; x ∈ ℝ; x >= -1; x <= 2}', 'x\quad (-1 \le x \le 2)'),
+    ('domain_interval_imaginary_coordinate', 'test_TeX_real_interval_domains_cases',
+     '{x | x=?; Im(x) > -1; Im(x) <= 2}', 'x\quad (-1 < \mathfrak{Im}\mathopen{}\left\{x\right\} \le 2)')
+ON CONFLICT(name) DO UPDATE SET operation=excluded.operation, input=excluded.input, expected=excluded.expected;
+
+INSERT INTO test_case_runner(module, source, parent, table_name, operation) VALUES
+    ('TeX.wrapped_domain', 'tests/TeX/test_TeX.c', 'tests.test_TeX_real_interval_domains', 'TeX_cases', 'wrapped_domain')
+ON CONFLICT(module) DO UPDATE SET table_name=excluded.table_name, operation=excluded.operation;
+
+INSERT INTO test_case_runner(module, source, parent, table_name, operation) VALUES
+    ('TeX.optimised_domain', 'tests/TeX/test_TeX.c', 'tests.test_TeX_real_interval_domains', 'TeX_cases', 'optimised_domain')
+ON CONFLICT(module) DO UPDATE SET table_name=excluded.table_name, operation=excluded.operation;
+
+INSERT INTO TeX_cases(name, operation, input, expected) VALUES
+    ('domain_log_intrinsic_nonzero', 'optimised_domain', '{ln(x) | x=?; x != 0}', '\ln(x)'),
+    ('domain_log10_intrinsic_nonzero', 'optimised_domain', '{log10(x) | x=?; x != 0}', '\lg(x)'),
+    ('domain_log_scaled_intrinsic_nonzero', 'optimised_domain', '{ln(2*x) | x=?; x != 0}', '\ln(2\mkern-2mu x)'),
+    ('domain_root_nonzero_base', 'optimised_domain', '{x | x=?; sqrt(x) != 0}', 'x\quad (x\ne 0)'),
+    ('domain_power_nonzero_base', 'optimised_domain', '{x | x=?; x^2 != 0}', 'x\quad (x\ne 0)'),
+    ('domain_scalar_nonzero_base', 'optimised_domain', '{x | x=?; -2*x != 0}', 'x\quad (x\ne 0)'),
+    ('domain_retained_after_cancellation', 'optimised_domain', '{1 | x=?; x != 0}', '1\quad (x\ne 0)'),
+    ('domain_retained_unrelated_log', 'optimised_domain', '{ln(x+1) | x=?; x != 0}', '\ln(x + 1)\quad (x\ne 0)'),
+    ('domain_retained_mutable_factor', 'optimised_domain', '{ln(x) | x=?; a=2; a*x != 0}',
+     '\ln(x)\quad (a\mkern-2mu x\ne 0)'),
+    ('domain_principal_root_range', 'optimised_domain',
+     '{x | x=?; realpart(x)>=0; sgn(realpart(x))+sgn(imagpart(x))>=0}',
+     'x\quad (x = 0\quad \text{or}\quad -\frac{\pi}{2} < \operatorname{arg}\left(x\right) \le \frac{\pi}{2})'),
+    ('domain_principal_root_extra_bound', 'optimised_domain',
+     '{x | x=?; realpart(x)>=0; realpart(x)<2; sgn(realpart(x))+sgn(imagpart(x))>=0}',
+     'x\quad (2>\mathfrak{Re}\mathopen{}\left\{x\right\},\;x = 0\quad \text{or}\quad -\frac{\pi}{2} < \operatorname{arg}\left(x\right) \le \frac{\pi}{2})'),
+    ('domain_imaginary_pi_interval', 'optimised_domain', '{x | x=?; Im(x)>-pi/2; Im(x)<=pi/2}',
+     'x\quad (\frac{-\pi}{2} < \mathfrak{Im}\mathopen{}\left\{x\right\} \le \frac{\pi}{2})')
+ON CONFLICT(name) DO UPDATE SET operation=excluded.operation, input=excluded.input, expected=excluded.expected;
+
+INSERT INTO TeX_cases(name, operation, input, expected) VALUES
+    ('wrapped_domain_nonzero', 'wrapped_domain', '{x | x=?; x ≠ 0}', '\begin{aligned}[t]
+&x \\
+&\text{provided that} \\
+&\quad x\ne 0
+\end{aligned}'),
+    ('wrapped_domain_real_interval', 'wrapped_domain', '{x | x=?; x ∈ ℝ; Re(x)>-1; Re(2)>x}', '\begin{aligned}[t]
+&x \\
+&\text{provided that} \\
+&\quad -1 < x < 2
+\end{aligned}'),
+    ('wrapped_domain_separate_restrictions', 'wrapped_domain', '{x | x=?, a=?; a ∈ ℝ; Re(a)>0; Re(x)>a; Re(1)>x}', '\begin{aligned}[t]
+&x \\
+&\text{provided that} \\
+&\quad a>0 \\
+&\quad \mathfrak{Re}(x)>a \\
+&\quad 1>x
+\end{aligned}')
+ON CONFLICT(name) DO UPDATE SET operation=excluded.operation, input=excluded.input, expected=excluded.expected;
+
 INSERT INTO test_case_runner(module, source, parent, table_name, operation) VALUES (
     'TeX.test_TeX_native_aggregate_contexts_cases', 'tests/TeX/test_TeX.c', 'tests.test_TeX_native_aggregate_contexts', 'TeX_cases', 'test_TeX_native_aggregate_contexts_cases')
 ON CONFLICT(module) DO UPDATE SET table_name=excluded.table_name, operation=excluded.operation;

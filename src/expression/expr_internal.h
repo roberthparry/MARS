@@ -547,8 +547,21 @@ expr_t *expr_imag_coordinate(const expr_t *value);
 /** Whether every occurrence of a symbol is confined to a fixed real-coordinate projection. */
 bool expr_transform_real_coordinate_only(const expr_t *expr, const expr_t *symbol);
 
-/** Return the operand of a non-zero domain condition, or NULL for other predicates. */
+/**
+ * @brief Borrow the canonical operand of a non-zero domain restriction.
+ * @param condition Borrowed linked condition pair, kept alive while its operand is used; NULL is accepted.
+ * @return Borrowed operand with roots, fixed non-zero powers and scalar factors removed, or NULL for other predicates.
+ * @note No expression is changed or retained. Mutable parameter values are never treated as fixed scalar factors.
+ */
 const expr_t *expr_domain_nonzero_operand(const expr_t *condition);
+
+/**
+ * @brief Borrow the base of a non-zero restriction after removing fixed non-zero factors, roots and powers.
+ * @param value Borrowed expression, or NULL. Mutable named parameter factors remain part of the base.
+ * @return Borrowed node owned by value, or NULL for absent input; never release it separately.
+ * @note This describes the finite mathematical domain; callers retain the original numerical guard.
+ */
+const expr_t *expr_domain_nonzero_base(const expr_t *value);
 
 /* Add a borrowed integration constant inside the primitive's outer domain restrictions. */
 expr_t *expr_add_integration_constant(const expr_t *antiderivative, const expr_t *constant);

@@ -642,6 +642,15 @@ static TeX_t *render_domain_relation(const TeX_node_view_t *view, const TeX_t *c
                                            TeX_source(children[1])));
 }
 
+static TeX_t *render_interval_chain(const TeX_node_view_t *view, const TeX_t *const *children)
+{
+    if (view->child_count != 3u)
+        return invalid_node();
+    return from_owned_source(string_sprintf("%s %s %s %s %s", TeX_source(children[0]),
+        view->lower_inclusive ? "\\le" : "<", TeX_source(children[1]),
+        view->upper_inclusive ? "\\le" : "<", TeX_source(children[2])));
+}
+
 static TeX_t *render_domain(const TeX_node_view_t *view, const TeX_t *const *children)
 {
     if (view->child_count < 2u)
@@ -865,6 +874,7 @@ static const TeX_node_renderer_fn renderers[TeX_NODE_COUNT] = {
     [TeX_NODE_TRANSFORM]  = render_transform,
     [TeX_NODE_RELATION]   = render_relation,
     [TeX_NODE_DOMAIN_RELATION] = render_domain_relation,
+    [TeX_NODE_INTERVAL_CHAIN] = render_interval_chain,
     [TeX_NODE_DOMAIN]     = render_domain,
     [TeX_NODE_DISTRIBUTION_QUALIFICATION] = render_distribution_qualification,
     [TeX_NODE_DISTRIBUTION_INLINE] = render_distribution_qualification,

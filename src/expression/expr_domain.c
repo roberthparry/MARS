@@ -20,11 +20,45 @@
 
 static bool domain_numeric(const expr_t *expr);
 
+/* Preserve non-zero tests while removing roots, powers and fixed non-zero scalar factors. */
+const expr_t *expr_domain_nonzero_base(const expr_t *value)
+{
+    for (unsigned depth = 0u; value && depth < 128u; ++depth) {
+        if (expr_is_neg(value) || expr_is_op(value, &ops_abs) || expr_is_sqrt_expr(value)) {
+            value = value->a;
+            continue;
+        }
+        const expr_t *base = NULL;
+        number_t exponent = NUM_NAN;
+        bool power = expr_match_pow_const(value, &base, &exponent) && num_is_finite(exponent) &&
+                     num_is_real(exponent) && !num_is_zero(exponent);
+        num_destroy(&exponent);
+        if (power) {
+            value = base;
+            continue;
+        }
+        if (expr_is_mul(value) || expr_is_div(value)) {
+            const expr_t *factor = value->b;
+            const expr_t *operand = value->a;
+            if (expr_is_mul(value) && !expr_is_unnamed_const(factor)) {
+                factor = value->a;
+                operand = value->b;
+            }
+            if (expr_is_unnamed_const(factor) && num_is_finite(factor->c) && !num_is_zero(factor->c)) {
+                value = operand;
+                continue;
+            }
+        }
+        break;
+    }
+    return value;
+}
+
 /* Recognise |z| > 0 as z != 0 without changing the predicate's evaluation. */
 const expr_t *expr_domain_nonzero_operand(const expr_t *condition)
 {
     return condition && expr_is_op(condition->a, &ops_abs) && condition->b &&
-                   expr_const_is_zero(condition->b->a) ? condition->a->a : NULL;
+                   expr_const_is_zero(condition->b->a) ? expr_domain_nonzero_base(condition->a->a) : NULL;
 }
 
 static bool domain_same_value(const expr_t *left, const expr_t *right)

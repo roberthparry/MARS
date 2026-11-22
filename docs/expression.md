@@ -3881,7 +3881,20 @@ char *expr_to_TeX_body(const expr_t *expr);
 
 ### `expr_to_TeX_body_wrapped()`
 
-Returns the public result described by to TeX body wrapped.
+Returns a display-oriented TeX body. Long additive expressions may wrap at the soft
+`line_limit`; zero selects the default. Outer domain and branch restrictions appear
+on separate rows below their formula, introduced by “provided that”. Conditions on
+nested operands keep their local scope. This changes layout only: no condition is
+added, removed or applied to an enclosing expression. Ordinary `expr_to_TeX_body()`
+output retains its compact inline spelling.
+
+Native domain presentation reduces non-zero root and fixed-power tests to their
+base and omits a non-zero check already required by a logarithm in the retained
+formula. Its numerical guard remains active, rejecting the logarithmic singularity.
+Formatting combines lower and upper bounds with their own open or closed
+endpoints. Principal-square-root range tests include zero explicitly and otherwise
+use the corresponding argument interval, replacing sign-function indicator sums.
+These rules retain complex-valued parameters and the original branch boundaries.
 
 ```c
 char *expr_to_TeX_body_wrapped(const expr_t *expr, size_t line_limit);

@@ -2267,7 +2267,10 @@ char *expr_to_TeX_operation_body(const expr_t *expr);
  * This keeps the ordinary expr_to_TeX_body() spelling available for exact
  * serialisation, but may wrap long additive expressions in an amsmath
  * aligned environment for display. @p line_limit is a soft character budget;
- * pass 0 for the default.
+ * pass 0 for the default. Outer domain and branch restrictions appear on separate
+ * rows below their formula, even when the formula is short. Conditions on nested
+ * operands retain their local scope; no restriction is added, removed or moved
+ * onto an enclosing expression.
  *
  * The returned C string is allocated with malloc() and must be released with
  * free(). Returns NULL on invalid input or allocation failure.

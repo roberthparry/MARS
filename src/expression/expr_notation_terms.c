@@ -137,7 +137,7 @@ char *expr_to_TeX_body_wrapped(const expr_t *expression, size_t line_limit)
     expr_t *initial = NULL;
     expr_t *display = expr_notation_primitive_display(expression, &initial);
     const expr_t *selected = display ? display : expression;
-    expr_wrap_state_t state = {.expression = selected};
+    expr_wrap_state_t state = {.expression = expr_domain_body(selected)};
     static const TeX_sum_provider_t provider = {.count = wrapped_term_count, .term = wrapped_term};
     TeX_context_t *context = expr_TeX_result_context(selected);
     TeX_t *body = TeX_wrap_sum(context, line_limit,

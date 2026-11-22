@@ -245,6 +245,8 @@ INSERT OR IGNORE INTO equation_cases(name, operation, input, expected, precision
      '{"coordinate":"y","formula":"tanh(x)","samples":[{"bindings":{"x":"-2"},"valid":true},{"bindings":{"x":"2"},"valid":true},{"bindings":{"x":"1+i/2"},"valid":true},{"bindings":{"x":"3*i"},"valid":false}]}', 64),
     ('guarded_inverse_root', 'guarded_inverse', 'sqrt(y)=x',
      '{"coordinate":"y","formula":"x^2","samples":[{"bindings":{"x":"3"},"valid":true},{"bindings":{"x":"0"},"valid":true},{"bindings":{"x":"i"},"valid":true},{"bindings":{"x":"-3"},"valid":false},{"bindings":{"x":"-i"},"valid":false}]}', 64),
+    ('guarded_inverse_shifted_root', 'guarded_inverse', 'sqrt(y)+2=x',
+     '{"coordinate":"y","formula":"(x-2)^2","samples":[{"bindings":{"x":"3"},"valid":true},{"bindings":{"x":"2"},"valid":true},{"bindings":{"x":"2+i"},"valid":true},{"bindings":{"x":"1"},"valid":false},{"bindings":{"x":"2-i"},"valid":false}]}', 64),
     ('guarded_inverse_log_affine', 'guarded_inverse', 'a+2*ln(y)=x',
      '{"coordinate":"y","constants":["a"],"formula":"exp((x-a)/2)","samples":[{"bindings":{"a":"1","x":"3"},"valid":true},{"bindings":{"a":"1","x":"-1"},"valid":true},{"bindings":{"a":"1","x":"-8*i"},"valid":false}]}', 64),
     ('guarded_inverse_exp_affine', 'guarded_inverse', 'a+2*exp(y)=x',
@@ -275,6 +277,9 @@ INSERT OR IGNORE INTO equation_cases(name, operation, input, expected, precision
     ('guarded_inverse_euler_power', 'guarded_inverse',
      'x=-(2*atanh(sqrt(C+2*e^y)/sqrt(C)))/sqrt(C)+D',
      '{"coordinate":"y","constants":["C","D"],"formula":"ln(-C/(2*cosh(sqrt(C)*(x-D)/2)^2))","samples":[{"bindings":{"C":"-1","D":"1","x":"1"},"valid":true},{"bindings":{"C":"-1","D":"1","x":"2"},"valid":true},{"bindings":{"C":"-1","D":"1","x":"0"},"valid":false}]}', 64),
+    ('guarded_inverse_complex_parameters', 'guarded_inverse',
+     'x=-(2*atanh(sqrt(C+2*exp(y))/sqrt(C)))/sqrt(C)+D',
+     '{"coordinate":"y","constants":["C","D"],"formula":"ln(-C/(2*cosh(sqrt(C)*(x-D)/2)^2))","samples":[{"bindings":{"C":"4","D":"0","x":"-1"},"valid":true},{"bindings":{"C":"4","D":"0","x":"0"},"valid":true},{"bindings":{"C":"4","D":"0","x":"1"},"valid":false},{"bindings":{"C":"1+i","D":"2-i","x":"2-i-2*(1+i/4)/sqrt(1+i)"},"valid":true},{"bindings":{"C":"1+i","D":"2-i","x":"2-i"},"valid":true},{"bindings":{"C":"1+i","D":"2-i","x":"2-i-2*(1+2*i)/sqrt(1+i)"},"valid":false}]}', 64),
     ('guarded_root_polynomial_branches', 'solve_count', '{sqrt(y^2)=a | y=?; a=?}', '2', 64);
 
 INSERT OR IGNORE INTO equation_cases(name, operation, input, expected, precision) VALUES

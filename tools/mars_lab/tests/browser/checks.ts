@@ -365,10 +365,14 @@
                 root.querySelector('legend')!.textContent === 'Parameter',
                 'the unwrapped inverse equation displays y(x), with a real contour and two constant parameters');
             const displayed = WorksheetContext.rendered.dataset.displayTex || '';
-            check(displayed.includes('\\quad (') && displayed.includes('\\sqrt{C}\\ne 0') &&
-                displayed.includes('\\operatorname{sgn}') && displayed.includes('>-\\frac{\\pi}{2}') &&
-                !displayed.includes('Conditions in Solutions') && WorksheetContext.rendered.querySelector('svg'),
-                'Rendered TeX shows the complete native domain and branch restrictions with its solution: ' +
+            const formula_svg = WorksheetContext.rendered.querySelector('svg');
+            check(displayed.includes('\\\\\n&\\text{provided that}') && displayed.includes('C\\ne 0') &&
+                displayed.includes('\\operatorname{arg}') && displayed.includes('\\text{or}') &&
+                displayed.includes('\\le \\frac{\\pi}{2}') && !displayed.includes('\\operatorname{sgn}') &&
+                (displayed.match(/\\\\\n&\\quad /g) || []).length === 4 &&
+                !displayed.includes('Conditions in Solutions') && formula_svg &&
+                formula_svg.viewBox.baseVal.height > 60,
+                'Rendered TeX places the native inverse-branch restrictions on separate rows below its solution: ' +
                 displayed + '; SVG: ' + Boolean(WorksheetContext.rendered.querySelector('svg')));
             const symbolic_source = WorksheetBindings.editor.currentExpressionText();
             const coefficient = root.querySelector<HTMLElement>('.plot-slice[data-name="C"]')!;

@@ -269,22 +269,25 @@ INSERT OR IGNORE INTO mars_lab_cases(name, operation, input, expected) VALUES
 
 -- Retain the complete native domain and branch restrictions in the dependent-coordinate TeX card.
 UPDATE mars_lab_cases SET expected =
-    '{"route":"/equation-eval","status":"200","parameters":{},"display_contains":"y &=","display_excludes":"Conditions in Solutions","display_fragments":["\\quad (","\\sqrt{C}\\ne 0","\\operatorname{sgn}","\\mathfrak{Re}","\\mathfrak{Im}","\\frac{\\pi}{2}\\ge",">-\\frac{\\pi}{2}"],"solutions_contains":"where","horizontal":"x","bindings":{"x":"variable","y":"variable","C":"constant","D":"constant"}}'
+    '{"route":"/equation-eval","status":"200","parameters":{},"display_contains":"y &=","display_excludes":"\\operatorname{sgn}","display_fragments":["\\text{provided that}","C\\ne 0","\\operatorname{arg}","\\text{or}","\\mathfrak{Im}","\\le \\frac{\\pi}{2}"],"solutions_contains":"where","horizontal":"x","bindings":{"x":"variable","y":"variable","C":"constant","D":"constant"}}'
 WHERE name = 'equation_unwrapped_inverse_display';
 INSERT INTO mars_lab_cases(name, operation, input, expected) VALUES
     ('equation_display_inverse_conditions_renamed', 'equation_parameters',
      '{"equation":"t=-(2*atanh(sqrt(A+2*exp(x))/sqrt(A)))/sqrt(A)+B","precision":40}',
-     '{"route":"/equation-eval","status":"200","parameters":{},"display_contains":"x &=","display_excludes":"Conditions in Solutions","display_fragments":["\\quad (","\\sqrt{A}\\ne 0","\\operatorname{sgn}","\\frac{\\pi}{2}\\ge",">-\\frac{\\pi}{2}"],"solutions_contains":"where","horizontal":"t"}'),
+     '{"route":"/equation-eval","status":"200","parameters":{},"display_contains":"x &=","display_excludes":"\\operatorname{sgn}","display_fragments":["\\text{provided that}","A\\ne 0","\\operatorname{arg}","\\text{or}","\\le \\frac{\\pi}{2}"],"solutions_contains":"where","horizontal":"t"}'),
     ('equation_display_square_root_conditions', 'equation_parameters',
      '{"equation":"x=sqrt(y)","precision":32}',
-     '{"route":"/equation-eval","status":"200","parameters":{},"display_contains":"y &=","display_excludes":"Conditions in Solutions","display_fragments":["\\quad (","\\mathfrak{Re}","\\operatorname{sgn}"],"solutions_contains":"where","horizontal":"x"}'),
+     '{"route":"/equation-eval","status":"200","parameters":{},"display_contains":"y &=","display_excludes":"\\operatorname{sgn}","display_fragments":["\\text{provided that}","\\operatorname{arg}","\\text{or}"],"solutions_contains":"where","horizontal":"x"}'),
     ('equation_display_logarithm_conditions', 'equation_parameters',
      '{"equation":"a+2*ln(y)=x","precision":32}',
-     '{"route":"/equation-eval","status":"200","parameters":{},"display_contains":"y &=","display_excludes":"Conditions in Solutions","display_fragments":["\\quad (","\\mathfrak{Im}","\\pi"],"solutions_contains":"where","horizontal":"x"}'),
+     '{"route":"/equation-eval","status":"200","parameters":{},"display_contains":"y &=","display_excludes":"Conditions in Solutions","display_fragments":["\\text{provided that}","\\mathfrak{Im}","\\pi"],"solutions_contains":"where","horizontal":"x"}'),
     ('equation_display_reciprocal_conditions', 'equation_parameters',
      '{"equation":"x=atanh(y)/a","precision":32}',
-     '{"route":"/equation-eval","status":"200","parameters":{},"display_contains":"y &=","display_excludes":"Conditions in Solutions","display_fragments":["\\quad (","a\\ne 0"],"solutions_contains":"where","horizontal":"x"}')
+     '{"route":"/equation-eval","status":"200","parameters":{},"display_contains":"y &=","display_excludes":"Conditions in Solutions","display_fragments":["\\text{provided that}","a\\ne 0"],"solutions_contains":"where","horizontal":"x"}')
 ON CONFLICT(name) DO UPDATE SET operation=excluded.operation, input=excluded.input, expected=excluded.expected;
+
+UPDATE mars_lab_cases SET expected = json_set(expected, '$.display_min_condition_rows', '4')
+WHERE name IN ('equation_unwrapped_inverse_display', 'equation_display_inverse_conditions_renamed');
 
 -- Fixing any coordinate, including the selected first one, changes the plot dimension without changing its role.
 INSERT OR IGNORE INTO mars_lab_cases(name, operation, input, expected) VALUES

@@ -1,10 +1,11 @@
 /**
  * @file TeX_wrap.c
- * @brief Wrap semantic sums using native-owned term-selection callbacks.
+ * @brief Lay out semantic domains and wrap sums using native-owned term-selection callbacks.
  *
- * TeX chooses whether line wrapping is necessary and owns alignment, signs and
- * spacing. The caller selects mathematical terms and supplies independent
- * semantic contexts only when a longer rendering needs them. No native object
+ * TeX lays out outer domain restrictions beneath their formula and chooses when
+ * additive terms need wrapping. It owns alignment, signs and spacing. The caller
+ * selects mathematical terms and supplies independent semantic contexts only
+ * when a longer rendering needs them. No native object
  * layout or mathematical transformation is interpreted here.
  */
 #include <string.h>
@@ -16,6 +17,50 @@
 #define MARS_TeX_INTERNAL_ACCESS
 #include "TeX_internal.h"
 
+/* Incorporate only this renderer's own outer alignment; nested mathematical groups remain untouched. */
+static bool append_aligned_body(string_t *source, const TeX_t *body)
+{
+    static const char prefix[] = "\\begin{aligned}[t]\n";
+    static const char suffix[] = "\n\\end{aligned}";
+    const char *text = TeX_source(body);
+    size_t length = strlen(text);
+    if (length >= sizeof prefix + sizeof suffix - 2u && !strncmp(text, prefix, sizeof prefix - 1u) &&
+        !strcmp(text + length - (sizeof suffix - 1u), suffix))
+        return string_append_bytes(source, text + sizeof prefix - 1u,
+                                   length - (sizeof prefix + sizeof suffix - 2u)) == 0;
+    return string_append_format(source, "&%s", text) >= 0;
+}
+
+/* A domain qualifies its own body, not an enclosing sum, equation or neighbouring solution. */
+static TeX_t *wrap_domain(TeX_node_ref_t root, const TeX_node_view_t *view, size_t line_limit,
+                           const TeX_sum_provider_t *provider, void *state)
+{
+    TeX_node_ref_t child = {0};
+    if (!root.provider->child(root.context, root.node, 0u, &child))
+        return NULL;
+    TeX_context_t *context = TeX_context_new(child);
+    TeX_t *body = context ? TeX_wrap_sum(context, line_limit, provider, state) : NULL;
+    TeX_context_free(context);
+    string_t *source = body ? string_new_with("\\begin{aligned}[t]\n") : NULL;
+    bool valid = source && append_aligned_body(source, body);
+    TeX_free(body);
+    if (valid)
+        valid = string_append_cstr(source, " \\\\\n&\\text{provided that}") == 0;
+    for (size_t i = 1u; valid && i < view->child_count; ++i) {
+        valid = root.provider->child(root.context, root.node, i, &child);
+        context = valid ? TeX_context_new(child) : NULL;
+        TeX_t *condition = context ? TeX_from_context(context) : NULL;
+        TeX_context_free(context);
+        valid = condition && string_append_format(source, " \\\\\n&\\quad %s", TeX_source(condition)) >= 0;
+        TeX_free(condition);
+    }
+    if (valid)
+        valid = string_append_cstr(source, "\n\\end{aligned}") == 0;
+    TeX_t *result = valid ? TeX_compose_raw(string_c_str(source)) : NULL;
+    string_free(source);
+    return result;
+}
+
 /* Apply a soft source-line budget while retaining the ordinary body if wrapping is unavailable. */
 TeX_t *TeX_wrap_sum(const TeX_context_t *context, size_t line_limit,
                     const TeX_sum_provider_t *provider, void *state)
@@ -23,6 +68,16 @@ TeX_t *TeX_wrap_sum(const TeX_context_t *context, size_t line_limit,
     TeX_t *body = context ? TeX_from_context(context) : NULL;
     if (!body)
         return NULL;
+    TeX_node_ref_t root = TeX_context_root(context);
+    TeX_node_view_t view;
+    if (root.provider->describe(root.context, root.node, &view) && view.kind == TeX_NODE_DOMAIN) {
+        TeX_t *wrapped = wrap_domain(root, &view, line_limit, provider, state);
+        if (wrapped) {
+            TeX_free(body);
+            return wrapped;
+        }
+        return body;
+    }
     if (!line_limit)
         line_limit = 110u;
     if (strlen(TeX_source(body)) <= line_limit || !provider || !provider->count || !provider->term)

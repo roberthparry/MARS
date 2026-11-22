@@ -4171,8 +4171,13 @@ constants can justify sign and domain simplifications; free-variable values rema
 evaluation data, not assumptions. This does not change solver branch selection or
 matrix pivot rules, and unknown restrictions remain visible.
 In Equation mode, the Rendered TeX card includes the dependent solution's complete native domain and
-principal-branch conditions alongside its formula, just as the Solutions card does. It does not replace
-those conditions with a cross-reference to another card.
+principal-branch conditions below its formula, introduced by “provided that”, with one restriction per
+line. These qualify the displayed inverse branch; they do not impose unrelated assumptions on the
+whole authored equation. Restrictions on nested operands retain their local scope. The Solutions card
+keeps the same conditions in parseable native notation.
+The native formatter combines matching interval bounds, simplifies non-zero tests
+and replaces square-root branch indicators with a standard argument condition,
+including its zero case. No real-valued assumptions are inferred from a plot.
 The generated integration constant is the last term of the displayed formula,
 before any domain condition; conditions remain after the binding bar in the
 Expression card.

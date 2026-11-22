@@ -209,7 +209,26 @@
         "case_9e0d9351f1fbe79f": true,
         "case_d2214ce45769403c": true,
         "case_f33ac7820f07e0aa": true,
-        "enabled": true
+        "enabled": true,
+        "wrapped_domain_nonzero": true,
+        "wrapped_domain_real_interval": true,
+        "wrapped_domain_separate_restrictions": true,
+        "domain_imaginary_pi_interval": true,
+        "domain_interval_closed_both": true,
+        "domain_interval_closed_lower": true,
+        "domain_interval_closed_upper": true,
+        "domain_interval_imaginary_coordinate": true,
+        "domain_log10_intrinsic_nonzero": true,
+        "domain_log_intrinsic_nonzero": true,
+        "domain_log_scaled_intrinsic_nonzero": true,
+        "domain_power_nonzero_base": true,
+        "domain_principal_root_extra_bound": true,
+        "domain_principal_root_range": true,
+        "domain_retained_after_cancellation": true,
+        "domain_retained_mutable_factor": true,
+        "domain_retained_unrelated_log": true,
+        "domain_root_nonzero_base": true,
+        "domain_scalar_nonzero_base": true
       },
       "test_TeX_relation_input": {
         "case_19f265ef9f6c63ed": true,
@@ -1045,7 +1064,9 @@
         "guarded_inverse_renamed_scaled": true,
         "guarded_inverse_root": true,
         "guarded_inverse_upper_boundary": true,
-        "guarded_inverse_upper_negative_boundary": true
+        "guarded_inverse_upper_negative_boundary": true,
+        "guarded_inverse_shifted_root": true,
+        "guarded_inverse_complex_parameters": true
       },
       "test_equation_inverts_roots_and_constant_powers": true,
       "test_equation_preserves_principal_root_domain": {

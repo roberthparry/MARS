@@ -129,6 +129,7 @@ typedef enum {
     TeX_NODE_REAL_PROJECTION, /**< A grouped real-part projection. */
     TeX_NODE_IMAG_PROJECTION, /**< A grouped imaginary-part projection. */
     TeX_NODE_FUNCTION_ORDER, /**< Function symbol, mathematical order and argument. */
+    TeX_NODE_INTERVAL_CHAIN, /**< Lower endpoint, real coordinate and upper endpoint with independent inclusivity. */
     TeX_NODE_COUNT        /**< Array bound, not a valid node kind. */
 } TeX_node_kind_t;
 
@@ -150,6 +151,8 @@ typedef enum {
  * DOMAIN contains a body followed by conditions; domain_qualification marks its
  * final child as a separately scoped distribution qualification. A distribution
  * condition supplies one operand and a plain-text caption.
+ * INTERVAL_CHAIN supplies a lower endpoint, real coordinate and upper endpoint;
+ * lower_inclusive and upper_inclusive independently select closed endpoints.
  * LINES supplies successive mathematical or prose rows. With one derivative variable,
  * order may exceed one; with several variables, order must equal their count.
  * Other arities are checked by TeX.
@@ -163,6 +166,8 @@ typedef struct {
     unsigned order; /**< Derivative or prime order; zero when unused. */
     bool partial; /**< Select partial rather than ordinary derivative or differential notation. */
     bool domain_qualification; /**< The final domain child is a separately scoped distribution qualification. */
+    bool lower_inclusive; /**< Include the lower endpoint of an INTERVAL_CHAIN; otherwise use strict ordering. */
+    bool upper_inclusive; /**< Include the upper endpoint of an INTERVAL_CHAIN; otherwise use strict ordering. */
     TeX_transform_kind_t transform; /**< Transform meaning, used only by TRANSFORM. */
     TeX_relation_t relation; /**< Relation meaning, used only by RELATION. */
     TeX_number_set_t number_set; /**< Standard set, used only by NUMBER_SET. */
@@ -206,13 +211,15 @@ typedef struct _TeX_sum_provider_t {
 } TeX_sum_provider_t;
 
 /**
- * @brief Render a semantic body, using native-selected terms when it exceeds a soft line budget.
+ * @brief Render a semantic body with separate domain rows and optionally wrapped additive terms.
  * @param context Borrowed ordinary body context.
  * @param line_limit Soft TeX source-line budget; zero selects 110 bytes.
  * @param provider Borrowed optional term provider; queried only when wrapping is necessary.
  * @param state Borrowed caller-owned state passed unchanged to the callbacks.
  * @return Owned notation released with TeX_free, or NULL when the ordinary body cannot be rendered.
- * @note If a multiline alternative is unavailable, the valid ordinary body is retained.
+ * @note Outer domain conditions follow their own formula on separate rows, even below the line budget.
+ * Nested operand conditions retain their local scope. If a multiline alternative is unavailable,
+ * the valid ordinary body is retained.
  */
 TeX_t *TeX_wrap_sum(const TeX_context_t *context, size_t line_limit,
                     const TeX_sum_provider_t *provider, void *state);
