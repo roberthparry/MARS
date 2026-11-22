@@ -1,7 +1,15 @@
 # Building MARS
 
 MARS uses `make` as its main build entry point. The supported and guaranteed
-build target is Linux with GCC or Clang.
+build target is Linux with GCC or Clang, using C17 with GNU extensions
+(`-std=gnu17`). The root Makefile selects this dialect explicitly for native
+programmes, test harnesses and WebAssembly assets; the README checker uses the
+same dialect. VS Code's C/C++ configuration also selects `gnu17`, and Makefile
+Tools obtains it from the actual compiler commands.
+
+C17 includes the C11 facilities used by MARS: atomic operations, thread-local
+storage, compile-time assertions and fundamental alignment through `max_align_t`.
+The build does not rely on the compiler's default language version.
 
 Make keeps compiler temporary files in the active build tree: `build/release/tmp`
 or `build/debug/tmp`. It creates the directory before compilation and dependency
@@ -769,7 +777,7 @@ make help
 ## Notes
 
 - Run commands from the repository root.
-- The code is C99-style C with intentional GNU C extensions such as
+- The code uses C17 with intentional GNU C extensions such as
   `__attribute__`, so GCC or Clang is required.
 - The Linux system toolchain is the supported path; MSVC/Windows builds are not
   currently guaranteed.

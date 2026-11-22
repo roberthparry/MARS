@@ -86,10 +86,93 @@ non-coordinate bindings change. This interface is not an installed public API.
 The controlled `expr_finite_progression_sample_form()` interface supplies a linked
 closed-form graph for finite sine, cosine, hyperbolic sine/cosine and exponential
 progressions whose non-negative integer upper bound is independent of the plotted
-coordinates. Native workers use that graph for values and derivatives, retaining
-the authored sum as a fallback at removable singularities. Coordinate-dependent
-or non-integer bounds retain ordinary summation semantics. This numerical sampling
+coordinates. Native workers differentiate the authored sum and reduce each
+derivative separately, retaining the authored sum as a fallback at removable
+singularities. Polynomial weights through degree six are supported for these five
+functions, including weights introduced by repeated differentiation. Their compact identities use a bounded
+geometric-moment recurrence rather than expanding the individual terms. A linked
+`expr_finite_progression_sample_guard()` detects cancellation near denominator
+zeros so workers increase their working precision before accepting a value from
+an ill-conditioned quotient. Actual denominator zeros still use the finite sum.
+Coordinate-dependent or non-integer bounds retain ordinary summation semantics. This numerical sampling
 choice does not change the authored expression or its worksheet bindings.
+
+Generated closed forms receive a final native simplification pass before they
+are returned. It removes unit multipliers and folds exact arithmetic throughout
+the formula. Weighted progression moments absorb an overall minus into their
+numerator terms, preserving signs and linked parameter bindings. Expression,
+Function and TeX output therefore describe the same simplified algebra.
+Exact zero-argument identities are shared by regular circular, hyperbolic and
+exponential functions, including removal of constant hyperbolic terms from these
+generated numerators. Non-zero arguments stay symbolic, and bound parameter
+values are preserved rather than substituted into the result.
+
+Finite tangent, cotangent, secant and cosecant sums require different sampling
+windows because their poles become denser as the upper bound grows. The controlled
+`expr_finite_circular_progression_sample_bounds()` interface recognises a fixed
+positive integer count and a real affine step `a*x+b`, returning a window centred
+at `-b/a` with radius `pi/(4*n*abs(a))`. The companion
+`expr_finite_circular_progression_sample_regular()` conservatively checks whether
+an interval stays within the first pole-free phase neighbourhood. Native workers
+can then use adaptive value sampling without repeatedly differentiating the sum.
+Cotangent and cosecant intervals crossing zero phase keep their domain-gap and
+derivative checks. Explicit plotting bounds are preserved. These interfaces read
+parameter values without changing worksheet bindings and never evaluate the
+individual unit-circle q-digamma terms. Recognition also accepts exact numerical
+arguments such as `1001` in place of `1000 + 1` and equivalent Gaussian coefficients.
+
+The controlled `expr_finite_qdigamma_progression_derivative_form()` interface
+differentiates the closed forms of all eight circular and hyperbolic quotient
+progressions. Both q-digamma arguments follow the chain rule: a changing base
+requires a base partial derivative, distinct from the ordinary argument
+derivative. Expression and Function output preserve the complete differentiation
+coordinate, including compound coordinates, so reading the result back does not
+introduce a second chain-rule factor. Recognised differentiated finite
+combinations evaluate through their finite terms at the active precision,
+including removable points. Individual base partials on the unit circle are
+not assigned numerical values. The upper bound must be independent of the
+differentiation coordinate; other bounds retain ordinary differentiation rules.
+
+Finite `sinh`, `cosh` and exponential progressions use the controlled
+`expr_finite_growth_progression_sample_bounds()` interface. For a fixed positive
+integer count `n` and real affine step `a*x+b`, it returns a window centred at
+`-b/a` with radius `2/(n*abs(a))`. Each summand's real exponent then stays within
+`[-2,2]`, avoiding automatic views dominated by exponential tails. The native
+closed form still supplies the sampled values, with ordinary summation at
+removable points. Explicit bounds and worksheet bindings remain unchanged.
+
+An explicit common minus sign is displayed outside a summation in Expression,
+Function and TeX output; indexed products retain signs inside their factors.
+For example, the second derivative of a finite sine progression is
+$-\sum_{k=1}^{n}k^2\sin(kx)$. Its native closed form is available to Lab
+presentation and plotting. The public calculus API preserves the same finite-sum
+semantics and live bindings:
+
+```c
+#include "expression-t.h"
+#include "string-t.h"
+
+int main(void)
+{
+    expr_bindings_t *bindings = NULL;
+    expr_t *sum = expr_from_string("{@Z_(k=1)^4 sin(kx) | x=pi/2}", &bindings);
+    expr_t *x = expr_bindings_get(bindings, "x");
+    expr_t *second = expr_create_2nd_deriv(sum, x, x);
+    number_t value = expr_eval(second);
+    string_printf("Second derivative at x=pi/2: %g\n", num_to_double(value));
+    num_destroy(&value);
+    expr_free(second);
+    expr_free(sum);
+    expr_bindings_free(bindings);
+    return 0;
+}
+```
+
+Output:
+
+```text
+Second derivative at x=pi/2: 8
+```
 
 Use [`computation_run()`](computation.md#scoped-native-calculations) to place native
 work under a shared cancellation flag, deadline and work allowance without changing
@@ -3405,9 +3488,12 @@ bindings.
     every result card retains the condition; an unset, irrational, or larger
     rational step remains a formal sum
   - `atan(kx)`, `acot(kx)`, `atanh(kx)`, and `acoth(kx)` use finite log-gamma
-    identities. Arctangent keeps its real-axis branch explicit through
-    `x/abs(x)`, and its derivative reduces to a conjugate pair of digamma
-    differences. Other inverse-function progressions remain formal; supplied
+    identities. For real non-zero `x`, arctangent uses
+    `n*pi*sgn(x)/2 + Im(lgamma(1+i/x)-lgamma(n+1+i/x))`, retaining the real,
+    non-zero conditions. Analytic log-gamma preserves complete phase turns;
+    explicitly complex inputs keep the original finite sum. Its derivative reduces to a conjugate pair of digamma
+    differences. Native TeX keeps the differentiated sum beside that closed form,
+    joined by an equality. Other inverse-function progressions remain formal; supplied
     bounds of at most one million terms may still be evaluated directly
   - exact `atanh` and `acoth` progression poles return signed infinity. A
     supplied zero step gives the removable `atan(kx)` value zero, and complex

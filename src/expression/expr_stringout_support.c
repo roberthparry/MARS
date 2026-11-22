@@ -133,7 +133,10 @@ int expr_tostring_is_negative_const(const expr_t *f)
 {
     if (!expr_is_unnamed_const(f))
         return 0;
-    return num_is_real(f->c) && num_get_sign(f->c) < 0;
+    if (num_is_real(f->c))
+        return num_get_sign(f->c) < 0;
+    NUM_SCOPE(numbers);
+    return num_is_zero(num_real_part(f->c)) && num_get_sign(num_imag_part(f->c)) < 0;
 }
 
 int expr_tostring_is_var_pow_d(const expr_t *f)

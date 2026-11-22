@@ -70,6 +70,14 @@ int lab_worker_complex_plot(const char *source, const expr_t *expression, const 
     expr_context_t *assumptions = expr_context_from_expression(expression, variable);
     bool real = assumptions && expr_context_set(assumptions, variable, EXPR_CONTEXT_FREE, EXPR_CONTEXT_REAL, NUM_NAN) &&
                 expr_context_proves(assumptions, reduced ? reduced : expression, EXPR_CONTEXT_REAL);
+    /* A recognised real circular progression is meromorphic on the real axis.
+       Do not spend the complex preflight budget sampling its dense real poles. */
+    number_t progression_lower = NUM_NAN, progression_upper = NUM_NAN;
+    if (!real && !force_complex)
+        real = expr_finite_circular_progression_sample_bounds(expression, variable,
+                                                              &progression_lower, &progression_upper);
+    num_destroy(&progression_upper);
+    num_destroy(&progression_lower);
     expr_context_free(assumptions);
     expr_free(reduced);
     if (real && !force_complex)

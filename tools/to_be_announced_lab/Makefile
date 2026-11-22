@@ -54,7 +54,7 @@ check-tba-crypto-deps:
 	trap 'exit 1' HUP INT TERM; \
 	if ! printf '%s\n' '#include <openssl/evp.h>' '#include <openssl/rsa.h>' \
 	    'int main(void) { EVP_PKEY *k = EVP_RSA_gen(2048); EVP_PKEY_free(k); return 0; }' \
-	    | $(CC) $(TBA_CRYPTO_CFLAGS) -x c - -o "$$probe_dir/probe" $(TBA_CRYPTO_LIBS); then \
+	    | $(CC) -std=$(C_STANDARD) $(TBA_CRYPTO_CFLAGS) -x c - -o "$$probe_dir/probe" $(TBA_CRYPTO_LIBS); then \
 	    echo 'Private Lab OpenSSL 3 compile/link probe failed; see compiler diagnostics above.' >&2; \
 	    echo 'Development package on Debian/Ubuntu: libssl-dev.' >&2; exit 1; \
 	fi
@@ -72,7 +72,7 @@ TBA_CODEC_WASM := $(TBA_BUILD_DIR)/wasm/tba_codec.wasm
 TBA_CODEC_OBJS := $(addprefix $(TBA_BUILD_DIR)/wasm/,tba_browser.o tba_memory.o tba_jobs.o tba_job_worker.o)
 $(TBA_BUILD_DIR)/wasm/%.o: tools/to_be_announced_lab/wasm/src/%.c tools/to_be_announced_lab/Makefile | check-tba-wasm-deps
 	@mkdir -p $(dir $@)
-	"$(TBA_WASM_CC)" --target=wasm32-unknown-unknown -O2 -Wall -Wextra -Werror -ffreestanding -fno-builtin \
+	"$(TBA_WASM_CC)" --target=wasm32-unknown-unknown -std=$(C_STANDARD) -O2 -Wall -Wextra -Werror -ffreestanding -fno-builtin \
 	    -nostdlib -Wmissing-prototypes -MMD -MP -MF $(@:.o=.d) -Itools/to_be_announced_lab/wasm/include -c $< -o $@
 $(TBA_WASM): $(TBA_WASM_OBJS) tools/to_be_announced_lab/wasm/tba_browser.imports tools/to_be_announced_lab/Makefile
 	"$(TBA_WASM_LD)" --no-entry --export-all --allow-undefined-file=tools/to_be_announced_lab/wasm/tba_browser.imports \

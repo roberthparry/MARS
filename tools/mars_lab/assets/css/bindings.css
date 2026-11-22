@@ -393,7 +393,7 @@
   margin: 0.3rem;
   padding: 0.3rem 0.5rem 0.1rem;
   row-gap: 0.1rem;
-  background: #10241d;
+  background: var(--panel);
 }
 
 .complex-panel > #plotCamera > #plotCameraTitle {

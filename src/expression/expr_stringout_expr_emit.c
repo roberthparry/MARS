@@ -80,6 +80,14 @@ void emit_expr_abs(const expr_t *f, sbuf_t *b, int parent_prec)
         return;
     }
 
+    if (expr_is_op(f, &ops_summation) && expr_is_negative(f->a)) {
+        expr_t *positive = expr_positive_summation(f);
+        if (positive)
+            emit_expr(positive, b, parent_prec);
+        expr_free(positive);
+        return;
+    }
+
     if (expr_tostring_is_negative_const(f)) {
         char *text;
         number_t pos_value = num_neg(f->c);
@@ -120,9 +128,12 @@ void emit_expr_abs(const expr_t *f, sbuf_t *b, int parent_prec)
     }
 
     if (expr_is_mul(f)) {
+        bool grouped_product = PREC_MUL < parent_prec;
         expr_t *fac[64];
         int n = 0;
 
+        if (grouped_product)
+            sbuf_putc(b, '(');
         flatten_mul((expr_t *)f, fac, &n, 64);
         sort_factors(fac, n);
 
@@ -139,12 +150,15 @@ void emit_expr_abs(const expr_t *f, sbuf_t *b, int parent_prec)
         for (int i = 0; i < n; ++i) {
             if (i > 0)
                 emit_expr_mul_separator_local(fac[i - 1], fac[i], b);
-            if (n > 1 && mul_factor_needs_visible_parens(fac[i]))
+            bool grouped = n > 1 && mul_coefficient_needs_parens(fac[i], i == 0);
+            if (grouped)
                 sbuf_putc(b, '(');
             emit_factor_abs(fac[i], b);
-            if (n > 1 && mul_factor_needs_visible_parens(fac[i]))
+            if (grouped)
                 sbuf_putc(b, ')');
         }
+        if (grouped_product)
+            sbuf_putc(b, ')');
         return;
     }
 
@@ -503,7 +517,7 @@ static void emit_expr_inner(const expr_t *f, sbuf_t *b, int parent_prec)
         for (int i = 0; i < n; i++) {
             if (i > 0)
                 emit_expr_mul_separator_local(fac[i - 1], fac[i], b);
-            bool grouped = n > 1 && mul_coefficient_needs_parens(fac[i], i == 0 && sign > 0);
+            bool grouped = n > 1 && mul_coefficient_needs_parens(fac[i], i == 0);
             if (grouped)
                 sbuf_putc(b, '(');
             emit_factor_abs(fac[i], b);
@@ -747,11 +761,14 @@ static void emit_expr_inner(const expr_t *f, sbuf_t *b, int parent_prec)
             const expr_t *upper = NULL;
             number_t upper_value = NUM_NAN;
             bool infinite = false;
+            bool negative = expr_is_op(f, &ops_summation) && expr_is_negative(f->a);
 
             /* Otherwise a following product or quotient is reparsed inside the sum. */
-            bool grouped = parent_prec >= PREC_MUL;
+            bool grouped = parent_prec >= PREC_MUL || (negative && parent_prec >= PREC_ADD);
             if (grouped)
                 sbuf_putc(b, '(');
+            if (negative)
+                sbuf_putc(b, '-');
             if (expr_is_op(f->b, &ops_argument_list)) {
                 index = f->b->a;
                 upper = f->b->b;
@@ -786,7 +803,10 @@ static void emit_expr_inner(const expr_t *f, sbuf_t *b, int parent_prec)
             if (upper && !infinite && expr_is_addsub(upper))
                 sbuf_putc(b, ')');
             sbuf_putc(b, ' ');
-            emit_expr(f->a, b, PREC_MUL);
+            if (negative)
+                emit_expr_abs(f->a, b, PREC_MUL);
+            else
+                emit_expr(f->a, b, PREC_MUL);
             if (grouped)
                 sbuf_putc(b, ')');
             num_destroy(&upper_value);

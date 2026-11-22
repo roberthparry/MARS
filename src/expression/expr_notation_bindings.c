@@ -165,6 +165,14 @@ static const TeX_model_node_t *build_binding(notation_build_t *build, const expr
 
         case EXPR_BINDING_EXPR_POWI: {
             number_t exponent = num_create_from_long(binding->u.powi.exponent);
+            const expr_binding_expr_t *base = binding->u.powi.base;
+            if (base && base->kind == EXPR_BINDING_EXPR_UNARY_OP && base->u.unary_op.ops &&
+                expr_trig_slot(base->u.unary_op.ops->kind) < 12u && binding->u.powi.exponent > 1) {
+                const TeX_model_node_t *result = expr_notation_function_power(build, base->u.unary_op.ops,
+                    build_binding(build, base->u.unary_op.child, depth + 1u), exponent);
+                num_destroy(&exponent);
+                return result;
+            }
             const TeX_model_node_t *parts[] = {
                 build_binding(build, binding->u.powi.base, depth + 1u), notation_build_number(build, exponent)
             };
@@ -194,6 +202,20 @@ static const TeX_model_node_t *build_binding(notation_build_t *build, const expr
         }
 
         case EXPR_BINDING_EXPR_BINARY_OP: {
+            const expr_binding_expr_t *base = binding->u.binary_op.left;
+            number_t exponent = NUM_NAN;
+            bool powered_function = binding->u.binary_op.ops == &ops_pow && base &&
+                base->kind == EXPR_BINDING_EXPR_UNARY_OP && base->u.unary_op.ops &&
+                expr_trig_slot(base->u.unary_op.ops->kind) < 12u &&
+                expr_binding_expr_number_value(binding->u.binary_op.right, &exponent) &&
+                num_is_real(exponent) && num_is_finite(exponent) && num_is_integer(exponent) && num_gt(exponent, NUM_ONE);
+            if (powered_function) {
+                const TeX_model_node_t *result = expr_notation_function_power(build, base->u.unary_op.ops,
+                    build_binding(build, base->u.unary_op.child, depth + 1u), exponent);
+                num_destroy(&exponent);
+                return result;
+            }
+            num_destroy(&exponent);
             const TeX_model_node_t *left = build_binding(build, binding->u.binary_op.left, depth + 1u);
             const TeX_model_node_t *right = build_binding(build, binding->u.binary_op.right, depth + 1u);
             return left && right ? expr_notation_operation(build, binding->u.binary_op.ops, left, right) : NULL;

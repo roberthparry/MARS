@@ -552,8 +552,9 @@ To run an extracted example yourself, execute its named binary in that
 directory. To compile a copied block independently, save it as a C source file
 and use the same compiler/linker options recorded by Make: the public headers
 are in `include/`, the archive is `build/release/libmars.a`, and the external
-libraries are listed in the [build guide](building.md). GNU C extensions are
-required; do not disable assertions in examples that use `assert`.
+libraries are listed in the [build guide](building.md). Compile as GNU C17
+(`-std=gnu17`), matching the library and the checker's default flags; do not
+disable assertions in examples that use `assert`.
 
 Programs run in separate temporary working directories, so relative database
 and file names cannot overwrite project files. File examples receive fresh

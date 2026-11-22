@@ -241,6 +241,16 @@ bool match_sum_quotient(const expr_t *expr, const expr_t **factor_out, const exp
 int expr_is_negative(const expr_t *f);
 void emit_factor_abs(const expr_t *f, sbuf_t *b);
 int expr_renders_negative(const expr_t *f);
+
+/**
+ * @brief Remove an explicit common minus from a formal summation for magnitude rendering.
+ * @param expression Borrowed sum; neither its bounds nor its summand are modified or consumed.
+ * @return Owned positive-summand sum released with expr_free(), or NULL when no explicit minus applies
+ * or allocation fails. The sum itself is not evaluated or reduced. Source bindings remain shared and
+ * must be accessed on the owning thread or with external synchronisation.
+ */
+expr_t *expr_positive_summation(const expr_t *expression);
+
 size_t function_ascii_stacked_fraction(char *out, const char *text);
 size_t function_ascii_vulgar_fraction(char *out, const char *text);
 const expr_t *expr_stringout_set_expanded_node(const expr_t *node);

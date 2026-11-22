@@ -159,6 +159,7 @@
     ],
 
     "C_Cpp.default.configurationProvider": "ms-vscode.makefile-tools",
+    "C_Cpp.default.cStandard": "gnu17",
     "C_Cpp.default.mergeConfigurations": true,
     "C_Cpp.default.includePath": [
         "${workspaceFolder}",

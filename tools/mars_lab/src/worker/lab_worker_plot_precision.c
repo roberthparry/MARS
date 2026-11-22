@@ -10,6 +10,7 @@
  */
 #include <ctype.h>
 #include <errno.h>
+#include <math.h>
 #include <string.h>
 
 #define MARS_SHARED_NUMBER_INTERNAL_ACCESS
@@ -174,7 +175,7 @@ static sampler_status_t evaluate_plot_derivatives(number_t parameter, number_t *
 }
 
 static sampler_t *sample_at(const char *source, const char *variable, number_t lower, number_t upper,
-                             size_t bits, bool probes, bool preview)
+                             size_t bits, bool probes, bool preview, double absolute_tolerance)
 {
     num_set_default_prec_bits(bits);
     expr_bindings_t *bindings = NULL;
@@ -185,27 +186,32 @@ static sampler_t *sample_at(const char *source, const char *variable, number_t l
     if (detached_axis)
         axis = expr_new_named_var(NUM_NAN, variable);
     const expr_t *axes[] = {axis};
-    expr_t *reduced = expr_finite_progression_sample_form(expression, axes, 1);
-    const expr_t *derivative_source = reduced ? reduced : expression;
+    expr_t *reduced = !probes && !preview && bits > 53 ? expr_finite_progression_sample_form(expression, axes, 1) : NULL;
+    /* Differentiate authored finite sums before reducing them. Their derivatives
+     * are weighted moments with their own stable guard, rather than large nested
+     * quotient derivatives with increasingly ill-conditioned cancellations. */
+    const expr_t *derivative_source = expression;
+    bool regular_progression = !probes && !preview &&
+                               expr_finite_circular_progression_sample_regular(expression, axis, lower, upper);
     number_t lo = lab_worker_sample_coordinate(lower, bits), hi = lab_worker_sample_coordinate(upper, bits);
     sampler_options_t options = sampler_options_default();
     options.intervals = probes || preview ? 16 : 64;
     options.max_evaluations = probes ? 17 : preview ? 513 : 8193;
     options.method = probes ? SAMPLER_UNIFORM : SAMPLER_ADAPTIVE;
     options.max_depth = lab_worker_plot_depth(options.intervals, options.max_evaluations, preview ? 4u : 8u);
-    options.absolute_tolerance = 1e-5;
+    options.absolute_tolerance = absolute_tolerance;
     options.relative_tolerance = preview ? 0.01 : 0.002;
     plot_evaluation_t evaluation = {.expression = derivative_source, .axis = axis};
-    if (!probes && !preview && expression && axis)
+    if (!probes && !preview && !regular_progression && expression && axis)
         evaluation.second_derivative = expr_create_2nd_deriv(derivative_source, axis, axis);
-    if (!probes && !preview && bits == 53 && expression && axis)
+    if (!probes && !preview && !regular_progression && (bits == 53 || reduced) && expression && axis)
         evaluation.first_derivative = expr_create_deriv(derivative_source, axis);
     evaluation.value = lab_worker_sample_new(expression, &axis, 1, bits);
     evaluation.first = lab_worker_sample_new(evaluation.first_derivative, &axis, 1, bits);
     evaluation.second = lab_worker_sample_new(evaluation.second_derivative, &axis, 1, bits);
     sampler_t *samples = NULL;
     if (expression && axis && evaluation.value)
-        samples = probes || preview ? sampler_new(evaluate_plot, &evaluation, lo, hi, &options) :
+        samples = probes || preview || regular_progression ? sampler_new(evaluate_plot, &evaluation, lo, hi, &options) :
             sampler_new_with_derivatives(evaluate_plot_derivatives, &evaluation, lo, hi, &options);
     int saved_error = samples ? 0 : (errno ? errno : EINVAL);
     lab_worker_sample_free(evaluation.second);
@@ -248,7 +254,8 @@ static int sample_resolution_error(const sampler_t *samples)
     return finite ? E2BIG : ENODATA;
 }
 
-static bool probes_agree(const sampler_t *low, const sampler_t *high, number_t ymin, number_t ymax)
+static bool probes_agree(const sampler_t *low, const sampler_t *high, number_t ymin, number_t ymax,
+                         double *absolute_tolerance)
 {
     NUM_SCOPE(numbers);
     number_t minimum = NUM_NAN, maximum = NUM_NAN;
@@ -262,6 +269,13 @@ static bool probes_agree(const sampler_t *low, const sampler_t *high, number_t y
         maximum = num_is_nan(maximum) ? value : greater(maximum, value);
     }
     number_t scale = num_sub(maximum, minimum);
+    /* Chord errors are visual distances: local relative error alone demands unbounded
+     * refinement around a zero, even when the missing arc is far smaller than a pixel.
+     * Keep the floor at one hundred-thousandth of the observed visible height; the
+     * tangent, curvature and domain tests still reject unresolved poles and jumps. */
+    double floor = num_to_double(num_mul(scale, num_create_from_frac(1, 100000)));
+    if (isfinite(floor) && floor > *absolute_tolerance)
+        *absolute_tolerance = floor;
     if (num_is_zero(scale))
         scale = num_abs(maximum);
     number_t tolerance = num_mul(scale, num_create_from_frac(1, 10000000));
@@ -316,16 +330,18 @@ sampler_t *lab_worker_plot_samples_quality(const char *source, const char *varia
         size_t check_bits = saved_precision < 4096 ? saved_precision : 4096;
         if (reference_bits < check_bits)
             reference_bits = check_bits;
-        sampler_t *low = sample_at(source, variable, probe_lower, probe_upper, bits, true, preview);
-        sampler_t *high = low ? sample_at(source, variable, probe_lower, probe_upper, reference_bits, true, preview) : NULL;
-        bool agree = low && high && probes_agree(low, high, ymin, ymax);
+        double absolute_tolerance = 1e-5;
+        sampler_t *low = sample_at(source, variable, probe_lower, probe_upper, bits, true, preview, absolute_tolerance);
+        sampler_t *high = low ? sample_at(source, variable, probe_lower, probe_upper, reference_bits, true, preview,
+                                          absolute_tolerance) : NULL;
+        bool agree = low && high && probes_agree(low, high, ymin, ymax, &absolute_tolerance);
         bool failed = !low || !high;
         sampler_free(high);
         sampler_free(low);
         if (failed)
             break;
         if (agree) {
-            result = sample_at(source, variable, lower, upper, bits, false, preview);
+            result = sample_at(source, variable, lower, upper, bits, false, preview, absolute_tolerance);
             int error = result ? sample_resolution_error(result) : 0;
             if (error) {
                 sampler_free(result);

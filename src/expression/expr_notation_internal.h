@@ -234,6 +234,18 @@ const TeX_model_node_t *expr_notation_operation(notation_build_t *build, const e
                                                const TeX_model_node_t *left, const TeX_model_node_t *right);
 
 /**
+ * @brief Place a positive integer power on a circular or hyperbolic function's name.
+ * @param build Borrowed builder which owns all returned semantic nodes.
+ * @param operation Borrowed unary operation identifying the circular or hyperbolic function.
+ * @param argument Borrowed model-owned function argument; not modified or consumed.
+ * @param exponent Borrowed numerical power, which must be a positive integer greater than one.
+ * @return Model-owned application of the powered function name, or NULL for an unsupported operation,
+ * exponent or allocation failure. No graph or numerical value is changed; the builder remains thread-confined.
+ */
+const TeX_model_node_t *expr_notation_function_power(notation_build_t *build, const expr_ops_t *operation,
+                                                   const TeX_model_node_t *argument, number_t exponent);
+
+/**
  * @brief Prepare an optional local antiderivative abbreviation for a transform.
  * @param expression Borrowed input expression.
  * @param initial Receives an owned copy of the abbreviated integral, or NULL.

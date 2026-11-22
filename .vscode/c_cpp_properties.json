@@ -3,7 +3,7 @@
         {
             "name": "Linux",
             "compilerPath": "/usr/bin/gcc",
-            "cStandard": "c17",
+            "cStandard": "gnu17",
             "intelliSenseMode": "linux-gcc-x64",
             "mergeConfigurations": true,
             "defines": [

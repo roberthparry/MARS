@@ -2,9 +2,9 @@
 
 ![CI](https://github.com/rparry/MARS/actions/workflows/ci.yml/badge.svg)
 [![Licence: MIT](https://img.shields.io/badge/Licence-MIT-yellow.svg)](LICENSE)
-![C99/GNU C](https://img.shields.io/badge/C-C99%20%2B%20GNU%20extensions-blue.svg)
+![C17/GNU C](https://img.shields.io/badge/C-C17%20%2B%20GNU%20extensions-blue.svg)
 
-MARS is a Linux-focused C99/GNU C library for high-precision numerics,
+MARS is a Linux-focused C17/GNU C library for high-precision numerics,
 symbolic differentiation, reverse-mode automatic differentiation, symbolic
 mathematics, datetime utilities, UTF-8 strings and generic containers. It also
 includes **MARS Lab**, a local browser-based workspace for using those
@@ -108,7 +108,7 @@ worked examples, all seven modes and private mobile access through Tailscale.
 
 ## Requirements
 
-- GCC or Clang on Linux, compiling C99/GNU C
+- GCC or Clang on Linux, compiling C17 with GNU extensions (`-std=gnu17`)
 - Standard C library plus `libm` and pthreads
 - GMP, MPFR, and MPC development libraries
 - SQLCipher 4.1.0 or newer development libraries, with embedded SQLite >= 3.27.0, FTS5 and window functions

@@ -212,6 +212,16 @@ expr_binding_expr_t *expr_binding_simplify_unary_op(expr_binding_expr_t *expr)
     if (!expr || expr->kind != EXPR_BINDING_EXPR_UNARY_OP)
         return expr;
     expr->u.unary_op.child = expr_binding_expr_simplify(expr->u.unary_op.child);
+    const expr_ops_t *ops = expr->u.unary_op.ops;
+    if (ops && (ops->fold_const_unary == expr_fold_zero_to_zero || ops->fold_const_unary == expr_fold_zero_to_one)) {
+        number_t value = NUM_NAN, folded = NUM_NAN;
+        bool matched = expr_binding_expr_number_value(expr->u.unary_op.child, &value) &&
+                       ops->fold_const_unary(&value, &folded);
+        num_destroy(&value);
+        if (matched)
+            return binding_expr_fold_to_number_owned(expr, folded);
+        num_destroy(&folded);
+    }
     return binding_try_simplify_unary_exact(expr);
 }
 

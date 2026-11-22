@@ -285,36 +285,44 @@ static inline number_t expr_reverse_num_mul(const number_t a, const number_t b) 
 
 static inline number_t expr_reverse_num_div(const number_t a, const number_t b) { return num_div(a, b); }
 
-typedef struct expr_ops {
-    number_t (*eval)(expr_t *expr);
-    expr_t *(*deriv)(expr_t *expr);
-    expr_reverse_fn reverse;
-    expr_reverse_many_fn reverse_many;
-    expr_op_kind_t kind;
-    expr_arity_t arity;
-    expr_diff_kind_t diff_kind;
-    const char *expression_name;
-    const char *function_name;
-    const struct expr_ops *direct_inverse;
-    expr_inverse_unary_fn inverse_unary;
-    expr_apply_unary_fn apply_unary;
-    expr_apply_binary_fn apply_binary;
-    expr_number_unary_fn finite_progression_term_eval;
-    expr_finite_progression_fn finite_progression;
-    expr_integrate_fn integrate;
-    expr_simplify_fn simplify;
-    expr_fold_const_unary_fn fold_const_unary;
-} expr_ops_t;
+/** @brief Shared operator definition borrowed by expression nodes and their native dispatch helpers. */
+typedef struct _expr_ops_t expr_ops_t;
+
+/** @brief Evaluation, calculus and rendering callbacks for one immutable expression operation. */
+struct _expr_ops_t {
+    number_t (*eval)(expr_t *expr);                    /**< Evaluate a borrowed node and return an owned number. */
+    expr_t *(*deriv)(expr_t *expr);                    /**< Return an owned derivative for the active coordinate. */
+    expr_reverse_fn reverse;                           /**< Propagate the output adjoint to two child contributions. */
+    expr_reverse_many_fn reverse_many;                 /**< Accumulate adjoints for operations with multiple children. */
+    expr_op_kind_t kind;                               /**< Symbolic identifier of this operation. */
+    expr_arity_t arity;                                /**< Ordinary node operand count. */
+    expr_diff_kind_t diff_kind;                        /**< Differentiability classification used by native calculus. */
+    const char *expression_name;                       /**< Borrowed mathematical spelling for Expression output. */
+    const char *function_name;                         /**< Borrowed callable spelling for Function output. */
+    const expr_ops_t *direct_inverse;                  /**< Borrowed inverse operator definition, or NULL. */
+    expr_inverse_unary_fn inverse_unary;               /**< Construct the inverse when direct inversion is insufficient. */
+    expr_apply_unary_fn apply_unary;                   /**< Construct a unary node while retaining its argument. */
+    expr_apply_binary_fn apply_binary;                 /**< Construct a binary node while retaining its arguments. */
+    expr_number_unary_fn finite_progression_term_eval; /**< Evaluate an individual finite-progression term. */
+    expr_finite_progression_fn finite_progression;     /**< Construct a supported finite-progression closed form. */
+    expr_integrate_fn integrate;                       /**< Construct a supported primitive, or NULL when unavailable. */
+    expr_simplify_fn simplify;                         /**< Rebuild or reduce a node from its simplified children. */
+    expr_fold_const_unary_fn fold_const_unary;         /**< Fold supported unary constants without changing their domain. */
+};
 
 static inline const char *expr_ops_expression_name(const expr_ops_t *ops) { return ops ? ops->expression_name : "?"; }
 
 static inline const char *expr_ops_function_name(const expr_ops_t *ops) { return ops ? ops->function_name : "?"; }
 
-typedef struct expr_deriv_cache {
-    uint64_t wrt_id;
-    expr_t *dx;
-    struct expr_deriv_cache *next;
-} expr_deriv_cache_t;
+/** @brief Private derivative-cache entry owned and released by its expression node. */
+typedef struct _expr_deriv_cache_t expr_deriv_cache_t;
+
+/** @brief Link a retained derivative to its differentiation coordinate and the next cached entry. */
+struct _expr_deriv_cache_t {
+    uint64_t wrt_id;            /**< Stable identifier of the differentiation coordinate. */
+    expr_t *dx;                 /**< Owned derivative reference, released when this entry is discarded. */
+    expr_deriv_cache_t *next;   /**< Next owned cache entry, or NULL at the end of the list. */
+};
 
 typedef struct {
     expr_t *base;
@@ -344,43 +352,48 @@ typedef enum {
     EXPR_BINDING_CONST_GAMMA
 } expr_binding_const_id_t;
 
-typedef struct expr_binding_expr {
-    expr_binding_expr_kind_t kind;
-    number_t cached_value;
-    size_t cached_precision_bits;
-    bool cached_value_valid;
-    union {
-        char *text;
-        struct {
-            struct expr_binding_expr **items;
-            size_t count;
-            bool unspecified;
-        } array;
-        expr_binding_const_id_t const_id;
-        struct {
-            struct expr_binding_expr *child;
-        } unary;
-        struct {
-            struct expr_binding_expr *left;
-            struct expr_binding_expr *right;
-        } binary;
-        struct {
-            struct expr_binding_expr *base;
-            long exponent;
-        } powi;
-        struct {
-            const expr_ops_t *ops;
-            struct expr_binding_expr *child;
-        } unary_op;
-        struct {
-            const expr_ops_t *ops;
-            struct expr_binding_expr *left;
-            struct expr_binding_expr *right;
-        } binary_op;
-    } u;
-} expr_binding_expr_t;
+/** @brief Owned symbolic binding-value tree, released with expr_binding_expr_free(). */
+typedef struct _expr_binding_expr_t expr_binding_expr_t;
 
-typedef struct _expr_t {
+/** @brief Private binding-value representation with owned children and a precision-aware numerical cache. */
+struct _expr_binding_expr_t {
+    expr_binding_expr_kind_t kind;               /**< Discriminant selecting the active union member. */
+    number_t cached_value;                       /**< Owned cached value when cached_value_valid is true. */
+    size_t cached_precision_bits;                /**< Working precision used to compute cached_value. */
+    bool cached_value_valid;                     /**< Whether the numerical cache is initialised. */
+    union {
+        char *text;                              /**< Owned source spelling of a numerical literal. */
+        struct {
+            expr_binding_expr_t **items;         /**< Owned array of owned element trees. */
+            size_t count;                        /**< Number of elements in items. */
+            bool unspecified;                    /**< Whether the array has an unspecified value. */
+        } array;                                 /**< Array-valued binding payload. */
+        expr_binding_const_id_t const_id;        /**< Identity of a supported named mathematical constant. */
+        struct {
+            expr_binding_expr_t *child;          /**< Owned operand of an explicit negation. */
+        } unary;                                 /**< Negation payload. */
+        struct {
+            expr_binding_expr_t *left;           /**< Owned left arithmetic operand. */
+            expr_binding_expr_t *right;          /**< Owned right arithmetic operand. */
+        } binary;                                /**< Binary arithmetic payload. */
+        struct {
+            expr_binding_expr_t *base;           /**< Owned base of an integer power. */
+            long exponent;                       /**< Signed integer exponent. */
+        } powi;                                  /**< Integer-power payload. */
+        struct {
+            const expr_ops_t *ops;               /**< Borrowed unary operator definition. */
+            expr_binding_expr_t *child;          /**< Owned function argument. */
+        } unary_op;                              /**< Unary native-function payload. */
+        struct {
+            const expr_ops_t *ops;               /**< Borrowed binary operator definition. */
+            expr_binding_expr_t *left;           /**< Owned first function argument. */
+            expr_binding_expr_t *right;          /**< Owned second function argument. */
+        } binary_op;                             /**< Binary native-function payload. */
+    } u;                                         /**< Owned payload selected by kind. */
+};
+
+/** @brief Private layout of the reference-counted expr_t declared by the public expression API. */
+struct _expr_t {
     const expr_ops_t *ops;
     expr_t *a;
     expr_t *b;
@@ -397,7 +410,7 @@ typedef struct _expr_t {
     size_t formal_wrt_count;
     int refcount;
     uint64_t var_id;
-} expr_t;
+};
 
 extern const expr_ops_t ops_const;
 extern const expr_ops_t ops_var;
@@ -930,13 +943,14 @@ typedef struct {
     bool is_constant;
 } expr_binding_entry_t;
 
-typedef struct _expr_bindings_t {
-    size_t count;
-    expr_binding_entry_t *entries;
-    dictionary_t *index;
-    bool has_symbolic_derivative;
-    bool has_symbolic_integral;
-} expr_bindings_t;
+/** @brief Private layout of the owned expr_bindings_t collection declared by the public expression API. */
+struct _expr_bindings_t {
+    size_t count;                                /**< Number of active binding entries. */
+    expr_binding_entry_t *entries;               /**< Owned entries retaining their names and expression nodes. */
+    dictionary_t *index;                         /**< Owned lookup index mapping binding names to entry positions. */
+    bool has_symbolic_derivative;                /**< Whether parsing retained a symbolic derivative request. */
+    bool has_symbolic_integral;                  /**< Whether parsing retained a symbolic integral request. */
+};
 
 /* ------------------------------------------------------------------------- */
 /* Internal helpers                                                          */
@@ -959,6 +973,13 @@ expr_t *expr_get_dx_internal(const expr_t *expr);
 const expr_t *expr_current_wrt_internal(void);
 expr_t *expr_deriv_rational_over_polynomial_power(const expr_t *expr, const expr_t *wrt);
 expr_t *expr_deriv_cosine_harmonic_antiderivative(const expr_t *expr, const expr_t *wrt);
+/**
+ * @brief Build and simplify the native closed form of a recognised finite progression.
+ * @param[in] expr Borrowed authored sum; neither it nor its bindings are modified or consumed.
+ * @return Owned simplified expression released with expr_free(), or NULL when no identity applies or
+ * allocation fails. Generated arithmetic and unit factors are simplified without substituting bound variables.
+ * Retained source symbols remain linked to their bindings; use the graph on its owning thread or synchronise access.
+ */
 expr_t *expr_finite_progression_closed_form(const expr_t *expr);
 
 /**
@@ -973,6 +994,60 @@ expr_t *expr_finite_progression_closed_form(const expr_t *expr);
  */
 expr_t *expr_finite_progression_sample_form(const expr_t *expr, const expr_t *const *axes, size_t count);
 
+/**
+ * @brief Build a live denominator guard for polynomially weighted finite-progression sampling.
+ * @param expression Borrowed authored progression; not modified or consumed.
+ * @return Owned guard released with expr_free(), or NULL when no weighted guard applies or allocation fails.
+ * A small non-zero guard signals cancellation requiring extra working precision. At an actual zero,
+ * evaluate the authored sum instead of its quotient identity to preserve the removable point.
+ * The guard shares mutable source symbols and must remain confined to their owning thread.
+ */
+expr_t *expr_finite_progression_sample_guard(const expr_t *expression);
+
+/**
+ * @brief Choose a frequency-scaled real window for a fixed finite circular progression.
+ * @param expression Borrowed tangent, cotangent, secant or cosecant sum, or its recognised q-digamma form.
+ * @param axis Borrowed plotting variable; neither it nor any binding is modified.
+ * @param lower Output receiving an owned lower bound, released with num_destroy().
+ * @param upper Distinct output receiving an owned upper bound, released with num_destroy().
+ * @return True for a fixed positive integer count and a finite non-constant real affine step; false for
+ * unsupported expressions, coordinate-dependent bounds, invalid arguments or allocation failure. Valid
+ * distinct outputs are initialised to NUM_NAN on failure. The window is centred where the step is zero,
+ * with radius pi/(4*n*abs(slope)); cotangent/cosecant retain their central pole. Recompute after changing
+ * parameters. Access to mutable source graphs must remain confined to their owning thread.
+ */
+bool expr_finite_circular_progression_sample_bounds(const expr_t *expression, const expr_t *axis,
+                                                    number_t *lower, number_t *upper);
+
+/**
+ * @brief Choose a growth-scaled real window for a fixed finite sinh, cosh or exponential progression.
+ * @param[in] expression Borrowed finite sum with a real affine step; not modified or consumed.
+ * @param[in] axis Borrowed plotting variable, kept alive throughout inspection.
+ * @param[out] lower Output receiving an owned lower bound, released with num_destroy().
+ * @param[out] upper Distinct output receiving an owned upper bound, released with num_destroy().
+ * @return True for a fixed positive integer count n and a finite real step a*x+b with non-zero a.
+ * The window is centred at -b/a with radius 2/(n*abs(a)), keeping each summand's exponent within [-2,2].
+ * Returns false for unsupported expressions, coordinate-dependent bounds, invalid arguments or allocation
+ * failure; valid distinct outputs receive NUM_NAN on failure. Recompute after changing parameters.
+ * Neither the axis nor any binding is changed. Use on the source graph's owning thread or synchronise access.
+ */
+bool expr_finite_growth_progression_sample_bounds(const expr_t *expression, const expr_t *axis,
+                                                  number_t *lower, number_t *upper);
+
+/**
+ * @brief Prove that a finite circular progression has no poles throughout a real interval near zero phase.
+ * @param expression Borrowed sum or recognised q-digamma form; not modified or consumed.
+ * @param axis Borrowed plotting variable; source bindings remain unchanged.
+ * @param lower Borrowed finite real lower endpoint.
+ * @param upper Borrowed finite real upper endpoint, strictly greater than lower.
+ * @return True when every term stays in its first pole-free phase interval; false for unsupported forms,
+ * uncertain domains, invalid bounds or allocation failure. Cotangent/cosecant intervals crossing zero
+ * phase are rejected. This is a sufficient local test, not a complete domain classifier. Call on the
+ * source graph's owning thread or with external synchronisation.
+ */
+bool expr_finite_circular_progression_sample_regular(const expr_t *expression, const expr_t *axis,
+                                                     number_t lower, number_t upper);
+
 /** @brief Identify the upper bound, step and function of a finite progression. */
 bool expr_finite_progression_parts(const expr_t *expr, const expr_t **upper, expr_t **step,
                                    const expr_ops_t **function);
@@ -982,6 +1057,18 @@ expr_t *expr_finite_exponential_sine_progression_closed_form(const expr_t *expr)
 
 /** @brief Construct the closed form of a recognised scaled progression. */
 expr_t *expr_finite_progression_scaled_closed_form(const expr_t *expr);
+
+/**
+ * @brief Reduce a degree-six-or-less polynomial weight on an entire elementary finite progression.
+ * @param expression Borrowed sum with inclusive lower bound one; not modified or consumed.
+ * @param upper_out Optional output for its borrowed upper bound; cleared when recognition fails.
+ * @return Owned elementary graph with linked source symbols, released with expr_free(), or NULL for
+ * unsupported functions, non-polynomial weights, excessive degree, invalid structure or allocation failure.
+ * The identity assumes a non-negative integer upper bound; sampling must validate its independence of axes.
+ * Mutable source bindings and the returned graph must remain confined to their owning thread.
+ */
+expr_t *expr_finite_weighted_progression_closed_form(const expr_t *expression, const expr_t **upper_out);
+
 expr_t *expr_finite_weighted_sinh_from_lerch_form(const expr_t *expr);
 expr_t *expr_finite_weighted_cosh_from_lerch_form(const expr_t *expr);
 expr_t *expr_new_unary_internal(const expr_ops_t *ops, const expr_t *a);
@@ -1122,8 +1209,23 @@ expr_t *expr_rebuild_product_chain(number_t c_acc, expr_t **terms, size_t nterms
 expr_t *expr_rebuild_division_chain(expr_t **den_terms, size_t nden_terms);
 
 /* Constant-fold hooks. */
+/**
+ * @brief Recognise an exact zero argument for an operator whose value there is zero.
+ * @param[in] in Borrowed numerical argument; not modified or retained. NULL is invalid.
+ * @param[out] out Required output receiving NUM_ZERO on success; it may be released with num_destroy().
+ * @return One for a zero argument and valid pointers, otherwise zero without changing the output.
+ * Used only after symbolic-constant eligibility checks. No input ownership transfers or shared state changes.
+ */
 int expr_fold_zero_to_zero(const number_t *in, number_t *out);
-int expr_fold_cos_const(const number_t *in, number_t *out);
+
+/**
+ * @brief Recognise an exact zero argument for an operator whose value there is one.
+ * @param[in] in Borrowed numerical argument; not modified or retained. NULL is invalid.
+ * @param[out] out Required output receiving NUM_ONE on success; it may be released with num_destroy().
+ * @return One for a zero argument and valid pointers, otherwise zero without changing the output.
+ * Used only after symbolic-constant eligibility checks. No input ownership transfers or shared state changes.
+ */
+int expr_fold_zero_to_one(const number_t *in, number_t *out);
 int expr_fold_asin_const(const number_t *in, number_t *out);
 int expr_fold_acos_const(const number_t *in, number_t *out);
 int expr_fold_atan_const(const number_t *in, number_t *out);
@@ -1132,7 +1234,6 @@ int expr_fold_acosec_const(const number_t *in, number_t *out);
 int expr_fold_acot_const(const number_t *in, number_t *out);
 int expr_inverse_trig_exact_pi_ratio(const expr_ops_t *ops, const number_t *in, long *numer_out,
                                      unsigned long *denom_out);
-int expr_fold_exp_const(const number_t *in, number_t *out);
 int expr_fold_log_const(const number_t *in, number_t *out);
 int expr_fold_sqrt_const(const number_t *in, number_t *out);
 /**

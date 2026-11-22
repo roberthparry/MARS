@@ -6,6 +6,107 @@ CREATE TABLE IF NOT EXISTS mars_lab_cases (
 ) WITHOUT ROWID;
 CREATE INDEX IF NOT EXISTS mars_lab_cases_operation ON mars_lab_cases(operation, name);
 
+INSERT INTO mars_lab_cases(name, operation, input, expected) VALUES
+    ('progression_plot_sinh_1000', 'progression_plot', '{"expression":"@Z_(k=1)^1000 sinh(kx)","action":"plot","wrt":"x","precision":101}',
+     '{"segments":"20","lower":"-0.002","upper":"0.002"}'),
+    ('progression_plot_cosh_1000', 'progression_plot', '{"expression":"@Z_(k=1)^1000 cosh(kx)","action":"plot","wrt":"x","precision":101}',
+     '{"segments":"20","lower":"-0.002","upper":"0.002"}'),
+    ('progression_plot_exp_1000', 'progression_plot', '{"expression":"@Z_(k=1)^1000 exp(kx)","action":"plot","wrt":"x","precision":101}',
+     '{"segments":"20","lower":"-0.002","upper":"0.002"}'),
+    ('progression_plot_sinh_renamed', 'progression_plot', '{"expression":"@Z_(j=1)^500 sinh(jt)","action":"plot","wrt":"t","precision":101}',
+     '{"segments":"20","lower":"-0.004","upper":"0.004"}'),
+    ('progression_plot_cosh_affine', 'progression_plot', '{"expression":"@Z_(j=1)^1000 cosh(j*(2t+1))","action":"plot","wrt":"t","precision":101}',
+     '{"segments":"20","lower":"-0.501","upper":"-0.499"}'),
+    ('progression_plot_sinh_manual', 'progression_plot', '{"expression":"@Z_(k=1)^1000 sinh(kx)","action":"plot","wrt":"x","plot_lower":"-0.001","plot_upper":"0.001","precision":101}',
+     '{"segments":"20","lower":"-0.001","upper":"0.001"}'),
+    ('progression_plot_tangent_1000', 'progression_plot', '{"expression":"@Z_(k=1)^1000 tan(kx)","action":"plot","wrt":"x","precision":101}',
+     '{"segments":"20","lower":"-pi/4000","upper":"pi/4000"}'),
+    ('progression_plot_tangent_q_paste', 'progression_plot', '{"expression":"1000*i+(qdigamma(exp(4*i*x),1)-qdigamma(exp(4*i*x),1001)-qdigamma(exp(2*i*x),1)+qdigamma(exp(2*i*x),1001))/x","action":"plot","wrt":"x","precision":101}',
+     '{"segments":"20","lower":"-pi/4000","upper":"pi/4000"}'),
+    ('progression_plot_secant_1000', 'progression_plot', '{"expression":"@Z_(k=1)^1000 sec(kx)","action":"plot","wrt":"x","precision":101}',
+     '{"segments":"20","lower":"-pi/4000","upper":"pi/4000"}'),
+    ('progression_plot_tangent_affine', 'progression_plot', '{"expression":"@Z_(k=1)^1000 tan(k*(2t+1))","action":"plot","wrt":"t","precision":101}',
+     '{"segments":"20","lower":"-1/2-pi/8000","upper":"-1/2+pi/8000"}'),
+    ('progression_plot_tangent_manual', 'progression_plot', '{"expression":"@Z_(k=1)^4 tan(kx)","action":"plot","wrt":"x","plot_lower":"0.35","plot_upper":"0.45","precision":101}',
+     '{"segments":"20","lower":"0.35","upper":"0.45","pole":"pi/8"}'),
+    ('progression_plot_cotangent_pole', 'progression_plot', '{"expression":"@Z_(k=1)^10 cot(kx)","action":"plot","wrt":"x","precision":40}',
+     '{"segments":"20","lower":"-pi/40","upper":"pi/40","pole":"0"}'),
+    ('progression_plot_cosecant_pole', 'progression_plot', '{"expression":"@Z_(k=1)^10 cosec(kx)","action":"plot","wrt":"x","precision":40}',
+     '{"segments":"20","lower":"-pi/40","upper":"pi/40","pole":"0"}')
+ON CONFLICT(name) DO UPDATE SET input=excluded.input, expected=excluded.expected;
+
+INSERT INTO test_case_runner(module, source, parent, table_name, operation) VALUES (
+    'mars_lab.progression_cards', 'tools/mars_lab/tests/test_lab_evaluation_extra.c',
+    'tests.test_lab_extra_progression_cards', 'mars_lab_cases', 'progression_card')
+ON CONFLICT(module) DO UPDATE SET source=excluded.source, parent=excluded.parent,
+    table_name=excluded.table_name, operation=excluded.operation;
+INSERT INTO mars_lab_cases(name, operation, input, expected) VALUES
+    ('progression_card_atan_real', 'progression_card',
+     '{"expression":"@Z_(k=1)^1000 atan(kx)","precision":97}',
+     '["expression","Im(","expression","sgn(x)","expression","x ∈ ℝ","function","imagpart(","tex","Im}"]'),
+    ('progression_card_atan_zero', 'progression_card',
+     '{"expression":"{@Z_(k=1)^1000 atan(kx)|x=0}","precision":97}',
+     '["value","0","expression","Im(","function","imagpart("]'),
+    ('progression_card_atan_complex', 'progression_card',
+     '{"expression":"{@Z_(k=1)^4 atan(kx)|x=1+i/3}","precision":97}',
+     '["expression","atan(","function","sum("]'),
+    ('progression_card_atan_derivative', 'progression_card',
+     '{"expression":"@Z_(k=1)^1000 atan(kx)","action":"derivative","wrt":"x","precision":97}',
+     '["derivative_TeX","\\sum_{k=1}^{1000}","derivative_TeX"," = ","derivative_TeX","\\psi", "derivative_function","digamma("]'),
+    ('progression_card_atan_derivative_renamed', 'progression_card',
+     '{"expression":"@Z_(j=1)^13 atan(2jt)","action":"derivative","wrt":"t","precision":97}',
+     '["derivative_TeX","\\sum_{j=1}^{13}","derivative_TeX"," = ","derivative_TeX","\\psi", "derivative_function","digamma("]'),
+    ('progression_card_atan_derivative_bound', 'progression_card',
+     '{"expression":"{@Z_(k=1)^4 atan(kx)|x=1}","action":"derivative","wrt":"x","precision":97}',
+     '["derivative_TeX","\\sum_{k=1}^{4}","derivative_TeX"," = ","derivative_function","digamma(","derivative_value","1.435294117647058823529411764705882352941"]'),
+    ('progression_card_tan_derivative', 'progression_card',
+     '{"expression":"@Z_(k=1)^1000 tan(kx)","action":"derivative","wrt":"x","precision":97}',
+     '["derivative_TeX","\\sum_{k=1}^{1000}","derivative_TeX"," = ","derivative_TeX","\\partial","derivative_function","derivative(qdigamma("]'),
+    ('progression_card_tan_derivative_renamed', 'progression_card',
+     '{"expression":"@Z_(j=1)^13 tan(j*(2t+1))","action":"derivative","wrt":"t","precision":97}',
+     '["derivative_TeX","\\sum_{j=1}^{13}","derivative_TeX"," = ","derivative_function","derivative(qdigamma("]'),
+    ('progression_card_tan_derivative_zero', 'progression_card',
+     '{"expression":"{@Z_(k=1)^1000 tan(kx)|x=0}","action":"derivative","wrt":"x","precision":97}',
+     '["derivative_TeX","\\sum_{k=1}^{1000}","derivative_TeX"," = ","derivative_function","derivative(qdigamma(","derivative_value","500500","run_output","500500"]'),
+    ('progression_card_simplified_derivative_1000', 'progression_card',
+     '{"expression":"@Z_(k=1)^1000 sin(kx)","action":"derivative","wrt":"x","precision":97}',
+     '["derivative","(1001·cos(1000x) - 1000·cos(1001x) - 1)/(4·sin²(x/2))","derivative_TeX","\\frac{1001","derivative_function","return (1001.cos(1000.x) - 1000.cos(1001.x) - 1)/(4.sin(x/2)^2)."]'),
+    ('progression_card_simplified_evaluate_1000', 'progression_card',
+     '{"expression":"@Z_(k=1)^1000 k*cos(kx)","precision":97}',
+     '["expression","(1001·cos(1000x) - 1000·cos(1001x) - 1)/(4·sin²(x/2))","tex","\\frac{1001","function","return (1001.cos(1000.x) - 1000.cos(1001.x) - 1)/(4.sin(x/2)^2)."]'),
+    ('progression_card_sine', 'progression_card', '{"expression":"@Z_(k=1)^100 sin(kx)","precision":101}', 'function'),
+    ('progression_card_weighted', 'progression_card', '{"expression":"@Z_(k=1)^100 -k^2*sin(kx)","precision":101}', 'function'),
+    ('progression_card_formal_derivative', 'progression_card', '{"expression":"Dxx(@Z_(k=1)^100 sin(kx))","precision":101}', 'function'),
+    ('progression_card_first_derivative', 'progression_card', '{"expression":"@Z_(k=1)^100 sin(kx)","action":"derivative","wrt":"x","precision":101}', 'derivative_function'),
+    ('progression_card_second_derivative', 'progression_card', '{"expression":"@Z_(k=1)^100 k*cos(kx)","action":"derivative","wrt":"x","precision":101}', 'derivative_function')
+ON CONFLICT(name) DO UPDATE SET input=excluded.input, expected=excluded.expected;
+
+INSERT INTO mars_lab_cases(name, operation, input, expected) VALUES
+    ('progression_plot_weighted_derivative', 'progression_plot', '{"expression":"Dxx(@Z_(k=1)^100 sin(kx))","action":"plot","wrt":"x","precision":101}', '20'),
+    ('progression_plot_weighted_sine_100', 'progression_plot', '{"expression":"@Z_(k=1)^100 -k^2*sin(kx)","action":"plot","wrt":"x","precision":101}', '20'),
+    ('progression_plot_weighted_cosine_100', 'progression_plot', '{"expression":"@Z_(k=1)^100 k*cos(kx)","action":"plot","wrt":"x","precision":101}', '20'),
+    ('progression_plot_weighted_renamed', 'progression_plot', '{"expression":"@Z_(j=1)^100 -j^2*sin(jt)","action":"plot","wrt":"t","precision":101}', '20')
+ON CONFLICT(name) DO UPDATE SET input=excluded.input, expected=excluded.expected;
+
+INSERT INTO mars_lab_cases(name, operation, input, expected, precision) VALUES
+    ('progression_sample_weighted_outer_minus', 'progression_sample', '{"expression":"-(@Z_(k=1)^4 k^2*sin(kx))","point":"pi/2"}', '8', 53),
+    ('progression_sample_weighted_sine_zero', 'progression_sample', '{"expression":"@Z_(k=1)^100 -k^2*sin(kx)","point":"0"}', '0', 53),
+    ('progression_sample_weighted_cosine_zero', 'progression_sample', '{"expression":"@Z_(k=1)^100 k^2*cos(kx)","point":"0"}', '338350', 384),
+    ('progression_sample_weighted_sine_tiny', 'progression_sample', '{"expression":"@Z_(k=1)^100 -k^2*sin(kx)","point":"1e-60"}', '-2.55025e-53', 384),
+    ('progression_sample_weighted_sine_regular', 'progression_sample', '{"expression":"@Z_(k=1)^4 -k^2*sin(kx)","point":"pi/2"}', '8', 53),
+    ('progression_sample_weighted_cosine_regular', 'progression_sample', '{"expression":"@Z_(k=1)^4 k^2*cos(kx)","point":"pi/2"}', '12', 384),
+    ('progression_sample_weighted_empty', 'progression_sample', '{"expression":"@Z_(k=1)^0 k^2*sin(kx)","point":"1"}', '0', 384),
+    ('progression_sample_weighted_noninteger', 'progression_sample', '{"expression":"@Z_(k=1)^(3/2) k^2*sin(kx)","point":"1"}', 'NaN', 384),
+    ('progression_sample_weighted_coordinate_upper', 'progression_sample', '{"expression":"{@Z_(k=1)^n k^2*sin(kx)|x=1}","axis":"n","point":"3/2"}', 'NaN', 384)
+ON CONFLICT(name) DO UPDATE SET input=excluded.input, expected=excluded.expected, precision=excluded.precision;
+
+INSERT INTO mars_lab_cases(name, operation, input, expected, precision) VALUES
+    ('progression_sample_cubic_cosine_zero', 'progression_sample', '{"expression":"@Z_(k=1)^1000 k^3*cos(kx)","point":"0"}', '250500250000', 53),
+    ('progression_sample_cubic_sine_tiny', 'progression_sample', '{"expression":"@Z_(k=1)^1000 k^3*sin(kx)","point":"1e-60"}', '2.005003333333e-46', 384),
+    ('progression_sample_quintic_cosine', 'progression_sample', '{"expression":"@Z_(k=1)^4 k^5*cos(kx)","point":"pi/2"}', '992', 53),
+    ('progression_sample_sextic_cosine', 'progression_sample', '{"expression":"@Z_(k=1)^4 k^6*cos(kx)","point":"pi/2"}', '4032', 53)
+ON CONFLICT(name) DO UPDATE SET input=excluded.input, expected=excluded.expected, precision=excluded.precision;
+
 INSERT INTO test_case_runner(module, source, parent, table_name, operation) VALUES (
     'mars_lab.progression_plots', 'tools/mars_lab/tests/test_lab_evaluation_extra.c',
     'tests.test_lab_extra_progression_plots', 'mars_lab_cases', 'progression_plot')
@@ -29,6 +130,29 @@ INSERT INTO mars_lab_cases(name, operation, input, expected) VALUES
     ('progression_plot_bound_1000', 'progression_plot', '{"expression":"{@Z_(k=1)^n sin(kx)|n=1000}","action":"plot","wrt":"x","precision":97}', '20'),
     ('progression_plot_closed_1000', 'progression_plot', '{"expression":"sin(500*x)*sin(1001*x/2)/sin(x/2)","action":"plot","wrt":"x","precision":97}', '20'),
     ('progression_plot_renamed_1000', 'progression_plot', '{"expression":"@Z_(k=1)^1000 sin(kt)","action":"plot","wrt":"t","precision":97}', '20')
+ON CONFLICT(name) DO UPDATE SET input=excluded.input, expected=excluded.expected;
+
+INSERT INTO mars_lab_cases(name, operation, input, expected) VALUES
+    ('progression_plot_cubic_cosine_1000', 'progression_plot', '{"expression":"@Z_(k=1)^1000 k^3*cos(kx)","action":"plot","wrt":"x","precision":97}', '100'),
+    ('progression_plot_quartic_sine_1000', 'progression_plot', '{"expression":"@Z_(k=1)^1000 k^4*sin(kx)","action":"plot","wrt":"x","precision":97}', '100'),
+    ('progression_plot_cubic_cosine_bound', 'progression_plot', '{"expression":"{@Z_(j=1)^n j^3*cos(jt)|n=1000}","action":"plot","wrt":"t","precision":97}', '100')
+ON CONFLICT(name) DO UPDATE SET input=excluded.input, expected=excluded.expected;
+
+INSERT INTO test_case_runner(module, source, parent, table_name, operation) VALUES (
+    'mars_lab.curve_continuity', 'tools/mars_lab/tests/test_lab_evaluation_extra.c',
+    'tests.test_lab_extra_curve_continuity', 'mars_lab_cases', 'curve_continuity')
+ON CONFLICT(module) DO UPDATE SET table_name=excluded.table_name, operation=excluded.operation;
+INSERT INTO mars_lab_cases(name, operation, input, expected) VALUES
+    ('curve_continuity_sine_1000', 'curve_continuity', '{"expression":"@Z_(k=1)^1000 sin(kx)","lower":"-0.03125","upper":"0.03125"}', '{"continuous":true,"sine_terms":"1000"}'),
+    ('curve_continuity_sine_auto', 'curve_continuity', '{"expression":"sin(x)+sin(2x)+sin(3x)+...+sin(1000x)","lower":"-0.01","upper":"0.01"}', '{"continuous":true,"sine_terms":"1000"}'),
+    ('curve_continuity_sine_scaled', 'curve_continuity', '{"expression":"1e6*sin(500*x)*sin(1001*x/2)/sin(x/2)","lower":"0.0001","upper":"0.03125"}', '{"continuous":true,"sine_terms":"1000","amplitude":"1e6"}'),
+    ('curve_continuity_cosine_1000', 'curve_continuity', '{"expression":"@Z_(k=1)^1000 cos(kx)","lower":"-0.03125","upper":"0.03125"}', '{"continuous":true}'),
+    ('curve_continuity_generic_cosine', 'curve_continuity', '{"expression":"cos(1000*x)","lower":"-0.03125","upper":"0.03125"}', '{"continuous":true}'),
+    ('curve_continuity_cubic_cosine', 'curve_continuity', '{"expression":"@Z_(k=1)^1000 k^3*cos(kx)","lower":"-0.01","upper":"0.01"}', '{"continuous":true,"cosine_terms":"1000","weight":"3","derivatives":true}'),
+    ('curve_continuity_quartic_sine', 'curve_continuity', '{"expression":"@Z_(k=1)^1000 k^4*sin(kx)","lower":"-0.01","upper":"0.01"}', '{"continuous":true,"sine_terms":"1000","weight":"4","derivatives":true}'),
+    ('curve_continuity_rational_pole', 'curve_continuity', '{"expression":"1/(x-1/3)","lower":"-1","upper":"1"}', '{"continuous":false,"pole":"1/3"}'),
+    ('curve_continuity_tangent_pole', 'curve_continuity', '{"expression":"tan(x)","lower":"-2","upper":"2"}', '{"continuous":false,"pole":"pi/2"}'),
+    ('curve_continuity_cotangent_pole', 'curve_continuity', '{"expression":"cot(x)","lower":"-1","upper":"1"}', '{"continuous":false,"pole":"0"}')
 ON CONFLICT(name) DO UPDATE SET input=excluded.input, expected=excluded.expected;
 
 INSERT INTO test_case_runner(module, source, parent, table_name, operation) VALUES (

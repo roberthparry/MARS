@@ -74,9 +74,9 @@ INSERT INTO test_case_runner(module, source, parent, table_name, operation) VALU
 ON CONFLICT(module) DO UPDATE SET table_name=excluded.table_name, operation=excluded.operation;
 
 INSERT INTO diffequation_cases(name, operation, input, expected) VALUES
-    ('solution_notation_bessel', 'solution_notation', 'x^2y''''+xy''+(x^2-1/4)y=0', 'y\left(x\right) &= \frac{C_{1}'),
-    ('solution_notation_conditioned', 'solution_notation', 'x^2y''''+xy''+(x^2-1/4)y=0; y(1)=2; y''(1)=-1', 'y\left(x\right) &= \frac{2'),
-    ('solution_notation_renamed', 'solution_notation', 't^2Dtt(u)+t*Dt(u)+(t^2-1/4)u=0', 'u\left(t\right) &= \frac{C_{1}'),
+    ('solution_notation_bessel', 'solution_notation', 'x^2y''''+xy''+(x^2-1/4)y=0', 'y\left(x\right) ={}& \frac{C_{1}'),
+    ('solution_notation_conditioned', 'solution_notation', 'x^2y''''+xy''+(x^2-1/4)y=0; y(1)=2; y''(1)=-1', 'y\left(x\right) ={}& \frac{2'),
+    ('solution_notation_renamed', 'solution_notation', 't^2Dtt(u)+t*Dt(u)+(t^2-1/4)u=0', 'u\left(t\right) ={}& \frac{C_{1}'),
     ('solution_notation_first_order', 'solution_notation', 'y''=y; y(0)=1', 'y\left(x\right) &= '),
     ('solution_notation_time', 'solution_notation', 'x''''+x=0', 'x\left(t\right) &= '),
     ('solution_notation_partial', 'solution_notation', 'u_t+u_x=0', 'u &= ')

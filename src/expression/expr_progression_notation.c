@@ -3,7 +3,8 @@
  * @brief Prepare finite-progression identities for semantic notation.
  *
  * Expression recognises each progression and selects the mathematical closed
- * form. The notation provider receives ordinary operations and symbols only.
+ * form. Differentiated sums retain their index and bounds beside the native
+ * derivative result. The notation provider receives ordinary operations and symbols only.
  */
 #include <stdlib.h>
 #include <string.h>
@@ -27,6 +28,23 @@ static const TeX_model_node_t *call(notation_build_t *build, const char *name, c
         (TeX_node_view_t){.kind = TeX_NODE_CALL, .text = text, .child_count = 1u}, &argument) : NULL;
     string_free(text);
     return node;
+}
+
+/* Keep the finite sum visible when a specialised native result bypasses ordinary progression recognition. */
+char *expr_summation_identity_TeX(const expr_t *summation, const expr_t *result)
+{
+    const expr_t *body = expr_is_neg(summation) ? summation->a : summation;
+    if (!expr_is_op(body, &ops_summation) || !result)
+        return NULL;
+    notation_build_t *build = notation_build_new();
+    const TeX_model_node_t *left = build ? notation_build_expr(build, summation) : NULL;
+    const TeX_model_node_t *right = build ? notation_build_expr(build, result) : NULL;
+    const TeX_model_node_t *identity = left && right ? pair(build, TeX_NODE_EQUATION, left, right) : NULL;
+    string_t *output = identity ? notation_build_render(build, identity) : NULL;
+    char *text = output ? strdup(string_c_str(output)) : NULL;
+    string_free(output);
+    notation_build_free(build);
+    return text;
 }
 
 static const TeX_model_node_t *symbolic_closed_form(notation_build_t *build, const expr_t *upper,
@@ -59,9 +77,7 @@ char *expr_finite_progression_identity_TeX(const expr_t *expression)
     bool symbolic = false;
     bool recognised = expr_finite_progression_parts(expression, &upper, &step, &function);
     if (!recognised) {
-        closed = expr_finite_exponential_sine_progression_closed_form(expression);
-        if (!closed)
-            closed = expr_finite_progression_scaled_closed_form(expression);
+        closed = expr_finite_progression_closed_form(expression);
     } else if (!function->finite_progression) {
         expr_free(step);
         return NULL;

@@ -24,6 +24,11 @@ fractional; a long terminating rational uses the exact decimal when clearly shor
 complex arguments. Scientific numeric text is typeset with a power of ten, and compound scientific values
 retain their parentheses when used as a power's base. The TeX renderer does not approximate or alter the number.
 
+Positive integer powers of circular and hyperbolic trigonometric functions put
+the exponent on the function name, as in \(\sin^{2}(x/2)\). The native expression
+adapter applies this convention to both expression graphs and preserved binding
+arithmetic. It changes presentation only; other powers retain their usual bases.
+
 Every push and operation returns a Boolean. A failure leaves the stack unchanged and
 saves the first error. Later operations and finish fail until you explicitly
 clear that error. This means the examples can check the finished result once,

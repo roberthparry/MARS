@@ -6,6 +6,24 @@ CREATE TABLE IF NOT EXISTS TeX_cases (
 ) WITHOUT ROWID;
 CREATE INDEX IF NOT EXISTS TeX_cases_operation ON TeX_cases(operation, name);
 
+INSERT INTO TeX_cases(name, operation, input, expected) VALUES
+    ('function_power_sine_half', 'test_TeX_expression_style_cases', 'sin(x/2)^2', '\sin^{2}\left(\frac{x}{2}\right)'),
+    ('function_power_cosine_cube', 'test_TeX_expression_style_cases', 'cos(x)^3', '\cos^{3}\left(x\right)'),
+    ('function_power_tangent', 'test_TeX_expression_style_cases', 'tan(x)^4', '\tan^{4}\left(x\right)'),
+    ('function_power_cotangent', 'test_TeX_expression_style_cases', 'cot(x)^2', '\cot^{2}\left(x\right)'),
+    ('function_power_secant', 'test_TeX_expression_style_cases', 'sec(x)^2', '\sec^{2}\left(x\right)'),
+    ('function_power_cosecant', 'test_TeX_expression_style_cases', 'cosec(x)^2', '\operatorname{cosec}^{2}\left(x\right)'),
+    ('function_power_sinh', 'test_TeX_expression_style_cases', 'sinh(x)^2', '\sinh^{2}\left(x\right)'),
+    ('function_power_cosh', 'test_TeX_expression_style_cases', 'cosh(x)^3', '\cosh^{3}\left(x\right)'),
+    ('function_power_tanh', 'test_TeX_expression_style_cases', 'tanh(x)^2', '\tanh^{2}\left(x\right)'),
+    ('function_power_coth', 'test_TeX_expression_style_cases', 'coth(x)^2', '\coth^{2}\left(x\right)'),
+    ('function_power_sech', 'test_TeX_expression_style_cases', 'sech(x)^2', '\operatorname{sech}^{2}\left(x\right)'),
+    ('function_power_cosech', 'test_TeX_expression_style_cases', 'cosech(x)^2', '\operatorname{cosech}^{2}\left(x\right)'),
+    ('function_power_nested', 'test_TeX_expression_style_cases', 'sin(sin(x))^2', '\sin^{2}\left(\sin(x)\right)'),
+    ('function_power_constant_binding', 'test_TeX_expression_style_cases', 'sin(1)^2', '\sin^{2}\left(1\right)'),
+    ('function_power_other_function', 'test_TeX_expression_style_cases', 'gamma(x)^2', '\Gamma(x)^{2}')
+ON CONFLICT(name) DO UPDATE SET input=excluded.input, expected=excluded.expected;
+
 INSERT INTO test_case_runner(module, source, parent, table_name, operation) VALUES (
     'TeX.test_TeX_calculus_shorthand_cases', 'tests/TeX/test_TeX.c', 'tests.test_TeX_calculus_shorthand', 'TeX_cases', 'test_TeX_calculus_shorthand_cases')
 ON CONFLICT(module) DO UPDATE SET table_name=excluded.table_name, operation=excluded.operation;

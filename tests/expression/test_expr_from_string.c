@@ -687,6 +687,29 @@ static void function_series_endpoint_row(const void *data)
         ASSERT_NOT_NULL(function);
         ASSERT_NOT_NULL(TeX);
         ASSERT_NOT_NULL(round_trip);
+        const string_t *closed_reference = json_string_value(json_array_get(expected, 4u));
+        if (closed_reference) {
+            expr_t *closed = expr_finite_progression_closed_form(expression);
+            expr_t *reference = expr_from_text(closed_reference, NULL);
+            expr_t *normal_reference = reference ? expr_simplify(reference) : NULL;
+            const style_t styles[] = {style_EXPRESSION, style_FUNCTION, style_LATEX};
+            ASSERT_NOT_NULL(closed);
+            ASSERT_NOT_NULL(normal_reference);
+            for (size_t i = 0; closed && normal_reference && i < sizeof styles / sizeof *styles; ++i) {
+                char *got = expr_to_string(closed, styles[i]);
+                char *want = expr_to_string(normal_reference, styles[i]);
+                if (!got || !want || strcmp(got, want))
+                    string_printf("Closed progression %S, style %zu: %s; expected %s\n", row->input, i, got, want);
+                TEST_ASSERT_TRUE(got && want && !strcmp(got, want),
+                                 "every native style uses the simplified closed-form algebra");
+                free(want); free(got);
+            }
+            char *rhs = normal_reference ? expr_to_TeX_body(normal_reference) : NULL;
+            TEST_ASSERT_TRUE(rhs && strstr(string_c_str(derivation_TeX), rhs),
+                             "the native identity renders the same simplified right-hand side");
+            free(rhs);
+            expr_free(normal_reference); expr_free(reference); expr_free(closed);
+        }
         if (value_text) {
             expr_t *reference = expr_from_text(value_text, NULL);
             number_t want = reference ? expr_eval(reference) : num_clone(NUM_NAN);
@@ -696,6 +719,16 @@ static void function_series_endpoint_row(const void *data)
             ASSERT_TRUE(num_is_finite(got));
             TEST_ASSERT_EXPR_NUMBER_CLOSE(got, want);
             TEST_ASSERT_EXPR_NUMBER_CLOSE(round_trip_value, want);
+            bool regular_closed_value = false;
+            if (json_bool_value(json_array_get(expected, 3u), &regular_closed_value) && regular_closed_value) {
+                expr_t *closed = expr_finite_progression_closed_form(expression);
+                number_t closed_value = closed ? expr_eval(closed) : num_clone(NUM_NAN);
+                ASSERT_NOT_NULL(closed);
+                ASSERT_TRUE(num_is_finite(closed_value));
+                TEST_ASSERT_EXPR_NUMBER_CLOSE(closed_value, want);
+                num_destroy(&closed_value);
+                expr_free(closed);
+            }
             num_destroy(&round_trip_value);
             num_destroy(&got);
             num_destroy(&want);
@@ -716,6 +749,226 @@ static void test_from_string_function_series_endpoints(void)
 {
     test_run_database_cases(__FILE__, __LINE__, "expression.function_series_endpoints", NULL,
                             function_series_endpoint_row);
+}
+
+static void atan_progression_row(const void *data)
+{
+    const test_database_case_t *row = data;
+    size_t saved = num_get_default_prec_bits();
+    num_set_default_prec_bits((size_t)row->precision);
+    json_t *expected = json_from_text(row->expected);
+    const string_t *name = json_string_value(json_array_get(expected, 0u));
+    const string_t *point_text = json_string_value(json_array_get(expected, 1u));
+    const string_t *terms_text = json_string_value(json_array_get(expected, 2u));
+    expr_bindings_t *bindings = NULL;
+    expr_t *source = expr_from_text(row->input, &bindings);
+    expr_t *axis = name ? expr_bindings_get(bindings, string_c_str(name)) : NULL;
+    expr_t *closed = source ? expr_finite_progression_closed_form(source) : NULL;
+    expr_t *point_expr = point_text ? expr_from_text(point_text, NULL) : NULL;
+    number_t point = point_expr ? expr_eval(point_expr) : num_clone(NUM_NAN);
+    number_t reference = num_clone(NUM_ZERO);
+    unsigned long terms = terms_text ? strtoul(string_c_str(terms_text), NULL, 10) : 0u;
+    bool ok = source && axis && closed && num_is_finite(point) && terms > 0u;
+    char *plain = closed ? expr_to_string(closed, style_EXPRESSION) : NULL;
+    char *function = closed ? expr_to_string(closed, style_FUNCTION) : NULL;
+    char *TeX = closed ? expr_to_TeX_body(closed) : NULL;
+    ok = ok && plain && strstr(plain, "Im(") && strstr(plain, "sgn(") && strstr(plain, "∈ ℝ") &&
+         function && strstr(function, "imagpart(") && TeX && strstr(TeX, "Im}");
+    if (axis)
+        expr_set_val(axis, point);
+    for (unsigned long k = 1u; ok && k <= terms; ++k) {
+        number_t argument = num_mul_long(point, (long)k);
+        number_t term = num_atan(argument);
+        number_t next = num_add(reference, term);
+        num_destroy(&argument);
+        num_destroy(&term);
+        num_destroy(&reference);
+        reference = next;
+    }
+    number_t value = source ? expr_eval(source) : num_clone(NUM_NAN);
+    number_t compact_value = closed ? expr_eval(closed) : num_clone(NUM_NAN);
+    expr_t *fresh = source ? expr_finite_progression_closed_form(source) : NULL;
+    if (ok) {
+        TEST_ASSERT_EXPR_NUMBER_CLOSE(value, reference);
+        if (num_is_real(point) && !num_is_zero(point)) {
+            ok = fresh && num_is_finite(compact_value) && num_is_real(compact_value);
+            TEST_ASSERT_EXPR_NUMBER_CLOSE(compact_value, reference);
+        } else {
+            ok = num_is_nan(compact_value) && (num_is_real(point) || !fresh);
+        }
+    }
+    if (!ok)
+        string_printf("Arctangent progression %S: %s; %s; %s\n", row->name, plain, function, TeX);
+    expr_free(fresh);
+    num_destroy(&compact_value);
+    num_destroy(&value);
+    num_destroy(&reference);
+    num_destroy(&point);
+    expr_free(point_expr);
+    free(TeX);
+    free(function);
+    free(plain);
+    expr_free(closed);
+    expr_free(source);
+    expr_bindings_free(bindings);
+    json_free(expected);
+    num_set_default_prec_bits(saved);
+    TEST_ASSERT_TRUE(ok, "real arctangent identities preserve the analytic log-gamma branch and live domain guards");
+}
+
+static void test_from_string_atan_progression(void)
+{
+    test_run_database_cases(__FILE__, __LINE__, "expression.atan_progression", NULL, atan_progression_row);
+}
+
+static void quotient_derivative_row(const void *data)
+{
+    const test_database_case_t *row = data;
+    size_t saved = num_get_default_prec_bits();
+    num_set_default_prec_bits((size_t)row->precision);
+    json_t *expected = json_from_text(row->expected);
+    const string_t *name = json_string_value(json_array_get(expected, 0u));
+    const string_t *point_text = json_string_value(json_array_get(expected, 1u));
+    expr_bindings_t *bindings = NULL;
+    expr_t *source = expr_from_text(row->input, &bindings);
+    expr_t *axis = name ? expr_bindings_get(bindings, string_c_str(name)) : NULL;
+    expr_t *reference = source && axis ? expr_create_deriv(source, axis) : NULL;
+    expr_t *closed = source && axis ? expr_finite_qdigamma_progression_derivative_form(source, axis) : NULL;
+    expr_t *point_expr = point_text ? expr_from_text(point_text, NULL) : NULL;
+    number_t point = point_expr ? expr_eval(point_expr) : num_clone(NUM_NAN);
+    if (axis)
+        expr_set_val(axis, point);
+    number_t want = reference ? expr_eval(reference) : num_clone(NUM_NAN);
+    number_t got = closed ? expr_eval(closed) : num_clone(NUM_NAN);
+    char *plain = closed ? expr_to_string(closed, style_EXPRESSION) : NULL;
+    char *function = closed ? expr_to_string(closed, style_FUNCTION) : NULL;
+    char *TeX = closed ? expr_to_TeX_body(closed) : NULL;
+    bool ok = closed && num_is_finite(want) && num_is_finite(got) && plain && function && TeX &&
+              strstr(plain, "derivative(") && strstr(function, "derivative(qdigamma(");
+    if (!ok)
+        string_printf("Quotient derivative %S: got %.17g, expected %.17g\n%s\n", row->name,
+                      num_to_double(got), num_to_double(want), plain);
+    TEST_ASSERT_TRUE(ok, "closed q-digamma derivatives remain evaluable with both base and argument chain rules");
+    if (ok) {
+        TEST_ASSERT_EXPR_NUMBER_CLOSE(got, want);
+        expr_t *parsed = expr_from_string(plain, NULL);
+        number_t parsed_value = parsed ? expr_eval(parsed) : num_clone(NUM_NAN);
+        if (!parsed || !num_is_finite(parsed_value)) {
+            char *readback = parsed ? expr_to_string(parsed, style_UNBOUND) : NULL;
+            string_printf("Readback %S: %s\nsource: %s\n", row->name, readback, plain);
+            free(readback);
+        }
+        TEST_ASSERT_TRUE(parsed && num_is_finite(parsed_value), "compound partial coordinates survive round trips");
+        TEST_ASSERT_EXPR_NUMBER_CLOSE(parsed_value, want);
+        num_destroy(&parsed_value);
+        expr_free(parsed);
+    }
+    free(TeX);
+    free(function);
+    free(plain);
+    num_destroy(&got);
+    num_destroy(&want);
+    num_destroy(&point);
+    expr_free(point_expr);
+    expr_free(closed);
+    expr_free(reference);
+    expr_free(source);
+    expr_bindings_free(bindings);
+    json_free(expected);
+    num_set_default_prec_bits(saved);
+}
+
+static void test_from_string_quotient_progression_derivatives(void)
+{
+    test_run_database_cases(__FILE__, __LINE__, "expression.quotient_derivative", NULL, quotient_derivative_row);
+}
+
+static void test_weighted_progression_linked_derivatives(void)
+{
+    expr_bindings_t *bindings = NULL;
+    expr_t *source = expr_from_string("{@Z_(k=1)^n sin(kx)|x=pi/2; n=4}", &bindings);
+    expr_t *x = bindings ? expr_bindings_get(bindings, "x") : NULL;
+    expr_t *n = bindings ? expr_bindings_get(bindings, "n") : NULL;
+    expr_t *first = x ? expr_create_deriv(source, x) : NULL;
+    expr_t *second = first ? expr_create_deriv(first, x) : NULL;
+    expr_t *closed = second ? expr_finite_progression_closed_form(second) : NULL;
+    ASSERT_NOT_NULL(closed);
+    number_t initial = closed ? expr_eval(closed) : num_clone(NUM_NAN);
+    number_t eight = num_create_from_long(8);
+    TEST_ASSERT_EXPR_NUMBER_CLOSE(initial, eight);
+    if (n)
+        expr_set_val(n, NUM_TWO);
+    number_t changed = closed ? expr_eval(closed) : num_clone(NUM_NAN);
+    TEST_ASSERT_EXPR_NUMBER_CLOSE(changed, NUM_NEG_ONE);
+    if (x)
+        expr_set_val(x, NUM_PI);
+    number_t direct = second ? expr_eval(second) : num_clone(NUM_NAN);
+    number_t reduced = closed ? expr_eval(closed) : num_clone(NUM_NAN);
+    TEST_ASSERT_EXPR_NUMBER_CLOSE(reduced, direct);
+    num_destroy(&reduced); num_destroy(&direct); num_destroy(&changed); num_destroy(&initial); num_destroy(&eight);
+    expr_free(closed); expr_free(second); expr_free(first); expr_free(source);
+    expr_bindings_free(bindings);
+}
+
+static void progression_sample_row(const void *data, bool growth)
+{
+    NUM_SCOPE(numbers);
+    const test_database_case_t *row = data;
+    json_t *expected = json_from_text(row->expected);
+    expr_bindings_t *bindings = NULL;
+    expr_t *expression = expr_from_text(row->input, &bindings);
+    const string_t *name = json_string_value(json_array_get(expected, 0u));
+    expr_t *axis = name && bindings ? expr_bindings_get(bindings, string_c_str(name)) : NULL;
+    number_t before = axis ? expr_get_val(axis) : NUM_NAN;
+    number_t lower = NUM_NAN, upper = NUM_NAN;
+    bool bounded = growth ? expr_finite_growth_progression_sample_bounds(expression, axis, &lower, &upper) :
+                            expr_finite_circular_progression_sample_bounds(expression, axis, &lower, &upper);
+    bool wanted = json_type(json_array_get(expected, 1u)) == JSON_STRING;
+    ASSERT_TRUE(bounded == wanted);
+    for (size_t i = 1u; bounded && i <= 2u; ++i) {
+        expr_t *reference = expr_from_text(json_string_value(json_array_get(expected, i)), NULL);
+        number_t value = reference ? expr_eval(reference) : NUM_NAN;
+        TEST_ASSERT_EXPR_NUMBER_CLOSE(i == 1u ? lower : upper, value);
+        expr_free(reference);
+    }
+    if (!bounded) {
+        ASSERT_TRUE(num_is_nan(lower));
+        ASSERT_TRUE(num_is_nan(upper));
+    }
+    expr_t *lo = expr_from_text(json_string_value(json_array_get(expected, 3u)), NULL);
+    expr_t *hi = expr_from_text(json_string_value(json_array_get(expected, 4u)), NULL);
+    bool regular = lo && hi && expr_finite_circular_progression_sample_regular(expression, axis,
+                                                                               expr_eval(lo), expr_eval(hi));
+    bool expected_regular = false;
+    ASSERT_TRUE(json_bool_value(json_array_get(expected, 5u), &expected_regular));
+    ASSERT_TRUE(regular == expected_regular);
+    number_t after = axis ? expr_get_val(axis) : NUM_NAN;
+    ASSERT_TRUE((num_is_nan(before) && num_is_nan(after)) || num_eq(before, after));
+    expr_free(hi); expr_free(lo);
+    num_destroy(&upper); num_destroy(&lower);
+    expr_free(expression); expr_bindings_free(bindings); json_free(expected);
+}
+
+static void circular_progression_sample_row(const void *data)
+{
+    progression_sample_row(data, false);
+}
+
+static void growth_progression_sample_row(const void *data)
+{
+    progression_sample_row(data, true);
+}
+
+static void test_circular_progression_sampling(void)
+{
+    test_run_database_cases(__FILE__, __LINE__, "expression.circular_progression_sampling", NULL,
+                              circular_progression_sample_row);
+}
+
+static void test_growth_progression_sampling(void)
+{
+    test_run_database_cases(__FILE__, __LINE__, "expression.growth_progression_sampling", NULL,
+                              growth_progression_sample_row);
 }
 
 static void test_from_string_series_ellipsis(void)
@@ -869,7 +1122,7 @@ static void test_from_string_series_ellipsis(void)
             ASSERT_NOT_NULL(sine_closed);
             ASSERT_NOT_NULL(sine_closed_text);
             ASSERT_NOT_NULL(sine_identity_TeX);
-            TEST_ASSERT_STR_EQ(sine_closed_text, "sin(nx/2)·sin((n + 1)·x/2)/sin(x/2)");
+            TEST_ASSERT_STR_EQ(sine_closed_text, "sin(½nx)·sin(½·(n + 1)·x)/sin(x/2)");
             TEST_ASSERT_STR_EQ(sine_identity_TeX,
                                "\\sum_{k=1}^{n}\\sin(k\\mkern-2mu x) = "
                                "\\frac{\\sin(\\frac{n\\mkern-2mu x}{2})\\mkern-2mu "
@@ -965,7 +1218,7 @@ static void test_from_string_series_ellipsis(void)
             ASSERT_NOT_NULL(lerch_form);
             ASSERT_NOT_NULL(lerch_x);
             ASSERT_NOT_NULL(lerch_derivative);
-            TEST_ASSERT_STR_EQ(lerch_derivative_text, "sinh(nx/2)·cosh((n + 1)·x/2)/sinh(x/2)");
+            TEST_ASSERT_STR_EQ(lerch_derivative_text, "sinh(½nx)·cosh(½·(n + 1)·x)/sinh(x/2)");
             free(lerch_derivative_text);
             expr_free(lerch_derivative);
             expr_free(lerch_form);
@@ -4427,6 +4680,11 @@ void test_expr_t_from_string(void)
     TEST_RUN_SUBTEST(test_from_string_arithmetic, NULL);
     TEST_RUN_SUBTEST(test_from_string_series_ellipsis, NULL);
     TEST_RUN_SUBTEST(test_from_string_function_series_endpoints, NULL);
+    TEST_RUN_SUBTEST(test_from_string_atan_progression, NULL);
+    TEST_RUN_SUBTEST(test_from_string_quotient_progression_derivatives, NULL);
+    TEST_RUN_SUBTEST(test_weighted_progression_linked_derivatives, NULL);
+    TEST_RUN_SUBTEST(test_circular_progression_sampling, NULL);
+    TEST_RUN_SUBTEST(test_growth_progression_sampling, NULL);
     TEST_RUN_SUBTEST(test_from_string_functions, NULL);
     TEST_RUN_SUBTEST(test_from_text_api, NULL);
     TEST_RUN_SUBTEST(test_from_string_special_functions, NULL);

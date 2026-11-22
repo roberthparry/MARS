@@ -204,6 +204,9 @@ bool lab_worker_plot_ranges(const char *source, const char *first, const char *s
     for (unsigned i = 0; i < dimensions; ++i)
         if (owned[i])
             axes[i] = expr_new_named_var(NUM_NAN, i ? second : first);
+    if (ok && formula && dimensions == 1u && automatic[0] && automatic[1])
+        found = expr_finite_circular_progression_sample_bounds(formula, axes[0], &bounds[0], &bounds[1]) ||
+                expr_finite_growth_progression_sample_bounds(formula, axes[0], &bounds[0], &bounds[1]);
     const expr_t *coordinates[] = {axes[0], axes[1]};
     expr_t *gradient_formula = expr_finite_progression_sample_form(formula, coordinates, dimensions);
     ok = ok && formula && axes[0] && (!second || axes[1]);

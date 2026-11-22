@@ -3604,9 +3604,18 @@ starting orientation; a superseding plot invalidates an unfinished gesture.
 
 Recognised finite sine, cosine, hyperbolic sine/cosine and exponential sums use
 their native closed form for range detection, curve values and derivatives.
+This includes polynomial weights through degree six, such as the
+\(-k^2\sin(kx)\) summand obtained by differentiating a sine sum twice.
 Their integer upper bound must be fixed with respect to the plotted coordinates.
 At removable singularities, including the sine/cosine formula at zero, evaluation
-falls back to the authored finite sum so valid points remain visible.
+falls back to the authored finite sum so valid points remain visible. Weighted
+formulas also check for cancellation close to these points. If the guarded double
+plan cannot safely evaluate a weighted moment, the worker raises its mantissa
+precision according to the small denominator before evaluating the compact form.
+It restores the ordinary plotting precision afterwards. First and second
+sampling derivatives reduce the differentiated sum to separate weighted moments,
+avoiding repeated differentiation of a large quotient. This keeps cubic and
+quartic weighted plots on the compact numerical path even near zero.
 
 Sampling and camera presentation are separate. Native MARS still supplies the
 normalised coordinates, colours, tick labels, precision checks and domain gaps.
@@ -3877,6 +3886,13 @@ not a guarantee of numerical accuracy everywhere. They include additional guard
 precision for very small ranges and up to 4,096 bits of the worksheet precision.
 The plotting limit is 32,768 working bits, with bounds and reference checks
 limited to 65,536 bits; unresolved precision requirements produce an error.
+
+Adaptive chord tolerances include an absolute floor of one hundred-thousandth of
+the visible height observed by those reference probes, in addition to the minimum
+coordinate tolerance. This keeps smooth curves connected near zero without
+requiring accuracy far below a displayed pixel. Tangent, curvature and domain
+checks still leave gaps at unresolved singularities; the floor does not join
+points across detected poles.
 
 Equation mode generates a plot asynchronously after evaluation. It draws the left and right
 sides of a one-free-variable equation as separately coloured curves on common axes; their intersections
@@ -4257,6 +4273,21 @@ a binding control. Mathematical output renders sums with Σ; Function output
 uses `sum(k, 1, n, term)` when the summation itself remains the simplified
 result.
 
+An explicit common minus sign appears outside the sigma, for example
+$-\sum_{k=1}^{100}k^2\sin(kx)$, in all three native output styles.
+Weighted progressions retain a closed form after differentiation and when their
+result is used as fresh input; plotting samples that form rather than summing
+100 terms at every coordinate. See the runnable
+[finite-sum differentiation example](expression.md#cooperative-calculation-control).
+
+The native closed form is simplified before all three result cards are generated.
+For example, taking the **x derivative** of `@Z_(k=1)^1000 sin(kx)` gives
+
+$\quad\begin{array}{l}\displaystyle \sum_{k=1}^{1000} k\cos(kx)=\frac{1001\cos(1000x)-1000\cos(1001x)-1}{4\sin^2(x/2)}.\end{array}$
+
+The leading minus is absorbed into the numerator and redundant unit multipliers
+are removed in Rendered TeX, Expression and Function output.
+
 Formal `sin(kx)`, `cos(kx)`, `sinh(kx)` and `cosh(kx)` sums from 1 to `n`
 use the same native geometric-series identities as recognised ellipsis input.
 For example, with supplied `x` and `n`, `@Z_(k=1)^n sin(kx)` displays
@@ -4451,6 +4482,44 @@ the separate q-digamma terms are not assigned artificial values on the unit
 circle. Using the displayed formula as input recovers the same summation,
 identity, bindings and value.
 
+The derivative action differentiates this closed form, retaining the differentiated
+sum on the left of the rendered equality. Its q-digamma base depends on the
+coordinate, so the result includes base partial derivatives and their chain-rule
+factors. Ordinary trigamma differentiates the other argument and cannot replace
+these partials. Expression and Function retain the same closed derivative;
+recognised finite combinations evaluate through the differentiated finite terms,
+without evaluating separate q-digamma values on the unit circle. This also applies
+to cotangent, secant, cosecant and their hyperbolic counterparts, with fixed upper
+bounds and scaled or renamed coordinates.
+
+Automatic plotting accounts for the largest frequency before sampling these
+circular pole families. With an affine step `a*x+b`, the initial window is centred
+at `-b/a` and has radius `pi/(4*n*abs(a))`. For `@Z_(k=1)^1000 tan(kx)`, this gives:
+
+```text
+Automatic x range: -pi/4000 to pi/4000
+```
+
+This window lies inside the nearest tangent poles. A native interval check allows
+adaptive value sampling there, avoiding thousands of unnecessary derivative-term
+evaluations. Cotangent and cosecant retain their central gap. Manually supplied
+bounds remain unchanged, with ordinary pole and resolution checks; a wider range
+may require more sampling work. The q-digamma identity stays visible while its
+finite real combination supplies the plotted values.
+
+Rapidly growing finite `sinh`, `cosh` and exponential progressions also scale
+their initial automatic window to the largest summand. For a real affine step
+`a*x+b`, the centre is `-b/a` and the radius is `2/(n*abs(a))`. For
+`@Z_(k=1)^1000 sinh(kx)`, this gives:
+
+```text
+Automatic x range: -0.002 to 0.002
+```
+
+The closed form supplies the curve while each summand's exponent remains within
+`[-2,2]`. This avoids spending the sampling budget on exponential tails. Supplied
+manual bounds retain their requested values and the usual resolution checks.
+
 Inverse circular and inverse hyperbolic progressions use log-gamma identities
 where those identities are genuinely shorter than the original sum. Define
 
@@ -4464,13 +4533,17 @@ and
 
 $\quad\begin{array}{l}\displaystyle \sum_{k=1}^{n}\operatorname{atanh}(kx) =\frac{n\left(\ln x-\ln(-x)\right)+D_n(1/x)}{2}.\end{array}$
 
-For real non-zero `x`, arctangent uses the sign-aware complex-shift log-gamma identity
+For real non-zero `x`, arctangent combines the conjugate log-gamma terms into the
+compact real-valued identity
 
-$\quad\begin{array}{l}\displaystyle \sum_{k=1}^{n}\operatorname{atan}(kx) =\frac{n\pi x}{2|x|}+\frac{i}{2}\left( \ln\Gamma\left(n+1+\frac{i}{x}\right)-\ln\Gamma\left(1+\frac{i}{x}\right) +\ln\Gamma\left(1-\frac{i}{x}\right)-\ln\Gamma\left(n+1-\frac{i}{x}\right) \right).\end{array}$
+$\quad\begin{array}{l}\displaystyle \sum_{k=1}^{n}\operatorname{atan}(kx) =\frac{n\pi}{2}\operatorname{sgn}(x)+\operatorname{Im}\!\left[\ln\Gamma\left(1+\frac{i}{x}\right)-\ln\Gamma\left(n+1+\frac{i}{x}\right)\right].\end{array}$
 
-This uses `ln(-ix) - ln(ix) = -iπx/|x|`, keeps the imaginary unit out of the
-denominator, and preserves the principal-logarithm branches for positive and
-negative real `x`. The Value card evaluates the supplied real terms directly at
+The native result explicitly retains `x ∈ ℝ` and `x ≠ 0`. Here `lnΓ` is the
+continuous analytic log-gamma function, real on the positive real axis; it is
+not the principal logarithm of a gamma quotient, whose wrapped phase would
+introduce incorrect jumps. Explicitly complex inputs retain their finite sum
+rather than being projected onto the real axis.
+The Value card evaluates the supplied terms directly at
 the active precision, while the reduced identity remains visible in every
 non-Value card. At `x = 0`, the finite sum evaluates directly to zero. Other
 displayed log-gamma formulae may likewise use their finite terms to cross a
@@ -4478,7 +4551,11 @@ removable numerical singularity without hiding the symbolic identity.
 
 Differentiating the arctangent progression uses the compact conjugate-pair form
 
-$\quad\begin{array}{l}\displaystyle \frac{\psi(n+1+i/x)-\psi(1+i/x)+\psi(n+1-i/x)-\psi(1-i/x)}{2x^2} =\sum_{k=1}^{n}\frac{k}{1+k^2x^2}.\end{array}$
+$\quad\begin{array}{l}\displaystyle \sum_{k=1}^{n}\frac{k}{1+k^2x^2}=\frac{\psi(n+1+i/x)-\psi(1+i/x)+\psi(n+1-i/x)-\psi(1-i/x)}{2x^2}.\end{array}$
+
+Rendered TeX retains the differentiated sum on the left of the equality and
+shows this closed form on the right. Expression and Function use the same
+simplified closed form, with the supplied bindings kept separate.
 
 MARS evaluates its complex digamma terms through the active arbitrary-precision
 backend and returns the mathematically real result. At 386 requested digits,

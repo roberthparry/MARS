@@ -47,7 +47,7 @@ static void checks_readme_free_options(struct options *options)
 static bool checks_readme_parse_options(struct options *options, int argc, char **argv)
 {
     *options = (struct options){.cc = checks_text("cc"),
-                                .cflags = checks_text("-D_GNU_SOURCE -std=gnu11 -Wall -Wextra -Werror"),
+                                .cflags = checks_text("-D_GNU_SOURCE -std=gnu17 -Wall -Wextra -Werror"),
                                 .archive = checks_text("build/release/libmars.a"),
                                 .output = checks_text("build/readme-examples"),
                                 .timeout = 60};

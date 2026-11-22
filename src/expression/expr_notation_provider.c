@@ -210,6 +210,23 @@ static const TeX_node_kind_t binary_kinds[EXPR_KIND_COUNT] = {
     [EXPR_KIND_INDEXED_SYMBOL] = TeX_NODE_SUBSCRIPT
 };
 
+/* Use the same structural function-power convention in graphs and exact binding snapshots. */
+const TeX_model_node_t *expr_notation_function_power(notation_build_t *build, const expr_ops_t *operation,
+                                                   const TeX_model_node_t *argument, number_t exponent)
+{
+    if (!operation || expr_trig_slot(operation->kind) >= 12u || !num_is_real(exponent) ||
+        !num_is_finite(exponent) || !num_is_integer(exponent) || !num_gt(exponent, NUM_ONE))
+        return NULL;
+    const TeX_model_node_t *power[] = {
+        notation_build_literal(build, TeX_NODE_FUNCTION_NAME, operation->function_name),
+        notation_build_number(build, exponent)
+    };
+    const TeX_model_node_t *call[] = {
+        notation_build_node(build, (TeX_node_view_t){.kind = TeX_NODE_POWER, .child_count = 2u}, power), argument
+    };
+    return notation_build_node(build, (TeX_node_view_t){.kind = TeX_NODE_APPLY, .child_count = 2u}, call);
+}
+
 /* Share mathematical operation interpretation with exact binding-value snapshots. */
 const TeX_model_node_t *expr_notation_operation(notation_build_t *build, const expr_ops_t *operation,
                                                const TeX_model_node_t *left, const TeX_model_node_t *right)
@@ -393,6 +410,10 @@ static const TeX_model_node_t *build_expression(notation_build_t *build, const e
     if ((kind == EXPR_KIND_POW_D || kind == EXPR_KIND_POW) &&
         (kind == EXPR_KIND_POW_D || (expr_is_const(expression->b) && !expression->b->name))) {
         number_t exponent = kind == EXPR_KIND_POW_D ? expression->c : expression->b->c;
+        if (expr_trig_slot(expression->a->ops->kind) < 12u && num_is_real(exponent) &&
+            num_is_finite(exponent) && num_is_integer(exponent) && num_gt(exponent, NUM_ONE))
+            return expr_notation_function_power(build, expression->a->ops,
+                                                 notation_build_expr(build, expression->a->a), exponent);
         long numerator = 0, denominator = 0;
         if (num_get_small_rational(exponent, &numerator, &denominator) && numerator == 1 && denominator > 1) {
             number_t degree = num_create_from_long(denominator);
@@ -570,6 +591,7 @@ static const TeX_model_node_t *build_expression(notation_build_t *build, const e
             (TeX_node_view_t){.kind = TeX_NODE_ORDERED_DERIVATIVE, .child_count = count}, children);
     }
     if (kind == EXPR_KIND_SUMMATION || kind == EXPR_KIND_PRODUCT) {
+        expr_t *positive = kind == EXPR_KIND_SUMMATION ? expr_positive_summation(expression) : NULL;
         const expr_t *index = expression->b, *lower = NULL, *upper = NULL;
         if (expr_is_op(index, &ops_argument_list)) {
             index = expression->b->a;
@@ -580,13 +602,17 @@ static const TeX_model_node_t *build_expression(notation_build_t *build, const e
             }
         }
         const TeX_model_node_t *children[] = {
-            notation_build_expr(build, expression->a), notation_build_expr(build, index),
+            notation_build_expr(build, positive ? positive->a : expression->a), notation_build_expr(build, index),
             lower ? notation_build_expr(build, lower) : notation_build_literal(build, TeX_NODE_NUMBER, "0"),
             upper ? notation_build_expr(build, upper) : notation_build_literal(build, TeX_NODE_IDENTIFIER, "∞")
         };
-        return notation_build_node(build, (TeX_node_view_t){
+        const TeX_model_node_t *node = notation_build_node(build, (TeX_node_view_t){
             .kind = kind == EXPR_KIND_SUMMATION ? TeX_NODE_SUMMATION : TeX_NODE_INDEXED_PRODUCT,
             .child_count = 4u}, children);
+        const TeX_model_node_t *result = positive ? notation_build_node(build,
+            (TeX_node_view_t){.kind = TeX_NODE_NEGATIVE, .child_count = 1u}, &node) : node;
+        expr_free(positive);
+        return result;
     }
     if (expr_is_integral_transform(expression)) {
         if (build->resolve_transforms) {

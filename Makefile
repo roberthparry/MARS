@@ -3,6 +3,7 @@
 # ------------------------------------------------------------
 DEBUG ?= 0
 RELEASE_OPT_FLAGS ?= -O2
+C_STANDARD := gnu17
 
 ifeq ($(DEBUG),1)
     BUILD_DIR      := build/debug
@@ -20,7 +21,7 @@ endif
 TMPDIR ?= $(abspath $(BUILD_DIR)/tmp)
 export TMPDIR
 
-CFLAGS += -D_GNU_SOURCE -pthread
+CFLAGS += -std=$(C_STANDARD) -D_GNU_SOURCE -pthread
 
 CC := gcc
 AR := ar rcs
@@ -383,7 +384,7 @@ check-native-deps: check-sqlcipher-deps check-curl-deps
 	check_dep() { \
 	    name="$$1"; header="$$2"; lib="$$3"; package="$$4"; body="$$5"; \
 	    if ! printf '%s\n' "#include <stdint.h>" "#include <$$header>" "int main(void) { $$body; return 0; }" \
-	        | $(CC) -x c - -o "$$probe_dir/probe" $$lib >/dev/null 2>&1; then \
+	        | $(CC) -std=$(C_STANDARD) -x c - -o "$$probe_dir/probe" $$lib >/dev/null 2>&1; then \
 	        echo "Missing $$name development files."; \
 	        echo "  Debian/Ubuntu: sudo apt install $$package"; \
 	        packages="$$packages $$package"; \
@@ -520,7 +521,7 @@ check-http-fixture-deps:
 	trap 'exit 1' HUP INT TERM; \
 	if ! printf '%s\n' '#include <openssl/ssl.h>' \
 	    'int main(void) { SSL_CTX *ctx = SSL_CTX_new(TLS_server_method()); SSL_CTX_free(ctx); return 0; }' \
-	    | $(CC) $(HTTP_FIXTURE_CFLAGS) -x c - -o "$$probe_dir/probe" $(HTTP_FIXTURE_LIBS); then \
+	    | $(CC) -std=$(C_STANDARD) $(HTTP_FIXTURE_CFLAGS) -x c - -o "$$probe_dir/probe" $(HTTP_FIXTURE_LIBS); then \
 	    echo 'Native HTTPS test fixtures require OpenSSL development files (Debian/Ubuntu: libssl-dev).'; \
 	    exit 1; \
 	fi
@@ -589,7 +590,7 @@ $(TEST_CORE_BUILD_OBJS): $(TEST_BUILD_DIR)/%.o: tests/%.c Makefile \
     tests/include/test_harness.h tests/include/test_harness_adapter.h tests/test_harness/test_harness_internal.h \
     | build-temporary
 	@mkdir -p $(dir $@) $(dir $@).deps
-	$(CC) $(filter -O% -g% -Wall -Wextra -Werror -DDEBUG,$(CFLAGS)) -D_GNU_SOURCE -std=c11 \
+	$(CC) $(filter -O% -g% -Wall -Wextra -Werror -DDEBUG,$(CFLAGS)) -D_GNU_SOURCE -std=$(C_STANDARD) \
 	    $(DEPFLAGS) -Itests/include -c $< -o $@
 
 $(TEST_CORE_BIN): $(TEST_BUILD_DIR)/test_test_harness/test_harness_bootstrap.o $(TEST_CORE_OBJS)

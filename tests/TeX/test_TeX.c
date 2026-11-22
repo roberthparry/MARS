@@ -307,6 +307,9 @@ static void test_TeX_expression_style_cases_row(const void *data)
     expr_t *expression = expr_from_string_preserving_calculus_internal(string_c_str(input));
     string_t *serialised = expression ? expr_to_text(expression, style_EXPRESSION) : NULL;
     TeX_t *notation = serialised ? TeX_from_expression(serialised) : NULL;
+    if (!notation || strcmp(TeX_source(notation), string_c_str(row->expected)))
+        string_printf("Expression notation %S: got %s; expected %S\n", row->input,
+                       notation ? TeX_source(notation) : "NULL", row->expected);
     TEST_ASSERT_TRUE(notation && strcmp(TeX_source(notation), string_c_str(row->expected)) == 0, string_c_str(row->input));
     TeX_free(notation);
     string_free(serialised);

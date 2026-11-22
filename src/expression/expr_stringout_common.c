@@ -336,6 +336,9 @@ int mul_factor_needs_visible_parens(const expr_t *factor)
 /* A leading imaginary coefficient needs no grouping; a trailing negative factor still does. */
 bool mul_coefficient_needs_parens(const expr_t *factor, bool leading)
 {
+    if (leading && expr_is_unnamed_const(factor) &&
+        (num_eq(factor->c, NUM_I) || num_eq(factor->c, NUM_NEG_I)))
+        return false;
     if (leading && expr_is_unnamed_const(factor) && !num_is_real(factor->c) &&
         !expr_tostring_should_emit_binding_expr(factor)) {
         number_t real = num_real_part(factor->c);
@@ -1090,6 +1093,18 @@ void emit_factor_abs(const expr_t *f, sbuf_t *b)
         emit_expr_abs(f, b, PREC_MUL);
     else
         emit_expr(f, b, PREC_MUL);
+}
+
+/* Remove only an explicit common minus; do not evaluate or reduce the sum itself. */
+expr_t *expr_positive_summation(const expr_t *expression)
+{
+    if (!expr_is_op(expression, &ops_summation) || !expr_is_negative(expression->a))
+        return NULL;
+    expr_t *summand = expr_simplify_owned(expr_neg(expression->a));
+    if (!summand)
+        return NULL;
+    expr_retain(expression->b);
+    return expr_new_binary_internal(&ops_summation, summand, expression->b);
 }
 
 int expr_renders_negative(const expr_t *f)

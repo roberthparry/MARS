@@ -38,14 +38,24 @@ static const char *math_fourier_before(const char *source, const char *delimiter
     return result;
 }
 
+/* Compare the formula separately from domain conditions and detached distribution captions. */
+static const char *math_fourier_formula_TeX(const char *source)
+{
+    static const char prefix[] = "\\begin{aligned}[t]\n&";
+    static const char conditions[] = " \\\\\n&\\text{provided that}";
+    if (strncmp(source, prefix, sizeof prefix - 1u) == 0 && strstr(source, conditions))
+        source = math_fourier_before(source + sizeof prefix - 1u, conditions);
+    return math_fourier_before(source, "\\quad");
+}
+
 static void test_log_absolute_spellings_and_cards(void)
 {
     const json_t *expected = math_fourier_fields("-@pi*(finite_part(1/abs(k))+2*@eulermascheroni*delta(k))", "k");
     const char *sources[] = {"@F{ln|x|}", "@F{ln(|x|)}", "@F{ln(abs(x))}"};
     for (size_t i = 0; i < 3; ++i) {
         const json_t *r = math_fourier_fields(sources[i], "k");
-        lab_math_equal(math_fourier_before(math_fourier_text(r, "tex"), "\\quad"), math_fourier_before(
-            math_fourier_text(expected, "tex"), "\\quad"));
+        lab_math_equal(math_fourier_formula_TeX(math_fourier_text(r, "tex")),
+                       math_fourier_formula_TeX(math_fourier_text(expected, "tex")));
         lab_math_contains(math_fourier_text(r, "function"), "fourier(", false);
         lab_math_contains(math_fourier_text(r, "expression"), "finite part", true);
         lab_math_contains(math_fourier_text(r, "tex"), "\\text{finite part}", true);
@@ -87,7 +97,7 @@ static void test_finite_part_fourier_pair_and_inverse(void)
             forward_points[p]), "t")),
                         log(fabs(forward_points[p])), 12);
     const json_t *inverse = math_fourier_fields("@Finv{ln(abs(ω))}", "t");
-    lab_math_equal(math_fourier_before(math_fourier_text(inverse, "tex"), "\\quad"),
+    lab_math_equal(math_fourier_formula_TeX(math_fourier_text(inverse, "tex")),
         "-\\frac{\\frac{1}{\\left| t \\right|} + 2\\mkern-2mu \\gamma\\mkern-2mu \\delta(t)}{2}");
     for (size_t a = 0; a < 2; ++a) {
         const char *body = lab_math_format("%s(1/abs(x))", aliases[a]);

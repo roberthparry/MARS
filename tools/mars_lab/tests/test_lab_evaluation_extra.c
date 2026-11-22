@@ -1624,6 +1624,7 @@ static void test_lab_extra_plot_tangent_bounds(void)
 static void progression_plot_row(const void *data)
 {
     const test_database_case_t *row = data;
+    json_t *expected = json_from_text(row->expected);
     unsigned status = 0u;
     json_t *response = request("/eval", string_c_str(row->input), &status);
     const char *svg = lab_eval_text(response, "plot_svg");
@@ -1633,19 +1634,127 @@ static void progression_plot_row(const void *data)
     for (const char *path = series ? strstr(series, "<path d=\"M ") : NULL; path && end && path < end;
          path = strstr(path + 1, "<path d=\"M "))
         ++paths;
-    number_t minimum = num_create_from_text(row->expected), actual = num_create_from_long((long)paths);
+    const char *minimum_text = json_type(expected) == JSON_OBJECT ? lab_eval_text(expected, "segments") :
+                               string_c_str(row->expected);
+    number_t minimum = num_create_from_string(minimum_text), actual = num_create_from_long((long)paths);
     bool ok = status == 200u && test_lab_ok(response, true) && num_ge(actual, minimum);
+    double edges[2] = {0};
+    const char *attributes[] = {"data-x-min=\"", "data-x-max=\""};
+    const char *keys[] = {"lower", "upper"};
+    for (size_t i = 0u; ok && i < 2u && json_type(expected) == JSON_OBJECT; ++i) {
+        const char *attribute = strstr(svg, attributes[i]);
+        const char *required = lab_eval_text(expected, keys[i]);
+        expr_t *reference = *required ? expr_from_string(required, NULL) : NULL;
+        number_t value = reference ? expr_eval(reference) : NUM_NAN;
+        double wanted = num_to_double(value);
+        ok = attribute && sscanf(attribute + strlen(attributes[i]), "%lf", &edges[i]) == 1 &&
+             isfinite(wanted) && fabs(edges[i] - wanted) <= 1e-12 * fmax(1, fabs(wanted));
+        num_destroy(&value);
+        expr_free(reference);
+    }
+    const char *pole = lab_eval_text(expected, "pole");
+    if (ok && *pole) {
+        expr_t *reference = expr_from_string(pole, NULL);
+        number_t value = reference ? expr_eval(reference) : NUM_NAN;
+        double left = 0, width = 0;
+        const char *origin = strstr(svg, "data-plot-left=\""), *size = strstr(svg, "data-plot-width=\"");
+        ok = origin && size && sscanf(origin, "data-plot-left=\"%lf", &left) == 1 &&
+             sscanf(size, "data-plot-width=\"%lf", &width) == 1;
+        double pixel = left + width * (num_to_double(value) - edges[0]) / (edges[1] - edges[0]);
+        for (const char *path = series ? strstr(series, "<path d=\"M ") : NULL; ok && path && end && path < end;
+             path = strstr(path + 1, "<path d=\"M ")) {
+            double x1, y1, x2, y2;
+            if (sscanf(path, "<path d=\"M %lf %lf L %lf %lf", &x1, &y1, &x2, &y2) == 4)
+                ok = !((x1 < pixel - 0.05 && x2 > pixel + 0.05) || (x2 < pixel - 0.05 && x1 > pixel + 0.05));
+        }
+        num_destroy(&value);
+        expr_free(reference);
+    }
     num_destroy(&actual);
     num_destroy(&minimum);
     if (!ok)
         string_printf("Progression plot %S: status %u, visible path segments %zu\n", row->name, status, paths);
     json_free(response);
+    json_free(expected);
     TEST_ASSERT_TRUE(ok, "automatic finite-progression views retain a non-empty curve instead of empty axes");
 }
 
 static void test_lab_extra_progression_plots(void)
 {
     test_run_database_cases(__FILE__, __LINE__, "mars_lab.progression_plots", NULL, progression_plot_row);
+}
+
+static void curve_continuity_row(const void *data)
+{
+    const test_database_case_t *row = data;
+    json_t *input = json_from_text(row->input), *expected = json_from_text(row->expected);
+    number_t lower = NUM_NAN, upper = NUM_NAN;
+    bool continuous = false;
+    json_bool_value(lab_eval_get(expected, "continuous"), &continuous);
+    bool ok = lab_worker_plot_bounds(test_lab_text(input, "lower"), test_lab_text(input, "upper"), &lower, &upper);
+    size_t bits = 0u, gaps = 0u;
+    sampler_t *samples = ok ? lab_worker_plot_samples(test_lab_text(input, "expression"), "x", lower, upper,
+                                                       NUM_NAN, NUM_NAN, &bits) : NULL;
+    size_t sine_terms = (size_t)strtoul(test_lab_text(expected, "sine_terms"), NULL, 10);
+    size_t cosine_terms = (size_t)strtoul(test_lab_text(expected, "cosine_terms"), NULL, 10);
+    size_t terms = cosine_terms ? cosine_terms : sine_terms;
+    unsigned weight = (unsigned)strtoul(test_lab_text(expected, "weight"), NULL, 10);
+    bool derivatives = false;
+    json_bool_value(lab_eval_get(expected, "derivatives"), &derivatives);
+    double amplitude = *test_lab_text(expected, "amplitude") ? strtod(test_lab_text(expected, "amplitude"), NULL) : 1;
+    const char *pole_text = test_lab_text(expected, "pole");
+    expr_t *pole_expression = *pole_text ? expr_from_string(pole_text, NULL) : NULL;
+    number_t pole = pole_expression ? expr_eval(pole_expression) : NUM_NAN;
+    bool crossed = false;
+    ok = ok && samples && sampler_count(samples) >= 20u;
+    for (size_t i = 0u; ok && i < sampler_count(samples); ++i) {
+        const sampler_point_t *point = sampler_point(samples, i);
+        gaps += i && point->break_before;
+        if (continuous)
+            ok = point->valid && (!i || !point->break_before);
+        if (terms && point->valid) {
+            double x = num_to_double(point->x), reference[3] = {0}, scales[3] = {0};
+            /* Independent term-by-term reference; never reuse the closed form being sampled. */
+            for (size_t k = 1u; k <= terms; ++k) {
+                double factor = pow((double)k, weight);
+                double sine = sin((double)k * x), cosine = cos((double)k * x);
+                double wave = cosine_terms ? cosine : sine;
+                double tangent = cosine_terms ? -sine : cosine;
+                reference[0] += factor * wave;
+                reference[1] += factor * (double)k * tangent;
+                reference[2] -= factor * (double)k * (double)k * wave;
+                scales[0] += fabs(factor * wave);
+                scales[1] += fabs(factor * (double)k * tangent);
+                scales[2] += fabs(factor * (double)k * (double)k * wave);
+            }
+            const number_t actual[] = {point->y, point->dy, point->ddy};
+            for (size_t j = 0; ok && j < (derivatives ? 3u : 1u); ++j)
+                ok = num_is_finite(actual[j]) && fabs(num_to_double(actual[j]) - amplitude * reference[j]) <=
+                     fabs(amplitude) * 1e-10 * fmax(1, scales[j]);
+        }
+        const sampler_point_t *previous = i ? sampler_point(samples, i - 1u) : NULL;
+        if (previous && num_lt(previous->parameter, pole) && num_ge(point->parameter, pole)) {
+            crossed = true;
+            ok = ok && (!previous->valid || !point->valid || point->break_before);
+        }
+    }
+    ok = ok && (continuous || (crossed && gaps));
+    if (!ok)
+        string_printf("Curve continuity %S: points %zu, gaps %zu, crossed pole %u\n",
+                       row->name, sampler_count(samples), gaps, crossed);
+    num_destroy(&pole);
+    expr_free(pole_expression);
+    sampler_free(samples);
+    num_destroy(&upper);
+    num_destroy(&lower);
+    json_free(expected);
+    json_free(input);
+    TEST_ASSERT_TRUE(ok, "visible smooth arcs remain connected while genuine singularities retain gaps");
+}
+
+static void test_lab_extra_curve_continuity(void)
+{
+    test_run_database_cases(__FILE__, __LINE__, "mars_lab.curve_continuity", NULL, curve_continuity_row);
 }
 
 static void plot_resolution_row(const void *data)
@@ -1689,7 +1798,8 @@ static void progression_sample_row(const void *data)
     number_t expected = num_create_from_text(row->expected);
     number_t tolerance = num_add(num_mul(num_abs(expected), num_create_from_string("1e-12")),
                                  num_create_from_string("1e-80"));
-    bool ok = sample && (num_is_nan(expected) ? num_is_nan(value) :
+    bool ok = sample && num_get_default_prec_bits() == (size_t)row->precision &&
+                         (num_is_nan(expected) ? num_is_nan(value) :
                          num_is_finite(value) && num_le(num_abs(num_sub(value, expected)), tolerance));
     if (!ok)
         string_printf("Progression sample %S: got %.17g, expected %.17g\n", row->name,
@@ -1711,6 +1821,53 @@ static void progression_sample_row(const void *data)
 static void test_lab_extra_progression_samples(void)
 {
     test_run_database_cases(__FILE__, __LINE__, "mars_lab.progression_samples", NULL, progression_sample_row);
+}
+
+static void progression_card_row(const void *data)
+{
+    const test_database_case_t *row = data;
+    unsigned status = 0u;
+    json_t *response = request("/eval", string_c_str(row->input), &status);
+    const char *field = string_c_str(row->expected);
+    json_t *fields = *field == '[' ? json_from_text(row->expected) : NULL;
+    const string_t *run_output = NULL;
+    bool ok = status == 200u && test_lab_ok(response, true);
+    if (fields) {
+        for (size_t i = 0; i < json_array_size(fields); i += 2u) {
+            const string_t *name = json_string_value(json_array_get(fields, i));
+            const string_t *fragment = json_string_value(json_array_get(fields, i + 1u));
+            if (name && strcmp(string_c_str(name), "run_output") == 0)
+                run_output = fragment;
+            else
+                ok = ok && name && fragment && contains(response, string_c_str(name), string_c_str(fragment));
+        }
+    } else
+        ok = ok && (contains(response, field, "sin(") || contains(response, field, "cos(")) &&
+             !contains(response, field, "sum(") && !*lab_eval_text(response, "operation_function");
+    if (ok && run_output) {
+        string_t *route = string_new_with("/function-run"), *key = string_new_with("source");
+        json_t *input = json_new_object();
+        const json_t *programme = test_lab_member(response, "derivative_function");
+        bool ready = route && key && input && programme && json_object_set(input, key, programme);
+        json_t *run = ready ? lab_eval_request(route, input, &status) : NULL;
+        ok = status == 200u && test_lab_ok(run, true) && contains(run, "output", string_c_str(run_output));
+        if (!ok)
+            show_failure(run);
+        json_free(run);
+        json_free(input);
+        string_free(key);
+        string_free(route);
+    }
+    if (!ok)
+        show_failure(response);
+    json_free(response);
+    json_free(fields);
+    TEST_ASSERT_TRUE(ok, "all native progression result cards use the simplified closed form");
+}
+
+static void test_lab_extra_progression_cards(void)
+{
+    test_run_database_cases(__FILE__, __LINE__, "mars_lab.progression_cards", NULL, progression_card_row);
 }
 
 static void test_lab_extra_plot_precision(void)
@@ -2013,6 +2170,66 @@ static void test_lab_plot_title_readme(void)
     TEST_ASSERT_TRUE(ok, "README reciprocal-series plot displays the documented sigma title");
 }
 
+static void test_lab_circular_progression_readme(void)
+{
+    /* README example in docs/mars-lab.md: the largest tangent frequency sets the automatic window. */
+    unsigned status = 0u;
+    json_t *response = request("/eval", "{\"expression\":\"@Z_(k=1)^1000 tan(kx)\",\"action\":\"plot\","
+                                "\"wrt\":\"x\",\"precision\":101}", &status);
+    const char *svg = lab_eval_text(response, "plot_svg");
+    const char *lo = strstr(svg, "data-x-min=\""), *hi = strstr(svg, "data-x-max=\"");
+    double lower = 0, upper = 0, radius = acos(-1.0) / 4000;
+    bool ok = status == 200u && test_lab_ok(response, true) && lo && hi &&
+              sscanf(lo, "data-x-min=\"%lf", &lower) == 1 &&
+              sscanf(hi, "data-x-max=\"%lf", &upper) == 1 &&
+              fabs(lower + radius) < 1e-15 && fabs(upper - radius) < 1e-15 &&
+              contains(response, "plot_title_TeX", "\\sum_{k=1}^{1000}") && contains(response, "plot_svg", "data-series");
+    if (!ok)
+        show_failure(response);
+    json_free(response);
+    TEST_ASSERT_TRUE(ok, "README tangent progression produces its documented pole-safe automatic plot");
+    string_printf("Automatic x range: -pi/4000 to pi/4000\n");
+}
+
+static void test_lab_growth_progression_readme(void)
+{
+    /* README example in docs/mars-lab.md: the largest real exponent determines the initial view. */
+    unsigned status = 0u;
+    json_t *response = request("/eval", "{\"expression\":\"@Z_(k=1)^1000 sinh(kx)\",\"action\":\"plot\","
+                                "\"wrt\":\"x\",\"precision\":101}", &status);
+    const char *svg = lab_eval_text(response, "plot_svg");
+    const char *lo = strstr(svg, "data-x-min=\""), *hi = strstr(svg, "data-x-max=\"");
+    double lower = 0, upper = 0;
+    bool ok = status == 200u && test_lab_ok(response, true) && lo && hi &&
+              sscanf(lo, "data-x-min=\"%lf", &lower) == 1 &&
+              sscanf(hi, "data-x-max=\"%lf", &upper) == 1 &&
+              fabs(lower + 0.002) < 1e-15 && fabs(upper - 0.002) < 1e-15 &&
+              contains(response, "plot_title_TeX", "\\sum_{k=1}^{1000}") && contains(response, "plot_svg", "data-series");
+    if (!ok)
+        show_failure(response);
+    json_free(response);
+    TEST_ASSERT_TRUE(ok, "README sinh progression uses its documented growth-scaled automatic plot");
+    string_printf("Automatic x range: -0.002 to 0.002\n");
+}
+
+static void test_lab_closed_derivative_readme(void)
+{
+    /* README example in docs/mars-lab.md: a weighted cosine derivative has one simplified numerator. */
+    unsigned status = 0u;
+    json_t *response = request("/eval", "{\"expression\":\"@Z_(k=1)^1000 sin(kx)\",\"action\":\"derivative\","
+                                "\"wrt\":\"x\",\"precision\":97}", &status);
+    bool ok = status == 200u && test_lab_ok(response, true) &&
+              contains(response, "derivative", "(1001·cos(1000x) - 1000·cos(1001x) - 1)/(4·sin²(x/2))") &&
+              contains(response, "derivative_TeX", "\\frac{1001") &&
+              contains(response, "derivative_function",
+                       "return (1001.cos(1000.x) - 1000.cos(1001.x) - 1)/(4.sin(x/2)^2).");
+    if (!ok)
+        show_failure(response);
+    TEST_ASSERT_TRUE(ok, "README sine-sum derivative uses the simplified closed form in every card");
+    string_printf("Closed derivative: %s\n", lab_eval_text(response, "derivative"));
+    json_free(response);
+}
+
 static void test_lab_surface_readme(void)
 {
     /* README example in docs/mars-lab.md: Automatic selects the two unset variables. */
@@ -2180,6 +2397,9 @@ static void test_lab_screenshots_readme(void)
 /* Run the documented plot inputs after the ordinary Lab regressions. */
 void test_lab_plot_readme_cases(void)
 {
+    TEST_RUN_IN_GROUP(test_lab_circular_progression_readme, readme, NULL);
+    TEST_RUN_IN_GROUP(test_lab_growth_progression_readme, readme, NULL);
+    TEST_RUN_IN_GROUP(test_lab_closed_derivative_readme, readme, NULL);
     TEST_RUN_IN_GROUP(test_lab_plot_title_readme, readme, NULL);
     TEST_RUN_IN_GROUP(test_lab_surface_readme, readme, NULL);
     TEST_RUN_IN_GROUP(test_lab_surface_slice_readme, readme, NULL);
@@ -3010,12 +3230,14 @@ static void test_lab_extra_ode_interval(void)
     bool ok = response && status == 200u && contains(response, "status", "solved") &&
               contains(response, "problem", "0 < x < π") && contains(response, "problem_TeX", "\\pi") &&
               contains(response, "problem_TeX", "0 < x < \\pi") &&
-              contains(response, "display_TeX", "\\quad (0 < x < \\pi,") &&
+              contains(response, "display_TeX", "\\text{provided that}") &&
+              contains(response, "display_TeX", "\\quad 0 < x < \\pi") &&
               !contains(response, "display_TeX", "\\mathfrak{Re}") &&
               !contains(response, "problem", "NAN") && !contains(response, "display_TeX", "NAN");
     const char *display = test_lab_text(response, "display_TeX");
-    const char *constant = strstr(display, "C_{2}"), *condition = strstr(display, "\\quad (");
-    ok = ok && constant && condition && constant < condition && !strstr(condition + 1u, "\\quad (");
+    const char *constant = strstr(display, "C_{2}"), *condition = strstr(display, "\\text{provided that}");
+    ok = ok && constant && condition && constant < condition &&
+         !strstr(condition + 1u, "\\text{provided that}");
     if (!ok) show_failure(response);
     json_free(response);
     TEST_ASSERT_TRUE(ok, "authored DE intervals survive the native worker and mathematical presentation");
@@ -3509,8 +3731,10 @@ void test_lab_evaluation_extra_cases(void)
     TEST_RUN_IN_GROUP(test_lab_extra_nested_root_equation, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_plot_precision, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_progression_plots, tests, NULL);
+    TEST_RUN_IN_GROUP(test_lab_extra_curve_continuity, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_plot_resolution, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_progression_samples, tests, NULL);
+    TEST_RUN_IN_GROUP(test_lab_extra_progression_cards, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_plot_title_fallback, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_native_records, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_editor_and_cards, tests, NULL);

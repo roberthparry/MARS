@@ -7,6 +7,143 @@ CREATE TABLE IF NOT EXISTS expression_cases (
 CREATE INDEX IF NOT EXISTS expression_cases_operation ON expression_cases(operation, name);
 
 INSERT INTO test_case_runner(module, source, parent, table_name, operation) VALUES (
+    'expression.quotient_derivative', 'tests/expression/test_expr_from_string.c',
+    'tests.test_expr_t_from_string.test_from_string_quotient_progression_derivatives', 'expression_cases',
+    'quotient_derivative')
+ON CONFLICT(module) DO UPDATE SET source=excluded.source, parent=excluded.parent,
+    table_name=excluded.table_name, operation=excluded.operation;
+INSERT INTO expression_cases(name, operation, input, expected, precision) VALUES
+    ('quotient_derivative_tan', 'quotient_derivative', '@Z_(k=1)^4 tan(kx)', '["x","0.1"]', 320),
+    ('quotient_derivative_cot', 'quotient_derivative', '@Z_(k=1)^4 cot(kx)', '["x","0.1"]', 320),
+    ('quotient_derivative_sec', 'quotient_derivative', '@Z_(k=1)^4 sec(kx)', '["x","0.1"]', 320),
+    ('quotient_derivative_cosec', 'quotient_derivative', '@Z_(k=1)^4 cosec(kx)', '["x","0.1"]', 320),
+    ('quotient_derivative_tanh', 'quotient_derivative', '@Z_(k=1)^4 tanh(kx)', '["x","0.1"]', 320),
+    ('quotient_derivative_coth', 'quotient_derivative', '@Z_(k=1)^4 coth(kx)', '["x","0.1"]', 320),
+    ('quotient_derivative_sech', 'quotient_derivative', '@Z_(k=1)^4 sech(kx)', '["x","0.1"]', 320),
+    ('quotient_derivative_cosech', 'quotient_derivative', '@Z_(k=1)^4 cosech(kx)', '["x","0.1"]', 320),
+    ('quotient_derivative_tan_zero', 'quotient_derivative', '@Z_(k=1)^1000 tan(kx)', '["x","0"]', 320),
+    ('quotient_derivative_tan_large', 'quotient_derivative', '@Z_(k=1)^1000 tan(kx)', '["x","0.01"]', 320),
+    ('quotient_derivative_tan_complex', 'quotient_derivative', '@Z_(k=1)^4 tan(kx)', '["x","0.1+0.03i"]', 320),
+    ('quotient_derivative_tan_scaled', 'quotient_derivative', '@Z_(j=1)^13 tan(j*(2t+1))', '["t","0.1"]', 320)
+ON CONFLICT(name) DO UPDATE SET input=excluded.input, expected=excluded.expected, precision=excluded.precision;
+
+INSERT INTO test_case_runner(module, source, parent, table_name, operation) VALUES (
+    'expression.atan_progression', 'tests/expression/test_expr_from_string.c',
+    'tests.test_expr_t_from_string.test_from_string_atan_progression', 'expression_cases', 'atan_progression')
+ON CONFLICT(module) DO UPDATE SET source=excluded.source, parent=excluded.parent,
+    table_name=excluded.table_name, operation=excluded.operation;
+INSERT INTO expression_cases(name, operation, input, expected, precision) VALUES
+    ('atan_progression_positive', 'atan_progression', '@Z_(k=1)^1000 atan(kx)', '["x","1","1000"]', 320),
+    ('atan_progression_negative', 'atan_progression', '@Z_(k=1)^1000 atan(kx)', '["x","-1","1000"]', 320),
+    ('atan_progression_small', 'atan_progression', '@Z_(k=1)^1000 atan(kx)', '["x","1e-8","1000"]', 320),
+    ('atan_progression_small_negative', 'atan_progression', '@Z_(k=1)^1000 atan(kx)', '["x","-1e-8","1000"]', 320),
+    ('atan_progression_large', 'atan_progression', '@Z_(k=1)^1000 atan(kx)', '["x","1e8","1000"]', 320),
+    ('atan_progression_large_negative', 'atan_progression', '@Z_(k=1)^1000 atan(kx)', '["x","-1e8","1000"]', 320),
+    ('atan_progression_zero', 'atan_progression', '@Z_(k=1)^1000 atan(kx)', '["x","0","1000"]', 320),
+    ('atan_progression_renamed', 'atan_progression', '@Z_(j=1)^13 atan(jt)', '["t","0.3","13"]', 320),
+    ('atan_progression_complex', 'atan_progression', '@Z_(k=1)^4 atan(kx)', '["x","1+i/3","4"]', 320),
+    ('atan_progression_complex_negative', 'atan_progression', '@Z_(k=1)^4 atan(kx)', '["x","-1-i/3","4"]', 320)
+ON CONFLICT(name) DO UPDATE SET input=excluded.input, expected=excluded.expected, precision=excluded.precision;
+
+INSERT INTO expression_cases(name, operation, input, expected) VALUES
+    ('fold_sinh_zero', 'test_from_string_functions_check_parse_simplified_expr_4', 'sinh(0)', '0'),
+    ('fold_cosh_zero', 'test_from_string_functions_check_parse_simplified_expr_4', 'cosh(0)', '1'),
+    ('fold_tanh_zero', 'test_from_string_functions_check_parse_simplified_expr_4', 'tanh(0)', '0'),
+    ('fold_sech_zero', 'test_from_string_functions_check_parse_simplified_expr_4', 'sech(0)', '1'),
+    ('fold_sec_zero', 'test_from_string_functions_check_parse_simplified_expr_4', 'sec(0)', '1'),
+    ('fold_asinh_zero', 'test_from_string_functions_check_parse_simplified_expr_4', 'asinh(0)', '0'),
+    ('fold_atanh_zero', 'test_from_string_functions_check_parse_simplified_expr_4', 'atanh(0)', '0'),
+    ('fold_sinh_nonzero_symbolic', 'test_from_string_functions_check_parse_simplified_expr_4', 'sinh(1)', 'sinh(1)'),
+    ('fold_cosh_nonzero_symbolic', 'test_from_string_functions_check_parse_simplified_expr_4', 'cosh(1)', 'cosh(1)'),
+    ('fold_coth_zero_remains_singular', 'test_from_string_functions_check_parse_simplified_expr_4', 'coth(0)', 'coth(0)'),
+    ('fold_sinh_bound_variable_preserved', 'test_from_string_functions_check_parse_simplified_expr_4',
+     '{sinh(c)|c=0}', '{ sinh(c) | c = 0 }')
+ON CONFLICT(name) DO UPDATE SET input=excluded.input, expected=excluded.expected;
+
+INSERT INTO test_case_runner(module, source, parent, table_name, operation) VALUES (
+    'expression.growth_progression_sampling', 'tests/expression/test_expr_from_string.c',
+    'tests.test_expr_t_from_string.test_growth_progression_sampling', 'expression_cases', 'growth_sample')
+ON CONFLICT(module) DO UPDATE SET source=excluded.source, parent=excluded.parent,
+    table_name=excluded.table_name, operation=excluded.operation;
+INSERT INTO expression_cases(name, operation, input, expected) VALUES
+    ('growth_sample_sinh', 'growth_sample', '@Z_(k=1)^1000 sinh(kx)',
+     '["x","-1/500","1/500","-1/500","1/500",false]'),
+    ('growth_sample_cosh', 'growth_sample', '@Z_(k=1)^1000 cosh(kx)',
+     '["x","-1/500","1/500","-1/500","1/500",false]'),
+    ('growth_sample_exp', 'growth_sample', '@Z_(k=1)^1000 exp(kx)',
+     '["x","-1/500","1/500","-1/500","1/500",false]'),
+    ('growth_sample_affine', 'growth_sample', '@Z_(j=1)^1000 sinh(j*(2t+1))',
+     '["t","-501/1000","-499/1000","-501/1000","-499/1000",false]'),
+    ('growth_sample_negative_slope', 'growth_sample', '@Z_(k=1)^1000 cosh(k*(-3x+2))',
+     '["x","2/3-1/1500","2/3+1/1500","2/3-1/1500","2/3+1/1500",false]'),
+    ('growth_sample_bound_parameters', 'growth_sample', '{@Z_(k=1)^n exp(k*(a*t+b))|t=2,n=1000; a=2,b=1}',
+     '["t","-501/1000","-499/1000","-501/1000","-499/1000",false]'),
+    ('growth_sample_variable_upper', 'growth_sample', '{@Z_(k=1)^n sinh(kx)|n=1000,x=1}',
+     '["n",null,null,"1","2",false]'),
+    ('growth_sample_variable_lower', 'growth_sample', '{@Z_(k=x)^1000 sinh(kx)|x=1}',
+     '["x",null,null,"1","2",false]'),
+    ('growth_sample_noninteger', 'growth_sample', '@Z_(k=1)^(3/2) sinh(kx)',
+     '["x",null,null,"-0.1","0.1",false]'),
+    ('growth_sample_empty', 'growth_sample', '@Z_(k=1)^0 cosh(kx)',
+     '["x",null,null,"-0.1","0.1",false]'),
+    ('growth_sample_nonlinear', 'growth_sample', '@Z_(k=1)^1000 sinh(k*x^2)',
+     '["x",null,null,"-0.1","0.1",false]'),
+    ('growth_sample_circular_unchanged', 'growth_sample', '@Z_(k=1)^1000 sin(kx)',
+     '["x",null,null,"-0.1","0.1",false]')
+ON CONFLICT(name) DO UPDATE SET input=excluded.input, expected=excluded.expected;
+
+INSERT INTO test_case_runner(module, source, parent, table_name, operation) VALUES (
+    'expression.circular_progression_sampling', 'tests/expression/test_expr_from_string.c',
+    'tests.test_expr_t_from_string.test_circular_progression_sampling', 'expression_cases', 'circular_sample')
+ON CONFLICT(module) DO UPDATE SET source=excluded.source, parent=excluded.parent,
+    table_name=excluded.table_name, operation=excluded.operation;
+INSERT INTO expression_cases(name, operation, input, expected) VALUES
+    ('circular_sample_tangent', 'circular_sample', '@Z_(k=1)^1000 tan(kx)',
+     '["x","-pi/4000","pi/4000","-pi/4000","pi/4000",true]'),
+    ('circular_sample_secant', 'circular_sample', '@Z_(k=1)^1000 sec(kx)',
+     '["x","-pi/4000","pi/4000","-pi/4000","pi/4000",true]'),
+    ('circular_sample_cotangent', 'circular_sample', '@Z_(k=1)^1000 cot(kx)',
+     '["x","-pi/4000","pi/4000","-pi/4000","pi/4000",false]'),
+    ('circular_sample_cosecant', 'circular_sample', '@Z_(k=1)^1000 cosec(kx)',
+     '["x","-pi/4000","pi/4000","pi/8000","pi/4000",true]'),
+    ('circular_sample_cotangent_endpoint', 'circular_sample', '@Z_(k=1)^1000 cot(kx)',
+     '["x","-pi/4000","pi/4000","0","pi/4000",false]'),
+    ('circular_sample_tangent_pole', 'circular_sample', '@Z_(k=1)^1000 tan(kx)',
+     '["x","-pi/4000","pi/4000","0","pi/2000",false]'),
+    ('circular_sample_tangent_wide', 'circular_sample', '@Z_(k=1)^1000 tan(kx)',
+     '["x","-pi/4000","pi/4000","-10","10",false]'),
+    ('circular_sample_renamed_scaled', 'circular_sample', '@Z_(j=1)^1000 tan(2jt)',
+     '["t","-pi/8000","pi/8000","-pi/8000","pi/8000",true]'),
+    ('circular_sample_affine', 'circular_sample', '@Z_(k=1)^1000 tan(k*(2x+1))',
+     '["x","-1/2-pi/8000","-1/2+pi/8000","-0.5001","-0.4999",true]'),
+    ('circular_sample_negative_scale', 'circular_sample', '@Z_(k=1)^1000 tan(k*(-3x+2))',
+     '["x","2/3-pi/12000","2/3+pi/12000","2/3-pi/24000","2/3+pi/24000",true]'),
+    ('circular_sample_bound_parameters', 'circular_sample', '{@Z_(k=1)^n tan(k*(a*t+b))|t=2,n=1000; a=2,b=1}',
+     '["t","-1/2-pi/8000","-1/2+pi/8000","-0.5001","-0.4999",true]'),
+    ('circular_sample_variable_upper', 'circular_sample', '{@Z_(k=1)^n tan(kx)|n=1000,x=1}',
+     '["n",null,null,"1","2",false]'),
+    ('circular_sample_variable_lower', 'circular_sample', '{@Z_(k=x)^1000 tan(kx)|x=1}',
+     '["x",null,null,"1","2",false]'),
+    ('circular_sample_noninteger', 'circular_sample', '@Z_(k=1)^(3/2) tan(kx)',
+     '["x",null,null,"-0.1","0.1",false]'),
+    ('circular_sample_empty', 'circular_sample', '@Z_(k=1)^0 tan(kx)',
+     '["x",null,null,"-0.1","0.1",false]'),
+    ('circular_sample_nonlinear', 'circular_sample', '@Z_(k=1)^1000 tan(k*x^2)',
+     '["x",null,null,"-0.1","0.1",false]'),
+    ('circular_sample_sine_unchanged', 'circular_sample', '@Z_(k=1)^1000 sin(kx)',
+     '["x",null,null,"-0.1","0.1",false]'),
+    ('circular_sample_q_identity', 'circular_sample',
+     '1000*i+(qdigamma(exp(4*i*x),1)-qdigamma(exp(4*i*x),1001)-qdigamma(exp(2*i*x),1)+qdigamma(exp(2*i*x),1001))/x',
+     '["x","-pi/4000","pi/4000","-pi/4000","pi/4000",true]'),
+    ('circular_sample_q_wrong_coefficient', 'circular_sample',
+     '1001*i+(qdigamma(exp(4*i*x),1)-qdigamma(exp(4*i*x),1001)-qdigamma(exp(2*i*x),1)+qdigamma(exp(2*i*x),1001))/x',
+     '["x",null,null,"-pi/4000","pi/4000",false]'),
+    ('circular_sample_q_wrong_endpoint', 'circular_sample',
+     '1000*i+(qdigamma(exp(4*i*x),1)-qdigamma(exp(4*i*x),1002)-qdigamma(exp(2*i*x),1)+qdigamma(exp(2*i*x),1001))/x',
+     '["x",null,null,"-pi/4000","pi/4000",false]')
+ON CONFLICT(name) DO UPDATE SET input=excluded.input, expected=excluded.expected;
+
+INSERT INTO test_case_runner(module, source, parent, table_name, operation) VALUES (
     'expression.binding_square_domain', 'tests/expression/test_expr_from_string.c',
     'tests.test_expr_t_from_string.test_binding_square_domain_ownership',
     'expression_cases', 'binding_square_domain')
@@ -20,10 +157,100 @@ INSERT INTO expression_cases(name, operation, input, expected) VALUES
 ON CONFLICT(name) DO UPDATE SET input=excluded.input, expected=excluded.expected;
 
 INSERT INTO test_case_runner(module, source, parent, table_name, operation) VALUES (
+    'expression.negative_sums', 'tests/expression/test_expr_to_string.c',
+    'tests.test_expr_t_to_string.test_to_string_all.test_to_string_negative_sums',
+    'expression_cases', 'negative_sum')
+ON CONFLICT(module) DO UPDATE SET source=excluded.source, parent=excluded.parent,
+    table_name=excluded.table_name, operation=excluded.operation;
+INSERT INTO expression_cases(name, operation, input, expected) VALUES
+    ('negative_sum_polynomial', 'negative_sum', '@Z_(k=1)^4 -k^2*sin(k*pi/2)',
+     '["-Σ_(k=1)^4 k²", "-sum(k, 1, 4,", "-\\sum_{k=1}^{4}"]'),
+    ('negative_sum_divisor', 'negative_sum', '@Z_(k=1)^4 k/(-2)',
+     '["-Σ_(k=1)^4", "-sum(k, 1, 4,", "-\\sum_{k=1}^{4}"]'),
+    ('negative_sum_product', 'negative_sum', '3*(@Z_(k=1)^4 -k^2)',
+     '["(-Σ_(k=1)^4", "-sum(k, 1, 4,", "-\\sum_{k=1}^{4}"]'),
+    ('negative_sum_power', 'negative_sum', '(@Z_(k=1)^4 -k^2)^2',
+     '["(-Σ_(k=1)^4", "(-sum(k, 1, 4,", "-\\sum_{k=1}^{4}"]'),
+    ('negative_sum_subtraction', 'negative_sum', '1-(@Z_(k=1)^4 -k^2)',
+     '["Σ_(k=1)^4", "sum(k, 1, 4,", "1 + \\sum_{k=1}^{4}"]'),
+    ('negative_sum_even_signs', 'negative_sum', '@Z_(k=1)^4 (-k)*(-k)',
+     '["Σ_(k=1)^4", "sum(k, 1, 4,", "\\sum_{k=1}^{4}"]'),
+    ('negative_sum_infinite', 'negative_sum', '@Z_(k=1) -1/2^k',
+     '["-Σ_(k=1)", "-sum(k, 1, @inf,", "-\\sum_{k=1}^{\\infty}"]'),
+    ('negative_product_stays_inside', 'negative_sum', '@P_(k=1)^4 -k',
+     '["Π_(k=1)^4 -k", "product(k, 1, 4, -k)", "\\prod_{k=1}^{4}-k"]')
+ON CONFLICT(name) DO UPDATE SET input=excluded.input, expected=excluded.expected;
+
+INSERT INTO expression_cases(name, operation, input, expected) VALUES
+    ('series_simplified_linear_cosine_1000', 'function_series_endpoint', '@Z_(k=1)^1000 k*cos(kx)',
+     '["\\sum_{k=1}^{1000}",null," = ",false,"(1001*cos(1000*x)-1000*cos(1001*x)-1)/(4*sin(x/2)^2)"]'),
+    ('series_simplified_linear_cosine_small', 'function_series_endpoint', '@Z_(k=1)^4 k*cos(kx)',
+     '["\\sum_{k=1}^{4}",null," = ",false,"(5*cos(4*x)-4*cos(5*x)-1)/(4*sin(x/2)^2)"]'),
+    ('series_simplified_linear_cosine_renamed', 'function_series_endpoint', '@Z_(j=1)^7 j*cos(jt)',
+     '["\\sum_{j=1}^{7}",null," = ",false,"(8*cos(7*t)-7*cos(8*t)-1)/(4*sin(t/2)^2)"]'),
+    ('series_simplified_linear_sine', 'function_series_endpoint', '@Z_(k=1)^4 k*sin(kx)',
+     '["\\sum_{k=1}^{4}",null," = ",false,"(5*sin(4*x)-4*sin(5*x))/(4*sin(x/2)^2)"]'),
+    ('series_simplified_linear_sinh', 'function_series_endpoint', '@Z_(k=1)^4 k*sinh(kx)',
+     '["\\sum_{k=1}^{4}",null," = ",false,"(4*sinh(5*x)-5*sinh(4*x))/(4*sinh(x/2)^2)"]'),
+    ('series_simplified_linear_cosh', 'function_series_endpoint', '@Z_(k=1)^4 k*cosh(kx)',
+     '["\\sum_{k=1}^{4}",null," = ",false,"(1-5*cosh(4*x)+4*cosh(5*x))/(4*sinh(x/2)^2)"]'),
+    ('series_weighted_second_derivative', 'function_series_endpoint', '{Dxx(@Z_(k=1)^4 sin(kx))|x=pi/2}',
+     '["\\sum_{k=1}^{4}","8"," = ",true]'),
+    ('series_weighted_square_sine_unbound', 'function_series_endpoint', '@Z_(k=1)^100 -k^2*sin(kx)',
+     '["\\sum_{k=1}^{100}",null," = "]'),
+    ('series_weighted_square_sine', 'function_series_endpoint', '{@Z_(k=1)^4 -k^2*sin(kx)|x=pi/2}',
+     '["\\sum_{k=1}^{4}","8"," = ",true]'),
+    ('series_weighted_square_cosine', 'function_series_endpoint', '{@Z_(k=1)^4 k^2*cos(kx)|x=pi/2}',
+     '["\\sum_{k=1}^{4}","12"," = ",true]'),
+    ('series_weighted_linear_sine', 'function_series_endpoint', '{@Z_(k=1)^4 k*sin(kx)|x=pi/2}',
+     '["\\sum_{k=1}^{4}","-2"," = ",true]'),
+    ('series_weighted_linear_cosine', 'function_series_endpoint', '{@Z_(k=1)^4 k*cos(kx)|x=pi/2}',
+     '["\\sum_{k=1}^{4}","2"," = ",true]'),
+    ('series_weighted_cubic_sine', 'function_series_endpoint', '{@Z_(k=1)^4 k^3*sin(kx)|x=pi/2}',
+     '["\\sum_{k=1}^{4}","-26"," = ",true]'),
+    ('series_weighted_quartic_cosine', 'function_series_endpoint', '{@Z_(k=1)^4 k^4*cos(kx)|x=pi/2}',
+     '["\\sum_{k=1}^{4}","240"," = ",true]'),
+    ('series_weighted_quintic_sine', 'function_series_endpoint', '{@Z_(k=1)^4 k^5*sin(kx)|x=pi/2}',
+     '["\\sum_{k=1}^{4}","-242"," = ",true]'),
+    ('series_weighted_sextic_cosine', 'function_series_endpoint', '{@Z_(k=1)^4 k^6*cos(kx)|x=pi/2}',
+     '["\\sum_{k=1}^{4}","4032"," = ",true]'),
+    ('series_weighted_quintic_exponential', 'function_series_endpoint', '{@Z_(k=1)^4 k^5*exp(kx)|x=ln(2)}',
+     '["\\sum_{k=1}^{4}","18458"," = ",true]'),
+    ('series_weighted_sextic_sinh', 'function_series_endpoint', '{@Z_(k=1)^4 k^6*sinh(kx)|x=ln(2)}',
+     '["\\sum_{k=1}^{4}","570099/16"," = ",true]'),
+    ('series_weighted_sextic_cosh', 'function_series_endpoint', '{@Z_(k=1)^4 k^6*cosh(kx)|x=ln(2)}',
+     '["\\sum_{k=1}^{4}","575917/16"," = ",true]'),
+    ('series_weighted_shifted_polynomial', 'function_series_endpoint', '{@Z_(k=1)^4 (k+1)^2*sin(kx)|x=pi/2}',
+     '["\\sum_{k=1}^{4}","-12"," = ",true]'),
+    ('series_weighted_symbolic_coefficients', 'function_series_endpoint',
+     '{@Z_(k=1)^4 (a*k^2+b*k+c)*sin(kx)|x=pi/2; a=2,b=3,c=4}',
+     '["\\sum_{k=1}^{4}","-22"," = ",true]'),
+    ('series_weighted_sinh', 'function_series_endpoint', '{@Z_(k=1)^4 k^2*sinh(kx)|x=ln(2)}',
+     '["\\sum_{k=1}^{4}","2739/16"," = ",true]'),
+    ('series_weighted_cosh', 'function_series_endpoint', '{@Z_(k=1)^4 k^2*cosh(kx)|x=ln(2)}',
+     '["\\sum_{k=1}^{4}","2797/16"," = ",true]'),
+    ('series_weighted_exponential', 'function_series_endpoint', '{@Z_(k=1)^4 k^2*exp(kx)|x=ln(2)}',
+     '["\\sum_{k=1}^{4}","346"," = ",true]'),
+    ('series_weighted_renamed_scaled', 'function_series_endpoint', '{@Z_(j=1)^4 j*cos(2jt)|t=pi/4}',
+     '["\\sum_{j=1}^{4}","2"," = ",true]')
+ON CONFLICT(name) DO UPDATE SET input=excluded.input, expected=excluded.expected;
+
+INSERT INTO test_case_runner(module, source, parent, table_name, operation) VALUES (
     'expression.function_series_endpoints', 'tests/expression/test_expr_from_string.c',
     'tests.test_expr_t_from_string.test_from_string_function_series_endpoints',
     'expression_cases', 'function_series_endpoint')
 ON CONFLICT(module) DO UPDATE SET table_name=excluded.table_name, operation=excluded.operation;
+WITH functions(function) AS (VALUES ('sin'), ('cos'), ('sinh'), ('cosh'), ('exp')),
+     powers(degree, second, third) AS (VALUES (1, 2, 3), (2, 4, 9), (3, 8, 27), (4, 16, 81))
+INSERT INTO expression_cases(name, operation, input, expected)
+SELECT 'series_moment_complex_' || function || '_' || degree, 'function_series_endpoint',
+       '{@Z_(k=1)^3 k^' || degree || '*' || function || '(kx)|x=1+i}',
+       json_array('\sum_{k=1}^{3}', function || '(1+i)+' || second || '*' || function || '(2+2i)+' ||
+                  third || '*' || function || '(3+3i)', ' = ', json('true'))
+FROM functions CROSS JOIN powers
+WHERE true
+ON CONFLICT(name) DO UPDATE SET input=excluded.input, expected=excluded.expected;
+
 INSERT INTO expression_cases(name, operation, input, expected) VALUES
     ('series_explicit_sine_unbound', 'function_series_endpoint', '@Z_(k=1)^100 sin(kx)',
      '["\\sum_{k=1}^{100}\\sin(k\\mkern-2mu x)",null,"\\sin(50\\mkern-2mu x)"]'),

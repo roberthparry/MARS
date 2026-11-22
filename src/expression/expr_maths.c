@@ -1767,18 +1767,29 @@ expr_t *deriv_qdigamma(expr_t *expr)
     expr_t *q_term;
     expr_t *z_term;
     expr_t *out;
+    expr_t *base;
+    expr_t *argument;
+    expr_t *normal;
 
     if (!expr || !expr->a || !expr->b)
         return expr_new_const(NUM_NAN);
     dq = expr_get_dx_internal(expr->a);
     dz = expr_get_dx_internal(expr->b);
-    wrts[0] = expr->a;
-    q_partial = expr_new_formal_derivative(expr, 1u, wrts);
-    wrts[0] = expr->b;
-    z_partial = expr_new_formal_derivative(expr, 1u, wrts);
-    q_term = dq && q_partial ? expr_mul(dq, q_partial) : NULL;
-    z_term = dz && z_partial ? expr_mul(dz, z_partial) : NULL;
+    base = expr_simplify(expr->a);
+    argument = expr_simplify(expr->b);
+    normal = base && argument ? expr_qdigamma(base, argument) : NULL;
+    wrts[0] = base;
+    q_partial = normal && dq && !expr_is_exact_zero(dq) ? expr_new_formal_derivative(normal, 1u, wrts) : NULL;
+    wrts[0] = argument;
+    z_partial = normal && dz && !expr_is_exact_zero(dz) ? expr_new_formal_derivative(normal, 1u, wrts) : NULL;
+    q_term = dq && expr_is_exact_zero(dq) ? expr_const_zero() :
+             dq && q_partial ? expr_mul(dq, q_partial) : NULL;
+    z_term = dz && expr_is_exact_zero(dz) ? expr_const_zero() :
+             dz && z_partial ? expr_mul(dz, z_partial) : NULL;
     out = q_term && z_term ? expr_add(q_term, z_term) : NULL;
+    expr_free(normal);
+    expr_free(argument);
+    expr_free(base);
     expr_free(z_term);
     expr_free(q_term);
     expr_free(z_partial);

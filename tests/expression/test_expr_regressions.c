@@ -2136,7 +2136,7 @@ static void test_simplify_trig_and_hyperbolic_identities(void)
         },
         {
             "{ i^3*sinh(x) | x = ? }",
-            "{ (-i)·sinh(x) | x = ? }",
+            "{ -i·sinh(x) | x = ? }",
             "i^3*sinh(x) simplifies to -i*sinh(x)",
         },
         {

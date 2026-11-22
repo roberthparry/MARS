@@ -186,7 +186,7 @@ LAB_WASM_MEMORY_EXPORTS := --export=memset --export=memcpy --export=memmove --ex
 # Solid-axis projection nests roughly 74 KiB of C frames. Keep explicit headroom
 # and place the stack before static data so an overflow traps instead of corrupting it.
 LAB_WASM_STACK_FLAGS := --stack-first -z stack-size=262144
-LAB_WASM_CFLAGS := --target=wasm32-unknown-unknown -O2 -Wall -Wextra -Werror -ffreestanding -fno-builtin -fvisibility=default \
+LAB_WASM_CFLAGS := --target=wasm32-unknown-unknown -std=$(C_STANDARD) -O2 -Wall -Wextra -Werror -ffreestanding -fno-builtin -fvisibility=default \
                    -nostdlib -nostdlibinc -Wmissing-prototypes -isystem "$(LAB_WASM_INCLUDE)" -Iinclude -Itools/mars_lab/wasm/include
 
 # Compile the actual library module for both browser integration and independent WASM clients.
@@ -348,7 +348,7 @@ check-lab-wasm-deps:
 	    'int mars_wasm_memory_probe(char *dst, const char *src, unsigned length) {' \
 	    'memset(dst, 0, length); memcpy(dst, src, length); memmove(dst, src, length);' \
 	    'return memcmp(dst, src, length) + (int)strlen(src); }' \
-	    | "$(LAB_WASM_CC)" --target=wasm32-unknown-unknown -ffreestanding -fno-builtin -fvisibility=default -nostdlib -nostdlibinc \
+	    | "$(LAB_WASM_CC)" --target=wasm32-unknown-unknown -std=$(C_STANDARD) -ffreestanding -fno-builtin -fvisibility=default -nostdlib -nostdlibinc \
 	        -isystem "$(LAB_WASM_INCLUDE)" -Iinclude -x c -c - \
 	        -o "$$probe_dir/probe.o" >"$$probe_dir/probe.log" 2>&1; then \
 	    echo "MARS Lab requires Clang's wasm32-unknown-unknown target and WASM maths headers." >&2; \

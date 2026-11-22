@@ -44,6 +44,14 @@ void emit_func_abs(const expr_t *f, sbuf_t *b, int parent_prec)
         return;
     }
 
+    if (expr_is_op(f, &ops_summation) && expr_is_negative(f->a)) {
+        expr_t *positive = expr_positive_summation(f);
+        if (positive)
+            emit_func(positive, b, parent_prec);
+        expr_free(positive);
+        return;
+    }
+
     if (expr_is_neg(f)) {
         emit_func(f->a, b, parent_prec);
         return;
@@ -617,6 +625,12 @@ void emit_func(const expr_t *f, sbuf_t *b, int parent_prec)
             const expr_t *upper = NULL;
             number_t upper_value = NUM_NAN;
             bool infinite = false;
+            bool negative = expr_is_op(f, &ops_summation) && expr_is_negative(f->a);
+            bool grouped = negative && parent_prec >= PREC_ADD;
+            if (grouped)
+                sbuf_putc(b, '(');
+            if (negative)
+                sbuf_putc(b, '-');
 
             if (expr_is_op(f->b, &ops_argument_list)) {
                 index = f->b->a;
@@ -643,8 +657,13 @@ void emit_func(const expr_t *f, sbuf_t *b, int parent_prec)
             else
                 sbuf_puts(b, "@inf");
             sbuf_puts(b, ", ");
-            emit_func(f->a, b, 0);
+            if (negative)
+                emit_func_abs(f->a, b, 0);
+            else
+                emit_func(f->a, b, 0);
             sbuf_putc(b, ')');
+            if (grouped)
+                sbuf_putc(b, ')');
             num_destroy(&upper_value);
             return;
         }

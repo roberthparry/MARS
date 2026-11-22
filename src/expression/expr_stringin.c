@@ -396,7 +396,7 @@ static expr_t *parse_derivative_function(size_t count, expr_t *const *args)
 {
     if (count == 2u)
         return expr_new_ordered_derivative(args[0], args[1]);
-    if (count != 3u || (!expr_is_var(args[1]) && !(expr_is_const(args[1]) && args[1]->name)))
+    if (count != 3u || expr_is_unnamed_const(args[1]))
         return NULL;
     number_t value = NUM_NAN;
     long numerator = 0, denominator = 0;

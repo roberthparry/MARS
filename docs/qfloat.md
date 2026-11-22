@@ -159,7 +159,7 @@ extend `printf` for `qfloat_t` arguments passed by value.
 
 Compared with `double`, `qfloat_t` offers more precision at higher runtime cost.
 Compared with arbitrary-precision libraries it is lighter-weight and simpler
-to integrate into a C99 codebase.
+to integrate into a C17 codebase.
 
 ## Platform Notes
 

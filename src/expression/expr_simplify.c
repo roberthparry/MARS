@@ -1481,7 +1481,7 @@ int expr_fold_trigamma_const(const number_t *in, number_t *out)
     return 1;
 }
 
-int expr_fold_cos_const(const number_t *in, number_t *out)
+int expr_fold_zero_to_one(const number_t *in, number_t *out)
 {
     if (!in || !out || !num_eq(*in, NUM_ZERO))
         return 0;
@@ -1896,14 +1896,6 @@ int expr_fold_acot_const(const number_t *in, number_t *out)
     unsigned long denom;
 
     return expr_inverse_trig_exact_pi_ratio(&ops_acot, in, &numer, &denom) && expr_fold_to_pi_ratio(numer, denom, out);
-}
-
-int expr_fold_exp_const(const number_t *in, number_t *out)
-{
-    if (!in || !out || !num_eq(*in, NUM_ZERO))
-        return 0;
-    *out = NUM_ONE;
-    return 1;
 }
 
 int expr_fold_log_const(const number_t *in, number_t *out)

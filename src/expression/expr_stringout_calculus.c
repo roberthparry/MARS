@@ -75,6 +75,19 @@ void emit_expr_integral(const expr_t *f, sbuf_t *b, int parent_prec)
 
 void emit_formal_derivative_expr(const expr_t *f, sbuf_t *b)
 {
+    for (size_t i = 0u; i < f->formal_wrt_count; ++i) {
+        if (!f->formal_wrts[i]->name) {
+            for (size_t j = 0u; j < f->formal_wrt_count; ++j)
+                sbuf_puts(b, "derivative(");
+            emit_expr(f->a, b, PREC_LOWEST);
+            for (size_t j = 0u; j < f->formal_wrt_count; ++j) {
+                sbuf_puts(b, ", ");
+                emit_expr(f->formal_wrts[j], b, PREC_LOWEST);
+                sbuf_puts(b, ", 1)");
+            }
+            return;
+        }
+    }
     sbuf_putc(b, 'D');
     for (size_t i = 0u; i < f->formal_wrt_count; ++i) {
         const expr_t *wrt = f->formal_wrts[i];
@@ -195,7 +208,7 @@ void emit_formal_derivative_func(const expr_t *f, sbuf_t *b)
         while (end < f->formal_wrt_count && expr_struct_eq(f->formal_wrts[i], f->formal_wrts[end]))
             ++end;
         sbuf_puts(b, ", ");
-        emit_name_func(b, f->formal_wrts[i]->name ? f->formal_wrts[i]->name : "x");
+        emit_func(f->formal_wrts[i], b, PREC_LOWEST);
         char order[32];
         snprintf(order, sizeof(order), ", %zu)", end - i);
         sbuf_puts(b, order);

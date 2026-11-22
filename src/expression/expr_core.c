@@ -239,7 +239,15 @@ const expr_t *expr_current_wrt_internal(void)
 
 number_t expr_eval(const expr_t *expr)
 {
-    return num_clone(expr_eval_num_internal(expr));
+    number_t value = num_clone(expr_eval_num_internal(expr));
+    number_t finite = NUM_NAN;
+    if (num_is_nan(value) && expr_computation_active() &&
+        expr_finite_qdigamma_progression_derivative_value(expr, &finite)) {
+        num_destroy(&value);
+        value = finite;
+        expr_store_value_num((expr_t *)expr, num_clone(value));
+    }
+    return value;
 }
 
 /* ------------------------------------------------------------------------- */

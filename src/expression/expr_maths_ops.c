@@ -2125,13 +2125,14 @@ static void expr_scan_qdigammas(const expr_t *expr, expr_qdigamma_scan_t *scan)
             scan->first = expr;
             scan->single_base = true;
         } else if (expr_struct_eq(scan->first->a, expr->a)) {
-            if (!scan->second)
+            if (!scan->second && !expr_struct_eq(scan->first->b, expr->b))
                 scan->second = expr;
         } else {
             scan->single_base = false;
             if (!scan->alternate_first)
                 scan->alternate_first = expr;
-            else if (!scan->alternate_second && expr_struct_eq(scan->alternate_first->a, expr->a))
+            else if (!scan->alternate_second && expr_struct_eq(scan->alternate_first->a, expr->a) &&
+                     !expr_struct_eq(scan->alternate_first->b, expr->b))
                 scan->alternate_second = expr;
         }
     }
@@ -2213,8 +2214,38 @@ static expr_t *expr_simplified_progression_step(expr_t *raw_step)
     return step;
 }
 
+static bool expr_qdigamma_exact_coefficient(number_t value)
+{
+    NUM_SCOPE(numbers);
+    /* The generated Gaussian coefficients are binary-exact multiples of 1/16,
+       including half-imaginary shifts, even when held in a complex backend. */
+    return num_is_exact(value) ||
+           (num_is_integer(num_mul_long(num_real_part(value), 16L)) &&
+            num_is_integer(num_mul_long(num_imag_part(value), 16L)));
+}
+
+/* Fold a Gaussian coefficient before symbolic rebuilding, preserving the other
+   factor and its live bindings. General complex division need not cancel it. */
+static expr_t *expr_scale_progression_exponent(const expr_t *exponent, number_t scale)
+{
+    NUM_SCOPE(numbers);
+    if (expr_is_neg(exponent))
+        return expr_scale_progression_exponent(exponent->a, num_neg(scale));
+    if (!expr_is_mul(exponent))
+        return NULL;
+    const expr_t *coefficient = expr_is_unnamed_const(exponent->a) ? exponent->a : exponent->b;
+    const expr_t *factor = coefficient == exponent->a ? exponent->b : exponent->a;
+    if (!expr_is_unnamed_const(coefficient) || !expr_qdigamma_exact_coefficient(coefficient->c))
+        return NULL;
+    expr_t *scaled = expr_new_const(num_mul(coefficient->c, scale));
+    expr_t *result = scaled ? expr_mul(scaled, factor) : NULL;
+    expr_free(scaled);
+    return result;
+}
+
 static expr_t *expr_finite_tan_cot_step_from_q(const expr_t *q)
 {
+    NUM_SCOPE(numbers);
     expr_t *imaginary_unit;
     expr_t *divisor;
     expr_t *raw_step;
@@ -2232,6 +2263,9 @@ static expr_t *expr_finite_tan_cot_step_from_q(const expr_t *q)
         return half_step;
     }
 
+    raw_step = expr_scale_progression_exponent(q->a, num_neg(num_div(NUM_I, NUM_TWO)));
+    if (raw_step)
+        return expr_simplified_progression_step(raw_step);
     imaginary_unit = expr_new_named_const(NUM_I, "i");
     divisor = imaginary_unit ? expr_mul_long(imaginary_unit, 2L) : NULL;
     raw_step = divisor ? expr_div(q->a, divisor) : NULL;
@@ -2242,6 +2276,7 @@ static expr_t *expr_finite_tan_cot_step_from_q(const expr_t *q)
 
 static expr_t *expr_finite_sec_cosec_step_from_q(const expr_t *q)
 {
+    NUM_SCOPE(numbers);
     const expr_t *left;
     const expr_t *right;
     const expr_t *exponent;
@@ -2255,6 +2290,9 @@ static expr_t *expr_finite_sec_cosec_step_from_q(const expr_t *q)
     if (!expr_is_op(q, &ops_exp) || !q->a)
         return expr_euler_base_step(q);
 
+    raw_step = expr_scale_progression_exponent(q->a, num_neg(NUM_I));
+    if (raw_step)
+        return expr_simplified_progression_step(raw_step);
     exponent = q->a;
     while (expr_is_op(exponent, &ops_neg) && exponent->a) {
         negate_step = !negate_step;
@@ -2320,6 +2358,227 @@ static const expr_qdigamma_progression_t s_qdigamma_progressions[] = {
     {expr_cosech, expr_finite_cosech_progression_closed_form, expr_finite_sech_cosech_step_from_q, EXPR_QDIGAMMA_SECANT_NONE},
 };
 
+/* Exact unnamed coefficients may retain different source spelling, such as 4*i
+   and i*4. Their provenance is immaterial to recognising this finite identity. */
+static bool expr_qdigamma_candidate_atoms_equal(const expr_t *left, const expr_t *right);
+static bool expr_qdigamma_fraction_equal(const expr_t *left, const expr_t *right);
+static expr_t *expr_qdigamma_expand_constant(const expr_binding_expr_t *binding);
+
+/* Generated quotient identities contain fewer than sixteen factors per product.
+   This bounded algebraic proof does not search an operator registry. */
+static bool expr_qdigamma_product_parts(const expr_t *expr, number_t *coefficient,
+                                       const expr_t **factors, size_t *count)
+{
+    if (expr_is_mul(expr))
+        return expr_qdigamma_product_parts(expr->a, coefficient, factors, count) &&
+               expr_qdigamma_product_parts(expr->b, coefficient, factors, count);
+    if (expr_is_neg(expr)) {
+        number_t negative = num_neg(*coefficient);
+        num_destroy(coefficient);
+        *coefficient = negative;
+        return expr_qdigamma_product_parts(expr->a, coefficient, factors, count);
+    }
+    bool imaginary_unit = expr_is_const(expr) && expr->name && strcmp(expr->name, "i") == 0 &&
+                          num_eq(expr->c, NUM_I);
+    if ((expr_is_unnamed_const(expr) || imaginary_unit) && expr_qdigamma_exact_coefficient(expr->c)) {
+        number_t product = num_mul(*coefficient, expr->c);
+        num_destroy(coefficient);
+        *coefficient = product;
+        return true;
+    }
+    if (expr_is_unnamed_const(expr) && expr->binding_expr &&
+        expr->binding_expr->kind != EXPR_BINDING_EXPR_NUMBER &&
+        expr->binding_expr->kind != EXPR_BINDING_EXPR_CONST) {
+        expr_t *expanded = expr_qdigamma_expand_constant(expr->binding_expr);
+        if (expanded && !expr_struct_eq(expanded, expr)) {
+            bool ok = expr_qdigamma_product_parts(expanded, coefficient, factors, count);
+            expr_free(expanded);
+            return ok;
+        }
+        expr_free(expanded);
+    }
+    if (*count == 16u)
+        return false;
+    expr_retain(expr);
+    factors[(*count)++] = expr;
+    return true;
+}
+
+static bool expr_qdigamma_products_equal(const expr_t *left, const expr_t *right)
+{
+    const expr_t *a[16], *b[16];
+    size_t an = 0u, bn = 0u;
+    number_t ac = num_clone(NUM_ONE), bc = num_clone(NUM_ONE);
+    bool equal = expr_qdigamma_product_parts(left, &ac, a, &an) &&
+                 expr_qdigamma_product_parts(right, &bc, b, &bn) && an == bn && num_eq(ac, bc);
+    bool used[16] = {false};
+    for (size_t i = 0u; equal && i < an; ++i) {
+        bool matched = false;
+        for (size_t j = 0u; !matched && j < bn; ++j) {
+            if (!used[j] && expr_qdigamma_candidate_atoms_equal(a[i], b[j])) {
+                used[j] = true;
+                matched = true;
+            }
+        }
+        equal = matched;
+    }
+    num_destroy(&bc);
+    num_destroy(&ac);
+    for (size_t i = 0u; i < bn; ++i)
+        expr_free((expr_t *)b[i]);
+    for (size_t i = 0u; i < an; ++i)
+        expr_free((expr_t *)a[i]);
+    return equal;
+}
+
+/* Restore exact constant provenance without immediately folding pi*i back to a numerical atom. */
+static expr_t *expr_qdigamma_expand_constant(const expr_binding_expr_t *binding)
+{
+    static const expr_ops_t *const arithmetic[] = {&ops_add, &ops_sub, &ops_mul, &ops_div};
+    if (binding->kind >= EXPR_BINDING_EXPR_ADD && binding->kind <= EXPR_BINDING_EXPR_DIV) {
+        expr_t *left = expr_binding_expr_eval_expr(binding->u.binary.left);
+        expr_t *right = expr_binding_expr_eval_expr(binding->u.binary.right);
+        if (left && right)
+            return expr_new_binary_internal(arithmetic[binding->kind - EXPR_BINDING_EXPR_ADD], left, right);
+        expr_free(right);
+        expr_free(left);
+        return NULL;
+    }
+    if (binding->kind == EXPR_BINDING_EXPR_NEG) {
+        expr_t *child = expr_binding_expr_eval_expr(binding->u.unary.child);
+        return child ? expr_new_unary_internal(&ops_neg, child) : NULL;
+    }
+    return expr_binding_expr_eval_expr(binding);
+}
+
+static bool expr_qdigamma_candidate_atoms_equal(const expr_t *left, const expr_t *right)
+{
+    if (expr_struct_eq(left, right))
+        return true;
+    if (!left || !right)
+        return false;
+    if (expr_is_op(left, &ops_sub)) {
+        expr_t *negative = expr_neg(left->b);
+        expr_t *sum = negative ? expr_add(left->a, negative) : NULL;
+        bool equal = sum && expr_qdigamma_candidate_atoms_equal(sum, right);
+        expr_free(sum);
+        expr_free(negative);
+        return equal;
+    }
+    if (expr_is_op(right, &ops_sub)) {
+        expr_t *negative = expr_neg(right->b);
+        expr_t *sum = negative ? expr_add(right->a, negative) : NULL;
+        bool equal = sum && expr_qdigamma_candidate_atoms_equal(left, sum);
+        expr_free(sum);
+        expr_free(negative);
+        return equal;
+    }
+    if (expr_is_unnamed_const(left) && left->binding_expr &&
+        !expr_qdigamma_exact_coefficient(left->c) &&
+        left->binding_expr->kind != EXPR_BINDING_EXPR_NUMBER &&
+        left->binding_expr->kind != EXPR_BINDING_EXPR_CONST) {
+        expr_t *expanded = expr_qdigamma_expand_constant(left->binding_expr);
+        bool equal = expanded && !expr_struct_eq(expanded, left) &&
+                     expr_qdigamma_candidate_atoms_equal(expanded, right);
+        expr_free(expanded);
+        return equal;
+    }
+    if (expr_is_unnamed_const(right) && right->binding_expr &&
+        !expr_qdigamma_exact_coefficient(right->c) &&
+        right->binding_expr->kind != EXPR_BINDING_EXPR_NUMBER &&
+        right->binding_expr->kind != EXPR_BINDING_EXPR_CONST) {
+        expr_t *expanded = expr_qdigamma_expand_constant(right->binding_expr);
+        bool equal = expanded && !expr_struct_eq(expanded, right) &&
+                     expr_qdigamma_candidate_atoms_equal(left, expanded);
+        expr_free(expanded);
+        return equal;
+    }
+    if (expr_is_div(left) || expr_is_div(right))
+        return expr_qdigamma_fraction_equal(left, right);
+    if (expr_is_mul(left) || expr_is_mul(right) || expr_is_neg(left) || expr_is_neg(right))
+        return expr_qdigamma_products_equal(left, right);
+    if (left->ops != right->ops)
+        return false;
+    if (expr_is_const(left)) {
+        bool equal = expr_is_unnamed_const(left) && expr_is_unnamed_const(right) &&
+               expr_qdigamma_exact_coefficient(left->c) && expr_qdigamma_exact_coefficient(right->c) &&
+               num_eq(left->c, right->c);
+        return equal;
+    }
+    if (expr_is_formal_derivative(left)) {
+        if (left->formal_wrt_count != right->formal_wrt_count)
+            return false;
+        if (!expr_qdigamma_candidate_atoms_equal(left->a, right->a))
+            return false;
+        for (size_t i = 0u; i < left->formal_wrt_count; ++i) {
+            if (!expr_qdigamma_candidate_atoms_equal(left->formal_wrts[i], right->formal_wrts[i]))
+                return false;
+        }
+        return true;
+    }
+    if (expr_is_var(left) || left->ops->arity == EXPR_OP_ATOM || left->name || right->name)
+        return false;
+    if (expr_is_pow_d_expr(left) && !num_eq(left->c, right->c))
+        return false;
+    if (expr_qdigamma_candidate_atoms_equal(left->a, right->a) &&
+        expr_qdigamma_candidate_atoms_equal(left->b, right->b))
+        return true;
+    bool swapped = expr_is_op(left, &ops_add) && expr_qdigamma_candidate_atoms_equal(left->a, right->b) &&
+           expr_qdigamma_candidate_atoms_equal(left->b, right->a);
+    return swapped;
+}
+
+/* Split only the outer product and quotient, leaving special-function operands intact. */
+static bool expr_qdigamma_fraction_parts(const expr_t *expr, expr_t **numerator, expr_t **denominator)
+{
+    if (!expr)
+        return false;
+    if (expr_is_neg(expr)) {
+        if (!expr_qdigamma_fraction_parts(expr->a, numerator, denominator))
+            return false;
+        expr_t *negative = expr_neg(*numerator);
+        expr_free(*numerator);
+        *numerator = negative;
+        return negative != NULL;
+    }
+    if (!expr_is_mul(expr) && !expr_is_div(expr)) {
+        *numerator = expr_clone(expr);
+        *denominator = expr_new_const(NUM_ONE);
+        return *numerator && *denominator;
+    }
+    expr_t *an = NULL, *ad = NULL, *bn = NULL, *bd = NULL;
+    bool ok = expr_qdigamma_fraction_parts(expr->a, &an, &ad) &&
+              expr_qdigamma_fraction_parts(expr->b, &bn, &bd);
+    if (ok) {
+        bool divide = expr_is_div(expr);
+        *numerator = expr_mul(an, divide ? bd : bn);
+        *denominator = expr_mul(ad, divide ? bn : bd);
+        ok = *numerator && *denominator;
+    }
+    expr_free(bd);
+    expr_free(bn);
+    expr_free(ad);
+    expr_free(an);
+    return ok;
+}
+
+static bool expr_qdigamma_fraction_equal(const expr_t *left, const expr_t *right)
+{
+    expr_t *an = NULL, *ad = NULL, *bn = NULL, *bd = NULL;
+    bool ok = expr_qdigamma_fraction_parts(left, &an, &ad) &&
+              expr_qdigamma_fraction_parts(right, &bn, &bd);
+    expr_t *a = ok ? expr_mul(an, bd) : NULL;
+    expr_t *b = ok ? expr_mul(bn, ad) : NULL;
+    bool equal = a && b && expr_qdigamma_candidate_atoms_equal(a, b);
+    expr_free(b);
+    expr_free(a);
+    expr_free(bd);
+    expr_free(bn);
+    expr_free(ad);
+    expr_free(an);
+    return equal;
+}
+
 static bool expr_matches_finite_qdigamma_candidate(const expr_t *expr, const expr_t *candidate)
 {
     expr_t *difference;
@@ -2330,23 +2589,62 @@ static bool expr_matches_finite_qdigamma_candidate(const expr_t *expr, const exp
         return false;
     if (expr_struct_eq(expr, candidate))
         return true;
-    difference = expr_sub(expr, candidate);
+    /* Normalise arguments before cancellation: psi_q(n + 1) and psi_q(1001)
+       must be the same atom when n is the exact integer 1000. */
+    expr_t *normal_expr = expr_simplify(expr);
+    expr_t *normal_candidate = expr_simplify(candidate);
+    if (normal_expr && normal_candidate && expr_qdigamma_candidate_atoms_equal(normal_expr, normal_candidate)) {
+        expr_free(normal_candidate);
+        expr_free(normal_expr);
+        return true;
+    }
+    /* Re-reading a product containing a quotient can move the denominator:
+       (a/b)*c and (a*c)/b have the same exact factors. */
+    bool same_factors = normal_expr && normal_candidate &&
+                        expr_qdigamma_fraction_equal(normal_expr, normal_candidate);
+    if (same_factors) {
+        expr_free(normal_candidate);
+        expr_free(normal_expr);
+        return true;
+    }
+    difference = normal_expr && normal_candidate ? expr_sub(normal_expr, normal_candidate) : NULL;
     simplified = difference ? expr_simplify(difference) : NULL;
     matched = simplified && expr_is_exact_zero(simplified);
     expr_free(simplified);
     expr_free(difference);
+    expr_free(normal_candidate);
+    expr_free(normal_expr);
     return matched;
 }
 
 static expr_t *expr_recover_qdigamma_progression(const expr_t *expr, const expr_qdigamma_scan_t *scan,
-                                                 const expr_t *base_qdigamma, const expr_t *upper)
+                                                 const expr_t *base_qdigamma, const expr_t *upper,
+                                                 const expr_t *wrt)
 {
     const bool circular_base = expr_q_base_is_circular(base_qdigamma->a);
+    if (wrt) {
+        expr_t *upper_derivative = expr_create_deriv(upper, wrt);
+        bool fixed = upper_derivative && expr_is_exact_zero(upper_derivative);
+        expr_free(upper_derivative);
+        if (!fixed)
+            return NULL;
+    }
 
     for (size_t progression_index = 0u;
          progression_index < sizeof(s_qdigamma_progressions) / sizeof(s_qdigamma_progressions[0]);
          ++progression_index) {
         const expr_qdigamma_progression_t *progression = &s_qdigamma_progressions[progression_index];
+        /* Single-base identities have either the unshifted cotangent pair or
+           the shifted secant quartet. Two-base identities are tangent/cosecant. */
+        if (wrt) {
+            unsigned family = (unsigned)(progression_index % 4u);
+            bool unshifted = (scan->first && expr_is_unnamed_const(scan->first->b) &&
+                              num_is_one(scan->first->b->c)) ||
+                             (scan->second && expr_is_unnamed_const(scan->second->b) &&
+                              num_is_one(scan->second->b->c));
+            if (scan->single_base ? family != (unshifted ? 1u : 2u) : family != 0u && family != 3u)
+                continue;
+        }
         const bool secant_signature = scan->count == 4u && scan->single_base &&
                                       !expr_is_exact_one_value(base_qdigamma->b) &&
                                       ((progression->secant_signature == EXPR_QDIGAMMA_SECANT_CIRCULAR &&
@@ -2357,12 +2655,23 @@ static expr_t *expr_recover_qdigamma_progression(const expr_t *expr, const expr_
         expr_t *candidate = step ? progression->closed_form(upper, step) : NULL;
         expr_t *sum;
 
-        if (!secant_signature && !expr_matches_finite_qdigamma_candidate(expr, candidate)) {
+        if (wrt && candidate) {
+            expr_t *derivative = expr_create_deriv(candidate, wrt);
+            expr_free(candidate);
+            candidate = derivative;
+        }
+        bool matched = !(wrt || !secant_signature) || expr_matches_finite_qdigamma_candidate(expr, candidate);
+        if (!matched) {
             expr_free(candidate);
             expr_free(step);
             continue;
         }
         sum = expr_finite_progression_sum(upper, step, progression);
+        if (wrt && sum) {
+            expr_t *derivative = expr_create_deriv(sum, wrt);
+            expr_free(sum);
+            sum = derivative;
+        }
         expr_free(candidate);
         expr_free(step);
         return sum;
@@ -2371,7 +2680,7 @@ static expr_t *expr_recover_qdigamma_progression(const expr_t *expr, const expr_
 }
 
 static expr_t *expr_recover_qdigamma_pair(const expr_t *expr, const expr_qdigamma_scan_t *scan,
-                                          const expr_t *first, const expr_t *second)
+                                          const expr_t *first, const expr_t *second, const expr_t *wrt)
 {
     expr_t *raw_upper;
     expr_t *upper;
@@ -2386,10 +2695,10 @@ static expr_t *expr_recover_qdigamma_pair(const expr_t *expr, const expr_qdigamm
     if (!upper)
         return NULL;
 
-    sum = expr_recover_qdigamma_progression(expr, scan, first, upper);
+    sum = expr_recover_qdigamma_progression(expr, scan, first, upper, wrt);
     if (!sum) {
         negative_upper = expr_neg(upper);
-        sum = negative_upper ? expr_recover_qdigamma_progression(expr, scan, first, negative_upper) : NULL;
+        sum = negative_upper ? expr_recover_qdigamma_progression(expr, scan, first, negative_upper, wrt) : NULL;
         expr_free(negative_upper);
     }
     expr_free(upper);
@@ -2405,8 +2714,129 @@ expr_t *expr_finite_progression_from_qdigamma_form(const expr_t *expr)
     if (!expr)
         return NULL;
     expr_scan_qdigammas(expr, &scan);
-    sum = expr_recover_qdigamma_pair(expr, &scan, scan.first, scan.second);
-    return sum ? sum : expr_recover_qdigamma_pair(expr, &scan, scan.alternate_first, scan.alternate_second);
+    sum = expr_recover_qdigamma_pair(expr, &scan, scan.first, scan.second, NULL);
+    return sum ? sum : expr_recover_qdigamma_pair(expr, &scan, scan.alternate_first, scan.alternate_second, NULL);
+}
+
+/* Only finite quotient families need partial derivatives with respect to a changing q base. */
+expr_t *expr_finite_qdigamma_progression_derivative_form(const expr_t *expr, const expr_t *wrt)
+{
+    const expr_t *upper = NULL;
+    const expr_ops_t *function = NULL;
+    expr_t *step = NULL;
+    if (!wrt || !expr_finite_progression_parts(expr, &upper, &step, &function)) {
+        expr_free(step);
+        return NULL;
+    }
+    unsigned slot = expr_trig_slot(function->kind);
+    bool quotient = slot < 12u && slot % 6u >= 2u;
+    expr_t *upper_derivative = quotient ? expr_create_deriv(upper, wrt) : NULL;
+    expr_t *closed = upper_derivative && expr_is_exact_zero(upper_derivative)
+                         ? function->finite_progression(upper, step) : NULL;
+    expr_t *derivative = closed ? expr_create_deriv(closed, wrt) : NULL;
+    expr_t *linked = derivative ? expr_clone_linked_symbols(derivative, expr) : NULL;
+    expr_free(derivative);
+    expr_free(closed);
+    expr_free(upper_derivative);
+    expr_free(step);
+    return linked;
+}
+
+static bool expr_has_qdigamma_partial(const expr_t *expr)
+{
+    if (!expr)
+        return false;
+    if (expr_is_formal_derivative(expr) && expr_is_op(expr->a, &ops_qdigamma))
+        return true;
+    return expr_has_qdigamma_partial(expr->a) || expr_has_qdigamma_partial(expr->b);
+}
+
+/* Each supported identity has at most four distinct q-digamma operands; repeated partials share those operands. */
+static bool expr_collect_qdigamma_operands(const expr_t *expr, const expr_t **operands, size_t *count)
+{
+    if (!expr)
+        return true;
+    if (expr_is_op(expr, &ops_qdigamma)) {
+        for (size_t i = 0u; i < *count; ++i)
+            if (expr_qdigamma_candidate_atoms_equal(operands[i], expr))
+                return true;
+        if (*count == 4u)
+            return false;
+        operands[(*count)++] = expr;
+        return true;
+    }
+    return expr_collect_qdigamma_operands(expr->a, operands, count) &&
+           expr_collect_qdigamma_operands(expr->b, operands, count);
+}
+
+/* Try the fundamental exponential base before its square; no bound coordinate values enter this proof. */
+static bool expr_qdigamma_base_is_square(const expr_t *square, const expr_t *base)
+{
+    if (square->ops->kind != EXPR_KIND_EXP || base->ops->kind != EXPR_KIND_EXP)
+        return false;
+    expr_t *twice = expr_mul_long(base->a, 2L);
+    expr_t *difference = twice ? expr_sub(square->a, twice) : NULL;
+    expr_t *normal = difference ? expr_simplify(difference) : NULL;
+    bool matched = normal && expr_is_exact_zero(normal);
+    expr_free(normal);
+    expr_free(difference);
+    expr_free(twice);
+    return matched;
+}
+
+/* The eight fixed quotient identities are proof candidates, not numerical interpolation or domain guesses. */
+bool expr_finite_qdigamma_progression_derivative_value(const expr_t *expr, number_t *value_out)
+{
+    static _Thread_local bool recovering;
+    if (recovering || !value_out || !expr_has_qdigamma_partial(expr))
+        return false;
+    recovering = true;
+    expr_qdigamma_scan_t scan = {0};
+    expr_scan_qdigammas(expr, &scan);
+    const expr_t *operands[4] = {0};
+    size_t count = 0u;
+    number_t value = NUM_NAN;
+    bool found = false;
+    bool bounded = expr_collect_qdigamma_operands(expr, operands, &count);
+    for (size_t i = 1u; bounded && i < count; ++i) {
+        if (expr_qdigamma_base_is_square(operands[0]->a, operands[i]->a)) {
+            const expr_t *first = operands[0];
+            operands[0] = operands[i];
+            operands[i] = first;
+            break;
+        }
+    }
+    for (size_t base = 0u; bounded && !found && base < count; ++base) {
+        expr_bindings_t *bindings = expr_bindings_from_expr_internal(operands[base]->a);
+        /* Coordinate enumeration is bounded to the actual symbols in this base, never a function registry scan. */
+        for (size_t i = 0u; !found && i < expr_bindings_count(bindings); ++i) {
+            expr_t *wrt = expr_bindings_expr_at(bindings, i);
+            if (!expr_is_var(wrt))
+                continue;
+            number_t coordinate = expr_eval(wrt);
+            bool bound = num_is_finite(coordinate);
+            num_destroy(&coordinate);
+            if (!bound)
+                continue;
+            for (size_t end = base + 1u; !found && end < count; ++end) {
+                if (!expr_struct_eq(operands[base]->a, operands[end]->a))
+                    continue;
+                expr_t *sum = expr_recover_qdigamma_pair(expr, &scan, operands[base], operands[end], wrt);
+                if (sum) {
+                    value = expr_eval(sum);
+                    found = num_is_finite(value);
+                    if (!found)
+                        num_destroy(&value);
+                }
+                expr_free(sum);
+            }
+        }
+        expr_bindings_free(bindings);
+    }
+    recovering = false;
+    if (found)
+        *value_out = value;
+    return found;
 }
 
 /* Recover a finite tangent progression represented by its q-digamma identity. */
@@ -2629,61 +3059,55 @@ static expr_t *expr_finite_exponential_progression_closed_form(const expr_t *upp
 
 static expr_t *expr_finite_atan_progression_closed_form(const expr_t *upper, const expr_t *step)
 {
+    /* A real-domain identity must not project an explicitly complex input onto the real axis. */
+    number_t step_value = expr_eval(step);
+    bool complex_step = num_is_finite(step_value) && !num_is_real(step_value);
+    num_destroy(&step_value);
+    if (complex_step)
+        return NULL;
+
     number_t pi_value = num_const(NUM_PI);
     expr_t *imaginary_unit = expr_new_named_const(NUM_I, "i");
     expr_t *pi = expr_new_named_const(pi_value, "@pi");
     expr_t *one = expr_new_const(NUM_ONE);
+    expr_t *zero = expr_new_const(NUM_ZERO);
     expr_t *i_over_step = imaginary_unit ? expr_div(imaginary_unit, step) : NULL;
     expr_t *upper_plus_one = expr_add_long(upper, 1L);
-    expr_t *upper_minus = upper_plus_one && i_over_step ? expr_sub(upper_plus_one, i_over_step) : NULL;
-    expr_t *lower_minus = one && i_over_step ? expr_sub(one, i_over_step) : NULL;
     expr_t *upper_plus = upper_plus_one && i_over_step ? expr_add(upper_plus_one, i_over_step) : NULL;
     expr_t *lower_plus = one && i_over_step ? expr_add(one, i_over_step) : NULL;
-    expr_t *lgamma_upper_minus = upper_minus ? expr_lgamma(upper_minus) : NULL;
-    expr_t *lgamma_lower_minus = lower_minus ? expr_lgamma(lower_minus) : NULL;
     expr_t *lgamma_upper_plus = upper_plus ? expr_lgamma(upper_plus) : NULL;
     expr_t *lgamma_lower_plus = lower_plus ? expr_lgamma(lower_plus) : NULL;
-    expr_t *plus_difference = lgamma_upper_plus && lgamma_lower_plus
-                                  ? expr_sub(lgamma_upper_plus, lgamma_lower_plus)
-                                  : NULL;
-    expr_t *with_lower_minus = plus_difference && lgamma_lower_minus
-                                   ? expr_add(plus_difference, lgamma_lower_minus)
-                                   : NULL;
-    expr_t *gamma_correction = with_lower_minus && lgamma_upper_minus
-                                   ? expr_sub(with_lower_minus, lgamma_upper_minus)
-                                   : NULL;
+    /* lgamma is the continuous analytic logarithm, not a wrapped logarithm of the gamma quotient. */
+    expr_t *difference = lgamma_lower_plus && lgamma_upper_plus
+                             ? expr_sub(lgamma_lower_plus, lgamma_upper_plus) : NULL;
+    expr_t *gamma_contribution = difference ? expr_imag_coordinate(difference) : NULL;
     expr_t *upper_pi = pi ? expr_mul(upper, pi) : NULL;
-    expr_t *signed_numerator = upper_pi ? expr_mul(upper_pi, step) : NULL;
+    expr_t *half_upper_pi = upper_pi ? expr_div_long(upper_pi, 2L) : NULL;
+    expr_t *sign = expr_sgn(step);
+    expr_t *signed_contribution = half_upper_pi && sign ? expr_mul(half_upper_pi, sign) : NULL;
+    expr_t *body = signed_contribution && gamma_contribution ? expr_add(signed_contribution, gamma_contribution) : NULL;
+    expr_t *real_step = expr_real_parameter(step);
     expr_t *absolute_step = expr_abs(step);
-    expr_t *signed_denominator = absolute_step ? expr_mul_long(absolute_step, 2L) : NULL;
-    expr_t *signed_contribution = signed_numerator && signed_denominator
-                                      ? expr_div(signed_numerator, signed_denominator)
-                                      : NULL;
-    expr_t *gamma_numerator = imaginary_unit && gamma_correction ? expr_mul(imaginary_unit, gamma_correction) : NULL;
-    expr_t *gamma_contribution = gamma_numerator ? expr_div_long(gamma_numerator, 2L) : NULL;
-    expr_t *out = signed_contribution && gamma_contribution ? expr_add(signed_contribution, gamma_contribution) : NULL;
+    expr_t *conditions[] = {body, real_step, zero, absolute_step, zero};
+    expr_t *out = body && real_step && zero && absolute_step ? expr_real_domain_from_args(5u, conditions) : NULL;
 
     num_destroy(&pi_value);
-    expr_free(gamma_contribution);
-    expr_free(gamma_numerator);
-    expr_free(signed_contribution);
-    expr_free(signed_denominator);
     expr_free(absolute_step);
-    expr_free(signed_numerator);
+    expr_free(real_step);
+    expr_free(body);
+    expr_free(sign);
+    expr_free(half_upper_pi);
     expr_free(upper_pi);
-    expr_free(gamma_correction);
-    expr_free(with_lower_minus);
-    expr_free(plus_difference);
+    expr_free(gamma_contribution);
+    expr_free(signed_contribution);
+    expr_free(difference);
     expr_free(lgamma_lower_plus);
     expr_free(lgamma_upper_plus);
-    expr_free(lgamma_lower_minus);
-    expr_free(lgamma_upper_minus);
     expr_free(lower_plus);
     expr_free(upper_plus);
-    expr_free(lower_minus);
-    expr_free(upper_minus);
     expr_free(upper_plus_one);
     expr_free(i_over_step);
+    expr_free(zero);
     expr_free(one);
     expr_free(pi);
     expr_free(imaginary_unit);
@@ -3570,14 +3994,18 @@ cleanup:
     return out;
 }
 
-/* Return the closed form supplied by the summand function for a recognised finite progression. */
+/* Simplify every generated finite identity before presentation or subsequent algebra uses it. */
 expr_t *expr_finite_progression_closed_form(const expr_t *expr)
 {
     expr_t *out = expr_finite_exponential_sine_progression_closed_form(expr);
 
     if (!out)
         out = expr_finite_progression_direct_closed_form(expr);
-    return out ? out : expr_finite_progression_scaled_closed_form(expr);
+    if (!out)
+        out = expr_finite_progression_scaled_closed_form(expr);
+    if (!out)
+        out = expr_finite_weighted_progression_closed_form(expr, NULL);
+    return expr_simplify_owned(out);
 }
 
 /* Entire summands permit closed-form sampling; fixed integer bounds preserve the sum's discrete domain. */
@@ -3587,17 +4015,20 @@ expr_t *expr_finite_progression_sample_form(const expr_t *expr, const expr_t *co
     const expr_ops_t *function = NULL;
     expr_t *step = NULL, *closed = NULL, *linked = NULL;
     long terms = 0;
-    if (!axes || !count || count > 3 || !expr_finite_progression_parts(expr, &upper, &step, &function))
+    if (!axes || !count || count > 3)
         return NULL;
-    bool entire = function == &ops_sin || function == &ops_cos || function == &ops_sinh ||
+    bool ordinary = expr_finite_progression_parts(expr, &upper, &step, &function);
+    if (!ordinary)
+        closed = expr_finite_weighted_progression_closed_form(expr, &upper);
+    bool entire = closed || function == &ops_sin || function == &ops_cos || function == &ops_sinh ||
                   function == &ops_cosh || function == &ops_exp;
     bool fixed = entire && expr_summation_bound_to_long(upper, &terms) && terms >= 0;
     /* A plot has at most three coordinate identities; this is not a symbol-table lookup. */
     for (size_t i = 0; fixed && i < count; ++i)
         fixed = axes[i] && !expr_contains_progression_index(upper, axes[i]);
-    if (fixed && function->finite_progression)
+    if (fixed && ordinary && function->finite_progression)
         closed = function->finite_progression(upper, step);
-    if (closed)
+    if (fixed && closed)
         linked = expr_clone_linked_symbols(closed, expr);
     expr_free(closed);
     expr_free(step);
@@ -3760,7 +4191,7 @@ const expr_ops_t ops_cos = {.eval = eval_cos,
                             .finite_progression = expr_finite_cos_progression_closed_form,
                             .integrate = expr_integrate_dispatch_primitive,
                             .simplify = expr_simplify_unary_operator,
-                            .fold_const_unary = expr_fold_cos_const};
+                            .fold_const_unary = expr_fold_zero_to_one};
 const expr_ops_t ops_tan = {.eval = eval_tan,
                             .deriv = deriv_tan,
                             .reverse = expr_reverse_tan,
@@ -3790,7 +4221,7 @@ const expr_ops_t ops_sec = {.eval = eval_sec,
                             .finite_progression = expr_finite_sec_progression_closed_form,
                             .integrate = expr_integrate_dispatch_primitive,
                             .simplify = expr_simplify_unary_operator,
-                            .fold_const_unary = NULL};
+                            .fold_const_unary = expr_fold_zero_to_one};
 const expr_ops_t ops_cosec = {.eval = eval_cosec,
                               .deriv = deriv_cosec,
                               .reverse = expr_reverse_cosec,
@@ -3947,7 +4378,7 @@ const expr_ops_t ops_sinh = {.eval = eval_sinh,
                              .finite_progression = expr_finite_sinh_progression_closed_form,
                              .integrate = expr_integrate_dispatch_primitive,
                              .simplify = expr_simplify_unary_operator,
-                             .fold_const_unary = NULL};
+                             .fold_const_unary = expr_fold_zero_to_zero};
 const expr_ops_t ops_cosh = {.eval = eval_cosh,
                              .deriv = deriv_cosh,
                              .reverse = expr_reverse_cosh,
@@ -3962,7 +4393,7 @@ const expr_ops_t ops_cosh = {.eval = eval_cosh,
                              .finite_progression = expr_finite_cosh_progression_closed_form,
                              .integrate = expr_integrate_dispatch_primitive,
                              .simplify = expr_simplify_unary_operator,
-                             .fold_const_unary = NULL};
+                             .fold_const_unary = expr_fold_zero_to_one};
 const expr_ops_t ops_tanh = {.eval = eval_tanh,
                              .deriv = deriv_tanh,
                              .reverse = expr_reverse_tanh,
@@ -3977,7 +4408,7 @@ const expr_ops_t ops_tanh = {.eval = eval_tanh,
                              .finite_progression = expr_finite_tanh_progression_closed_form,
                              .integrate = expr_integrate_dispatch_primitive,
                              .simplify = expr_simplify_unary_operator,
-                             .fold_const_unary = NULL};
+                             .fold_const_unary = expr_fold_zero_to_zero};
 const expr_ops_t ops_sech = {.eval = eval_sech,
                              .deriv = deriv_sech,
                              .reverse = expr_reverse_sech,
@@ -3992,7 +4423,7 @@ const expr_ops_t ops_sech = {.eval = eval_sech,
                              .finite_progression = expr_finite_sech_progression_closed_form,
                              .integrate = expr_integrate_dispatch_primitive,
                              .simplify = expr_simplify_unary_operator,
-                             .fold_const_unary = NULL};
+                             .fold_const_unary = expr_fold_zero_to_one};
 const expr_ops_t ops_cosech = {.eval = eval_cosech,
                                .deriv = deriv_cosech,
                                .reverse = expr_reverse_cosech,
@@ -4226,7 +4657,7 @@ const expr_ops_t ops_asinh = {.eval = eval_asinh,
                               .finite_progression_term_eval = num_asinh,
                               .integrate = expr_integrate_dispatch_primitive,
                               .simplify = expr_simplify_unary_operator,
-                              .fold_const_unary = NULL};
+                              .fold_const_unary = expr_fold_zero_to_zero};
 const expr_ops_t ops_acosh = {.eval = eval_acosh,
                               .deriv = deriv_acosh,
                               .reverse = expr_reverse_acosh,
@@ -4255,7 +4686,7 @@ const expr_ops_t ops_atanh = {.eval = eval_atanh,
                               .finite_progression = expr_finite_atanh_progression_closed_form,
                               .integrate = expr_integrate_dispatch_primitive,
                               .simplify = expr_simplify_unary_operator,
-                              .fold_const_unary = NULL};
+                              .fold_const_unary = expr_fold_zero_to_zero};
 const expr_ops_t ops_asech = {.eval = eval_asech,
                               .deriv = deriv_asech,
                               .reverse = expr_reverse_asech,
@@ -4313,7 +4744,7 @@ const expr_ops_t ops_exp = {.eval = eval_exp,
                             .finite_progression = expr_finite_exponential_progression_closed_form,
                             .integrate = expr_integrate_dispatch_primitive,
                             .simplify = expr_simplify_unary_operator,
-                            .fold_const_unary = expr_fold_exp_const};
+                            .fold_const_unary = expr_fold_zero_to_one};
 const expr_ops_t ops_log = {.eval = eval_log,
                             .deriv = deriv_log,
                             .reverse = expr_reverse_log,

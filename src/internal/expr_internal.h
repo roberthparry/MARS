@@ -805,10 +805,11 @@ bool expr_is_summation(const expr_t *expr);
 bool expr_finite_summation_exceeds_direct_limit(const expr_t *expr);
 
 /**
- * @brief Return the closed form supplied by the summand function for a recognised finite progression.
- *
- * @param expr Expression to inspect.
- * @return Owning closed-form expression, or `NULL` when no identity applies.
+ * @brief Build and simplify the native closed form of a recognised finite progression.
+ * @param[in] expr Borrowed authored sum; neither it nor its bindings are modified or consumed.
+ * @return Owned simplified expression released with expr_free(), or NULL when no identity applies or
+ * allocation fails. Generated arithmetic and unit factors are simplified without substituting bound variables.
+ * Retained source symbols remain linked to their bindings; use the graph on its owning thread or synchronise access.
  */
 expr_t *expr_finite_progression_closed_form(const expr_t *expr);
 
@@ -823,6 +824,60 @@ expr_t *expr_finite_progression_closed_form(const expr_t *expr);
  * Access to mutable linked graphs must remain confined to their owning thread.
  */
 expr_t *expr_finite_progression_sample_form(const expr_t *expr, const expr_t *const *axes, size_t count);
+
+/**
+ * @brief Build a live denominator guard for polynomially weighted finite-progression sampling.
+ * @param expression Borrowed authored progression; not modified or consumed.
+ * @return Owned guard released with expr_free(), or NULL when no weighted guard applies or allocation fails.
+ * A small non-zero guard signals cancellation requiring extra working precision. At an actual zero,
+ * evaluate the authored sum instead of its quotient identity to preserve the removable point.
+ * The returned graph shares source bindings and must remain confined to their owning thread.
+ */
+expr_t *expr_finite_progression_sample_guard(const expr_t *expression);
+
+/**
+ * @brief Choose a frequency-scaled real window for a fixed finite circular progression.
+ * @param expression Borrowed tangent, cotangent, secant or cosecant sum, or its recognised q-digamma form.
+ * @param axis Borrowed plotting variable; neither it nor any binding is modified.
+ * @param lower Output receiving an owned lower bound, released with num_destroy().
+ * @param upper Distinct output receiving an owned upper bound, released with num_destroy().
+ * @return True for a fixed positive integer count and a finite non-constant real affine step; false for
+ * unsupported expressions, coordinate-dependent bounds, invalid arguments or allocation failure. Valid
+ * distinct outputs are initialised to NUM_NAN on failure. The window is centred where the step is zero,
+ * with radius pi/(4*n*abs(slope)); cotangent/cosecant retain their central pole. Recompute after changing
+ * parameters. Access to mutable source graphs must remain confined to their owning thread.
+ */
+bool expr_finite_circular_progression_sample_bounds(const expr_t *expression, const expr_t *axis,
+                                                    number_t *lower, number_t *upper);
+
+/**
+ * @brief Choose a growth-scaled real window for a fixed finite sinh, cosh or exponential progression.
+ * @param[in] expression Borrowed finite sum with a real affine step; not modified or consumed.
+ * @param[in] axis Borrowed plotting variable, kept alive throughout inspection.
+ * @param[out] lower Output receiving an owned lower bound, released with num_destroy().
+ * @param[out] upper Distinct output receiving an owned upper bound, released with num_destroy().
+ * @return True for a fixed positive integer count n and a finite real step a*x+b with non-zero a.
+ * The window is centred at -b/a with radius 2/(n*abs(a)), keeping each summand's exponent within [-2,2].
+ * Returns false for unsupported expressions, coordinate-dependent bounds, invalid arguments or allocation
+ * failure; valid distinct outputs receive NUM_NAN on failure. Recompute after changing parameters.
+ * Neither the axis nor any binding is changed. Use on the source graph's owning thread or synchronise access.
+ */
+bool expr_finite_growth_progression_sample_bounds(const expr_t *expression, const expr_t *axis,
+                                                  number_t *lower, number_t *upper);
+
+/**
+ * @brief Prove that a finite circular progression has no poles throughout a real interval near zero phase.
+ * @param expression Borrowed sum or recognised q-digamma form; not modified or consumed.
+ * @param axis Borrowed plotting variable; source bindings remain unchanged.
+ * @param lower Borrowed finite real lower endpoint.
+ * @param upper Borrowed finite real upper endpoint, strictly greater than lower.
+ * @return True when every term stays in its first pole-free phase interval; false for unsupported forms,
+ * uncertain domains, invalid bounds or allocation failure. Cotangent/cosecant intervals crossing zero
+ * phase are rejected. This is a sufficient local test, not a complete domain classifier. Call on the
+ * source graph's owning thread or with external synchronisation.
+ */
+bool expr_finite_circular_progression_sample_regular(const expr_t *expression, const expr_t *axis,
+                                                     number_t lower, number_t upper);
 
 /**
  * @brief Return whether a progression reduction depends on the supplied value of its step.
@@ -960,12 +1015,42 @@ bool expr_finite_qdigamma_progression_value(const expr_t *expr, number_t *value_
 expr_t *expr_finite_atan_progression_derivative_form(const expr_t *expr, const expr_t *wrt);
 
 /**
+ * @brief Differentiate a finite q-digamma progression's closed form using both argument and base chain rules.
+ * @param expr Borrowed finite sum; its index and bounds must be independent of wrt.
+ * @param wrt Borrowed differentiation variable, retained through linked source bindings.
+ * @return Owned simplified derivative released with expr_free(), or NULL for another progression or failure.
+ * Base partial derivatives remain explicit mathematical operations. Neither source nor bindings are changed.
+ * Mutable expression graphs must be accessed on their owning thread or with external synchronisation.
+ */
+expr_t *expr_finite_qdigamma_progression_derivative_form(const expr_t *expr, const expr_t *wrt);
+
+/**
+ * @brief Evaluate a recognised differentiated finite q-digamma combination through its analytic finite sum.
+ * @param expr Borrowed differentiated closed form; no individual unit-circle q-digamma value is required.
+ * @param value_out Required output, written with an owned number on success; release with num_destroy().
+ * @return True on recognition and finite evaluation, otherwise false without writing value_out. Candidate
+ * identities are checked structurally before evaluation; unrelated partial derivatives are never guessed.
+ * Source bindings are read without modification. Recursion protection is local to the current thread.
+ */
+bool expr_finite_qdigamma_progression_derivative_value(const expr_t *expr, number_t *value_out);
+
+/**
  * @brief Render a recognised finite progression as a summation followed by its closed form.
  *
  * @param expr Expression to inspect.
  * @return Newly allocated TeX text, or `NULL` when the expression is not a recognised progression.
  */
 char *expr_finite_progression_identity_TeX(const expr_t *expr);
+
+/**
+ * @brief Render an authored or differentiated summation together with its native result.
+ * @param summation Borrowed sum, optionally negated, retaining its original index and bounds.
+ * @param result Borrowed equivalent result, already simplified by the caller's native mathematical operation.
+ * @return Owned TeX body released with free(), or NULL for absent inputs, a non-summation source or rendering
+ * failure. Neither graph is consumed or modified; their live bindings must remain stable during rendering.
+ * The caller establishes the identity; this helper only combines their semantic notation on one equality line.
+ */
+char *expr_summation_identity_TeX(const expr_t *summation, const expr_t *result);
 
 /**
  * @brief Borrow the argument of a unary expression; return false for another expression kind.

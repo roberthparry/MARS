@@ -2115,7 +2115,7 @@ int lab_worker_expression(int argc, char **argv)
     printf("function    %s\n", func_text ? func_text : "(null)");
     printf("tex         %s\n", TeX_text ? TeX_text : "(null)");
     printf("derivation_TeX  %s\n", derivation_TeX ? string_c_str(derivation_TeX) : "");
-    string_t *operation_function = expr_to_calculus_function_text(request, display_expr);
+    string_t *operation_function = progression_closed_form ? NULL : expr_to_calculus_function_text(request, display_expr);
     if (!operation_function)
         operation_function = expr_to_transform_function_text(expr);
     expr_free(request);
@@ -2174,7 +2174,7 @@ int lab_worker_expression(int argc, char **argv)
         expr_t *derivative_root_base = NULL;
         expr_t *weighted_derivative_source = NULL;
         const expr_t *derivative_source = progression_closed_form ? expr : display_expr;
-        bool used_atan_derivative_form = false;
+        bool used_progression_derivative_form = false;
         long derivative_root_order = 0L;
 
         if (expr_is_unary_pattern_kind(expr, EXPR_PATTERN_UNARY_ACOT) ||
@@ -2188,9 +2188,12 @@ int lab_worker_expression(int argc, char **argv)
             expr_free(weighted_derivative_source);
         }
         deriv = expr_domain_specialised_inverse_power_derivative(expr, bindings, wrt);
-        if (!deriv)
+        if (!deriv) {
             deriv = expr_finite_atan_progression_derivative_form(expr, wrt);
-        used_atan_derivative_form = deriv != NULL;
+            if (!deriv)
+                deriv = expr_finite_qdigamma_progression_derivative_form(expr, wrt);
+            used_progression_derivative_form = deriv != NULL;
+        }
         if (!deriv && strstr(raw_input, "..."))
             deriv = expr_derivative_from_unbound_source(raw_input, bindings, wrt_name);
         if (!deriv)
@@ -2201,11 +2204,13 @@ int lab_worker_expression(int argc, char **argv)
             goto cleanup;
         }
         derivative_progression_closed_form = expr_finite_progression_closed_form(deriv);
-        if (!derivative_progression_closed_form && derivative_progression_source)
+        if (!derivative_progression_source && used_progression_derivative_form)
+            derivative_progression_source = expr_create_deriv(derivative_source, wrt);
+        if (!derivative_progression_closed_form && (derivative_progression_source || used_progression_derivative_form))
             derivative_progression_closed_form = expr_clone(deriv);
         display_deriv = derivative_progression_closed_form
                             ? derivative_progression_closed_form
-                            : used_atan_derivative_form ? expr_beautify(deriv)
+                            : used_progression_derivative_form ? expr_beautify(deriv)
                             : display_polynomial_simplified(deriv, wrt, complex_cartesian);
         if (display_deriv) {
             display_deriv_owned = true;
@@ -2236,19 +2241,23 @@ int lab_worker_expression(int argc, char **argv)
             deriv_func_text = cartesian_function ? xstrdup_local(string_c_str(cartesian_function))
                                                   : expr_text_dup(display_deriv, style_FUNCTION);
             deriv_TeX_text = derivative_progression_closed_form
-                                 ? expr_finite_progression_identity_TeX(derivative_progression_source
-                                                                           ? derivative_progression_source
-                                                                           : deriv)
+                                 ? expr_summation_identity_TeX(derivative_progression_source
+                                                                  ? derivative_progression_source : deriv,
+                                                              display_deriv)
                              : explicit_Ei_cartesian
                                  ? expr_Ei_derivative_cartesian_TeX_dup(expr, wrt_name, display_deriv)
                                  : NULL;
+            if (!deriv_TeX_text && derivative_progression_closed_form)
+                deriv_TeX_text = expr_finite_progression_identity_TeX(derivative_progression_source
+                                                                        ? derivative_progression_source : deriv);
             if (!deriv_TeX_text)
                 deriv_TeX_text = expr_result_TeX_dup(display_deriv);
             string_free(cartesian_function);
         }
         expr_t *derivative_variables[1] = {wrt};
         expr_t *derivative_operation = expr_new_formal_derivative(expr, 1u, derivative_variables);
-        string_t *derivative_programme = expr_to_calculus_function_text(derivative_operation, display_deriv);
+        string_t *derivative_programme = derivative_progression_closed_form ? NULL :
+                                            expr_to_calculus_function_text(derivative_operation, display_deriv);
         if (derivative_root_order >= 2L) {
             char *family_expression = NULL;
             char *family_function = NULL;

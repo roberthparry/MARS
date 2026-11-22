@@ -2979,8 +2979,45 @@ static void test_to_string_reciprocal_products_TeX(void)
                               test_reciprocal_product_TeX_row);
 }
 
+static void negative_sum_row(const void *data)
+{
+    const test_database_case_t *row = data;
+    expr_t *expression = expr_from_text(row->input, NULL);
+    json_t *expected = json_from_text(row->expected);
+    static const style_t styles[] = {style_EXPRESSION, style_FUNCTION, style_LATEX};
+    ASSERT_NOT_NULL(expression);
+    ASSERT_NOT_NULL(expected);
+    for (size_t i = 0u; i < sizeof styles / sizeof *styles; ++i) {
+        const string_t *fragment = json_string_value(json_array_get(expected, i));
+        char *text = expression ? expr_to_string(expression, styles[i]) : NULL;
+        bool ok = text && fragment && strstr(text, string_c_str(fragment));
+        if (!ok)
+            string_printf("Negative sum %S, style %zu: %s; wanted %S\n", row->name, i,
+                           text ? text : "NULL", fragment);
+        ASSERT_TRUE(ok);
+        if (i == 0u) {
+            expr_t *round_trip = text ? expr_from_string(text, NULL) : NULL;
+            number_t original = expression ? expr_eval(expression) : num_clone(NUM_NAN);
+            number_t reparsed = round_trip ? expr_eval(round_trip) : num_clone(NUM_NAN);
+            ASSERT_NOT_NULL(round_trip);
+            TEST_ASSERT_EXPR_NUMBER_CLOSE(reparsed, original);
+            num_destroy(&reparsed); num_destroy(&original);
+            expr_free(round_trip);
+        }
+        free(text);
+    }
+    json_free(expected);
+    expr_free(expression);
+}
+
+static void test_to_string_negative_sums(void)
+{
+    test_run_database_cases(__FILE__, __LINE__, "expression.negative_sums", NULL, negative_sum_row);
+}
+
 void test_to_string_all(void)
 {
+    TEST_RUN_SUBTEST(test_to_string_negative_sums, NULL);
     TEST_RUN_SUBTEST(test_to_string_indexed_principal_roots, NULL);
     TEST_RUN_SUBTEST(test_to_string_exact_rational_powers, NULL);
     TEST_RUN_SUBTEST(test_to_string_conjugate_overbar_TeX, NULL);
