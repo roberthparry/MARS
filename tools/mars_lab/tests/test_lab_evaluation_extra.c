@@ -2116,6 +2116,25 @@ static void test_lab_screenshots_readme(void)
     string_printf("README Differential Equation screenshot: %s\n", lab_eval_text(fields, "solutions"));
     json_free(fields);
 
+    /* README matrix screenshots in docs/mars-lab.md use a literal constant matrix, not a scalar binding. */
+    static const struct { const char *source, *caption; bool constant; } matrices[] = {
+        {"(1 2; 3 4)^x", "README Matrix screenshot: (1 2; 3 4)^x; exact sqrt(33) projectors", false},
+        {"Dx((1 2; 3 4)^x)", "README Matrix derivative screenshot: A^x ln(A)", false},
+        {"@S((1 2; 3 4)^x)dx", "README Matrix integral screenshot: A^x inverse(ln(A)) + C", true}
+    };
+    for (unsigned i = 0; i < sizeof matrices / sizeof *matrices; ++i) {
+        string_t *payload = string_sprintf("{\"matrix\":\"%s\",\"operation\":\"eval\"}", matrices[i].source);
+        fields = request("/matrix-eval", string_c_str(payload), &status);
+        ok = status == 200 && contains(fields, "expression", "33") && contains(fields, "expression", "x") &&
+             contains(fields, "svg", "<svg") && !*lab_eval_text(fields, "value") &&
+             (!matrices[i].constant || contains(fields, "expression", "C₁₁"));
+        if (!ok) show_failure(fields);
+        TEST_ASSERT_TRUE(ok, matrices[i].caption);
+        string_printf("%s\n", matrices[i].caption);
+        json_free(fields);
+        string_free(payload);
+    }
+
     fields = request("/integrator-eval",
                      "{\"expression\":\"exp(-x^2/2)\",\"bounds\":[{\"name\":\"x\",\"lo\":\"-inf\",\"hi\":\"2\"}]}",
                      &status);

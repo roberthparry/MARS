@@ -1,9 +1,12 @@
 # MARS Lab
 
-The screenshots in this guide were refreshed on 13 November 2026 after the
-calculation and drawing finished. Desktop images are uncropped, full-page browser
-captures from a 1900-pixel browser window; phone History images show the complete
-portrait and landscape viewports.
+The screenshots in this guide were refreshed on 22 November 2026 after the
+calculations, plots, flags and layout finished loading. The walkthroughs use the
+Earth theme at 100% browser zoom. Desktop worksheets are uncropped, full-page
+captures from a 1900-pixel-wide browser window. History captures show the complete
+desktop viewport (1900 × 1080), phone portrait viewport (390 × 844) and phone
+landscape viewport (844 × 390), with no cropping. The skin gallery retains each
+named theme.
 Datetime and Almanac retain the example date of 12 November 2026; the Almanac
 capture also records its GMT time. Open an image to inspect it at its original resolution.
 
@@ -604,20 +607,20 @@ its calculation completed. Backgrounds are decorative SVG illustrations.
 
 | Skin | Full-page preview |
 | :--- | :--- |
-| 0. Earth (Default) | [Existing green design](images/mars-lab/skin-earth.png?v=20261113-inline-precision) |
-| 1. Mars | [Rust-orange terrain, dark canyons and a pale polar cap](images/mars-lab/skin-mars.png?v=20261113-inline-precision) |
-| 2. Mercury | [Blue-teal terrain, pale rays and muted gold crater highlights](images/mars-lab/skin-mercury.png?v=20261113-inline-precision) |
-| 3. Jupiter | [Ivory and pale blue clouds, copper belts and the Great Red Spot](images/mars-lab/skin-jupiter.png?v=20261113-inline-precision) |
-| 4. Venus | [Bright gold, amber clouds and burnt-orange shadows](images/mars-lab/skin-venus.png?v=20261113-inline-precision) |
-| 5. Saturn | [Cream and tan clouds, silver-white rings and a dark Cassini Division](images/mars-lab/skin-saturn.png?v=20261113-inline-precision) |
-| 6. Neptune | [Deep ocean blues, icy clouds and swirling storms](images/mars-lab/skin-neptune.png?v=20261113-inline-precision) |
-| 7. Moon | [Warm ivory, taupe lunar seas and pale cream crater rays](images/mars-lab/skin-moon.png?v=20261113-inline-precision) |
-| 8. Galaxy | [The Milky Way, with a central bar and branching spiral arms](images/mars-lab/skin-galaxy.png?v=20261113-inline-precision) |
-| 9. Andromeda | [An inclined elliptical disc, with a warm bulge and soft dust lanes](images/mars-lab/skin-andromeda.png?v=20261113-inline-precision) |
-| 10. Nebula | [Pink and teal](images/mars-lab/skin-nebula.png?v=20261113-inline-precision) |
-| 11. Quasar | [Midnight and cyan](images/mars-lab/skin-quasar.png?v=20261113-inline-precision) |
-| 12. Asteroids | [Weathered rocks, impact pits and warm sunlight](images/mars-lab/skin-asteroids.png?v=20261113-inline-precision) |
-| 13. Exoplanet | [Lavender and turquoise](images/mars-lab/skin-exoplanet.png?v=20261113-inline-precision) |
+| 0. Earth (Default) | [Existing green design](images/mars-lab/skin-earth.png?v=20261122-earth-full) |
+| 1. Mars | [Rust-orange terrain, dark canyons and a pale polar cap](images/mars-lab/skin-mars.png?v=20261122-earth-full) |
+| 2. Mercury | [Blue-teal terrain, pale rays and muted gold crater highlights](images/mars-lab/skin-mercury.png?v=20261122-earth-full) |
+| 3. Jupiter | [Ivory and pale blue clouds, copper belts and the Great Red Spot](images/mars-lab/skin-jupiter.png?v=20261122-earth-full) |
+| 4. Venus | [Bright gold, amber clouds and burnt-orange shadows](images/mars-lab/skin-venus.png?v=20261122-earth-full) |
+| 5. Saturn | [Cream and tan clouds, silver-white rings and a dark Cassini Division](images/mars-lab/skin-saturn.png?v=20261122-earth-full) |
+| 6. Neptune | [Deep ocean blues, icy clouds and swirling storms](images/mars-lab/skin-neptune.png?v=20261122-earth-full) |
+| 7. Moon | [Warm ivory, taupe lunar seas and pale cream crater rays](images/mars-lab/skin-moon.png?v=20261122-earth-full) |
+| 8. Galaxy | [The Milky Way, with a central bar and branching spiral arms](images/mars-lab/skin-galaxy.png?v=20261122-earth-full) |
+| 9. Andromeda | [An inclined elliptical disc, with a warm bulge and soft dust lanes](images/mars-lab/skin-andromeda.png?v=20261122-earth-full) |
+| 10. Nebula | [Pink and teal](images/mars-lab/skin-nebula.png?v=20261122-earth-full) |
+| 11. Quasar | [Midnight and cyan](images/mars-lab/skin-quasar.png?v=20261122-earth-full) |
+| 12. Asteroids | [Weathered rocks, impact pits and warm sunlight](images/mars-lab/skin-asteroids.png?v=20261122-earth-full) |
+| 13. Exoplanet | [Lavender and turquoise](images/mars-lab/skin-exoplanet.png?v=20261122-earth-full) |
 
 Authored artwork lives in `tools/mars_lab/assets/skins/`, with the palettes and
 surface overrides in `assets/css/skins.css`. The small `appearance.ts` browser
@@ -4592,7 +4595,7 @@ variables from −3 to 3. The output is the principal-value surface
 `u(x,y) = acos(sin(2-x*y))`, with equal coordinate units and the compact
 azimuth, elevation, roll and coordinate-volume zoom controls beneath it.
 
-[![MARS Lab expression mode plotting the principal-value inverse-cosine surface with compact 3-D controls](images/mars-lab/expression.png?v=20261113-inline-precision)](images/mars-lab/expression.png?v=20261113-inline-precision)
+[![MARS Lab expression mode plotting the principal-value inverse-cosine surface with compact 3-D controls](images/mars-lab/expression.png?v=20261122-earth-full)](images/mars-lab/expression.png?v=20261122-earth-full)
 
 Function cards use MARS syntax rather than C syntax. A full stop terminates a
 statement, `.` within a statement denotes multiplication, and `/` is printed
@@ -5006,7 +5009,7 @@ The captured input is `(sqrt(x^2+y^2)-2)^2+z^2=1`. The symbolic output is
 `z = ±sqrt(1-(sqrt(x^2+y^2)-2)^2)`; the automatic implicit plot shows the
 complete torus, with equal coordinate units and the retained 3-D controls.
 
-[![MARS Lab equation mode showing a torus and its symbolic height branches in automatic mode](images/mars-lab/equation.png?v=20261113-inline-precision)](images/mars-lab/equation.png?v=20261113-inline-precision)
+[![MARS Lab equation mode showing a torus and its symbolic height branches in automatic mode](images/mars-lab/equation.png?v=20261122-earth-full)](images/mars-lab/equation.png?v=20261122-earth-full)
 
 ## Differential-equation mode
 
@@ -5045,7 +5048,7 @@ $\quad\begin{array}{l}\displaystyle y = \frac{C_1(2C_1x+1)}{2C_1x(C_1x+1)+1}.\en
 The zero-slope condition removes one arbitrary constant. The compact TeX
 fraction, representative real solution curves and solver working are shown together.
 
-[![MARS Lab differential-equation mode displaying the modified Emden solution family, representative curves and solver working](images/mars-lab/differential-equation.png?v=20261113-inline-precision)](images/mars-lab/differential-equation.png?v=20261113-inline-precision)
+[![MARS Lab differential-equation mode displaying the modified Emden solution family, representative curves and solver working](images/mars-lab/differential-equation.png?v=20261122-earth-full)](images/mars-lab/differential-equation.png?v=20261122-earth-full)
 
 Select **Help** in this mode for the accepted prime, `D`, partial-derivative and
 differential-form notation. Arbitrary constants are preserved when the problem
@@ -5144,8 +5147,8 @@ matrix with entries such as `C₁₁`, `C₁₂`, `C₂₁` and `C₂₂`.
 | `Dxx(x^3 xy; y^2 x^2y)` | `(6x, 0; 0, 2y)` |
 | `Dxy(x^2y x*y^2; y^3 x^3y)` | `(2x, 2y; 0, 3x²)` |
 
-For a symbolic matrix-power example, enter `A^x` with `A = (1 2; 3 4)`.
-Writing
+For a symbolic matrix-power example, enter `(1 2; 3 4)^x`.
+Writing `A = (1 2; 3 4)`,
 
 - `λ₊ = (5 + √33)/2` and `λ₋ = (5 - √33)/2`, and
 - `P₊ = (A - λ₋I)/√33` and `P₋ = (λ₊I - A)/√33`,
@@ -5165,22 +5168,22 @@ ordered higher and mixed derivatives and iterated integrals, and is not limited
 to `2 x 2` matrices.
 
 <figure>
-  <a href="images/mars-lab/matrix.png?v=20261113-inline-precision"><img src="images/mars-lab/matrix.png?v=20261113-inline-precision" alt="MARS Lab evaluating the symbolic matrix power (1 2; 3 4) raised to x"></a>
+  <a href="images/mars-lab/matrix.png?v=20261122-earth-full"><img src="images/mars-lab/matrix.png?v=20261122-earth-full" alt="MARS Lab evaluating the symbolic matrix power (1 2; 3 4) raised to x"></a>
   <figcaption><em>After clicking <strong>Evaluate</strong>.</em></figcaption>
 </figure>
 
 <br>
 
 <figure>
-  <a href="images/mars-lab/matrix-power-derivative.png?v=20261113-inline-precision"><img src="images/mars-lab/matrix-power-derivative.png?v=20261113-inline-precision" alt="MARS Lab differentiating the symbolic matrix power with respect to x"></a>
-  <figcaption><em>After clicking <strong>x derivative</strong>, with the TeX card at 80% to show the complete matrix.</em></figcaption>
+  <a href="images/mars-lab/matrix-power-derivative.png?v=20261122-earth-full"><img src="images/mars-lab/matrix-power-derivative.png?v=20261122-earth-full" alt="MARS Lab differentiating the symbolic matrix power with respect to x"></a>
+  <figcaption><em>After clicking <strong>x derivative</strong>, with the complete matrix visible at the default TeX zoom.</em></figcaption>
 </figure>
 
 <br>
 
 <figure>
-  <a href="images/mars-lab/matrix-power-integral.png?v=20261113-inline-precision"><img src="images/mars-lab/matrix-power-integral.png?v=20261113-inline-precision" alt="MARS Lab integrating the symbolic matrix power with respect to x and displaying the constant matrix"></a>
-  <figcaption><em>After clicking <strong>x integral</strong>, with the TeX card at 80%.</em></figcaption>
+  <a href="images/mars-lab/matrix-power-integral.png?v=20261122-earth-full"><img src="images/mars-lab/matrix-power-integral.png?v=20261122-earth-full" alt="MARS Lab integrating the symbolic matrix power with respect to x and displaying the constant matrix"></a>
+  <figcaption><em>After clicking <strong>x integral</strong>, including the independent constant matrix.</em></figcaption>
 </figure>
 
 Result cards have distinct purposes:
@@ -5299,7 +5302,7 @@ use the same native beautification pass, including rational radical cancellation
 The infinite endpoint has reduced to its exact limit; the plot shades the
 visible portion of the integration interval under the Gaussian curve.
 
-[![MARS Lab integrator mode showing the Gaussian improper integral with its simplified endpoint and shaded plot](images/mars-lab/integrator.png?v=20261113-inline-precision)](images/mars-lab/integrator.png?v=20261113-inline-precision)
+[![MARS Lab integrator mode showing the Gaussian improper integral with its simplified endpoint and shaded plot](images/mars-lab/integrator.png?v=20261122-earth-full)](images/mars-lab/integrator.png?v=20261122-earth-full)
 
 ## Datetime mode
 
@@ -5328,7 +5331,7 @@ The native presentation layer supplies and escapes these tooltips for fresh and
 cached results alike; copied text, dates and estimation qualifiers are unchanged.
 No database migration is needed, and unknown names receive no guessed translation.
 
-[![MARS Lab datetime mode showing Shrewsbury calendar and astronomical results for 12 November 2026](images/mars-lab/datetime.png?v=20261113-inline-precision)](images/mars-lab/datetime.png?v=20261113-inline-precision)
+[![MARS Lab datetime mode showing Shrewsbury calendar and astronomical results for 12 November 2026](images/mars-lab/datetime.png?v=20261122-earth-full)](images/mars-lab/datetime.png?v=20261122-earth-full)
 
 MARS supplies no shared WeatherAPI account or key. Weather is shown only when
 the person installing MARS Lab creates their own WeatherAPI account, configures
@@ -5641,7 +5644,7 @@ is disabled in the capture session. A configured WeatherAPI response instead sho
 both the estimated observer pressure used for refraction and the supplied sea-level
 pressure. Weather values may vary when the request is repeated.
 
-[![Full-page MARS Lab Almanac showing the London observer globe, land classification, weather inputs, corrected body altitudes and upcoming events](images/mars-lab/almanac.png?v=20261113-inline-precision)](images/mars-lab/almanac.png?v=20261113-inline-precision)
+[![Full-page MARS Lab Almanac showing the London observer globe, land classification, weather inputs, corrected body altitudes and upcoming events](images/mars-lab/almanac.png?v=20261122-earth-full)](images/mars-lab/almanac.png?v=20261122-earth-full)
 
 ### Almanac history
 
@@ -5650,19 +5653,20 @@ names, flag, date and GMT time; **Current** identifies the open worksheet. Drag 
 row's grip to reorder it, select its location to open the worksheet, or use
 **Earlier**, **Later** and **Remove**.
 
-[![Full-page MARS Lab Almanac History showing town and country names, location flags, the current worksheet and drag handles](images/mars-lab/almanac-history.png?v=20261113-inline-precision)](images/mars-lab/almanac-history.png?v=20261113-inline-precision)
+[![Complete desktop MARS Lab Almanac History viewport in Earth, showing loaded location flags, the current worksheet and drag handles](images/mars-lab/almanac-history.png?v=20261122-earth-full)](images/mars-lab/almanac-history.png?v=20261122-earth-full)
 
-This uncropped capture shows completed worksheets for several locations. Open the
-image to inspect the complete page at its original resolution.
+This uncropped viewport capture shows completed worksheets for several locations,
+with every flag loaded. The dialog and its backdrop belong to the same settled
+browser frame. Open the image to inspect it at its original resolution.
 
 On a phone, the editor fills the available screen and keeps the entry list
 scrollable directly beneath its heading, omitting the introduction and help section.
 These captures show the complete portrait and landscape
 viewports, without cropping:
 
-[![Phone portrait History with flags, place names and grouped touch controls](images/mars-lab/history-mobile.png?v=20261113-inline-precision)](images/mars-lab/history-mobile.png?v=20261113-inline-precision)
+[![Phone portrait History with flags, place names and grouped touch controls](images/mars-lab/history-mobile.png?v=20261122-earth-full)](images/mars-lab/history-mobile.png?v=20261122-earth-full)
 
-[![Phone landscape History with entry actions alongside the place names](images/mars-lab/history-mobile-landscape.png?v=20261113-inline-precision)](images/mars-lab/history-mobile-landscape.png?v=20261113-inline-precision)
+[![Phone landscape History with entry actions alongside the place names](images/mars-lab/history-mobile-landscape.png?v=20261122-earth-full)](images/mars-lab/history-mobile-landscape.png?v=20261122-earth-full)
 
 ## Mobile and private remote access
 
