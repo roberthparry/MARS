@@ -19,6 +19,7 @@
 
 #include "array-t.h"
 #include "mars_paths.h"
+#include "checks_checkpoint.h"
 #include "checks_process.h"
 #include "checks_fixtures.h"
 #include "checks_readme.h"
@@ -32,6 +33,7 @@ struct options {
     string_t *archive;
     string_t *output;
     bool compile_only;
+    bool resume;
     double timeout;
 };
 
@@ -53,6 +55,11 @@ static bool checks_readme_parse_options(struct options *options, int argc, char 
                                 .timeout = 60};
     for (int i = 0; i < argc; ++i) {
         string_t *argument = checks_text(argv[i]);
+        if (checks_equal(argument, "--resume")) {
+            options->resume = true;
+            string_free(argument);
+            continue;
+        }
         if (checks_equal(argument, "--compile-only")) {
             options->compile_only = true;
             string_free(argument);
@@ -115,6 +122,37 @@ static bool checks_readme_artifact(const string_t *output, const string_t *id, c
     string_free(path);
     string_free(name);
     return ok;
+}
+
+static string_t *checks_readme_compiler(const string_t *root, const string_t *command)
+{
+    checks_strings_t *words = checks_strings_new();
+    bool parsed = checks_shell_words(command, words) && checks_strings_count(words);
+    const string_t *programme = parsed ? checks_strings_get(words, 0) : NULL;
+    string_t *found = programme && string_find(programme, "/") >= 0 ?
+        checks_path(root, string_c_str(programme)) : NULL;
+    if (programme && !found) {
+        string_t *search = checks_text(getenv("PATH") ? getenv("PATH") : "");
+        checks_strings_t *directories = checks_split(search, ':');
+        /* Executable search must retain PATH order; each directory is examined once. */
+        for (size_t i = 0; !found && i < checks_strings_count(directories); ++i) {
+            string_t *base = checks_path(root, string_c_str(checks_strings_get(directories, i)));
+            string_t *path = checks_path(base, string_c_str(programme));
+            file_t *file = file_new(path), *resolved = file ? file_resolve(file) : NULL;
+            file_info_t *info = resolved ? file_get_info(resolved) : NULL;
+            if (info && file_info_type(info) == FILE_TYPE_REGULAR && (file_info_permissions(info) & 0111u))
+                found = string_clone(path);
+            file_info_free(info);
+            file_free(resolved);
+            file_free(file);
+            string_free(path);
+            string_free(base);
+        }
+        checks_strings_free(directories);
+        string_free(search);
+    }
+    checks_strings_free(words);
+    return found;
 }
 
 static const char *checks_readme_execute_example(const string_t *root, const struct options *options,
@@ -270,7 +308,24 @@ int checks_readme(const string_t *root, int argc, char **argv)
     checks_readme_progress_t *progress = checks_readme_progress_new(array_size(jobs));
     json_t *records = json_new_array();
     checks_fixtures_t *fixtures = checks_fixtures_new(root);
-    size_t checked = 0, failed = 0;
+    /* Installed-resource settings alter the environment: settle them before snapshotting the planned batch. */
+    for (size_t i = 0; !infrastructure_error && !options.compile_only && i < array_size(jobs); ++i) {
+        const checks_example_t *example = *(const checks_example_t **)array_get(jobs, i);
+        if (!checks_fixtures_settings(fixtures, checks_example_code(example))) infrastructure_error = 2;
+    }
+    checks_strings_t *arguments = checks_strings_new(), *files = checks_strings_new();
+    checks_strings_add(arguments, string_clone(options.cc));
+    checks_strings_add(arguments, string_clone(options.cflags));
+    checks_strings_add(arguments, string_clone(options.libs));
+    checks_strings_add(arguments, string_sprintf("compile-only=%d; timeout=%.17g", options.compile_only, options.timeout));
+    checks_strings_add(files, checks_path(root, string_c_str(options.archive)));
+    string_t *compiler = checks_readme_compiler(root, options.cc);
+    if (compiler) checks_strings_add(files, compiler);
+    checks_checkpoint_t *checkpoint = compiler ?
+        checks_checkpoint_new(root, "readme", arguments, files, options.resume) : NULL;
+    checks_strings_free(files);
+    checks_strings_free(arguments);
+    size_t checked = 0, failed = 0, reused = 0;
     for (size_t i = 0; !infrastructure_error && i < array_size(jobs) && !checks_process_interrupt_signal(); ++i) {
         const checks_example_t *example = *(const checks_example_t **)array_get(jobs, i);
         const string_t *relative = checks_example_path(example);
@@ -280,7 +335,25 @@ int checks_readme(const string_t *root, int argc, char **argv)
         checks_json_text(record, "id", id);
         checks_json_text(record, "path", relative);
         checks_json_integer(record, "line", (long)checks_example_line(example));
-        const char *error = checks_readme_execute_example(root, &options, output, fixtures, example, record, progress);
+        string_t *content = json_to_string(record);
+        if (content) {
+            string_append_format(content, "\n%zu:", string_byte_length(checks_example_code(example)));
+            checks_append(content, checks_example_code(example));
+            string_append_char(content, '\n');
+            if (checks_example_expected(example)) checks_append(content, checks_example_expected(example));
+        }
+        bool cached = content && checks_checkpoint_reuse(checkpoint, string_c_str(id), content, NULL);
+        const char *error = cached ? NULL :
+            checks_readme_execute_example(root, &options, output, fixtures, example, record, progress);
+        if (cached) {
+            ++reused;
+            json_t *flag = json_new_bool(true);
+            string_t *key = checks_text("reused");
+            json_object_set(record, key, flag);
+            string_free(key);
+            json_free(flag);
+        } else if (!error && content) checks_checkpoint_pass(checkpoint, string_c_str(id), content, NULL);
+        string_free(content);
         if (error) {
             ++failed;
             string_t *message = checks_text(error);
@@ -297,6 +370,7 @@ int checks_readme(const string_t *root, int argc, char **argv)
         json_free(record);
     }
     checks_fixtures_free(fixtures);
+    checks_checkpoint_free(checkpoint);
     string_t *results_path = checks_path(output, "results.json");
     string_t *results = json_to_string_pretty(records, 2);
     if (!results)
@@ -315,6 +389,7 @@ int checks_readme(const string_t *root, int argc, char **argv)
     bool success = !infrastructure_error && !failed && !checks_process_interrupt_signal();
     checks_readme_progress_finish(progress, success);
     checks_readme_progress_free(progress);
+    if (reused) printf("  README checkpoints: %zu reused; %zu executed.\n", reused, checked - reused);
     if (infrastructure_error)
         fprintf(stderr, "README check could not inspect the repository or write results\n");
     if (checks_process_interrupt_signal())

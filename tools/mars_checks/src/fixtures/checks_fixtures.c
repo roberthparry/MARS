@@ -6,7 +6,7 @@
  * three reaches a spawned fixture; other listeners retain close-on-exec. Peer
  * cleanup is bounded and escalates to SIGKILL before reaping when necessary.
  * Globe reader examples use a tiny disposable SQLite file with child-only configuration.
- * Examples requiring installed resources lazily load the application's saved settings once, before execution.
+ * Examples requiring installed resources load the application's saved settings once, before verification snapshots.
  */
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE
@@ -224,6 +224,21 @@ bool checks_fixtures_arguments(checks_fixtures_t *fixtures, const string_t *path
     return true;
 }
 
+/* Prepare settings before a runner fingerprints its environment, retaining lazy loading for other callers. */
+bool checks_fixtures_settings(checks_fixtures_t *fixtures, const string_t *code)
+{
+    bool installed = string_find(code, "globe_reader_identity(") < 0 &&
+        (string_find(code, "almanac_open(") >= 0 || string_find(code, "jurisdict_open(") >= 0 ||
+         string_find(code, "globe_open_configured(") >= 0);
+    if (!installed || fixtures->settings_loaded) return true;
+    if (!mars_settings_isolate() || !mars_settings_load()) {
+        fputs("Cannot load configured databases for the README example.\n", stderr);
+        return false;
+    }
+    fixtures->settings_loaded = true;
+    return true;
+}
+
 /* Keep standalone cache-identity examples independent of installed data and the parent's configuration. */
 bool checks_fixtures_programme(checks_fixtures_t *fixtures, const string_t *path, const string_t *code,
                               const string_t *binary, const string_t *working, checks_strings_t *arguments)
@@ -242,16 +257,7 @@ bool checks_fixtures_programme(checks_fixtures_t *fixtures, const string_t *path
         string_free(database);
         if (!ready)
             return false;
-    } else if (string_find(code, "almanac_open(") >= 0 || string_find(code, "jurisdict_open(") >= 0 ||
-               string_find(code, "globe_open_configured(") >= 0) {
-        if (!fixtures->settings_loaded) {
-            if (!mars_settings_isolate() || !mars_settings_load()) {
-                fputs("Cannot load configured databases for the README example.\n", stderr);
-                return false;
-            }
-            fixtures->settings_loaded = true;
-        }
-    }
+    } else if (!checks_fixtures_settings(fixtures, code)) return false;
     checks_strings_add(arguments, string_clone(binary));
     return checks_fixtures_arguments(fixtures, path, code, arguments);
 }

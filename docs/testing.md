@@ -2,6 +2,44 @@
 
 The project provides per-module test targets.
 
+## Continuing an unchanged build
+
+`make -j1 test` and ordinary per-module targets reuse completed, passing suites
+when their executable, checker, arguments, test inputs and selection are unchanged.
+The next invocation shows a green `PASS` with the saved passing-test count and a reuse note,
+for example `PASS (19 passed, 0 failed; reused; unchanged build and selection)`.
+It continues with failed, interrupted or unstarted suites. An unfinished suite
+starts again from its setup; individual cases within it are not skipped because
+they can share fixture state. The independent bootstrap target always runs fresh.
+
+Standalone README examples resume individually after the ordinary suites. Their
+programme source, documented output, archive, compiler options and selection must
+match. Reused examples are marked in `build/readme-examples/results.json` and the
+summary states how many were reused and executed.
+
+Use `TEST_RESUME=0` to force a complete fresh run, for example
+`make -j1 test TEST_RESUME=0`. This refreshes successful checkpoints and invalidates
+an old success before a new attempt, so a later failure cannot be hidden.
+Memory tests, planning-only invocations and explicit `--test-database` overrides
+always execute without reuse. Use a fresh run when checking changes in external
+services or other volatile resources outside the recorded build and test inputs.
+
+Checkpoints live in `tests/tests.db`, survive `make clean`, and are local to the
+host and checkout. Only explicit test execution creates or updates them.
+Reused successes add neither test-run reports nor timing samples; the original
+results, outlier flags and lifetime statistics remain intact. If checkpoint
+storage is unavailable, the tests run normally instead of assuming success.
+An older checkpoint without a saved count runs once to record the actual count for subsequent reuse.
+
+Native test-management clients can use `test_database_inputs_fingerprint()` to
+hash authored definitions, stored case data and saved profile rules, then
+`test_database_checkpoint_read()` and `test_database_checkpoint_write()` to look
+up, replace or invalidate a successful verification. The latter takes a null
+fingerprint to invalidate a scope. Close the management connection before
+executing a test; these operations never add a timing sample or alter selections.
+The read/write operations accept an optional passing-test count. A lookup requesting
+the count treats an older checkpoint without that count as a miss.
+
 ## Test Reports
 
 The native harness prints individual case results, group totals, a final
@@ -21,7 +59,8 @@ reports and running-case durations.
 The final standalone README batch uses one replacing progress row, including its
 enabled-example count and elapsed time. Compilation and execution refresh that row;
 successful or disabled examples do not print individual lines. Its final summary
-retains the bar, count, duration and bold coloured outcome. Failures are still printed
+retains the bar, count, duration and bold coloured outcome, followed by a reuse
+count when checkpoints were used. Failures are still printed
 with their example identifier, Markdown source line and diagnostic; compiler and
 programme output and `build/readme-examples/results.json` retain the detailed evidence.
 While a suite runs, a second progress bar shows completed tests out of the selected
@@ -107,7 +146,7 @@ make test_qfloat
 ## Optional test database
 
 The unencrypted **`tests/tests.db`** contains case definitions, the catalogue,
-selection profiles, run reports and lifetime timing statistics. It belongs in Git alongside the test
+selection profiles, run reports, verification checkpoints and lifetime timing statistics. It belongs in Git alongside the test
 sources, so another checkout receives the same database-backed cases. The
 shared schema is in `tests/test_database.sql`; module-owned SQL files contain
 the reviewable test inputs and expectations.

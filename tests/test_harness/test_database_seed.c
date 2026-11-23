@@ -93,8 +93,7 @@ static bool test_sql_hash_file(crypto_hash_sha256_state *hash, const string_t *r
     return ok;
 }
 
-/* Stable content identities detect pulled changes even when their timestamps predate the last import. */
-string_t *test_database_sources_fingerprint(const string_t *root)
+static string_t *test_sql_sources_fingerprint(const string_t *root, bool catalogue)
 {
     array_t *sources = test_sql_sources(root);
     crypto_hash_sha256_state hash;
@@ -102,7 +101,7 @@ string_t *test_database_sources_fingerprint(const string_t *root)
     static const unsigned char format[] = "MARS test sources v1";
     crypto_hash_sha256_update(&hash, format, sizeof format);
     bool ok = sources && test_sql_hash_file(&hash, root, "tests/test_database.sql") &&
-              test_sql_hash_file(&hash, root, "tests/test_config.json");
+              (!catalogue || test_sql_hash_file(&hash, root, "tests/test_config.json"));
     for (size_t i = 0u; ok && i < array_size(sources); ++i) {
         const char *module = string_c_str(((const test_sql_source_t *)array_get(sources, i))->module);
         string_t *relative = test_sql_relative_path(module);
@@ -117,6 +116,18 @@ string_t *test_database_sources_fingerprint(const string_t *root)
     return ok ? string_new_with(fingerprint) : NULL;
 }
 
+/* Stable content identities detect pulled changes even when their timestamps predate the last import. */
+string_t *test_database_sources_fingerprint(const string_t *root)
+{
+    return test_sql_sources_fingerprint(root, true);
+}
+
+/* Verification canonicalises JSON separately, so harmless selection formatting cannot invalidate a checkpoint. */
+string_t *test_database_definitions_fingerprint(const string_t *root)
+{
+    return test_sql_sources_fingerprint(root, false);
+}
+
 /* A missing marker is stale, not evidence that any cases or history should be removed. */
 bool test_database_sync_current(test_database_t *database, const string_t *root, bool *current)
 {
@@ -125,7 +136,7 @@ bool test_database_sync_current(test_database_t *database, const string_t *root,
     *current = false;
     sqlite3_stmt *statement = test_database_prepare(database,
         "SELECT count(*) FROM sqlite_master WHERE type = 'table' AND name = 'test_source_sync'\n"
-        "    AND (SELECT user_version FROM pragma_user_version) = 5");
+        "    AND (SELECT user_version FROM pragma_user_version) = 7");
     bool ok = statement && sqlite3_step(statement) == SQLITE_ROW;
     bool present = ok && sqlite3_column_int(statement, 0) != 0;
     sqlite3_finalize(statement);

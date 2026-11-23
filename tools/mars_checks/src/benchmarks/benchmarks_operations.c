@@ -22,6 +22,30 @@ static qcomplex_t benchmark_c_abs(qcomplex_t a)
     return qc_make(qc_abs(a), QF_ZERO);
 }
 
+/* Keep the phase real in every profile: this is the finite unit-circle workload used by plots. */
+static number_t benchmark_n_lambert_unit(number_t x)
+{
+    NUM_SCOPE(scope);
+    number_t phase = num_mul(NUM_I, num_mul_long(x, 2));
+    number_t q = num_exp(phase), count = num_create_from_long(1000);
+    number_t value = num_lambert_S(NUM_NEG_ONE, q, NUM_ONE, NUM_ONE, NUM_NEG_ONE, count);
+    return num_scope_detach(num_real_part(value));
+}
+
+static qcomplex_t benchmark_c_lambert_unit(qcomplex_t x)
+{
+    qcomplex_t q = qc_exp(qc_make(QF_ZERO, qf_mul(qf_from_double(2), x.re)));
+    qcomplex_t value = qc_lambert_S(qc_make(qf_from_double(-1), QF_ZERO), q, QC_ONE, QC_ONE,
+                                    qc_make(qf_from_double(-1), QF_ZERO),
+                                    qc_make(qf_from_double(1000), QF_ZERO));
+    return qc_make(value.re, QF_ZERO);
+}
+
+static qfloat_t benchmark_r_lambert_unit(qfloat_t x)
+{
+    return benchmark_c_lambert_unit(qc_make(x, QF_ZERO)).re;
+}
+
 /* Measure requesting both outputs through the shared native evaluation. */
 static number_t benchmark_n_zeta_pair(number_t a)
 {
@@ -731,10 +755,18 @@ static const benchmark_operation_t operations[] = {
      {.n6 = num_lambert_S},
      {.r6 = qf_lambert_S}, {.c6 = qc_lambert_S},
      {"0.5", "0.25", "1.25", "1", "-1", "inf"}, 7, false},
+    {"lambert_S_constant_base", 6,
+     {.n6 = num_lambert_S},
+     {.r6 = qf_lambert_S}, {.c6 = qc_lambert_S},
+     {"-1", "1", "1", "1", "-1", "1000"}, 5, false},
     {"lambert_S_finite", 6,
      {.n6 = num_lambert_S},
      {.r6 = qf_lambert_S}, {.c6 = qc_lambert_S},
      {"-1", "0.7", "1", "1", "-1", "1000"}, 7, false},
+    {"lambert_S_unit_circle", 1,
+     {.n1 = benchmark_n_lambert_unit},
+     {.r1 = benchmark_r_lambert_unit}, {.c1 = benchmark_c_lambert_unit},
+     {"0.001"}, 0, false},
     {"lambert_W0", 1,
      {.n1 = num_lambert_W0},
      {.r1 = qf_lambert_W0}, {.c1 = qc_productlog},

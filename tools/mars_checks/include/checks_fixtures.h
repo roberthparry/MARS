@@ -32,6 +32,16 @@ checks_fixtures_t *checks_fixtures_new(const string_t *root);
 void checks_fixtures_free(checks_fixtures_t *fixtures);
 
 /**
+ * @brief Load saved resource settings once when a documented programme requires installed databases.
+ * @param[in,out] fixtures Borrowed fixture owner, released with checks_fixtures_free.
+ * @param[in] code Borrowed programme source; not retained.
+ * @return True when no installed settings are needed or loading succeeds; false on helper or settings failure.
+ * @note Call sequentially before taking a verification fingerprint. Settings are loaded through an isolated
+ * helper and applied to the process environment without replacing explicit overrides. No database is installed.
+ */
+bool checks_fixtures_settings(checks_fixtures_t *fixtures, const string_t *code);
+
+/**
  * @brief Append the same protocol and file-example arguments as the original runner.
  * @param fixtures Borrowed fixture owner, except when ownership is explicitly released.
  * @param path Borrowed path; ownership is unchanged.

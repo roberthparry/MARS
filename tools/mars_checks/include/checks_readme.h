@@ -107,6 +107,8 @@ string_t *checks_output_normalise(const string_t *text);
  * @note Enabled examples are counted before execution; disabled examples do not enlarge the total. One progress
  * row updates during compilation and execution, followed by a bold coloured summary with count and elapsed time.
  * Failures retain their identifier, source location and saved JSON/compiler/output evidence. All work is sequential.
+ * With --resume, each independently completed example is reused only when its source, documented output, build,
+ * compiler arguments and selection are unchanged. Reused evidence is explicitly labelled, not timed as a new run.
  */
 int checks_readme(const string_t *root, int argc, char **argv);
 

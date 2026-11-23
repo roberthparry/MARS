@@ -29,10 +29,10 @@ static void checks_app_usage(void)
          "       mars_checks release-evidence [--library FILE] [--output FILE] [--allow-dirty]\n"
          "       mars_checks source-policy\n"
          "       mars_checks test-db help\n"
-         "       mars_checks test-suite EXECUTABLE [TEST_ARGUMENTS...]\n"
+         "       mars_checks test-suite [--resume] EXECUTABLE [TEST_ARGUMENTS...]\n"
          "       mars_checks public-distribution [--staged]\n"
          "       mars_checks readme-examples --libs LIBS [--cc CC] [--cflags FLAGS]\n"
-         "           [--archive FILE] [--compile-only] [--timeout SECONDS] [--output DIRECTORY]");
+         "           [--archive FILE] [--compile-only] [--timeout SECONDS] [--output DIRECTORY] [--resume]");
 }
 
 static int checks_app_compliance_command(const string_t *root, int argc, char **argv)
@@ -101,7 +101,7 @@ int main(int argc, char **argv)
         checks_app_usage();
         return 2;
     }
-    for (int i = 1; i < argc; ++i) {
+    for (int i = 1; i < argc && i < 3; ++i) {
         string_t *option = checks_text(argv[i]);
         bool help = checks_equal(option, "--help") || checks_equal(option, "-h");
         string_free(option);

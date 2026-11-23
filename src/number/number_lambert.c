@@ -42,45 +42,12 @@ static bool lambert_native(number_t a, number_t q, number_t z, unsigned weight, 
     if (!fixed) return false;
     qcomplex_t r = qc_make(qf_from_double(weight), QF_ZERO), s = qc_make(qf_from_double(order), QF_ZERO);
     qcomplex_t n = qc_make(count == SIZE_MAX ? QF_INF : qf_from_double((double)count), QF_ZERO);
-    qcomplex_t result = qc_lambert_S(arguments[0], arguments[1], arguments[2], r, s, n);
+    qcomplex_t result = complex_input || order > 0 || !num_gt(q, NUM_ZERO) ?
+        qc_lambert_S(arguments[0], arguments[1], arguments[2], r, s, n) :
+        qc_make(qf_lambert_S(arguments[0].re, arguments[1].re, arguments[2].re, r.re, s.re, n.re), QF_ZERO);
     *out = complex_input || !qf_eq(qc_imag(result), QF_ZERO) ? num_create_from_qcomplex(result) :
            extended ? num_create_from_qfloat(qc_real(result)) : num_create_from_double(qf_to_double(qc_real(result)));
     return true;
-}
-
-/* Eulerian coefficients are exact integers, including the constant polynomial for Li_0. */
-static void lambert_coefficients(number_t *coefficients, unsigned degree)
-{
-    for (unsigned j = 0; j <= degree; ++j) coefficients[j] = num_clone(j == 0 ? NUM_ONE : NUM_ZERO);
-    for (unsigned p = 2; p <= degree; ++p) {
-        for (unsigned j = p - 1; j > 0; --j) {
-            number_t a = num_mul_long(coefficients[j], (long)j + 1);
-            number_t b = num_mul_long(coefficients[j - 1], (long)p - j);
-            number_t next = num_add(a, b);
-            num_destroy(&a); num_destroy(&b); num_destroy(&coefficients[j]);
-            coefficients[j] = next;
-        }
-    }
-}
-
-static number_t lambert_polylog(number_t w, long order, const number_t *coefficients)
-{
-    NUM_SCOPE(scope);
-    if (order > 0) {
-        number_t s = num_create_from_long(order);
-        return num_scope_detach(num_polylog(s, w));
-    }
-    unsigned p = (unsigned)-order;
-    number_t polynomial = num_clone(coefficients[p ? p - 1 : 0]);
-    for (unsigned j = p > 0 ? p - 1 : 0; j > 0; --j) {
-        number_t product = num_mul(polynomial, w);
-        number_t next = num_add(product, coefficients[j - 1]);
-        num_destroy(&product); num_destroy(&polynomial); polynomial = next;
-    }
-    number_t numerator = num_mul(w, polynomial);
-    number_t one_minus = num_sub(NUM_ONE, w);
-    number_t denominator = num_pow_int(one_minus, (int)p + 1);
-    return num_scope_detach(num_div(numerator, denominator));
 }
 
 /* A positive majorant bounds every omitted term; no small computed term is taken as convergence. */
@@ -120,17 +87,23 @@ number_t number_lambert_series(number_t a, number_t q, number_t z, unsigned weig
         if (input_bits > bits) bits = input_bits;
     }
     if (bits > 65536 - 128) return num_clone(NUM_NAN);
+    if (order <= 0)
+        return num_scope_detach(number_lambert_rational(a, q, z, weight, (unsigned)-order, count, bits));
     num_set_default_prec_bits(bits + 96);
+    if (count != SIZE_MAX && weight <= 1 && num_eq(q, NUM_ONE)) {
+        number_t length = num_create_from_long((long)count), moment = length;
+        if (weight)
+            moment = num_add(num_mul(length, z), num_div(num_mul_long(length, (long)count - 1), NUM_TWO));
+        number_t value = num_mul(moment, num_polylog(num_create_from_long(order), a));
+        num_set_default_prec_bits(saved);
+        return num_scope_detach(num_is_finite(value) ? value : num_clone(NUM_NAN));
+    }
     number_t logarithm = num_log(q), exponent = num_mul(z, logarithm), initial = num_exp(exponent);
     number_t w = num_mul(a, initial), q_size = num_abs(q), z_abs = num_abs(z);
     double radius = nextafter(num_to_double(q_size), INFINITY), z_size = nextafter(num_to_double(z_abs), INFINITY);
-    number_t w_size = num_abs(w);
     bool infinite = count == SIZE_MAX;
     bool ok = num_is_finite(w) && (!infinite || (radius < 1 && isfinite(z_size)));
-    num_destroy(&w_size);
-    number_t coefficients[LAMBERT_MAX_ORDER + 1];
-    unsigned degree = order < 0 ? (unsigned)-order : 0;
-    lambert_coefficients(coefficients, degree);
+    number_t polylog_order = num_create_from_long(order);
     number_t sum = num_clone(NUM_ZERO);
     size_t limit = infinite ? LAMBERT_MAX_TERMS : count;
     bool finished = false;
@@ -139,7 +112,7 @@ number_t number_lambert_series(number_t a, number_t q, number_t z, unsigned weig
         computation_t *control = computation_current();
         if (control && !computation_checkpoint(control, 1)) { ok = false; break; }
         number_t coordinate = num_add_long(z, (long)n), power = num_pow_int(coordinate, (int)weight);
-        number_t li = lambert_polylog(w, order, coefficients), term = num_mul(power, li);
+        number_t li = num_polylog(polylog_order, w), term = num_mul(power, li);
         number_t next = num_add(sum, term);
         ok = num_is_finite(next);
         num_destroy(&sum); sum = num_scope_detach(next);
@@ -151,7 +124,6 @@ number_t number_lambert_series(number_t a, number_t q, number_t z, unsigned weig
         number_t next_w = num_mul(w, q);
         num_destroy(&w); w = num_scope_detach(next_w);
     }
-    for (unsigned j = 0; j <= degree; ++j) num_destroy(&coefficients[j]);
     num_set_default_prec_bits(saved);
     if (!ok || !finished) { num_destroy(&sum); return num_clone(NUM_NAN); }
     return num_scope_detach(sum);

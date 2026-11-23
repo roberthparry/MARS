@@ -11,6 +11,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "computation-t.h"
 #include "expression-t.h"
 #include "json-t.h"
 #include "matrix-t.h"
@@ -66,6 +67,47 @@ static number_t lambert_dual(const number_t *a, size_t bits)
     return num_scope_detach(sum);
 }
 
+/* A distinct Stirling-number polynomial and independently powered coordinates check the rational kernels. */
+static number_t lambert_rational_reference(const number_t *a, size_t bits)
+{
+    NUM_SCOPE(scope);
+    num_set_default_prec_bits(bits + 192);
+    unsigned degree = (unsigned)-num_to_double(a[4]);
+    size_t count = (size_t)num_to_double(a[5]);
+    number_t stirling[34];
+    for (unsigned j = 0; j <= degree + 1; ++j)
+        stirling[j] = num_clone(j == 0 ? NUM_ONE : NUM_ZERO);
+    for (unsigned n = 1; n <= degree + 1; ++n) {
+        for (unsigned j = n; j > 0; --j) {
+            number_t product = num_mul_long(stirling[j], j), next = num_add(product, stirling[j - 1]);
+            num_destroy(&product); num_destroy(&stirling[j]); stirling[j] = next;
+        }
+        num_destroy(&stirling[0]); stirling[0] = num_clone(NUM_ZERO);
+    }
+    number_t factorial = num_clone(NUM_ONE);
+    for (unsigned j = 1; j <= degree + 1; ++j) {
+        number_t next = num_mul(stirling[j], factorial);
+        num_destroy(&stirling[j]); stirling[j] = next;
+        next = num_mul_long(factorial, j);
+        num_destroy(&factorial); factorial = next;
+    }
+    number_t sum = num_clone(NUM_ZERO);
+    for (size_t n = 0; n < count; ++n) {
+        NUM_SCOPE(iteration);
+        number_t coordinate = num_add_long(a[2], (long)n), w = num_mul(a[0], num_pow(a[1], coordinate));
+        number_t u = num_div(w, num_sub(NUM_ONE, w)), polynomial = num_clone(stirling[degree + 1]);
+        for (unsigned j = degree; j > 0; --j) {
+            number_t next = num_add(num_mul(polynomial, u), stirling[j]);
+            num_destroy(&polynomial); polynomial = next;
+        }
+        number_t term = num_mul(num_pow_int(coordinate, (int)num_to_double(a[3])), num_mul(u, polynomial));
+        number_t next = num_add(sum, term);
+        num_destroy(&sum); sum = num_scope_detach(next);
+    }
+    num_set_default_prec_bits(bits);
+    return num_scope_detach(sum);
+}
+
 static qcomplex_t lambert_fixed(number_t value)
 {
     NUM_SCOPE(scope);
@@ -81,12 +123,15 @@ static void lambert_value_row(const void *data)
     json_t *input = json_from_text(row->input);
     number_t a[6];
     for (unsigned j = 0; j < 6; ++j) a[j] = lambert_text(json_string_value(json_array_get(input, j)));
-    number_t expected = strcmp(string_c_str(row->expected), "dual") == 0 ? lambert_dual(a, bits) : lambert_text(row->expected);
+    number_t expected = strcmp(string_c_str(row->expected), "dual") == 0 ? lambert_dual(a, bits) :
+        strcmp(string_c_str(row->expected), "rational") == 0 ? lambert_rational_reference(a, bits) : lambert_text(row->expected);
     number_t actual = num_lambert_S(a[0], a[1], a[2], a[3], a[4], a[5]);
+    TEST_ASSERT_TRUE(num_get_default_prec_bits() == bits, "Lambert evaluation preserves the caller's precision");
     if (!lambert_close(actual, expected, bits))
         string_printf("Lambert value %S: actual %.17g, expected %.17g\n", row->name,
                       num_to_double(actual), num_to_double(expected));
-    TEST_ASSERT_TRUE(lambert_close(actual, expected, bits), "Lambert values retain the selected precision against independent sums");
+    TEST_ASSERT_TRUE(lambert_close(actual, expected, bits),
+                     "Lambert values retain the selected precision against independent sums");
     qcomplex_t fixed[6];
     bool real = true;
     for (unsigned j = 0; j < 6; ++j) { fixed[j] = lambert_fixed(a[j]); real = real && num_is_real(a[j]); }
@@ -96,7 +141,8 @@ static void lambert_value_row(const void *data)
     if (real) {
         qfloat_t value = qf_lambert_S(fixed[0].re, fixed[1].re, fixed[2].re, fixed[3].re, fixed[4].re, fixed[5].re);
         number_t real_number = num_create_from_qfloat(value);
-        TEST_ASSERT_TRUE(lambert_close(real_number, expected, 106), "native real Lambert values agree");
+        TEST_ASSERT_TRUE(num_is_real(expected) ? lambert_close(real_number, expected, 106) : qf_isnan(value),
+                         "native real Lambert values agree or reject a non-real principal branch");
     }
     matrix_t *coordinate = mat_create(1, 1, &a[2]);
     matrix_t *matrix = mat_lambert_S(coordinate, a[0], a[1], a[3], a[4], a[5]);
@@ -271,6 +317,15 @@ static void test_lambert_qpartials(void)
     test_run_database_cases(__FILE__, __LINE__, "expression.lambert_qpartial", NULL, lambert_qpartial_row);
 }
 
+static bool lambert_controlled(void *context)
+{
+    const number_t *a = context;
+    number_t value = num_lambert_S(a[0], a[1], a[2], a[3], a[4], a[5]);
+    bool finite = num_is_finite(value);
+    num_destroy(&value);
+    return finite;
+}
+
 /* Executable graph fixtures check alias dispatch, reverse accumulation and matrix off-diagonal derivatives. */
 static void test_lambert_interfaces(void)
 {
@@ -292,6 +347,14 @@ static void test_lambert_interfaces(void)
     TEST_ASSERT_TRUE(lambert_close(typed, expr_eval(typed_reference), 53),
                      "typed native number arguments evaluate the full infinite sum");
     expr_free(typed_reference);
+    number_t branched = num_lambert_S(num_create_from_double(4), num_create_from_double(0.5),
+                                      num_create_from_double(1), NUM_ONE, NUM_ONE, NUM_ONE);
+    TEST_ASSERT_TRUE(lambert_close(branched, num_mul(num_neg(NUM_I), NUM_PI), 53),
+                     "real native inputs retain complex values on a positive-order polylogarithm cut");
+    number_t pole = num_lambert_S(NUM_ONE, NUM_ONE, NUM_ONE, NUM_ONE, NUM_ONE, num_create_from_long(1000));
+    TEST_ASSERT_TRUE(num_is_nan(pole), "a constant-base collapse does not turn a polylogarithm pole into a finite value");
+    pole = num_lambert_S(NUM_ONE, NUM_I, NUM_ONE, NUM_ONE, NUM_NEG_ONE, num_create_from_long(65));
+    TEST_ASSERT_TRUE(num_is_nan(pole), "a reciprocal recurrence retains exact finite-section poles");
     number_t elements[] = {NUM_ONE, NUM_ONE, NUM_ZERO, NUM_ONE};
     matrix_t *jordan = mat_create(2, 2, elements);
     matrix_t *value = mat_lambert_S(jordan, NUM_NEG_ONE, NUM_ONE, NUM_ONE, NUM_NEG_ONE, num_create_from_long(4));
@@ -318,6 +381,42 @@ static void test_lambert_interfaces(void)
     }
     num_destroy(&result);
     expr_free(function); expr_free(n); expr_free(s); expr_free(r); expr_free(z); expr_free(q); expr_free(a);
+    size_t saved = num_get_default_prec_bits();
+    num_set_default_prec_bits(512);
+    number_t base = num_create_from_string("0.250000000000000000000000000000000000000000000001");
+    number_t real_base = num_as_inexact_real_prec(base, 512), complex_base = num_as_complex_prec(real_base, 512);
+    number_t real_value = num_lambert_S(NUM_HALF, real_base, NUM_ONE, NUM_ONE, NUM_NEG_ONE, NUM_TWO);
+    number_t complex_value = num_lambert_S(NUM_HALF, complex_base, NUM_ONE, NUM_ONE, NUM_NEG_ONE, NUM_TWO);
+    TEST_ASSERT_TRUE(lambert_close(complex_value, real_value, 512),
+                     "a zero imaginary component retains every bit when selecting the real kernel");
+    number_t inputs[] = {NUM_HALF, num_create_from_frac(1, 4), NUM_ONE, NUM_ONE, NUM_NEG_ONE, NUM_INF};
+    number_t floating[6];
+    size_t input_precision[6];
+    for (unsigned j = 0; j < 6; ++j) {
+        floating[j] = num_as_inexact_real_prec(inputs[j], 512);
+        input_precision[j] = num_get_prec_bits(floating[j]);
+    }
+    for (unsigned repeat = 0; repeat < 8; ++repeat)
+        TEST_ASSERT_TRUE(lambert_controlled(floating), "repeated floating Lambert inputs retain a finite result");
+    for (unsigned j = 0; j < 6; ++j)
+        TEST_ASSERT_TRUE(num_get_prec_bits(floating[j]) == input_precision[j],
+                         "Lambert guard precision never widens a borrowed input across calls");
+    computation_options_t options = {.work_limit = 18};
+    computation_t *control = computation_new(&options);
+    TEST_ASSERT_TRUE(control && !computation_run(control, lambert_controlled, inputs) &&
+                     computation_status(control) == COMPUTATION_BUDGET_EXHAUSTED,
+                     "geometric acceleration retains cancellation inside its outer series");
+    computation_free(control);
+    number_t recurrent[] = {NUM_NEG_ONE, num_exp(num_mul(NUM_I, num_create_from_frac(1, 500))),
+                            NUM_ONE, NUM_ONE, NUM_NEG_ONE, num_create_from_long(1000)};
+    control = computation_new(&options);
+    TEST_ASSERT_TRUE(control && !computation_run(control, lambert_controlled, recurrent) &&
+                     computation_status(control) == COMPUTATION_BUDGET_EXHAUSTED,
+                     "the reciprocal recurrence retains per-term cancellation checkpoints");
+    computation_free(control);
+    TEST_ASSERT_TRUE(num_get_default_prec_bits() == 512 && lambert_controlled(inputs),
+                     "a stopped Lambert call leaves the caller's precision and subsequent calls intact");
+    num_set_default_prec_bits(saved);
 }
 
 /* Run the database-backed numerical and analytic Lambert checks in their ordinary suite group. */

@@ -26,6 +26,53 @@
 #include "internal/number_internal.h"
 
 /**
+ * @brief Evaluate a validated Lambert sum of non-positive polylogarithm order with reusable MPFR/MPC storage.
+ * @param a Borrowed finite amplitude.
+ * @param q Borrowed finite, non-zero base; an infinite section requires modulus below one.
+ * @param z Borrowed finite starting coordinate; powers use the principal branch.
+ * @param weight Non-negative polynomial weight, at most 64.
+ * @param degree Negated polylogarithm order, from zero through 32.
+ * @param count Number of terms, at most 100000, or SIZE_MAX for an infinite section.
+ * @param bits Requested result precision, with room for 96 guard bits below 65536.
+ * @return Owned real or complex result, or owned NaN for poles, unsupported convergence or cancellation.
+ * Release with num_destroy(). Scratch storage is call-local; cancellation follows the active computation.
+ */
+number_t number_lambert_rational(number_t a, number_t q, number_t z, unsigned weight, unsigned degree,
+                                 size_t count, size_t bits);
+
+/**
+ * @brief Sum a small-argument real Lambert tail by interchanging its absolutely convergent power series.
+ * @param[out] out Initialised, caller-owned MPFR destination, unchanged on failure and disjoint from inputs.
+ * @param q Borrowed real base with modulus below 0.9375.
+ * @param w Borrowed first polylogarithm argument, with modulus below one and suitably small for acceleration.
+ * @param z Borrowed starting coordinate of this tail.
+ * @param weight Polynomial weight, zero or one.
+ * @param degree Negated polylogarithm order, from zero through four.
+ * @param count Tail length, or SIZE_MAX for infinity.
+ * @param bits Required absolute accuracy in bits; out also supplies guard precision.
+ * @return True after a geometric remainder bound passes; false for unsupported inputs, a work limit or
+ * cancellation. All scratch storage is released; no ownership transfers. Independent calls are thread-safe.
+ */
+bool number_mpfr_lambert_tail(mpfr_ptr out, mpfr_srcptr q, mpfr_srcptr w, mpfr_srcptr z,
+                              unsigned weight, unsigned degree, size_t count, size_t bits);
+
+/**
+ * @brief Sum a small-argument complex Lambert tail using bounded geometric moments.
+ * @param[out] out Initialised, caller-owned MPC destination, unchanged on failure and disjoint from inputs.
+ * @param q Borrowed complex base with modulus below 0.9375.
+ * @param w Borrowed first polylogarithm argument, with modulus below one and suitably small for acceleration.
+ * @param z Borrowed starting coordinate of this tail.
+ * @param weight Polynomial weight, zero or one.
+ * @param degree Negated polylogarithm order, from zero through four.
+ * @param count Tail length, or SIZE_MAX for infinity.
+ * @param bits Required absolute accuracy in bits; out also supplies guard precision.
+ * @return True after an absolute remainder bound passes; false for unsupported inputs, a work limit or
+ * cancellation. Local scratch values are released; no ownership transfers or shared state changes occur.
+ */
+bool number_mpc_lambert_tail(mpc_ptr out, mpc_srcptr q, mpc_srcptr w, mpc_srcptr z,
+                             unsigned weight, unsigned degree, size_t count, size_t bits);
+
+/**
  * @brief Calculate a positive integer series denominator exactly when it fits a machine word.
  * @param base Positive integer base; series callers supply at least one.
  * @param exponent Non-negative integer exponent; zero returns one.

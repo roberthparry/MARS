@@ -51,6 +51,18 @@ void test_checks_control_cases(void);
 void test_checks_build_cases(void);
 
 /**
+ * @brief Register disposable executable replacement and test-runner failure regressions.
+ * @return No value; the sequential harness owns selection and reporting, and each case releases its fixture tree.
+ */
+void test_checks_link_cases(void);
+
+/**
+ * @brief Register isolated suite and README progress reuse, failure retry and input invalidation regressions.
+ * @return No value; fixtures own all checkpoint storage and the sequential harness records only real executions.
+ */
+void test_checks_checkpoint_cases(void);
+
+/**
  * @brief Register isolated benchmark catalogue, measurement and Markdown publication regressions.
  * @return No value; the sequential harness owns selection, timing and result reporting.
  * @note Fixtures use temporary storage and never mutate the repository benchmark database or documentation.

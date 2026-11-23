@@ -102,6 +102,14 @@ bool test_database_seed(test_database_t *database, const string_t *root);
 string_t *test_database_sources_fingerprint(const string_t *root);
 
 /**
+ * @brief Hash authored schema and module SQL inputs, leaving JSON selection canonicalisation to the checker.
+ * @param[in] root Borrowed repository root; NULL selects the current directory.
+ * @return Owned SHA-256 hexadecimal string released with string_free(), or NULL on discovery or file failure.
+ * @note Reads content without opening storage; names and source order are deterministic.
+ */
+string_t *test_database_definitions_fingerprint(const string_t *root);
+
+/**
  * @brief Compare current source contents with the last successfully committed complete synchronisation.
  * @param[in,out] database Borrowed compatible open connection, used only for reading.
  * @param[in] root Borrowed repository root locating the authored sources; NULL means the current directory.

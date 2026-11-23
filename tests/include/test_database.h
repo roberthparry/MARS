@@ -23,6 +23,42 @@ typedef struct _test_database_t test_database_t;
 /** @brief Opaque owned, indexed profile snapshot with no live SQLite connection. */
 typedef struct _test_profile_t test_profile_t;
 
+/**
+ * @brief Fingerprint authored and stored test inputs and selections, excluding result history and checkpoints.
+ * @param[in,out] database Borrowed compatible storage; no transaction may be active during a test callback.
+ * @param[in] root Borrowed repository root locating the authored schema, catalogue and module SQL files.
+ * @return Owned SHA-256 hexadecimal string, released with string_free(), or NULL with a retained diagnostic.
+ * @note Reads registered case tables in deterministic order and changes no test selections or measurements.
+ */
+string_t *test_database_inputs_fingerprint(test_database_t *database, const string_t *root);
+
+/**
+ * @brief Look up a previously successful verification by its exact scope and content fingerprint.
+ * @param[in,out] database Borrowed compatible storage, used sequentially.
+ * @param[in] scope Borrowed non-empty executable/example identity.
+ * @param[in] fingerprint Borrowed 64-character SHA-256 hexadecimal input identity.
+ * @param[out] matched Required destination, set false when no matching checkpoint exists.
+ * @param[out] passed Optional destination for the saved passing-test count; initially zero. When supplied,
+ * a checkpoint without a saved count is treated as a miss rather than displaying an invented count.
+ * @return True after a completed lookup; false on invalid arguments or SQL failure, with a retained diagnostic.
+ * @note An older schema has no matching checkpoint. This operation never changes timing statistics.
+ */
+bool test_database_checkpoint_read(test_database_t *database, const char *scope, const char *fingerprint, bool *matched,
+                                  size_t *passed);
+
+/**
+ * @brief Save a successful verification, or invalidate a previous checkpoint before another attempt.
+ * @param[in,out] database Borrowed writable storage, used sequentially without an active report transaction.
+ * @param[in] scope Borrowed non-empty executable/example identity.
+ * @param[in] fingerprint Borrowed SHA-256 hexadecimal identity for a successful check; NULL deletes the scope.
+ * @param[in] passed Optional borrowed passing-test count copied into the checkpoint; NULL records an unknown count.
+ * @return True after committing the single update; false on invalid input or SQL failure, retaining a diagnostic.
+ * @note Keeps at most one checkpoint per scope and never writes a test result or timing sample. Call only during
+ * explicit test execution; close the management connection before executing the next test programme.
+ */
+bool test_database_checkpoint_write(test_database_t *database, const char *scope, const char *fingerprint,
+                                   const size_t *passed);
+
 /** @brief Owned case data loaded from one module-specific table; release the complete array together. */
 typedef struct {
     string_t *name; /**< Owned stable case identifier. */

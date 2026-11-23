@@ -16,6 +16,12 @@ or `build/debug/tmp`. It creates the directory before compilation and dependency
 probes. An explicit `TMPDIR` still takes precedence. This avoids relying on spare
 space in the system temporary filesystem during a large build.
 
+The native checker executables are replaced atomically after successful linking,
+so the existing runner remains usable during a rebuild. A failed link leaves the
+previous executable intact. `make test` stops immediately if its runner cannot
+execute; ordinary test failures still allow the remaining suites and README
+examples to run.
+
 ## Requirements
 
 ### SQLCipher version and database features

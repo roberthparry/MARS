@@ -93,7 +93,9 @@ bool checks_process_run_observed(const checks_strings_t *arguments, const string
  * @brief Run one test executable with live elapsed-time progress and a coloured final summary.
  * @param[in] root Borrowed working directory used for execution and relative log paths.
  * @param[in] argc Number of arguments; at least the executable is required.
- * @param[in] argv Borrowed executable followed by literal test arguments, forwarded without a shell. An optional
+ * @param[in] argv Borrowed executable followed by literal test arguments, forwarded without a shell. Optional
+ * leading --resume reuses a successful suite for the identical build, input contents and selection; failed or
+ * interrupted suites run again from their setup. Reuse creates no test report or timing sample. An optional
  * leading --suite-progress INDEX TOTAL reports the overall suite count; these three arguments are not forwarded.
  * INDEX and TOTAL are positive decimal integers with INDEX no greater than TOTAL. Optional --summary-width WIDTH
  * follows that prefix (or precedes the executable alone) and pads executable labels to WIDTH columns, from 1 to

@@ -38,6 +38,17 @@ CHECKS_HEADERS := $(wildcard tools/mars_checks/include/*.h tools/mars_checks/tes
 CHECKS_HEADERS += $(wildcard tools/mars_checks/src/benchmarks/*.h)
 CHECKS_BENCHMARK_FLAGS := $(CC) $(CFLAGS)
 
+# Publish only a completely linked executable. A unique sibling directory keeps
+# the current runner usable during rebuilds, including failed or overlapping links.
+define CHECKS_LINK
+	@set -eu; \
+	checks_link_directory=$$(mktemp -d "$(@D)/.$(@F).link.XXXXXX"); \
+	trap 'rm -rf "$$checks_link_directory"' 0; \
+	trap 'exit 1' 1 2 3 15; \
+	$(CC) $(1) -o "$$checks_link_directory/$(@F)" $(2); \
+	mv -f "$$checks_link_directory/$(@F)" "$@"
+endef
+
 $(CHECKS_BUILD_DIR)/benchmarks/benchmarks_run.o: CFLAGS += \
     -DMARS_BENCHMARK_BUILD_FLAGS='"$(CHECKS_BENCHMARK_FLAGS)"' \
     -DMARS_BENCHMARK_LIBRARY='"$(STATIC_LIB)"'
@@ -48,7 +59,7 @@ $(CHECKS_BUILD_DIR)/%.o: tools/mars_checks/src/%.c $(CHECKS_HEADERS) tools/mars_
 
 $(CHECKS_BIN): $(CHECKS_OBJS) $(TEST_DATABASE_OBJS) $(STATIC_LIB)
 	@mkdir -p $(dir $@)
-	$(CC) $(LDFLAGS) -o $@ $(CHECKS_OBJS) $(TEST_DATABASE_OBJS) $(STATIC_LIB) $(LDLIBS)
+	$(call CHECKS_LINK,$(LDFLAGS),$(CHECKS_OBJS) $(TEST_DATABASE_OBJS) $(STATIC_LIB) $(LDLIBS))
 
 $(CHECKS_BUILD_DIR)/tests/%.o: tools/mars_checks/tests/%.c $(CHECKS_HEADERS) $(TEST_SHARED_HEADERS) tools/mars_checks/Makefile Makefile
 	@mkdir -p $(dir $@) $(dir $@).deps
@@ -60,11 +71,11 @@ $(CHECKS_BUILD_DIR)/tests/%.o: tools/mars_checks/tests/%.c $(CHECKS_HEADERS) $(T
 
 $(CHECKS_TEST_FIXTURE_BIN): tools/mars_checks/tests/fixtures/checks_process_fixture.c tools/mars_checks/Makefile Makefile
 	@mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $<
+	$(call CHECKS_LINK,$(CFLAGS) $(LDFLAGS),$<)
 
 $(CHECKS_TEST_BIN): $(CHECKS_TEST_OBJS) $(CHECKS_SUPPORT_OBJS) $(TEST_COMMON_HELPER_OBJS) $(STATIC_LIB) $(CHECKS_TEST_FIXTURE_BIN)
 	@mkdir -p $(dir $@)
-	$(CC) $(LDFLAGS) -o $@ $(CHECKS_TEST_OBJS) $(CHECKS_SUPPORT_OBJS) $(TEST_COMMON_HELPER_OBJS) $(STATIC_LIB) $(LDLIBS)
+	$(call CHECKS_LINK,$(LDFLAGS),$(CHECKS_TEST_OBJS) $(CHECKS_SUPPORT_OBJS) $(TEST_COMMON_HELPER_OBJS) $(STATIC_LIB) $(LDLIBS))
 
 .PHONY: native-checks clean-checks
 native-checks: $(CHECKS_BIN)

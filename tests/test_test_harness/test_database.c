@@ -93,6 +93,65 @@ static test_database_result_t result_record(void)
         .parent = "group", .tags = "fixture", .outcome = "pass", .enabled = true, .elapsed_ms = 2.5};
 }
 
+static void test_checkpoint_upgrade_preserves_history(void)
+{
+    database_fixture_t fixture = {0};
+    bool ok = fixture_open(&fixture, true);
+    test_database_result_t row = result_record();
+    ok = ok && test_database_run_begin(fixture.database, "fixture", "", false) &&
+        test_database_run_record(fixture.database, &row) && test_database_run_finish(fixture.database, 0, 2.5) &&
+        test_database_profile_create(fixture.database, "saved", false) &&
+        test_database_profile_set(fixture.database, "saved", row.source, row.path, false) &&
+        test_database_exec(fixture.database,
+            "INSERT INTO expression_cases(name,operation,input,expected,enabled)\n"
+            "VALUES ('checkpoint_custom','evaluate','1+1','2',0);\n"
+            "UPDATE test_result SET timing_outlier=1;\n"
+            "DROP TABLE test_checkpoint; PRAGMA user_version=5;");
+    test_database_close(fixture.database);
+    fixture.database = ok ? test_database_open(fixture.root, fixture.path, true, NULL) : NULL;
+    bool matched = false;
+    const char *fingerprint = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+    size_t passed = 37, saved_passed = 0;
+    ok = fixture.database && scalar(&fixture, "PRAGMA user_version") == 7 &&
+        scalar(&fixture, "SELECT count(*) FROM test_run") == 1 &&
+        scalar(&fixture, "SELECT count(*) FROM test_result WHERE timing_outlier=1") == 1 &&
+        scalar(&fixture, "SELECT normal_count FROM test_case_statistics WHERE path='group.original'") == 1 &&
+        scalar(&fixture, "SELECT enabled FROM expression_cases WHERE name='checkpoint_custom'") == 0 &&
+        scalar(&fixture, "SELECT enabled FROM test_selection WHERE profile='saved'") == 0 &&
+        test_database_checkpoint_write(fixture.database, "suite", fingerprint, &passed) &&
+        test_database_checkpoint_read(fixture.database, "suite", fingerprint, &matched, &saved_passed) &&
+        matched && saved_passed == passed &&
+        scalar(&fixture, "SELECT count(*) FROM test_run") == 1 &&
+        test_database_checkpoint_write(fixture.database, "suite", NULL, NULL) &&
+        test_database_checkpoint_read(fixture.database, "suite", fingerprint, &matched, &saved_passed) &&
+        !matched && saved_passed == 0;
+    ok = ok && test_database_exec(fixture.database,
+        "DROP TABLE test_checkpoint;\n"
+        "CREATE TABLE test_checkpoint(scope TEXT PRIMARY KEY,fingerprint TEXT NOT NULL,\n"
+        "finished_utc TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP) WITHOUT ROWID;\n"
+        "INSERT INTO test_checkpoint(scope,fingerprint) VALUES ('suite',\n"
+        "'0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef');\n"
+        "PRAGMA user_version=6;");
+    test_database_close(fixture.database);
+    fixture.database = ok ? test_database_open(fixture.root, fixture.path, true, NULL) : NULL;
+    ok = fixture.database && scalar(&fixture, "PRAGMA user_version") == 7 &&
+        scalar(&fixture, "SELECT count(*) FROM test_checkpoint") == 1 &&
+        test_database_checkpoint_read(fixture.database, "suite", fingerprint, &matched, NULL) && matched &&
+        test_database_checkpoint_read(fixture.database, "suite", fingerprint, &matched, &saved_passed) && !matched &&
+        test_database_checkpoint_write(fixture.database, "suite", fingerprint, &passed) &&
+        test_database_checkpoint_read(fixture.database, "suite", fingerprint, &matched, &saved_passed) &&
+        matched && saved_passed == passed &&
+        scalar(&fixture, "SELECT count(*) FROM test_run") == 1 &&
+        scalar(&fixture, "SELECT count(*) FROM test_result WHERE timing_outlier=1") == 1 &&
+        scalar(&fixture, "SELECT enabled FROM test_selection WHERE profile='saved'") == 0 && ok;
+    passed = 0;
+    ok = ok && test_database_checkpoint_write(fixture.database, "suite", fingerprint, &passed) &&
+        test_database_checkpoint_read(fixture.database, "suite", fingerprint, &matched, &saved_passed) &&
+        matched && saved_passed == 0;
+    fixture_close(&fixture);
+    TEST_ASSERT_TRUE(ok, "version-five/six upgrades preserve history and checkpoints retain exact passing counts");
+}
+
 static void test_source_relocation_preserves_history(void)
 {
     database_fixture_t fixture = {0};
@@ -498,7 +557,7 @@ static void test_legacy_reports_merge_once_and_upgrade(void)
     file_t *old_single = file_new(fixture.path);
     ok = ok && old_single && file_copy(copy, old_single, false);
     fixture.database = test_database_open(fixture.root, fixture.path, true, NULL);
-    ok = ok && fixture.database && scalar(&fixture, "PRAGMA user_version") == 5 &&
+    ok = ok && fixture.database && scalar(&fixture, "PRAGMA user_version") == 7 &&
          scalar(&fixture, "SELECT normal_count = 2 AND median_ms = 25 FROM test_case_metrics"
                           " WHERE path = 'legacy_case'") == 1 &&
          test_database_import(fixture.database, fixture.root, NULL, true) &&
@@ -660,7 +719,7 @@ static void test_conditional_sync_retries_failed_import(void)
          file_write_all_text(file, original) && append_sql(source, addition) && conditional_sync(&fixture) == 0 &&
          scalar(&fixture, "SELECT count(*) FROM expression_cases WHERE name = 'conditional_retry_case'") == 1;
     ok = ok && test_database_exec(fixture.database, "DROP TABLE test_source_sync; PRAGMA user_version = 4;") &&
-         conditional_sync(&fixture) == 0 && scalar(&fixture, "PRAGMA user_version") == 5 &&
+         conditional_sync(&fixture) == 0 && scalar(&fixture, "PRAGMA user_version") == 7 &&
          scalar(&fixture, "SELECT count(*) FROM test_source_sync") == 1;
     string_free(original);
     file_free(file);
@@ -1083,6 +1142,7 @@ void test_harness_database_cases(void)
     TEST_RUN_CASE(test_timing_outliers_preserve_evidence_and_baseline, "database,statistics,outliers,preservation");
     TEST_RUN_CASE(test_timing_outliers_allow_prior_variability, "database,statistics,outliers,variation");
     TEST_RUN_CASE(test_legacy_reports_merge_once_and_upgrade, "database,migration,statistics,preservation");
+    TEST_RUN_CASE(test_checkpoint_upgrade_preserves_history, "database,migration,checkpoint,preservation");
     TEST_RUN_CASE(test_fixture_and_unrelated_database_protection, "database,fixtures");
     TEST_RUN_CASE(test_case_rows_are_owned_and_not_deleted, "database,cases");
     TEST_RUN_CASE(test_help_creates_no_database, "database,lazy");

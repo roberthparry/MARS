@@ -140,6 +140,10 @@ static void test_benchmarks_precision(void)
     string_free(diagnostics);
     const char *infinite[] = {"measure", "lambert_S", "mpfr", "256", "3"};
     ok = benchmark_test_command(root, infinite, 5, 0, NULL) && ok;
+    const char *unit_circle[] = {"measure", "lambert_S_unit_circle", "mpc", "256", "3"};
+    ok = benchmark_test_command(root, unit_circle, 5, 0, NULL) && ok;
+    const char *constant_base[] = {"measure", "lambert_S_constant_base", "mpc", "256", "3"};
+    ok = benchmark_test_command(root, constant_base, 5, 0, NULL) && ok;
     ok = test_checks_finish(root) && ok;
     TEST_ASSERT_TRUE(ok, "benchmark timings reject finite results produced by a narrower numeric backend");
 }
@@ -1076,10 +1080,14 @@ static void test_benchmarks_expression_coverage(void)
                          !strcmp(name, "sincos") || !strcmp(name, "sinhcosh");
         const char *callable = !strcmp(name, "zatahp_integral") ? "zatahp" : name;
         if (!strncmp(name, "lerch_phi_", 10)) callable = "lerch_phi";
-        if (!strcmp(name, "lambert_S_finite")) callable = "lambert_S";
+        if (!strncmp(name, "lambert_S_", 10)) callable = "lambert_S";
         string_t *source = string_sprintf("%s(%s%s)", callable, sqlite_stmt_column_text(rows, 1),
                                            component ? ",0" : "");
-        if (!strcmp(name, "hypergeometric_pFq")) {
+        if (!strcmp(name, "lambert_S_unit_circle")) {
+            string_free(source);
+            source = string_sprintf("real_part(lambert_S(-1,exp(2i*(%s)),1,1,-1,1000))",
+                                    sqlite_stmt_column_text(rows, 1));
+        } else if (!strcmp(name, "hypergeometric_pFq")) {
             string_free(source);
             source = string_sprintf("hypergeometric_pFq(1,1,%s)", sqlite_stmt_column_text(rows, 1));
         } else if (!strcmp(name, "lauricella_F")) {

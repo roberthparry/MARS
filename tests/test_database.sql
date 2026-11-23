@@ -1,6 +1,14 @@
 -- Portable test definitions, persistent statistics and bounded detailed reports; used only by test tools.
 PRAGMA application_id = 1297371988;
-PRAGMA user_version = 5;
+PRAGMA user_version = 7;
+
+-- Derived verification checkpoints, never new measurements or replacements for recorded test history.
+CREATE TABLE IF NOT EXISTS test_checkpoint (
+    scope TEXT PRIMARY KEY,
+    fingerprint TEXT NOT NULL CHECK (length(fingerprint) = 64),
+    passed_count INTEGER CHECK (passed_count >= 0),
+    finished_utc TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+) WITHOUT ROWID;
 
 -- Only a successfully committed, complete catalogue import records this content fingerprint.
 CREATE TABLE IF NOT EXISTS test_source_sync (

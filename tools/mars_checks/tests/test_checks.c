@@ -89,6 +89,8 @@ int tests_main(void)
     test_checks_parser_cases();
     test_checks_control_cases();
     test_checks_build_cases();
+    test_checks_link_cases();
+    test_checks_checkpoint_cases();
     test_checks_benchmark_cases();
     test_checks_coverage_cases();
     test_checks_evidence_cases();

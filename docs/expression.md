@@ -169,6 +169,24 @@ Eulerian polynomials. An absolute tail bound controls convergence, independently
 of cancellation. Invalid parameters, poles or exhausted convergence limits
 return NaN. This definition supplies no additional analytic continuation in `q`.
 
+Non-positive orders use reusable MPFR/MPC working values, with a direct real
+double-double path for positive real bases. For weights zero and one and
+orders from -4 through zero, sufficiently small decaying tails can be
+interchanged with a power series whose finite or infinite geometric moments
+are evaluated explicitly. An absolute remainder bound checks that shortcut;
+other parameters retain direct summation. Finite sections with `q=1` and weight
+zero or one reduce to one polylogarithm multiplied by `N` or `N*z+N*(N-1)/2`,
+respectively. This also applies to positive polylogarithm orders and complex
+coordinates, while retaining the original pole checks.
+
+Finite complex-base sections of order -1 near the unit circle can instead
+advance the reciprocal denominator by a second-order recurrence. It restarts
+from the geometric argument every 32 terms and falls back to the direct
+quotient near poles. It retains both complex components and the existing
+working precision; proximity to the unit circle never implies a real-valued
+projection. Working precision is local and never widens a borrowed input
+between calls.
+
 With fixed discrete parameters, analytic partials and the full chain rule give
 
 $\quad\begin{array}{l}\displaystyle \partial_a\Lambda_{r,s}=a^{-1}\Lambda_{r,s-1},\qquad\partial_q\Lambda_{r,s}=q^{-1}\Lambda_{r+1,s-1},\qquad\partial_z\Lambda_{r,s}=r\Lambda_{r-1,s}+(\log q)\Lambda_{r,s-1}.\end{array}$

@@ -154,7 +154,7 @@ TEST_HELPER_OBJS  := $(TEST_HELPER_SRCS:tests/%.c=$(TEST_BUILD_DIR)/%.o)
 TEST_COMMON_HELPER_OBJS := $(TEST_COMMON_SRCS:tests/%.c=$(TEST_BUILD_DIR)/%.o)
 TEST_DATABASE_OBJS := $(filter %/test_database_store.o %/test_database_profile.o %/test_database_cases.o \
     %/test_database_command.o %/test_database_stats.o %/test_database_seed.o %/test_database_history.o \
-    %/test_database_migrate.o %/test_database_relocate.o,\
+    %/test_database_migrate.o %/test_database_relocate.o %/test_database_checkpoint.o,\
     $(TEST_COMMON_HELPER_OBJS))
 BENCH_SRCS        := $(shell find bench -name 'bench_*.c' 2>/dev/null | sort)
 BENCH_OBJS        := $(BENCH_SRCS:bench/%.c=$(BUILD_DIR)/bench/%.o)
@@ -622,7 +622,10 @@ VALGRIND := valgrind \
     --error-exitcode=99 \
     --track-origins=$(VALGRIND_TRACK_ORIGINS)
 
-README_EXAMPLE_CHECK = "$(CHECKS_BIN)" readme-examples --cc="$(CC)" --cflags="$(CFLAGS)" --libs="$(LDLIBS)" --archive="$(STATIC_LIB)"
+TEST_RESUME ?= 1
+TEST_RESUME_OPTION = $(if $(filter 1,$(TEST_RESUME)),--resume,)
+README_EXAMPLE_ARGS = readme-examples $(TEST_RESUME_OPTION) --cc="$(CC)" --cflags="$(CFLAGS)" --libs="$(LDLIBS)" --archive="$(STATIC_LIB)"
+README_EXAMPLE_CHECK = "$(CHECKS_BIN)" $(README_EXAMPLE_ARGS)
 
 .PHONY: test-readme-examples
 test-readme-examples: $(STATIC_LIB) $(CHECKS_BIN) $(HTTP_FIXTURE_BIN)
@@ -646,10 +649,21 @@ endif
 
 test: check-public-distribution $(TEST_BINS)
 	@rc=0; i=0; label_width=$$(printf '%s\n' $(TEST_BINS) | awk 'length > width { width = length } END { print width + 0 }'); \
-	"$(CHECKS_BIN)" source-policy || rc=1; for t in $(TEST_BINS); do \
-	    i=$$((i + 1)); "$(CHECKS_BIN)" test-suite --suite-progress $$i $(words $(TEST_BINS)) \
+	run_check() { \
+	    if [ ! -x "$(CHECKS_BIN)" ]; then \
+	        printf 'Cannot execute test runner: %s\n' "$(CHECKS_BIN)" >&2; exit 126; \
+	    fi; \
+	    "$(CHECKS_BIN)" "$$@"; check_status=$$?; \
+	    if [ "$$check_status" -eq 126 ] || [ "$$check_status" -eq 127 ]; then \
+	        printf 'Cannot execute test runner: %s (status %s)\n' "$(CHECKS_BIN)" "$$check_status" >&2; \
+	        exit "$$check_status"; \
+	    fi; \
+	    return "$$check_status"; \
+	}; \
+	run_check source-policy || rc=1; for t in $(TEST_BINS); do \
+	    i=$$((i + 1)); run_check test-suite $(TEST_RESUME_OPTION) --suite-progress $$i $(words $(TEST_BINS)) \
 	        --summary-width $$label_width "$$t" $(TEST_ARGS) || rc=1; \
-	done; $(README_EXAMPLE_CHECK) || rc=1; exit $$rc
+	done; run_check $(README_EXAMPLE_ARGS) || rc=1; exit $$rc
 
 memtest: $(TEST_BINS)
 	@rc=0; for t in $(TEST_BINS); do \
@@ -660,7 +674,7 @@ memtest: $(TEST_BINS)
 define TEST_ALIAS_RULES
 .PHONY: $(1) mem$(1)
 $(1): $(2)
-	@$(2) $$(TEST_ARGS)
+	@$(if $(filter $(TEST_CORE_BIN),$(2)),$(2),"$(CHECKS_BIN)" test-suite $$(TEST_RESUME_OPTION) $(2)) $$(TEST_ARGS)
 
 mem$(1): $(2)
 	$(VALGRIND) $(2) --test-memory $$(TEST_ARGS)
@@ -673,17 +687,17 @@ $(foreach bin,$(filter-out $(addprefix tests/build/release/almanac/,$(TEST_ALIAS
 test_almanac: tests/build/release/almanac/test_almanac $(CONFIG_PROGRAM)
 	@tmp_out=$$(mktemp); \
 	tmp_status=$$(mktemp); \
-	{ stdbuf -oL -eL $< $(TEST_ARGS) 2>&1; echo $$? >"$$tmp_status"; } | tee "$$tmp_out"; \
+	{ stdbuf -oL -eL "$(CHECKS_BIN)" test-suite $(TEST_RESUME_OPTION) $< $(TEST_ARGS) 2>&1; echo $$? >"$$tmp_status"; } | tee "$$tmp_out"; \
 	rc=$$(cat "$$tmp_status"); \
 	rm -f "$$tmp_status"; \
 	if [ "$$rc" -eq 0 ]; then \
 	    rm -f "$$tmp_out"; \
 	    exit 0; \
 	fi; \
-	if grep -q "Almanac tests require a configured almanac database." "$$tmp_out"; then \
+	if grep -q "Almanac tests require a configured almanac database." "$$tmp_out" "$<.log" 2>/dev/null; then \
 	    rm -f "$$tmp_out"; \
 	    "$(CONFIG_PROGRAM)" almanac || exit $$?; \
-	    exec stdbuf -oL -eL $< $(TEST_ARGS); \
+	    exec stdbuf -oL -eL "$(CHECKS_BIN)" test-suite $(TEST_RESUME_OPTION) $< $(TEST_ARGS); \
 	fi; \
 	rm -f "$$tmp_out"; \
 	exit 1
@@ -978,7 +992,8 @@ help:
 	@echo "    Add CALENDAR_LANGUAGE=code to preselect a calendar language (also works non-interactively)"
 	@printf '  %-40s %s\n' "make uninstall-jurisdiction-db" "Remove the configured jurisdiction database; preserve its saved path"
 	@printf '\n%s\n' "Tests and benchmarks"
-	@printf '  %-40s %s\n' "make test" "Run all tests"
+	@printf '  %-40s %s\n' "make test" "Resume tests; reuse unchanged passing suites (TEST_RESUME=1, default)"
+	@printf '  %-40s %s\n' "make test TEST_RESUME=0" "Run every selected test again; refresh saved passing results"
 	@printf '  %-40s %s\n' "make test_<name>" "Build and run a single test (e.g. make test_expression)"
 	@printf '  %-40s %s\n' "make test_lab_native" "Run native Lab tests"
 	@printf '  %-40s %s\n' "make lab-browser-test" "Run Lab browser tests"

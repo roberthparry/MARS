@@ -19,6 +19,7 @@
 #include <unistd.h>
 
 #include "file-t.h"
+#include "checks_checkpoint.h"
 #include "checks_process.h"
 
 typedef struct _checks_suite_progress_t {
@@ -241,6 +242,8 @@ int checks_test_suite(const string_t *root, int argc, char **argv)
 {
     size_t suite_index = 0, suite_total = 0;
     int summary_width = 0;
+    bool resume = argc > 0 && argv && argv[0] && !strcmp(argv[0], "--resume");
+    if (resume) { --argc; ++argv; }
     if (argc > 0 && argv && argv[0] && !strcmp(argv[0], "--suite-progress")) {
         char *index_end = NULL, *total_end = NULL;
         errno = 0;
@@ -273,8 +276,32 @@ int checks_test_suite(const string_t *root, int argc, char **argv)
         return 2;
     }
     checks_strings_t *arguments = checks_strings_new();
+    bool checkpoint_allowed = true, show_help = false;
     for (int i = 0; i < argc; ++i)
         checks_strings_add(arguments, checks_text(argv[i]));
+    for (int i = 1; i < argc; ++i) {
+        if (!strcmp(argv[i], "--help") || !strcmp(argv[i], "-h")) show_help = true;
+        if (!strcmp(argv[i], "--test-memory") || !strcmp(argv[i], "--test-database") || !strcmp(argv[i], "--test-plan") ||
+            !strcmp(argv[i], "--help") || !strcmp(argv[i], "-h"))
+            checkpoint_allowed = false;
+    }
+    checks_strings_t *files = checks_strings_new();
+    checks_strings_add(files, checks_path(root, argv[0]));
+    checks_checkpoint_t *checkpoint = checkpoint_allowed ?
+        checks_checkpoint_new(root, argv[0], arguments, files, resume) : NULL;
+    checks_strings_free(files);
+    size_t saved_passed = 0;
+    if (checks_checkpoint_reuse(checkpoint, "suite", NULL, &saved_passed)) {
+        if (suite_total) {
+            int digits = snprintf(NULL, 0, "%zu", suite_total);
+            printf("  [%*zu/%zu]", digits, suite_index, suite_total);
+        }
+        printf("  %-*s ... \033[1;32mPASS\033[0m (%zu passed, 0 failed; reused; unchanged build and selection)\n",
+               summary_width, argv[0], saved_passed);
+        checks_checkpoint_free(checkpoint);
+        checks_strings_free(arguments);
+        return 0;
+    }
     checks_suite_progress_t progress = {.name = argv[0], .terminal = isatty(STDOUT_FILENO),
                                         .suite_index = suite_index, .suite_total = suite_total};
     string_t *output = NULL, *errors = NULL;
@@ -304,6 +331,10 @@ int checks_test_suite(const string_t *root, int argc, char **argv)
         logged = path && output && checks_write(path, output);
     }
     checks_suite_clear(&progress);
+    if (show_help) {
+        if (output) fwrite(string_c_str(output), 1, string_byte_length(output), stdout);
+        if (errors) fwrite(string_c_str(errors), 1, string_byte_length(errors), stderr);
+    }
     if (progress.suite_total) {
         int digits = snprintf(NULL, 0, "%zu", progress.suite_total);
         printf("  [%*zu/%zu]", digits, progress.suite_index, progress.suite_total);
@@ -324,5 +355,7 @@ int checks_test_suite(const string_t *root, int argc, char **argv)
     string_free(relative);
     string_free(output);
     string_free(errors);
+    if (passed && logged) checks_checkpoint_pass(checkpoint, "suite", NULL, &progress.passed);
+    checks_checkpoint_free(checkpoint);
     return passed && logged ? 0 : ran && status > 0 ? status : 1;
 }

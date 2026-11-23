@@ -64,6 +64,16 @@ static int test_database_integer(test_database_t *database, const char *sql)
     return value;
 }
 
+static bool test_database_checkpoint_upgrade(test_database_t *database)
+{
+    int table = test_database_integer(database,
+        "SELECT count(*) FROM sqlite_master WHERE type='table' AND name='test_checkpoint'");
+    int column = test_database_integer(database,
+        "SELECT count(*) FROM pragma_table_info('test_checkpoint') WHERE name='passed_count'");
+    return table >= 0 && column >= 0 && (!table || column || test_database_exec(database,
+        "ALTER TABLE test_checkpoint ADD COLUMN passed_count INTEGER CHECK (passed_count >= 0)"));
+}
+
 /* Construct no files until an explicit caller opens storage. */
 test_database_t *test_database_open(const string_t *root, const string_t *path, bool create, string_t **error)
 {
@@ -84,8 +94,8 @@ test_database_t *test_database_open(const string_t *root, const string_t *path, 
         int version = test_database_integer(database, "PRAGMA user_version");
         bool empty = application == 0 && version == 0 &&
                      test_database_integer(database, "SELECT count(*) FROM sqlite_master WHERE name NOT LIKE 'sqlite_%'") == 0;
-        initialise = create && (empty || (application == 1297371988 && version > 0 && version < 5));
-        ok = (application == 1297371988 && version >= 1 && version <= 5) || (create && empty);
+        initialise = create && (empty || (application == 1297371988 && version > 0 && version < 7));
+        ok = (application == 1297371988 && version >= 1 && version <= 7) || (create && empty);
         if (!ok)
             test_database_fail(database, "Not a compatible MARS test database; the file was left unchanged.");
     }
@@ -97,7 +107,8 @@ test_database_t *test_database_open(const string_t *root, const string_t *path, 
         string_free(limit);
     }
     if (ok && initialise)
-        ok = test_database_exec(database, "BEGIN IMMEDIATE") && test_database_seed(database, root) &&
+        ok = test_database_exec(database, "BEGIN IMMEDIATE") && test_database_checkpoint_upgrade(database) &&
+             test_database_seed(database, root) &&
              test_database_exec(database, "COMMIT");
     if (ok && create && !path)
         ok = test_database_reports_migrate(database, root);
