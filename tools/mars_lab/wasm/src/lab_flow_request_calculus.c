@@ -345,6 +345,11 @@ static jsref lab_flow_request_calculus_plot_result(struct lab_flow_request_calcu
     int mode = lab_dom_get(lab_dom_get(ctx->frame, "initial"), "mode");
     int source = lab_dom_get(ctx->result, "expression");
     int range = lab_dom_id("plotRange");
+    if (lab_dom_equal(lab_dom_get(ctx->result, "plot_available"), lab_dom_string("no"))) {
+        lab_dom_remove(range, "data-calculus-source");
+        lab_layout_plot_unavailable();
+        return lab_flow_done(0);
+    }
     if (!lab_dom_equal(mode, lab_dom_string("expression")) || !lab_dom_length(source) ||
         !lab_dom_count(lab_dom_get(range, "marsPlotNames")))
         return lab_flow_done(0);

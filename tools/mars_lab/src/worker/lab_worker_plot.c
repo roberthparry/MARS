@@ -54,7 +54,7 @@ bool lab_worker_plot_reduced(string_t *svg)
 /* Select real or complex native curves while preserving the worksheet's original expression. */
 int lab_worker_plot(const char *source, const expr_t *expression, const expr_t *variable, const char *lower, const char *upper,
                     const char *scale, const char *y_lower, const char *y_upper,
-                    const char *const plane_bounds[4], bool preview, bool force_complex)
+                    const char *const plane_bounds[4], bool preview, bool force_complex, const expr_t *display_expression)
 {
     if (!variable || !expr_is_variable(variable)) {
         printf("error       Select a variable to plot.\n");
@@ -65,7 +65,7 @@ int lab_worker_plot(const char *source, const expr_t *expression, const expr_t *
     if (distribution >= 0)
         return distribution;
     int complex = lab_worker_complex_plot(source, expression, variable, lower, upper, scale,
-                                          y_lower, y_upper, plane_bounds, preview, force_complex);
+                                          y_lower, y_upper, plane_bounds, preview, force_complex, display_expression);
     if (complex >= 0)
         return complex;
     size_t worksheet_precision = num_get_default_prec_bits(), plotting_precision = 53;
@@ -107,7 +107,7 @@ int lab_worker_plot(const char *source, const expr_t *expression, const expr_t *
     string_t *svg = ok ? plot_to_svg(plot) : NULL;
     int saved = errno;
     num_set_default_prec_bits(worksheet_precision);
-    int result = lab_worker_plot_output(source, expression, svg, saved, NULL, NULL, NULL);
+    int result = lab_worker_plot_output(source, display_expression, svg, saved, NULL, NULL, NULL);
     string_free(svg);
     plot_free(plot);
     sampler_free(samples);

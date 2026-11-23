@@ -1734,6 +1734,39 @@
                   inputs[0].includes('C') && inputs[0] !== derivative && range.dataset.calculusSource !== derivative,
                   'Antiderivatives use the same automatic result-plot policy: ' +
                   JSON.stringify({source: range.dataset.calculusSource, inputs}));
+            check(!!document.querySelector('#plotSlices .plot-slice[data-name="C"]'),
+                  'A free integral retains its integration-constant slider');
+            for (const bound of ['{x^3|x=0}', '{x^3|x=1}']) {
+                await WorksheetRequests.presentation.prepareLabEditor(bound);
+                WorksheetBindings.controller.setExpressionEditor(bound);
+                inputs.length = 0;
+                await WorksheetRequests.plots.takeIntegral('x');
+                await waitForAutomaticPlot();
+                check(inputs.length === 0 && document.getElementById('plotCard')!.classList.contains('hidden') &&
+                      !range.dataset.calculusSource && !plot.querySelector('svg') &&
+                      !document.querySelector('#plotSlices .plot-slice') &&
+                      WorksheetWorkspace.presentation.state.lastTex.includes('C'),
+                      'A supplied integral coordinate hides and clears its plot while retaining the symbolic family');
+            }
+            const primitiveSource = '-4*lambert_S(-1,exp(2i*x),1,1,-1,1000)';
+            await WorksheetRequests.presentation.prepareLabEditor(primitiveSource);
+            WorksheetBindings.controller.setExpressionEditor(primitiveSource);
+            await WorksheetRequests.plots.takeIntegral('x');
+            await plotted();
+            const constant = document.querySelector<HTMLElement>('#plotSlices .plot-slice[data-name="C"]')!;
+            const constantValue = constant?.querySelector<HTMLInputElement>('.slice-value');
+            check(constantValue?.value === '0' && plot.querySelector('.complex-grid'),
+                  'The Lambert primitive plots with C zero and retains its genuine complex component');
+            const previousCurve = plot.querySelector('svg')!;
+            const primitiveEditor = WorksheetBindings.editor.currentExpressionText();
+            constantValue!.value = '0.5';
+            constantValue!.dispatchEvent(new Event('change', {bubbles: true}));
+            for (let attempt = 0; attempt < 1200 && previousCurve.isConnected; ++attempt)
+                await LabTestBrowser.wait(25);
+            await plotted();
+            check(!previousCurve.isConnected && constantValue!.value === '0.5' &&
+                  WorksheetBindings.editor.currentExpressionText() === primitiveEditor,
+                  'Moving C redraws the antiderivative without binding the authored worksheet');
             const source = '@Z_(k=1)^1000 tan(kx)';
             await WorksheetRequests.presentation.prepareLabEditor(source);
             WorksheetBindings.controller.setExpressionEditor(source);

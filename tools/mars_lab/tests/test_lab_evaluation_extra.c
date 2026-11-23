@@ -1627,7 +1627,8 @@ static void progression_plot_row(const void *data)
     json_t *expected = json_from_text(row->expected);
     unsigned status = 0u;
     json_t *response = request("/eval", string_c_str(row->input), &status);
-    const char *svg = lab_eval_text(response, "plot_svg");
+    bool is_complex = !strcmp(lab_eval_text(expected, "complex"), "yes");
+    const char *svg = lab_eval_text(response, is_complex ? "plot_components" : "plot_svg");
     const char *series = strstr(svg, "data-series=");
     const char *end = series ? strstr(series, "</g>") : NULL;
     size_t paths = 0u;
@@ -1638,6 +1639,20 @@ static void progression_plot_row(const void *data)
                                string_c_str(row->expected);
     number_t minimum = num_create_from_string(minimum_text), actual = num_create_from_long((long)paths);
     bool ok = status == 200u && test_lab_ok(response, true) && num_ge(actual, minimum);
+    if (is_complex) {
+        const char *plane = lab_eval_text(response, "plot_complex_plane");
+        const char *width = strstr(plane, "data-plot-width=\""), *height = strstr(plane, "data-plot-height=\"");
+        double drawing_width = 0, drawing_height = 0;
+        ok = ok && contains(response, "plot_svg", "data-segment=") &&
+             contains(response, "plot_complex_plane", "data-series=") &&
+             contains(response, "plot_amplitude", "data-series=") && width && height &&
+             sscanf(width, "data-plot-width=\"%lf", &drawing_width) == 1 &&
+             sscanf(height, "data-plot-height=\"%lf", &drawing_height) == 1 &&
+             drawing_width > 40 && drawing_height > 40;
+    }
+    const char *slice = lab_eval_text(expected, "slice");
+    if (*slice)
+        ok = ok && contains(response, "plot_slice_title", slice) && contains(response, "plot_slices", "C\t");
     double edges[2] = {0};
     const char *attributes[] = {"data-x-min=\"", "data-x-max=\""};
     const char *keys[] = {"lower", "upper"};
@@ -1842,6 +1857,12 @@ static void progression_card_row(const void *data)
                 run_output = fragment;
             else
                 ok = ok && name && fragment && contains(response, string_c_str(name), string_c_str(fragment));
+            if (name && fragment && !strcmp(string_c_str(name), "integral_plot_available")) {
+                ok = ok && lab_presentation_adapt(response);
+                const json_t *card = lab_eval_get(lab_eval_get(lab_eval_get(response, "presentation"), "calculus"),
+                                                 "integral");
+                ok = ok && !strcmp(lab_eval_text(card, "plot_available"), string_c_str(fragment));
+            }
         }
     } else
         ok = ok && (contains(response, field, "sin(") || contains(response, field, "cos(")) &&

@@ -3212,10 +3212,19 @@ Angles are in radians. Lab's Help includes this distinction; the
 ### Native function plots
 
 Derivative and antiderivative actions automatically plot the displayed native result
-without replacing the input editor. Range changes and restored mode views retain that
-result as their plotting source; ordinary evaluation returns to plotting the input.
+without replacing the input editor. An indefinite integral omits its plot when the
+integration variable has a supplied value, while retaining the symbolic antiderivative.
+With that variable unset, the generated integration constant remains an adjustable
+plot-only slider, initially zero; it never becomes a plotting coordinate. Range changes
+and restored mode views retain that result as their plotting source; ordinary evaluation
+returns to plotting the input.
 Finite Lambert forms of real trigonometric derivatives, including repeated derivatives,
 retain real-valued samples and use frequency-aware automatic ranges that avoid the nearest poles.
+Complex antiderivatives retain both components, including constant imaginary offsets.
+When their derivative identifies a finite circular progression, automatic bounds use
+its pole-aware window; parameter slices are applied before complex sampling as well as real sampling.
+An automatic complex-plane viewport pads a transverse span smaller than one display
+pixel, keeping an almost horizontal or vertical curve visible without changing its samples.
 Entering the expanded derivative sum directly uses the same native recognition:
 `sum(k,1,N,k*(tan(k*x)^2+1))` retains its summation on the left of the TeX identity
 and uses the corresponding Lambert form for the result cards and plotting.

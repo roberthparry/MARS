@@ -63,6 +63,7 @@ static const field_t field_table[] = {
     {"integral_TeX", "integral_TeX", true},
     {"integral_binding", "integral_bindings", false},
     {"integral_function", "integral_function", true},
+    {"integral_plot_available", "integral_plot_available", false},
     {"interpretation_note", "interpretation_note", false},
     {"intervals", "intervals", false},
     {"iterations", "iterations", false},

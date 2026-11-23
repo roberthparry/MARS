@@ -61,7 +61,7 @@ static plot_t *scene(const char *x, const char *y, const char *z, bool equal)
 int lab_worker_complex_plot(const char *source, const expr_t *expression, const expr_t *variable,
                              const char *lower, const char *upper, const char *scale,
                              const char *y_lower, const char *y_upper, const char *const plane_bounds[4], bool preview,
-                             bool force_complex)
+                             bool force_complex, const expr_t *display_expression)
 {
     NUM_SCOPE(numbers);
     /* The input axis is real; prove ordinary real output before doing any extra sampling. */
@@ -83,8 +83,13 @@ int lab_worker_complex_plot(const char *source, const expr_t *expression, const 
     if (real && !force_complex)
         return -1;
     number_t lo = NUM_NAN, hi = NUM_NAN;
-    if (!lab_worker_plot_bounds(*lower ? lower : "-10", *upper ? upper : "10", &lo, &hi))
-        return force_complex ? lab_worker_plot_output(source, expression, NULL, errno, NULL, NULL, NULL) : -1;
+    /* A primitive may have a constant imaginary offset while its real meromorphic derivative supplies
+     * an informative pole-free window. The bounds do not assert that the primitive itself is real. */
+    expr_t *gradient = !*lower && !*upper ? expr_create_deriv(expression, variable) : NULL;
+    bool ranged = gradient && expr_finite_circular_progression_sample_bounds(gradient, variable, &lo, &hi);
+    expr_free(gradient);
+    if (!ranged && !lab_worker_plot_bounds(*lower ? lower : "-10", *upper ? upper : "10", &lo, &hi))
+        return force_complex ? lab_worker_plot_output(source, display_expression, NULL, errno, NULL, NULL, NULL) : -1;
     sampler_options_t options = sampler_options_default();
     options.intervals = preview ? 32 : 64;
     options.max_evaluations = preview ? 2049 : 16385;
@@ -103,7 +108,7 @@ int lab_worker_complex_plot(const char *source, const expr_t *expression, const 
         sampler_free(samples);
         num_set_default_prec_bits(saved);
         return context.complex || force_complex ?
-            lab_worker_plot_output(source, expression, NULL, errno, NULL, NULL, NULL) : -1;
+            lab_worker_plot_output(source, display_expression, NULL, errno, NULL, NULL, NULL) : -1;
     }
     size_t count = sampler_count(samples), segments = 0;
     plot_point_t *points = calloc(count * 4, sizeof(*points));
@@ -113,6 +118,7 @@ int lab_worker_complex_plot(const char *source, const expr_t *expression, const 
                         scene(name, "", "", false), scene(name, "", "", false)};
     bool ok = points && vertices && plots[0] && plots[1] && plots[2] && plots[3];
     number_t amplitude_max = NUM_ZERO;
+    number_t plane_extent[] = {NUM_NAN, NUM_NAN, NUM_NAN, NUM_NAN};
     for (size_t i = 0; ok && i < count; ++i) {
         const sampler_point_t *p = sampler_point(samples, i);
         bool gap = p->break_before || !p->valid;
@@ -123,6 +129,16 @@ int lab_worker_complex_plot(const char *source, const expr_t *expression, const 
             p->valid ? num_hypot(p->x, p->y) : NUM_NAN, gap};
         if (p->valid && num_gt(points[3 * count + i].y, amplitude_max))
             amplitude_max = points[3 * count + i].y;
+        if (p->valid) {
+            const number_t parts[] = {p->x, p->y};
+            for (unsigned axis = 0; axis < 2; ++axis) {
+                unsigned edge = 2 * axis;
+                if (num_is_nan(plane_extent[edge]) || num_lt(parts[axis], plane_extent[edge]))
+                    plane_extent[edge] = parts[axis];
+                if (num_is_nan(plane_extent[edge + 1]) || num_gt(parts[axis], plane_extent[edge + 1]))
+                    plane_extent[edge + 1] = parts[axis];
+            }
+        }
         if (!i || gap || !sampler_point(samples, i - 1)->valid)
             continue;
         for (unsigned end = 0; end < 2; ++end) {
@@ -149,7 +165,28 @@ int lab_worker_complex_plot(const char *source, const expr_t *expression, const 
         num_destroy(&bottom);
         num_destroy(&top);
     }
-    if (ok && plane_bounds && (*plane_bounds[0] || *plane_bounds[1] || *plane_bounds[2] || *plane_bounds[3])) {
+    bool explicit_plane = plane_bounds && (*plane_bounds[0] || *plane_bounds[1] || *plane_bounds[2] || *plane_bounds[3]);
+    if (ok && !explicit_plane && num_is_finite(plane_extent[0])) {
+        number_t spans[] = {num_sub(plane_extent[1], plane_extent[0]), num_sub(plane_extent[3], plane_extent[2])};
+        number_t widest = num_gt(spans[0], spans[1]) ? spans[0] : spans[1];
+        number_t pixel = num_div(widest, num_create_from_long(560));
+        bool padded = false;
+        /* An equal-unit diagram must give a subpixel transverse span room for its stroke and tick labels.
+         * Widen only the automatic viewport; retain both sampled components, including rounding residuals. */
+        for (unsigned axis = 0; axis < 2; ++axis) {
+            if (!num_gt(widest, NUM_ZERO) || !num_lt(spans[axis], pixel))
+                continue;
+            unsigned edge = 2 * axis;
+            number_t centre = num_mul(num_add(plane_extent[edge], plane_extent[edge + 1]), NUM_HALF);
+            number_t radius = num_mul(widest, NUM_HALF);
+            plane_extent[edge] = num_sub(centre, radius);
+            plane_extent[edge + 1] = num_add(centre, radius);
+            padded = true;
+        }
+        if (padded)
+            ok = plot_set_bounds(plots[1], plane_extent[0], plane_extent[1], plane_extent[2], plane_extent[3]);
+    }
+    if (ok && explicit_plane) {
         number_t bounds[4] = {NUM_NAN, NUM_NAN, NUM_NAN, NUM_NAN};
         ok = *plane_bounds[0] && *plane_bounds[1] && *plane_bounds[2] && *plane_bounds[3] &&
              lab_worker_plot_bounds(plane_bounds[0], plane_bounds[1], &bounds[0], &bounds[1]) &&
@@ -173,7 +210,7 @@ int lab_worker_complex_plot(const char *source, const expr_t *expression, const 
     }
     if (ok)
         ok = lab_worker_plot_quality(images[0], preview, count);
-    int result = lab_worker_plot_output(source, expression, ok ? images[0] : NULL, errno, NULL, NULL, NULL);
+    int result = lab_worker_plot_output(source, display_expression, ok ? images[0] : NULL, errno, NULL, NULL, NULL);
     if (ok)
         printf("plot_complex_plane %s\nplot_components %s\nplot_amplitude %s\n",
                string_c_str(images[1]), string_c_str(images[2]), string_c_str(images[3]));

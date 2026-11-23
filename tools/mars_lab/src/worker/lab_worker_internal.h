@@ -355,19 +355,48 @@ int lab_worker_distribution_plot(const char *source, const expr_t *expression, c
                                  const char *lower, const char *upper, const char *scale,
                                  const char *y_lower, const char *y_upper, bool preview);
 
-/** @brief Try four projections with independent component and Argand bounds; Auto returns -1 for real-only output.
+/**
+ * @brief Try four linked projections using plot-local parameter values and the unchanged worksheet formula.
+ * @param source Borrowed parseable sampling source, including plot-only slice values.
+ * @param expression Borrowed numeric graph with those slice values applied.
+ * @param variable Borrowed real input coordinate belonging to expression.
+ * @param lower Borrowed input lower bound; empty selects an automatic bound.
+ * @param upper Borrowed input upper bound; empty selects an automatic bound.
+ * @param scale Borrowed component/amplitude scale policy: auto, all or manual.
+ * @param y_lower Borrowed manual vertical lower bound, otherwise ignored.
+ * @param y_upper Borrowed manual vertical upper bound, otherwise ignored.
  * @param plane_bounds Four borrowed real/imaginary bound strings, or NULL for automatic Argand bounds.
+ * @param preview Select the bounded coarse sampling budget.
  * @param force_complex Retain the complex views during targeted refinement, including wholly real subsets.
+ * @param display_expression Borrowed original symbolic graph, whose bindings are retained in output.
+ * @return Zero after emitting all views, one on failure, or minus one when real-only plotting should be tried.
+ * No arguments are consumed or retained. Call only in an isolated native calculation worker.
  */
 int lab_worker_complex_plot(const char *source, const expr_t *expression, const expr_t *variable,
                              const char *lower, const char *upper, const char *scale,
                              const char *y_lower, const char *y_upper, const char *const plane_bounds[4], bool preview,
-                             bool force_complex);
+                             bool force_complex, const expr_t *display_expression);
 
-/** @brief Emit native plots for one variable; force_complex preserves complex views during targeted refinement. */
+/**
+ * @brief Emit a real or complex curve without binding the displayed worksheet to its slice values.
+ * @param source Borrowed sampling source including plot-local parameter values.
+ * @param expression Borrowed numeric expression graph used for classification and complex sampling.
+ * @param variable Borrowed plotting coordinate belonging to expression.
+ * @param lower Borrowed input lower bound; empty selects an automatic bound.
+ * @param upper Borrowed input upper bound; empty selects an automatic bound.
+ * @param scale Borrowed vertical scale policy: auto, all or manual.
+ * @param y_lower Borrowed manual vertical lower bound, otherwise ignored.
+ * @param y_upper Borrowed manual vertical upper bound, otherwise ignored.
+ * @param plane_bounds Four borrowed complex-plane bounds, or NULL for automatic bounds.
+ * @param preview Select bounded coarse sampling suitable for an interactive gesture.
+ * @param force_complex Preserve the four complex views during targeted refinement.
+ * @param display_expression Borrowed original symbolic graph used for output, preserving its bindings.
+ * @return Zero after emitting a plot, or one after a diagnostic on invalid input or sampling failure.
+ * No arguments are consumed or retained. Worksheet precision is restored before returning.
+ */
 int lab_worker_plot(const char *source, const expr_t *expression, const expr_t *variable, const char *lower, const char *upper,
                     const char *scale, const char *y_lower, const char *y_upper,
-                    const char *const plane_bounds[4], bool preview, bool force_complex);
+                    const char *const plane_bounds[4], bool preview, bool force_complex, const expr_t *display_expression);
 
 /**
  * @brief Formats a numerical card value with decimal or Unicode power-of-ten notation.

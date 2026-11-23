@@ -585,3 +585,44 @@ INSERT OR IGNORE INTO mars_lab_cases(name, operation, input, expected) VALUES
     ('weather_unclassified_provider_error', 'weather_diagnostic', '{"client":true,"error":0,"status":200,"payload":{"error":{"message":"fixture-weather-key"}}}', 'WeatherAPI returned a response MARS could not read.'),
     ('weather_no_response', 'weather_diagnostic', '{"client":true,"error":0,"status":0,"payload":null}', 'The weather request did not complete.'),
     ('weather_success', 'weather_diagnostic', '{"client":true,"error":0,"status":200,"payload":{}}', '');
+
+-- Integral plot visibility follows the supplied coordinate, independently of symbolic integration.
+INSERT INTO mars_lab_cases(name, operation, input, expected) VALUES
+    ('progression_card_integral_fixed_coordinate', 'progression_card',
+     '{"expression":"{x^2|x=1}","action":"integral","wrt":"x","precision":97}',
+     '["integral_plot_available","no","integral_function","const C"]'),
+    ('progression_card_integral_fixed_zero', 'progression_card',
+     '{"expression":"{x^2|x=0}","action":"integral","wrt":"x","precision":97}',
+     '["integral_plot_available","no","integral_function","const C"]'),
+    ('progression_card_integral_fixed_renamed', 'progression_card',
+     '{"expression":"{t^2|t=pi}","action":"integral","wrt":"t","precision":97}',
+     '["integral_plot_available","no","integral_TeX","t","integral_function","const C"]'),
+    ('progression_card_integral_free_coordinate', 'progression_card',
+     '{"expression":"{x^2|x=?}","action":"integral","wrt":"x","precision":97}',
+     '["integral_plot_available","yes","integral_function","const C"]'),
+    ('progression_card_integral_free_lambert', 'progression_card',
+     '{"expression":"-4*lambert_S(-1,exp(2i*x),1,1,-1,1000)","action":"integral","wrt":"x","precision":97}',
+     '["integral_plot_available","yes","integral_TeX","\\Lambda","integral_function","const C"]'),
+    ('progression_card_integral_fixed_lambert', 'progression_card',
+     '{"expression":"{-4*lambert_S(-1,exp(2i*x),1,1,-1,1000)|x=1}","action":"integral","wrt":"x","precision":97}',
+     '["integral_plot_available","no","integral_TeX","\\Lambda","integral_function","const C"]')
+ON CONFLICT(name) DO UPDATE SET input=excluded.input, expected=excluded.expected;
+
+-- A plot-only integration constant must reach complex preflight and every linked projection.
+INSERT INTO mars_lab_cases(name, operation, input, expected) VALUES
+    ('progression_plot_lambert_primitive_slice', 'progression_plot',
+     '{"expression":"{2i*lambert_S(-1,exp(2i*x),1,0,0,1000)+C|x=?;C=?}","action":"plot","wrt":"x","precision":97}',
+     '{"segments":"20","lower":"-pi/4000","upper":"pi/4000","slice":"C = 0","complex":"yes"}'),
+    ('progression_plot_lambert_primitive_slider', 'progression_plot',
+     '{"expression":"{2i*lambert_S(-1,exp(2i*x),1,0,0,1000)+C|x=?;C=?}","action":"plot","wrt":"x","plot_slices":"C\t-4\t4\t2\t-1","precision":97}',
+     '{"segments":"20","lower":"-pi/4000","upper":"pi/4000","slice":"C = 2","complex":"yes"}'),
+    ('progression_plot_lambert_primitive_renamed', 'progression_plot',
+     '{"expression":"{i*lambert_S(-1,exp(4i*t),1,0,0,1000)+C|t=?;C=?}","action":"plot","wrt":"t","precision":97}',
+     '{"segments":"20","lower":"-pi/8000","upper":"pi/8000","slice":"C = 0","complex":"yes"}'),
+    ('progression_plot_lambert_primitive_real_slice', 'progression_plot',
+     '{"expression":"{-8i*lambert_S(-1,exp(2i*x),1,2,-2,1000)+C|x=?;C=?}","action":"plot","wrt":"x","precision":97}',
+     '{"segments":"20","lower":"-pi/4000","upper":"pi/4000","slice":"C = 0"}'),
+    ('progression_plot_complex_slice', 'progression_plot',
+     '{"expression":"{i*x+C|x=?;C=?}","action":"plot","wrt":"x","plot_lower":"-1","plot_upper":"1","precision":97}',
+     '{"segments":"20","lower":"-1","upper":"1","slice":"C = 0","complex":"yes"}')
+ON CONFLICT(name) DO UPDATE SET input=excluded.input, expected=excluded.expected;

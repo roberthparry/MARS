@@ -50,6 +50,7 @@ static bool lab_pres_calculus_card(json_t *cards, json_t *lines, const json_t *f
          lab_eval_set(card, "svg", lab_pres_calculus_field(fields, "%s_svg", action)) &&
          lab_eval_set(card, "wrapped_svg", lab_pres_calculus_field(fields, "%s_wrapped_svg", action)) &&
          lab_eval_set(card, "render_error", lab_pres_calculus_field(fields, "%s_render_error", action)) &&
+         lab_eval_set(card, "plot_available", lab_pres_calculus_field(fields, "%s_plot_available", action)) &&
          lab_eval_set(card, "value", value) &&
          lab_eval_set(card, "value_title", *lab_pres_calculus_field(fields, "%s_values", action) ? "Values" : "Value");
     if (ok && equals >= 0) {

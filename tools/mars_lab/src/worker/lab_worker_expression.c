@@ -2364,6 +2364,9 @@ int lab_worker_expression(int argc, char **argv)
                 printf("integral  ∫d%s = %s\n", wrt_name, integral_text ? integral_text : "(null)");
                 printf("integral_function  %s\n", integral_func_text ? integral_func_text : "(null)");
                 printf("integral_TeX  %s\n", integral_TeX_text ? integral_TeX_text : "");
+                number_t coordinate_value = expr_get_val(wrt);
+                printf("integral_plot_available %s\n", num_is_nan(coordinate_value) ? "yes" : "no");
+                num_destroy(&coordinate_value);
                 print_expression_tree_bindings("integral_binding", integral);
                 print_owned_number("i value", expr_eval(integral), precision);
             }

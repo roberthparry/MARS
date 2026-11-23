@@ -405,10 +405,18 @@ int lab_worker_plot_request(const char *source, const expr_t *expression, expr_b
             lab_worker_surface_slice(source, expr_symbol_name(variable), NULL, argc > 19 ? argv[19] : "") : NULL;
         if (slices && !free_parameter && !sliced)
             return 1;
-        int result = lab_worker_plot(sliced ? sliced : source, expression, variable,
+        /* Complex preflight and range sampling must see the same plot-only parameter values. */
+        expr_bindings_t *slice_bindings = NULL;
+        expr_t *slice_expression = sliced ? expr_from_string(sliced, &slice_bindings) : NULL;
+        const expr_t *slice_axis = slice_bindings ? expr_bindings_get(slice_bindings, expr_symbol_name(variable)) : NULL;
+        int result = sliced && (!slice_expression || !slice_axis) ? 1 :
+            lab_worker_plot(sliced ? sliced : source, sliced ? slice_expression : expression,
+                                sliced ? slice_axis : variable,
                                 argc > 5 ? argv[5] : "", argc > 6 ? argv[6] : "",
                                 argc > 7 ? argv[7] : "auto", argc > 8 ? argv[8] : "", argc > 9 ? argv[9] : "",
-                                plane_bounds, !strcmp(quality, "preview"), force_complex);
+                                plane_bounds, !strcmp(quality, "preview"), force_complex, expression);
+        expr_free(slice_expression);
+        expr_bindings_free(slice_bindings);
         free(sliced);
         return result;
     }
