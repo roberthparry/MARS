@@ -4,7 +4,7 @@
  *
  * Finite rational/logarithmic sums and the independently interchanged infinite double series supply
  * references. Tests check selected precision, all numerical entry points, matrix functional calculus,
- * repeated chain rules, affine primitives and self-defining native TeX. README output runs last.
+ * repeated chain rules, affine/exponential primitives and self-defining native TeX. README output runs last.
  */
 #include <math.h>
 #include <stdio.h>
@@ -284,6 +284,60 @@ static void test_lambert_calculus(void)
     test_run_database_cases(__FILE__, __LINE__, "expression.lambert_calculus", NULL, lambert_calculus_row);
 }
 
+static void lambert_notation_row(const void *data)
+{
+    const test_database_case_t *row = data;
+    NUM_SCOPE(scope);
+    expr_t *expression = expr_from_text(row->input, NULL);
+    json_t *expected = json_from_text(row->expected);
+    number_t limit = NUM_NAN;
+    bool ok = expression && expected && json_number_value(json_array_get(expected, 0), &limit);
+    char *body = expression ? expr_to_TeX_body(expression) : NULL;
+    char *wrapped = ok ? expr_to_TeX_body_wrapped(expression, (size_t)num_to_double(limit)) : NULL;
+    const char *line = wrapped ? strstr(wrapped, "\\\\&") : NULL;
+    const char *definition = wrapped ? strstr(wrapped, ":=") : NULL;
+    ok = ok && body && wrapped && !strcmp(body, wrapped) && line && definition && definition > line &&
+         !strstr(definition + 2, ":=");
+    for (size_t i = 1; ok && i < json_array_size(expected); ++i) {
+        const string_t *fragment = json_string_value(json_array_get(expected, i));
+        const char *position = fragment ? strstr(wrapped, string_c_str(fragment)) : NULL;
+        ok = position && position < line;
+    }
+    if (!ok)
+        string_printf("Lambert notation %S:\n%s\n", row->name, wrapped ? wrapped : "(null)");
+    TEST_ASSERT_TRUE(ok, "the complete signed result precedes one separate Lambert definition");
+    free(wrapped);
+    free(body);
+    json_free(expected);
+    expr_free(expression);
+}
+
+static void test_lambert_notation(void)
+{
+    test_run_database_cases(__FILE__, __LINE__, "expression.lambert_notation", NULL, lambert_notation_row);
+}
+
+static void lambert_integral_limit_row(const void *data)
+{
+    const test_database_case_t *row = data;
+    expr_bindings_t *bindings = NULL;
+    expr_t *source = expr_from_text(row->input, &bindings), *x = expr_bindings_get(bindings, "x");
+    expr_t *primitive = source && x ? expr_integrate_lambert(source, x) : NULL;
+    json_t *expected = json_from_text(row->expected);
+    bool supported = false;
+    TEST_ASSERT_TRUE(source && x && json_bool_value(expected, &supported) && (primitive != NULL) == supported,
+                     "a contiguous primitive must not discard other dependencies");
+    json_free(expected);
+    expr_free(primitive);
+    expr_free(source);
+    expr_bindings_free(bindings);
+}
+
+static void test_lambert_integral_limits(void)
+{
+    test_run_database_cases(__FILE__, __LINE__, "expression.lambert_integral_limits", NULL, lambert_integral_limit_row);
+}
+
 static void lambert_qpartial_row(const void *data)
 {
     const test_database_case_t *row = data;
@@ -426,6 +480,8 @@ void test_expr_lambert(void)
     TEST_RUN_SUBTEST(test_lambert_real, NULL);
     TEST_RUN_SUBTEST(test_quotient_recognition, NULL);
     TEST_RUN_SUBTEST(test_lambert_calculus, NULL);
+    TEST_RUN_SUBTEST(test_lambert_notation, NULL);
+    TEST_RUN_SUBTEST(test_lambert_integral_limits, NULL);
     TEST_RUN_SUBTEST(test_lambert_interfaces, NULL);
     TEST_RUN_SUBTEST(test_lambert_qpartials, NULL);
 }

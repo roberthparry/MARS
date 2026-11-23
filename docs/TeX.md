@@ -759,7 +759,9 @@ text convenience entry point delegates parsing to those same mathematical module
 
 Wrapped and unwrapped expressions share one semantic renderer. TeX requests
 native-selected additive terms only when the ordinary body exceeds its line
-budget. For wide complex matrices, it requests native numeric components and
+budget. An explicit multirow result keeps its complete formula and accompanying
+definitions or equations together; their combined source length does not trigger
+additive-term decomposition. For wide complex matrices, it requests native numeric components and
 arranges them as real and imaginary matrices. Neither operation reparses numeric
 or TeX strings. Each traversal has independent memoisation and cycle detection;
 shared children render once. Native formatting and temporary-name scopes remain

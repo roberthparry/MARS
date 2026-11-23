@@ -160,6 +160,8 @@ uses a term count; omitting `N` selects infinity. The existing one-argument
 `Λ(x)` triangle-wave alias remains available. Native TeX always uses capital
 `Λ` and includes the defining equation once beneath the result, including in
 MARS Lab. Expression and Function styles retain the parseable `lambert_S` name.
+The complete formula, including its sign and any integration constant, appears
+above the defining equation; the definition is never inserted between additive terms.
 
 The numerical domains are integer `0 <= r <= 64`, integer `-32 <= s <= 32`,
 and integer `0 <= N <= 100000` or positive infinity. Principal powers are used
@@ -202,6 +204,20 @@ $\quad\begin{array}{l}\displaystyle \int\Lambda_{r,s}\,dz=\sum_{j=0}^{r}\frac{(-
 At `q=1` this becomes `Λ(r+1,s)/(r+1)`. Ordinary outer sums retain their index
 bindings and numerical evaluation. The [complete example](#lambert-sum-example)
 evaluates a four-term finite section.
+
+An exponential amplitude or base with a fixed non-zero slope `c` also has a
+direct primitive, with every other argument independent of `x`:
+
+$\quad\begin{array}{l}\displaystyle \int\Lambda_{r,s}^{[N]}(e^{cx+d},q,z)\,dx=c^{-1}\Lambda_{r,s+1}^{[N]}(e^{cx+d},q,z)+C.\end{array}$
+
+$\quad\begin{array}{l}\displaystyle \int\Lambda_{r,s}^{[N]}(a,e^{cx+d},z)\,dx=c^{-1}\Lambda_{r-1,s+1}^{[N]}(a,e^{cx+d},z)+C\qquad(r\geq1).\end{array}$
+
+The slope must currently simplify to a finite non-zero numerical constant.
+These local rules respect the original principal-power branches and poles;
+they do not replace `log(exp(u))` by `u` across a branch cut. Numerical
+evaluation remains subject to the weight and order limits above. Supplying a
+value for the variable, such as `x=1`, does not turn the symbolic integration
+into an evaluation at that point.
 
 ### Growth windows and weighted progressions
 

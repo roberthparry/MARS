@@ -2293,11 +2293,12 @@ int lab_worker_expression(int argc, char **argv)
 
     if (integral_request) {
         if (wrt_is_variable) {
+            /* Integrate native algebra before display-only Cartesian expansion can obscure its chain rule.
+             * A recognised progression may still supply its compact closed form to the integrator. */
             const expr_t *integral_source =
-                (complex_cartesian ||
-                 (progression_closed_form && expr_is_finite_inverse_progression(expr)))
-                    ? expr
-                    : display_expr;
+                progression_closed_form && !complex_cartesian && !expr_is_finite_inverse_progression(expr)
+                    ? display_expr
+                    : expr;
 
             integral = expr_integrate_family(integral_source, wrt);
             if (!integral) {

@@ -563,7 +563,7 @@ void *number_scope_mem_realloc(void *ptr, size_t size, size_t align);
 void number_scope_mem_free(void *ptr);
 bool number_scope_mem_is_arena_ptr(const void *ptr);
 
-typedef enum number_kind_t {
+typedef enum _number_kind_t {
     NUMBER_INVALID,
     NUMBER_DOUBLE,
     NUMBER_QFLOAT,
@@ -589,7 +589,7 @@ typedef enum number_math_family_t {
  * Higher mathematical functions are dispatched by number_maths.c according
  * to math_family; they are deliberately not repeated in every backend vtable.
  */
-typedef struct number_vtable_t {
+typedef struct _number_vtable_t {
     number_kind_t kind;
     number_math_family_t math_family;
     bool exact;
@@ -648,7 +648,7 @@ typedef struct number_vtable_t {
 
 typedef number_t *(*number_coerce_fn)(const number_t *number);
 
-typedef struct number_cdouble_t {
+typedef struct _number_cdouble_t {
     double _Complex value;
     int constant_id;
     bool immortal;

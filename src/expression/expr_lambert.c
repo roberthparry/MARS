@@ -4,8 +4,8 @@
  *
  * lambert_S is an explicitly defined MARS function, not a claimed standard special-function name.
  * Three continuous arguments and three discrete parameters use ordinary argument-list storage. Contiguous
- * relations provide chain rules and affine-coordinate primitives. Every native TeX context that uses this
- * operation includes its definition, through the owning notation provider.
+ * relations provide chain rules, affine-coordinate primitives and exponential-amplitude/base primitives.
+ * Every native TeX context that uses this operation includes its definition, through the owning notation provider.
  */
 #include <stdint.h>
 
@@ -167,21 +167,46 @@ int lambert_reverse(const expr_t *expression, const number_t *out_bar,
     return 0;
 }
 
+/* Integrating an exponential argument reverses its logarithmic chain rule without taking log(exp(u)). */
+static expr_t *lambert_integrate_exponential(const expr_t *const *args, unsigned axis, long weight,
+                                            const expr_t *wrt)
+{
+    if (args[axis]->ops->kind != EXPR_KIND_EXP || (axis == 1 && weight == 0)) return NULL;
+    expr_t *rate = expr_create_deriv(args[axis]->a, wrt);
+    /* A literal non-zero rate avoids silently excluding a degenerate symbolic parameter value. */
+    if (!expr_is_unnamed_const(rate) || !num_is_finite(rate->c) || num_is_zero(rate->c)) {
+        expr_free(rate);
+        return NULL;
+    }
+    number_t inverse = num_inv(rate->c);
+    expr_t *coefficient = expr_new_const(inverse), *shifted = lambert_shifted(args, axis == 1 ? -1 : 0, 1);
+    expr_t *out = coefficient && shifted ? expr_mul(coefficient, shifted) : NULL;
+    num_destroy(&inverse);
+    expr_free(coefficient);
+    expr_free(shifted);
+    expr_free(rate);
+    return out;
+}
+
 expr_t *expr_integrate_lambert(const expr_t *expression, const expr_t *wrt)
 {
     NUM_SCOPE(scope);
     const expr_t *args[6];
     if (!wrt || !expr_lambert_unpack(expression, args)) return NULL;
+    unsigned axis = 3;
     for (unsigned j = 0; j < 6; ++j) {
-        if (j == 2) continue;
         expr_t *dx = expr_create_deriv(args[j], wrt);
         bool fixed = dx && expr_is_exact_zero(dx);
+        bool valid = dx != NULL;
         expr_free(dx);
-        if (!fixed) return NULL;
+        if (!valid || (!fixed && (j >= 3 || axis < 3))) return NULL;
+        if (!fixed) axis = j;
     }
     number_t r_value = expr_eval_num_internal(args[3]);
     long r, denominator;
     if (!num_get_small_rational(r_value, &r, &denominator) || denominator != 1 || r < 0 || r > 64) return NULL;
+    if (axis < 2) return lambert_integrate_exponential(args, axis, r, wrt);
+    if (axis != 2) return NULL;
     expr_t *dz = expr_create_deriv(args[2], wrt), *ddz = dz ? expr_create_deriv(dz, wrt) : NULL;
     if (!dz || expr_is_exact_zero(dz) || !ddz || !expr_is_exact_zero(ddz)) {
         expr_free(ddz); expr_free(dz); return NULL;

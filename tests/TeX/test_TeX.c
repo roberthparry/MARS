@@ -701,6 +701,16 @@ static void test_TeX_sum_wrapping(void)
         "an operand's restriction is not promoted to a condition on the entire surrounding expression");
     TeX_free(notation);
     TeX_context_free(context);
+    context_test_node_t rows = {.kind = TeX_NODE_LINES, .children = {&difference, &restriction}, .count = 2u};
+    context = TeX_context_new((TeX_node_ref_t){&context_test_provider, &state, &rows});
+    selection.count_calls = selection.term_calls = 0u;
+    notation = TeX_wrap_sum(context, 1u, &provider, &selection);
+    TEST_ASSERT_TRUE(notation && !strcmp(TeX_source(notation),
+        "\\begin{aligned}&x - 2\\\\&\\text{local restriction}\\end{aligned}") &&
+        !selection.count_calls && !selection.term_calls,
+        "explicit semantic rows keep their complete formula and companion text without additive decomposition");
+    TeX_free(notation);
+    TeX_context_free(context);
     string_free(selection.state.scratch);
     string_free(state.scratch);
 }

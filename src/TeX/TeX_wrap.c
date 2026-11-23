@@ -73,7 +73,12 @@ TeX_t *TeX_wrap_sum(const TeX_context_t *context, size_t line_limit,
         return NULL;
     TeX_node_ref_t root = TeX_context_root(context);
     TeX_node_view_t view;
-    if (root.provider->describe(root.context, root.node, &view) && view.kind == TeX_NODE_DOMAIN) {
+    bool described = root.provider->describe(root.context, root.node, &view);
+    /* An explicit row layout already separates the complete formula from definitions or companion equations.
+     * Replacing it with additive terms would detach signs and discard or duplicate those accompanying rows. */
+    if (described && view.kind == TeX_NODE_LINES)
+        return body;
+    if (described && view.kind == TeX_NODE_DOMAIN) {
         TeX_t *wrapped = wrap_domain(root, &view, line_limit, provider, state);
         if (wrapped) {
             TeX_free(body);

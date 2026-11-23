@@ -225,6 +225,8 @@ typedef struct _TeX_sum_provider_t {
  * @param state Borrowed caller-owned state passed unchanged to the callbacks.
  * @return Owned notation released with TeX_free, or NULL when the ordinary body cannot be rendered.
  * @note Outer domain conditions follow their own formula on separate rows, even below the line budget.
+ * Explicit semantic row layouts retain their complete formula and accompanying definitions or equations;
+ * their combined source length does not trigger additive-term decomposition.
  * Nested operand conditions retain their local scope. If a multiline alternative is unavailable,
  * the valid ordinary body is retained.
  */

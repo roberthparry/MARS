@@ -723,10 +723,14 @@ expr_t *expr_lambert_progression_derivative(const expr_t *upper, const expr_t *s
                                            expr_op_kind_t kind, const expr_t *wrt);
 
 /**
- * @brief Construct an affine initial-coordinate primitive of a Lambert-sum application.
+ * @brief Construct a contiguous primitive of a Lambert-sum application.
  * @param expression Borrowed Lambert application.
  * @param wrt Borrowed integration coordinate.
  * @return Owned primitive, released with expr_free(), or NULL when the contiguous rule does not apply.
+ * Supports one varying continuous argument: an affine initial coordinate, or an exponential amplitude/base
+ * with a literal non-zero exponent slope. Exponential bases require positive weight. Other arguments must
+ * be independent of wrt; its numerical binding does not change this dependency test. Principal-power domains
+ * are retained locally, without replacing log(exp(u)) by u across a branch cut. No input is consumed.
  */
 expr_t *expr_integrate_lambert(const expr_t *expression, const expr_t *wrt);
 
