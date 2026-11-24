@@ -3548,7 +3548,8 @@ The separate **Manual limits** setting reveals vertical bounds. Blank horizontal
 remain automatic. Manual vertical limits wait until both fields are filled.
 Delayed edits are discarded after a worksheet change or newer explicit request.
 Incomplete or invalid live bounds leave the last valid plot visible and show
-validation feedback beside the controls; correcting the bounds redraws the plot.
+validation feedback above the drawing, explicitly identifying the retained view;
+correcting the bounds redraws the plot.
 Failed plot redraws also retain the previous coordinate-bearing view and show a
 separate diagnostic. Zoom out or use **Reset** to recover; the zoom buttons never
 switch to enlarging the diagnostic while a previous plot is available.
@@ -4429,10 +4430,10 @@ The weighted hyperbolic sums `@Z_k=1^n sinh(kx)/k` and
 large-bound evaluator supplies the Value, so the interface never suggests that
 an enormous number of terms was summed directly. TeX stays on one line when
 space permits, Expression output uses `Li1` and the capital symbol `Φ`, and
-Function output uses `li1` and `lerchphi`. **Use as input** copies that exact
-parseable Expression representation back to the editor while retaining the
-supplied bindings. Differentiating the copied weighted-sinh form recognises the
-identity from which it came and returns
+Function output uses `li1` and `lerchphi`. **Use as input** copies the original
+weighted sum back to the editor while retaining the supplied bindings. The
+rendered result retains the sum's identity. Differentiating the weighted-sinh
+sum, or its directly entered Lerch form, returns
 
 $\quad\begin{array}{l}\displaystyle \sum_{k=1}^{n}\cosh(kx) =\frac{\sinh(nx/2)\cosh((n+1)x/2)}{\sinh(x/2)}.\end{array}$
 
@@ -4589,6 +4590,12 @@ Rendered TeX retains the differentiated sum on the left of the equality and
 shows this closed form on the right. Expression and Function use the same
 simplified closed form, with the supplied bindings kept separate.
 
+For plotting, MARS recognises this complete identity and samples its equivalent
+real rational sum, including the removable point at `x = 0`. The peak there is
+`n*(n+1)/2`, so `n = 1000` gives `500500`. Automatic limits resolve the peak;
+manual limits are honoured. This produces one real 2-D curve instead of complex
+views triggered by rounding residues in separately evaluated digamma terms.
+
 Derivatives of finite tangent, cotangent, secant, cosecant and their hyperbolic
 counterparts use the evaluable MARS-defined `lambert_S` function. Native TeX
 shows capital `Λ` and always includes its [defining sum](expression.md#mars-defined-lambert-sum)
@@ -4691,8 +4698,16 @@ calculation:
   the only card that substitutes those bindings; it also appears when
   simplification proves a binding-independent value despite an unset binding.
 
-**Use as input** takes its source from the native parseable Expression result,
-not from TeX or Function presentation. Its binding-aware transfer preserves
+**Use as input** takes native parseable mathematical text, rather than TeX or
+Function presentation. For a finite-sum identity, including its differentiated
+sum, it copies the sum into the editor while the result retains **sum = closed form**.
+Evaluating the copied sum recognises the identity again. The Expression and Function
+cards continue to show the simplified closed form. Further differentiation uses
+the recognised closed form when the differentiated summand has no direct reduction.
+For real rational arctangent derivatives, numerical values use the closed form
+after agreement at two guarded precisions; removable points and unresolved
+cancellation fall back to the finite sum. Plots retain the faster compiled finite
+sum. Its binding-aware transfer preserves
 the expression body's order and notation while applying the result bindings to
 the editor controls.
 

@@ -698,19 +698,31 @@ static void real_sample_database_row(const void *data)
         coordinates[i] = num_to_double(value);
         num_destroy(&value);
     }
+    bool derivative = !strcmp(string_c_str(row->operation), "real_sum_derivative");
+    expr_t *reference = derivative ? expr_create_deriv(expression, axes[0]) : NULL;
+    if (derivative) {
+        expr_t *next = expr_finite_sum_sample_derivative(expression, axes[0]);
+        expr_free(expression);
+        expression = next;
+    }
     const expr_t *inputs[] = {axes[0], axes[1], axes[2]};
     expr_real_sample_t *sample = expr_real_sample_new(expression, inputs, 3);
-    number_t expected = expression ? expr_eval(expression) : NUM_NAN;
-    double result = 12345;
-    bool accepted = expr_real_sample_eval(sample, coordinates, &result);
-    bool wanted = !strcmp(string_c_str(row->expected), "accept");
-    bool ok = expression && accepted == wanted;
+    number_t expected = expression ? expr_eval(reference ? reference : expression) : NUM_NAN;
+    double result = 12345, error = 0;
+    bool estimate = !strcmp(string_c_str(row->expected), "estimate");
+    bool accepted = estimate ? expr_real_sample_estimate(sample, coordinates, &result, &error) :
+                              expr_real_sample_eval(sample, coordinates, &result);
+    bool wanted = estimate || !strcmp(string_c_str(row->expected), "accept");
+    bool ok = expression && (!derivative || reference) && accepted == wanted;
     if (wanted)
         ok = ok && num_is_real(expected) && num_is_finite(expected) &&
-             fabs(result - num_to_double(expected)) <= 1e-12 * fmax(1, fabs(result));
+             fabs(result - num_to_double(expected)) <= (estimate ? error : 1e-12 * fmax(1, fabs(result)));
     else
         ok = ok && result == 12345;
-    number_t unchanged = expression ? expr_eval(expression) : NUM_NAN;
+    if (estimate)
+        ok = ok && error >= 0 && error <= 1e-7 * fmax(1, fabs(result)) &&
+             fabs(result - num_to_double(expected)) <= error;
+    number_t unchanged = expression ? expr_eval(reference ? reference : expression) : NUM_NAN;
     ok = ok && ((num_is_nan(expected) && num_is_nan(unchanged)) || num_eq(expected, unchanged));
     if (!ok)
         fprintf(stderr, "sample %s: plan=%s accepted=%d value=%.17g expected=%.17g\n",
@@ -718,12 +730,58 @@ static void real_sample_database_row(const void *data)
     num_destroy(&unchanged);
     num_destroy(&expected);
     expr_real_sample_free(sample);
+    expr_free(reference);
     expr_free(expression);
     expr_bindings_free(bindings);
     for (unsigned i = 0; i < 3; ++i)
         if (detached[i])
             expr_free(axes[i]);
-    TEST_ASSERT_TRUE(ok, "real powers and principal roots agree with native evaluation or request safe fallback");
+    TEST_ASSERT_TRUE(ok, "guarded arithmetic and finite sums agree with native evaluation or request safe fallback");
+}
+
+static void atan_derivative_sample_row(const void *data)
+{
+    const test_database_case_t *row = data;
+    NUM_SCOPE(numbers);
+    expr_bindings_t *bindings = NULL;
+    expr_t *expression = expr_from_string(string_c_str(row->input), &bindings);
+    expr_t *axis = expr_bindings_get(bindings, "x");
+    if (!axis)
+        axis = expr_bindings_get(bindings, "t");
+    const expr_t *axes[] = {axis};
+    number_t coordinate = axis ? expr_get_val(axis) : NUM_NAN;
+    expr_t *reduced = expr_finite_progression_sample_form(expression, axes, 1);
+    bool reject = !strcmp(string_c_str(row->expected), "reject");
+    bool ok = expression && axis && (reject ? !reduced : reduced != NULL);
+    if (reduced) {
+        expr_t *reference = expr_from_string(string_c_str(row->expected), NULL);
+        number_t got = expr_eval(reduced), wanted = reference ? expr_eval(reference) : NUM_NAN;
+        number_t difference = num_abs(num_sub(got, wanted));
+        number_t tolerance = num_mul(num_create_from_double(1e-12), num_add(NUM_ONE, num_abs(wanted)));
+        ok = ok && reference && num_is_real(got) && num_is_finite(got) && num_le(difference, tolerance);
+        double point = num_to_double(coordinate), value = 0;
+        expr_real_sample_t *fast = expr_real_sample_new(reduced, axes, 1);
+        ok = ok && fast && expr_real_sample_eval(fast, &point, &value) &&
+             fabs(value - num_to_double(wanted)) <= 1e-10 * fmax(1, fabs(value));
+        expr_real_sample_free(fast);
+        expr_free(reference);
+    }
+    number_t lower = NUM_NAN, upper = NUM_NAN;
+    bool ranged = expr_finite_atan_derivative_sample_bounds(expression, axis, &lower, &upper);
+    ok = ok && ranged == !reject && (!ranged || (num_is_real(lower) && num_lt(lower, upper))) &&
+         num_eq(coordinate, expr_get_val(axis));
+    if (!ok)
+        fprintf(stderr, "arctangent derivative sample %s: recognised=%d ranged=%d\n",
+                string_c_str(row->name), reduced != NULL, ranged);
+    expr_free(reduced);
+    expr_free(expression);
+    expr_bindings_free(bindings);
+    TEST_ASSERT_TRUE(ok, "complete digamma identities sample as real rational sums through their removable point");
+}
+
+static void test_expr_atan_derivative_sample(void)
+{
+    test_run_database_cases(__FILE__, __LINE__, "expression.atan_derivative_sample", NULL, atan_derivative_sample_row);
 }
 
 static void test_expr_real_sample(void)
@@ -799,7 +857,22 @@ static void test_expr_real_sample(void)
     expr_real_sample_free(context.sample);
     expr_free(expression);
     expr_bindings_free(bindings);
+    bindings = NULL;
+    expression = expr_from_string("sum(k,1,1000,tan(k*x))", &bindings);
+    axis[0] = expr_bindings_get(bindings, "x");
+    context.sample = expr_real_sample_new(expression, axis, 1);
+    options.work_limit = 16;
+    control = computation_new(&options);
+    TEST_ASSERT_TRUE(context.sample && control && !computation_run(control, real_sample_controlled, &context) &&
+                     computation_status(control) == COMPUTATION_BUDGET_EXHAUSTED,
+                     "compiled finite sums check computation controls between terms");
+    computation_free(control);
+    expr_real_sample_free(context.sample);
+    expr_free(expression);
+    expr_bindings_free(bindings);
     test_run_database_cases(__FILE__, __LINE__, "expression.real_sample", "tests.test_expr_real_sample",
+                            real_sample_database_row);
+    test_run_database_cases(__FILE__, __LINE__, "expression.real_sum_derivative", "tests.test_expr_real_sample",
                             real_sample_database_row);
 }
 
@@ -872,6 +945,7 @@ int tests_main(void)
     TEST_SECTION("Runtime regressions");
     TEST_RUN_IN_GROUP(test_runtime_regressions, tests, NULL);
     TEST_RUN_IN_GROUP(test_expr_real_sample, tests, NULL);
+    TEST_RUN_IN_GROUP(test_expr_atan_derivative_sample, tests, NULL);
 
     TEST_SECTION("Imaginary-axis presentation");
     TEST_RUN_IN_GROUP(test_expr_t_imaginary_axis, tests, NULL);

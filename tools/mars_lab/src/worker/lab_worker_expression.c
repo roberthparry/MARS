@@ -824,6 +824,63 @@ static void print_owned_number(const char *label, number_t value, int precision)
     free(text);
 }
 
+/* Compare guarded precisions before using a real closed form; preserve finite sums at removable points. */
+static number_t progression_derivative_value(expr_t *closed, expr_t *finite, const expr_t *origin,
+                                              expr_t *axis, int precision, bool *used_closed)
+{
+    *used_closed = false;
+    size_t bits = num_get_default_prec_bits();
+    size_t digits = precision > 0 ? (size_t)precision : num_get_default_prec_digits();
+    number_t coordinate = expr_get_val(axis), lower = NUM_NAN, upper = NUM_NAN;
+    bool real_family = num_is_real(coordinate) && num_is_finite(coordinate) && bits <= 32768u - 128u &&
+                       expr_finite_atan_derivative_sample_bounds(origin, axis, &lower, &upper);
+    num_destroy(&upper);
+    num_destroy(&lower);
+    if (!real_family) {
+        num_destroy(&coordinate);
+        return expr_eval(finite);
+    }
+    number_t values[2] = {NUM_NAN, NUM_NAN};
+    bool ok = true;
+    for (unsigned pass = 0; ok && pass < 2u; ++pass) {
+        size_t working = bits + 64u * (pass + 1u);
+        ok = num_set_default_prec_bits(working) == 0;
+        number_t promoted = ok ? lab_worker_sample_coordinate(coordinate, working) : NUM_NAN;
+        ok = ok && num_is_finite(promoted);
+        if (ok) {
+            expr_set_val(axis, promoted);
+            values[pass] = expr_eval(closed);
+            ok = num_is_finite(values[pass]) && !num_is_zero(values[pass]) &&
+                 num_get_prec_bits(values[pass]) >= working;
+        }
+        num_destroy(&promoted);
+    }
+    num_set_default_prec_bits(bits);
+    expr_set_val(axis, coordinate);
+    num_destroy(&coordinate);
+    char literal[48];
+    snprintf(literal, sizeof literal, "1e-%zu", digits + 3u);
+    number_t epsilon = num_create_from_string(literal);
+    number_t difference = ok ? num_sub(values[0], values[1]) : NUM_NAN;
+    number_t error = num_abs(difference), scale = num_abs(values[1]);
+    number_t tolerance = num_mul(scale, epsilon);
+    number_t imaginary = num_imag_part(values[1]), imaginary_error = num_abs(imaginary);
+    ok = ok && num_is_finite(error) && num_le(error, tolerance) && num_le(imaginary_error, tolerance);
+    /* The affine rational-family proof establishes real values independently of numerical round-off. */
+    number_t result = ok ? num_real_part(values[1]) : expr_eval(finite);
+    *used_closed = ok;
+    num_destroy(&imaginary_error);
+    num_destroy(&imaginary);
+    num_destroy(&tolerance);
+    num_destroy(&scale);
+    num_destroy(&error);
+    num_destroy(&difference);
+    num_destroy(&epsilon);
+    num_destroy(&values[1]);
+    num_destroy(&values[0]);
+    return result;
+}
+
 static bool explicit_reciprocal_power(const expr_t *expr, expr_t **base_out, long *order_out)
 {
     if (!expr || !base_out || !order_out)
@@ -2111,6 +2168,11 @@ int lab_worker_expression(int argc, char **argv)
 
     printf("input       %s\n", raw_input);
     printf("expression  %s\n", expr_text ? expr_text : "(null)");
+    if (progression_closed_form || weighted_lerch_form) {
+        char *reuse = expr_text_dup(qdigamma_progression_source ? qdigamma_progression_source : expr, style_EXPRESSION);
+        printf("input_expression  %s\n", reuse ? reuse : "");
+        free(reuse);
+    }
     printf("unbound     %s\n", unbound_text ? unbound_text : "(null)");
     printf("function    %s\n", func_text ? func_text : "(null)");
     printf("tex         %s\n", TeX_text ? TeX_text : "(null)");
@@ -2175,6 +2237,7 @@ int lab_worker_expression(int argc, char **argv)
         expr_t *weighted_derivative_source = NULL;
         const expr_t *derivative_source = progression_closed_form ? expr : display_expr;
         bool used_progression_derivative_form = false;
+        bool use_progression_plot_source = false;
         long derivative_root_order = 0L;
 
         if (expr_is_unary_pattern_kind(expr, EXPR_PATTERN_UNARY_ACOT) ||
@@ -2204,6 +2267,17 @@ int lab_worker_expression(int argc, char **argv)
             goto cleanup;
         }
         derivative_progression_closed_form = expr_finite_progression_closed_form(deriv);
+        if (!derivative_progression_closed_form && progression_closed_form &&
+            expr_contains_summation_for_display(deriv)) {
+            /* The finite derivative remains the numerical source; differentiate the recognised identity for display. */
+            expr_t *closed_derivative = expr_create_deriv(progression_closed_form, wrt);
+            derivative_progression_closed_form = expr_simplify_owned(closed_derivative);
+            if (derivative_progression_closed_form) {
+                expr_free(derivative_progression_source);
+                derivative_progression_source = expr_retain_expr(deriv);
+                use_progression_plot_source = true;
+            }
+        }
         if (!derivative_progression_source && used_progression_derivative_form)
             derivative_progression_source = expr_summation_derivative_source(derivative_source, wrt);
         if (!derivative_progression_closed_form && (derivative_progression_source || used_progression_derivative_form))
@@ -2279,13 +2353,27 @@ int lab_worker_expression(int argc, char **argv)
         normalise_double_minus_owned(&deriv_TeX_text);
         expr_free(derivative_root_base);
         printf("derivative  d/d%s = %s\n", wrt_name, deriv_text ? deriv_text : "(null)");
+        if (derivative_progression_closed_form) {
+            char *reuse = expr_text_dup(derivative_progression_source ? derivative_progression_source : deriv,
+                                       style_EXPRESSION);
+            printf("derivative_input_expression  %s\n", reuse ? reuse : "");
+            if (use_progression_plot_source)
+                printf("derivative_plot_expression  %s\n", reuse ? reuse : "");
+            free(reuse);
+        }
         printf("derivative_function  %s\n", deriv_func_text ? deriv_func_text : "(null)");
         printf("derivative_TeX  %s\n", deriv_TeX_text ? deriv_TeX_text : "");
         print_expression_tree_bindings("derivative_binding", deriv);
         if (deriv_values_text)
             printf("d values     %s\n", deriv_values_text);
         else {
-            print_owned_number("d value", expr_eval(deriv), precision);
+            bool used_closed = false;
+            number_t value = use_progression_plot_source ?
+                                 progression_derivative_value(display_deriv, deriv, progression_closed_form,
+                                                               wrt, precision, &used_closed) : expr_eval(deriv);
+            print_owned_number("d value", value, precision);
+            if (use_progression_plot_source)
+                printf("derivative_value_source  %s\n", used_closed ? "closed-form" : "finite-sum");
         }
     } else if (derivative_request) {
         printf("derivative  no variable binding named '%s'\n", wrt_name);

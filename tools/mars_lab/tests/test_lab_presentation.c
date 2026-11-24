@@ -133,6 +133,8 @@ static void test_lab_presentation_calculus_cards(void)
 {
     json_t *fields = test_lab_json(
         "{\"derivative\":\"d/dx = 2*x\",\"derivative_function\":\"exact derivative\","
+        "\"derivative_input_expression\":\"sum(k,1,3,k*x)\","
+        "\"derivative_plot_expression\":\"native numerical sum\","
         "\"display_derivative_function\":\"short derivative\",\"full_display_derivative_function\":\"full derivative\","
         "\"derivative_TeX\":\"2x\",\"derivative_svg\":\"derivative svg\",\"derivative_value\":\"0\","
         "\"derivative_values\":\"x=0\",\"integral\":\"∫dx = x^2/2\",\"integral_function\":\"exact integral\","
@@ -142,6 +144,8 @@ static void test_lab_presentation_calculus_cards(void)
     const json_t *cards = test_lab_member(test_lab_member(fields, "presentation"), "calculus");
     const json_t *derivative = test_lab_member(cards, "derivative"), *integral = test_lab_member(cards, "integral");
     ok = ok && !strcmp(test_lab_text(derivative, "expression"), "2*x") &&
+         !strcmp(test_lab_text(derivative, "input_expression"), "sum(k,1,3,k*x)") &&
+         !strcmp(test_lab_text(derivative, "plot_expression"), "native numerical sum") &&
          !strcmp(test_lab_text(derivative, "function"), "short derivative") &&
          !strcmp(test_lab_text(derivative, "full_function"), "full derivative") &&
          !strcmp(test_lab_text(derivative, "wrapped_TeX"), "2x") &&
@@ -163,6 +167,8 @@ static void test_lab_presentation_calculus_cards(void)
     derivative = test_lab_member(cards, "derivative");
     integral = test_lab_member(cards, "integral");
     ok = ok && !strcmp(test_lab_text(derivative, "function"), "1/3") &&
+         !strcmp(test_lab_text(derivative, "input_expression"), "1/3") &&
+         !strcmp(test_lab_text(derivative, "plot_expression"), "1/3") &&
          !strcmp(test_lab_text(derivative, "full_function"), "1/3") && !*test_lab_text(integral, "expression") &&
          !*test_lab_text(integral, "function");
     json_free(fields);

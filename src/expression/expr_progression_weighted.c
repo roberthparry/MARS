@@ -9,6 +9,7 @@
  * Native presentation and sampling share this expression-module implementation.
  * Expanded tangent, cotangent and hyperbolic derivative polynomials are also recognised,
  * independently of how the summand was entered or obtained by calculus.
+ * Rational arctangent derivative sums recover their digamma identities when entered directly.
  */
 #define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_internal.h"
@@ -318,6 +319,43 @@ static bool polynomial_coefficients(const expr_t *polynomial, const expr_t *vari
     }
     expr_free(current);
     return ok;
+}
+
+/* Re-entered arctangent derivative sums retain their identity without relying on action history. */
+expr_t *expr_finite_rational_progression_closed_form(const expr_t *expression)
+{
+    if (expr_is_neg(expression)) {
+        expr_t *inner = expr_finite_rational_progression_closed_form(expression->a);
+        expr_t *out = inner ? expr_neg(inner) : NULL;
+        expr_free(inner);
+        return out;
+    }
+    if (!expr_is_op(expression, &ops_summation) || !expr_is_op(expression->b, &ops_argument_list) ||
+        !expr_is_div(expression->a))
+        return NULL;
+    const expr_t *index = expression->b->a, *bounds = expression->b->b, *term = expression->a;
+    if (!expr_is_var(index) || !expr_is_op(bounds, &ops_argument_list) ||
+        !expr_is_unnamed_const(bounds->a) || !num_is_one(bounds->a->c) || uses_index(bounds->b, index) ||
+        polynomial_degree(term->a, index, 1) != 1 || polynomial_degree(term->b, index, 2) != 2)
+        return NULL;
+    expr_t *numerator[2] = {0}, *denominator[3] = {0};
+    bool ok = polynomial_coefficients(term->a, index, 1, numerator) &&
+              polynomial_coefficients(term->b, index, 2, denominator) &&
+              expr_is_exact_zero(numerator[0]) && expr_is_unnamed_const(denominator[0]) &&
+              num_is_one(denominator[0]->c) &&
+              expr_is_exact_zero(denominator[1]);
+    const expr_t *step = NULL;
+    number_t exponent = NUM_NAN;
+    ok = ok && expr_match_pow_const(denominator[2], &step, &exponent) && num_eq(exponent, NUM_TWO);
+    expr_t *out = ok ? expr_finite_atan_moment_form(bounds->b, step, numerator[1]) : NULL;
+    expr_t *linked = out ? expr_clone_linked_symbols(out, expression) : NULL;
+    num_destroy(&exponent);
+    expr_free(out);
+    for (size_t i = 0; i < 2u; ++i)
+        expr_free(numerator[i]);
+    for (size_t i = 0; i < 3u; ++i)
+        expr_free(denominator[i]);
+    return linked;
 }
 
 /* G_0(t)=t and G_(n+1)(t)=(constant+quadratic*t^2)*G_n'(t), through supported Lambert order 32. */

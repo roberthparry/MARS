@@ -75,7 +75,9 @@ int lab_worker_complex_plot(const char *source, const expr_t *expression, const 
     number_t progression_lower = NUM_NAN, progression_upper = NUM_NAN;
     if (!real && !force_complex)
         real = expr_finite_circular_progression_sample_bounds(expression, variable,
-                                                              &progression_lower, &progression_upper);
+                                                              &progression_lower, &progression_upper) ||
+               expr_finite_atan_derivative_sample_bounds(expression, variable,
+                                                          &progression_lower, &progression_upper);
     num_destroy(&progression_upper);
     num_destroy(&progression_lower);
     expr_context_free(assumptions);

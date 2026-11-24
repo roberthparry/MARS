@@ -7,20 +7,22 @@
  * carry conversion error estimates; operations propagate round-off estimates and
  * reject ill-conditioned results. These estimates are conservative heuristics, not
  * certified interval arithmetic. Unsupported graphs and uncertain points fall back
- * to the caller's ordinary expression evaluator. The controlled expression façade
- * exposes this optional optimisation to native plotting workers only.
+ * to the caller's ordinary expression evaluator. Bounded finite sums compile their
+ * body once and retain a private index coordinate, without expanding the graph.
+ * The controlled expression façade exposes this optional optimisation to native
+ * plotting workers only.
  */
 #include <float.h>
 #include <limits.h>
 #include <math.h>
 #include <stdlib.h>
 
-#define MARS_EXPR_INTERNAL_ACCESS
-#include "expr_internal.h"
 #define MARS_SHARED_EXPR_INTERNAL_ACCESS
 #include "internal/expr_internal.h"
+#define MARS_EXPR_INTERNAL_ACCESS
+#include "expr_internal.h"
 
-enum { SAMPLE_NODES = 256, SAMPLE_DEPTH = 64, SAMPLE_AXES = 3 };
+enum { SAMPLE_NODES = 256, SAMPLE_DEPTH = 64, SAMPLE_AXES = 3, SAMPLE_TERMS = 4096, SAMPLE_WORK = 65536 };
 
 typedef struct {
     double value, error;
@@ -33,10 +35,13 @@ typedef struct {
     sample_value_t constant;
     size_t left, right;
     int axis;
+    expr_real_sample_t *sum;
+    long lower, upper;
 } sample_instruction_t;
 
 typedef struct _expr_real_sample_t {
-    size_t count, axes;
+    size_t count, axes, work;
+    bool allow_sum;
     sample_instruction_t instructions[SAMPLE_NODES];
 } expr_real_sample_t;
 
@@ -95,6 +100,26 @@ static sample_value_t cosine(sample_value_t a, sample_value_t b)
     if (fabs(a.value) > 1048576)
         return (sample_value_t){NAN, INFINITY};
     return rounded(cos(a.value), a.error + 8 * DBL_EPSILON);
+}
+
+static sample_value_t tangent(sample_value_t a, sample_value_t b)
+{
+    return divide(sine(a, b), cosine(a, b));
+}
+
+static sample_value_t cotangent(sample_value_t a, sample_value_t b)
+{
+    return divide(cosine(a, b), sine(a, b));
+}
+
+static sample_value_t secant(sample_value_t a, sample_value_t b)
+{
+    return divide((sample_value_t){1, 0}, cosine(a, b));
+}
+
+static sample_value_t cosecant(sample_value_t a, sample_value_t b)
+{
+    return divide((sample_value_t){1, 0}, sine(a, b));
 }
 
 static sample_value_t square(sample_value_t a, sample_value_t b)
@@ -174,6 +199,10 @@ static const sample_operation_t operations[EXPR_KIND_COUNT] = {
     [EXPR_KIND_ABS]   = absolute,
     [EXPR_KIND_SIN]   = sine,
     [EXPR_KIND_COS]   = cosine,
+    [EXPR_KIND_TAN]   = tangent,
+    [EXPR_KIND_COT]   = cotangent,
+    [EXPR_KIND_SEC]   = secant,
+    [EXPR_KIND_COSEC] = cosecant,
     [EXPR_KIND_EXP]   = exponential,
     [EXPR_KIND_LOG]   = logarithm,
     [EXPR_KIND_LOG10] = common_logarithm,
@@ -197,6 +226,61 @@ static bool constant_value(number_t value, sample_value_t *output)
     return ok;
 }
 
+static expr_real_sample_t *build(const expr_t *expression, const expr_t *const *axes, size_t count, bool allow_sum);
+
+static bool uses_coordinate(const expr_t *expression, const expr_t *const *axes, size_t count, unsigned depth)
+{
+    if (!expression)
+        return false;
+    if (depth > SAMPLE_DEPTH)
+        return true;
+    /* A bounded coordinate tuple, including the sum's private index, not a symbol-table lookup. */
+    for (size_t i = 0; i < count; ++i)
+        if (expression == axes[i] || (expression->var_id && expression->var_id == axes[i]->var_id))
+            return true;
+    return uses_coordinate(expression->a, axes, count, depth + 1) ||
+           uses_coordinate(expression->b, axes, count, depth + 1);
+}
+
+static bool compile_sum(expr_real_sample_t *sample, const expr_t *expr, const expr_t *const *axes,
+                        sample_instruction_t *instruction)
+{
+    const expr_t *bounds = expr->b, *lower = EXPR_ONE, *upper;
+    if (!sample->allow_sum || !bounds || bounds->ops->kind != EXPR_KIND_ARGUMENT_LIST || !expr_is_var(bounds->a))
+        return false;
+    upper = bounds->b;
+    if (upper && upper->ops->kind == EXPR_KIND_ARGUMENT_LIST) {
+        lower = upper->a;
+        upper = upper->b;
+    }
+    const expr_t *coordinates[SAMPLE_AXES + 1];
+    for (size_t i = 0; i < sample->axes; ++i)
+        coordinates[i] = axes[i];
+    coordinates[sample->axes] = bounds->a;
+    if (!upper || uses_coordinate(lower, coordinates, sample->axes + 1, 0) ||
+        uses_coordinate(upper, coordinates, sample->axes + 1, 0))
+        return false;
+    number_t lo = expr_eval(lower), hi = expr_eval(upper);
+    bool valid = num_is_real(lo) && num_is_integer(lo) && num_is_real(hi) && num_is_integer(hi) &&
+                 num_is_finite(lo) && num_is_finite(hi);
+    double first = num_to_double(lo), last = num_to_double(hi);
+    num_destroy(&hi);
+    num_destroy(&lo);
+    if (!valid || first < -1048576 || last > 1048576 || last < first || last - first >= SAMPLE_TERMS)
+        return false;
+    expr_real_sample_t *body = build(expr->a, coordinates, sample->axes + 1, false);
+    size_t terms = (size_t)(last - first) + 1;
+    if (!body || body->work > (SAMPLE_WORK - sample->work) / terms) {
+        expr_real_sample_free(body);
+        return false;
+    }
+    instruction->sum = body;
+    instruction->lower = (long)first;
+    instruction->upper = (long)last;
+    sample->work += terms * body->work;
+    return true;
+}
+
 static bool compile(expr_real_sample_t *sample, const expr_t *expr, const expr_t *const *axes,
                     unsigned depth, size_t *index)
 {
@@ -205,7 +289,7 @@ static bool compile(expr_real_sample_t *sample, const expr_t *expr, const expr_t
     sample_instruction_t instruction = {.axis = -1};
     expr_op_kind_t kind = expr->ops->kind;
     if (kind == EXPR_KIND_CONST || kind == EXPR_KIND_VAR) {
-        /* At most three explicitly supplied coordinate identities, not a symbol-table search. */
+        /* A fixed coordinate tuple plus an optional private index, not a symbol-table search. */
         for (size_t i = 0; i < sample->axes; ++i)
             if (expr == axes[i] || (expr->var_id && expr->var_id == axes[i]->var_id))
                 instruction.axis = (int)i;
@@ -216,6 +300,9 @@ static bool compile(expr_real_sample_t *sample, const expr_t *expr, const expr_t
             if (!ok)
                 return false;
         }
+    } else if (kind == EXPR_KIND_SUMMATION) {
+        if (!compile_sum(sample, expr, axes, &instruction))
+            return false;
     } else {
         if (kind == EXPR_KIND_ROOT && (!expr->b || expr->b->ops != &ops_const ||
             !num_is_integer(expr->b->c) || !num_gt(expr->b->c, NUM_ONE) ||
@@ -241,11 +328,29 @@ static bool compile(expr_real_sample_t *sample, const expr_t *expr, const expr_t
             !compile(sample, expr->b, axes, depth + 1, &instruction.right))
             return false;
     }
-    if (sample->count == SAMPLE_NODES)
+    if (sample->count == SAMPLE_NODES || sample->work == SAMPLE_WORK) {
+        expr_real_sample_free(instruction.sum);
         return false;
+    }
+    ++sample->work;
     *index = sample->count;
     sample->instructions[sample->count++] = instruction;
     return true;
+}
+
+static expr_real_sample_t *build(const expr_t *expression, const expr_t *const *axes, size_t count, bool allow_sum)
+{
+    expr_real_sample_t *sample = calloc(1, sizeof(*sample));
+    if (!sample)
+        return NULL;
+    sample->axes = count;
+    sample->allow_sum = allow_sum;
+    size_t root;
+    if (!compile(sample, expression, axes, 0, &root)) {
+        expr_real_sample_free(sample);
+        return NULL;
+    }
+    return sample;
 }
 
 /* Plans own their constants and coordinate indices, never the source expression. */
@@ -256,46 +361,80 @@ expr_real_sample_t *expr_real_sample_new(const expr_t *expression, const expr_t 
     for (size_t i = 0; i < count; ++i)
         if (!axes[i])
             return NULL;
-    expr_real_sample_t *sample = calloc(1, sizeof(*sample));
-    if (!sample)
-        return NULL;
-    sample->axes = count;
-    size_t root;
-    if (!compile(sample, expression, axes, 0, &root)) {
-        free(sample);
-        return NULL;
-    }
-    return sample;
+    return build(expression, axes, count, true);
 }
 
-/* A failed approximation must never be treated as a hole or as an accepted root. */
-bool expr_real_sample_eval(const expr_real_sample_t *sample, const double *coordinates, double *value)
+static bool evaluate(const expr_real_sample_t *sample, const double *coordinates, sample_value_t *output, bool control)
 {
-    if (!sample || !coordinates || !value)
-        return false;
     sample_value_t values[SAMPLE_NODES];
     for (size_t i = 0; i < sample->count; ++i) {
-        if (!expr_computation_step("expression.sample"))
+        if (control && !expr_computation_step("expression.sample"))
             return false;
         const sample_instruction_t *instruction = &sample->instructions[i];
         sample_value_t result = instruction->constant;
-        if (instruction->axis >= 0)
-            result = rounded(coordinates[instruction->axis], 0);
+        if (instruction->sum) {
+            double point[SAMPLE_AXES + 1];
+            for (size_t axis = 0; axis < sample->axes; ++axis)
+                point[axis] = coordinates[axis];
+            double total = 0, correction = 0, error = 0, magnitude = 0;
+            for (long term = instruction->lower; term <= instruction->upper; ++term) {
+                sample_value_t part;
+                point[sample->axes] = (double)term;
+                /* Each body has at most 256 instructions and no nested loop. */
+                if (!expr_computation_step("expression.sample") || !evaluate(instruction->sum, point, &part, false))
+                    return false;
+                double next = total + part.value;
+                correction += fabs(total) >= fabs(part.value) ? (total - next) + part.value :
+                                                                (part.value - next) + total;
+                total = next;
+                error += part.error;
+                magnitude += fabs(part.value);
+            }
+            /* Compensated accumulation avoids a quadratic round-off estimate from partial totals. */
+            result = rounded(total + correction, error + 16 * DBL_EPSILON * magnitude);
+        } else if (instruction->axis >= 0)
+            result = !sample->allow_sum && (size_t)instruction->axis == sample->axes - 1 ?
+                     (sample_value_t){coordinates[instruction->axis], 0} : rounded(coordinates[instruction->axis], 0);
         else if (instruction->operation)
             result = instruction->operation(values[instruction->left], values[instruction->right]);
         if (!isfinite(result.value) || !isfinite(result.error))
             return false;
         values[i] = result;
     }
-    sample_value_t result = values[sample->count - 1];
-    if (result.error >= fabs(result.value) || result.error > 1e-10 * fmax(1, fabs(result.value)))
+    *output = values[sample->count - 1];
+    return true;
+}
+
+/* The caller must compare this conservative estimate with its own approximation tolerance. */
+bool expr_real_sample_estimate(const expr_real_sample_t *sample, const double *coordinates,
+                               double *value, double *absolute_error)
+{
+    sample_value_t result;
+    if (!sample || !coordinates || !value || !absolute_error || value == absolute_error ||
+        !evaluate(sample, coordinates, &result, true))
+        return false;
+    if (result.error >= fabs(result.value))
         return false;
     *value = result.value;
+    *absolute_error = result.error;
+    return true;
+}
+
+/* A failed approximation must never be treated as a hole or as an accepted root. */
+bool expr_real_sample_eval(const expr_real_sample_t *sample, const double *coordinates, double *value)
+{
+    double result, error;
+    if (!value || !expr_real_sample_estimate(sample, coordinates, &result, &error) ||
+        error > 1e-10 * fmax(1, fabs(result)))
+        return false;
+    *value = result;
     return true;
 }
 
 /* Dispose of the optional plan independently of the original graph. */
 void expr_real_sample_free(expr_real_sample_t *sample)
 {
+    for (size_t i = 0; sample && i < sample->count; ++i)
+        expr_real_sample_free(sample->instructions[i].sum);
     free(sample);
 }

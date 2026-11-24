@@ -60,6 +60,8 @@ window.checkLabEvaluationCards = async function checkLabEvaluationCards() {
         equal(cards.expression, 'native compact', 'native editor metadata supplies compact display');
         equal(cards.full_expression, 'native full', 'full symbolic expression retained');
         equal(cards.input, 'native editor', 'explicit editor source has reuse precedence');
+        equal(plan(0, {...data, input_expression: 'native finite sum'}).input, 'native finite sum',
+              'native finite-sum reuse is independent of the closed-form expression card');
         equal(cards.derivative, 'native derivative', 'native derivative metadata retained');
         equal(cards.differentiable, false, 'native differentiability flag normalised');
         WorksheetResults.cards.installEvaluationTextCards(cards);

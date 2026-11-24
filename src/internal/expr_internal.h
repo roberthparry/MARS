@@ -814,16 +814,33 @@ bool expr_finite_summation_exceeds_direct_limit(const expr_t *expr);
 expr_t *expr_finite_progression_closed_form(const expr_t *expr);
 
 /**
- * @brief Build a sampling identity for a fixed finite progression of an entire elementary function.
- * @param expr Borrowed authored sum; not modified or consumed.
+ * @brief Build a stable sampling graph for a fixed finite progression or a proved arctangent derivative identity.
+ * @param expr Borrowed authored sum or complete digamma derivative identity; not modified or consumed.
  * @param axes Borrowed array of count coordinate nodes, kept live by the caller during sampling.
  * @param count Number of coordinates, from one to three.
  * @return Owned graph with linked source bindings, released with expr_free(), or NULL for unsupported sums,
  * coordinate-dependent or invalid bounds, invalid arguments or allocation failure. Rebuild after changing
- * non-coordinate bindings. Non-finite evaluations must fall back to expr to preserve removable points.
+ * non-coordinate bindings. Entire-function sums use compact closed forms; complete finite arctangent derivative
+ * identities use rational summands, preserving their removable zero-step value. Non-finite closed-form evaluations
+ * must fall back to expr to preserve removable points.
  * Access to mutable linked graphs must remain confined to their owning thread.
  */
 expr_t *expr_finite_progression_sample_form(const expr_t *expr, const expr_t *const *axes, size_t count);
+
+/**
+ * @brief Select a real automatic window resolving a finite arctangent progression derivative's central peak.
+ * @param[in] expression Borrowed complete conjugate-pair digamma derivative identity; left unchanged.
+ * @param[in] axis Borrowed plotting coordinate with a non-constant real affine progression step.
+ * @param[out] lower Output receiving an owned lower endpoint, released with num_destroy().
+ * @param[out] upper Distinct output receiving an owned upper endpoint, released with num_destroy().
+ * @return True for a structurally proved identity with a fixed positive integer count n and real step a*x+b.
+ * The window is centred at -b/a with radius 10/(n*abs(a)). False for unsupported expressions, uncertain
+ * domains, invalid arguments or allocation failure; valid distinct outputs receive NUM_NAN on failure.
+ * The identity is real and regular throughout this window, including its removable zero-step point.
+ * Recompute after parameter edits and confine linked source graphs to their owning thread.
+ */
+bool expr_finite_atan_derivative_sample_bounds(const expr_t *expression, const expr_t *axis,
+                                               number_t *lower, number_t *upper);
 
 /**
  * @brief Build a live denominator guard for polynomially weighted finite-progression sampling.
@@ -878,6 +895,17 @@ bool expr_finite_growth_progression_sample_bounds(const expr_t *expression, cons
  */
 bool expr_finite_circular_progression_sample_regular(const expr_t *expression, const expr_t *axis,
                                                      number_t lower, number_t upper);
+
+/**
+ * @brief Differentiate the body of a fixed finite sum while retaining its numerical loop.
+ * @param expression Borrowed finite sum or recognised q-digamma progression; not modified or consumed.
+ * @param axis Borrowed differentiation coordinate, independent of the sum's index and bounds.
+ * @return Owned derivative released with expr_free(), or NULL for unsupported forms, non-finite or
+ * non-integer bounds, coordinate-dependent bounds, or allocation failure. Symbols remain linked to
+ * their source bindings; use on their owning thread or synchronise access. This sampling graph does
+ * not replace the symbolic result's closed form.
+ */
+expr_t *expr_finite_sum_sample_derivative(const expr_t *expression, const expr_t *axis);
 
 /**
  * @brief Return whether a progression reduction depends on the supplied value of its step.
@@ -1854,7 +1882,10 @@ typedef struct _expr_real_sample_t expr_real_sample_t;
  * @param axes Borrowed count-element array of real coordinate expressions; at most three coordinates are supported.
  * @param count Number of entries in the supplied ordered array or collection.
  * @return Owned sampling plan released with expr_real_sample_free, or NULL when the expression is unsupported or
- * preparation fails.
+ * preparation fails. Fixed, coordinate-independent finite sums may contain up to 4096 terms and no nested sum;
+ * their body has its own private index coordinate. Plans are limited to 256 instructions per body and 65536
+ * operations per point. Source graphs and bindings are neither retained nor modified. Rebuild after changing
+ * non-coordinate bindings; independent evaluations may share an immutable plan while its lifetime is protected.
  */
 expr_real_sample_t *expr_real_sample_new(const expr_t *expression, const expr_t *const *axes, size_t count);
 
@@ -1866,6 +1897,21 @@ expr_real_sample_t *expr_real_sample_new(const expr_t *expression, const expr_t 
  * @return True when the requested operation succeeds; false when unavailable, invalid or unsuccessful.
  */
 bool expr_real_sample_eval(const expr_real_sample_t *sample, const double *coordinates, double *value);
+
+/**
+ * @brief Estimate a real sample and its propagated absolute round-off without choosing a caller's tolerance.
+ * @param sample Borrowed immutable sampling plan; its snapshot and source bindings remain unchanged.
+ * @param coordinates Borrowed real coordinate array in the plan's input order.
+ * @param value Required output receiving a finite double approximation only on success.
+ * @param absolute_error Required distinct output receiving a non-negative finite absolute error estimate on success.
+ * @return True when both outputs are available; false for invalid inputs, non-finite or uncertain arithmetic,
+ * cancellation exceeding the value, or a stopped computation control, leaving both outputs untouched.
+ * The estimate is a conservative numerical heuristic, not a certified interval. Callers must check it against
+ * their own accuracy requirement; expr_real_sample_eval() retains its stricter default guard. Independent calls
+ * may share a plan while its lifetime is protected. No ownership is transferred.
+ */
+bool expr_real_sample_estimate(const expr_real_sample_t *sample, const double *coordinates,
+                               double *value, double *absolute_error);
 
 /**
  * @brief Release a sampling plan; NULL is harmless.

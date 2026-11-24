@@ -193,6 +193,12 @@ static sampler_t *sample_at(const char *source, const char *variable, number_t l
     const expr_t *derivative_source = expression;
     bool regular_progression = !probes && !preview &&
                                expr_finite_circular_progression_sample_regular(expression, axis, lower, upper);
+    number_t inverse_lower = NUM_NAN, inverse_upper = NUM_NAN;
+    if (!probes && !preview && !regular_progression)
+        regular_progression = expr_finite_atan_derivative_sample_bounds(expression, axis,
+                                                                         &inverse_lower, &inverse_upper);
+    num_destroy(&inverse_upper);
+    num_destroy(&inverse_lower);
     number_t lo = lab_worker_sample_coordinate(lower, bits), hi = lab_worker_sample_coordinate(upper, bits);
     sampler_options_t options = sampler_options_default();
     options.intervals = probes || preview ? 16 : 64;
@@ -202,10 +208,15 @@ static sampler_t *sample_at(const char *source, const char *variable, number_t l
     options.absolute_tolerance = absolute_tolerance;
     options.relative_tolerance = preview ? 0.01 : 0.002;
     plot_evaluation_t evaluation = {.expression = derivative_source, .axis = axis};
-    if (!probes && !preview && !regular_progression && expression && axis)
-        evaluation.second_derivative = expr_create_2nd_deriv(derivative_source, axis, axis);
-    if (!probes && !preview && !regular_progression && (bits == 53 || reduced) && expression && axis)
-        evaluation.first_derivative = expr_create_deriv(derivative_source, axis);
+    if (!probes && !preview && !regular_progression && expression && axis) {
+        evaluation.first_derivative = expr_finite_sum_sample_derivative(derivative_source, axis);
+        if (evaluation.first_derivative)
+            evaluation.second_derivative = expr_finite_sum_sample_derivative(evaluation.first_derivative, axis);
+        if (!evaluation.second_derivative)
+            evaluation.second_derivative = expr_create_2nd_deriv(derivative_source, axis, axis);
+        if (!evaluation.first_derivative && (bits == 53 || reduced))
+            evaluation.first_derivative = expr_create_deriv(derivative_source, axis);
+    }
     evaluation.value = lab_worker_sample_new(expression, &axis, 1, bits);
     evaluation.first = lab_worker_sample_new(evaluation.first_derivative, &axis, 1, bits);
     evaluation.second = lab_worker_sample_new(evaluation.second_derivative, &axis, 1, bits);

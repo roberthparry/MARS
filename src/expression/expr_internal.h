@@ -1101,9 +1101,51 @@ bool expr_finite_growth_progression_sample_bounds(const expr_t *expression, cons
 bool expr_finite_circular_progression_sample_regular(const expr_t *expression, const expr_t *axis,
                                                      number_t lower, number_t upper);
 
+/**
+ * @brief Differentiate the body of a fixed finite sum while retaining its numerical loop.
+ * @param expression Borrowed finite sum or recognised q-digamma progression; not modified or consumed.
+ * @param axis Borrowed differentiation coordinate, independent of the sum's index and bounds.
+ * @return Owned derivative released with expr_free(), or NULL for unsupported forms, non-finite or
+ * non-integer bounds, coordinate-dependent bounds, or allocation failure. Symbols remain linked to
+ * their source bindings; use on their owning thread or synchronise access. This sampling graph does
+ * not replace the symbolic result's closed form.
+ */
+expr_t *expr_finite_sum_sample_derivative(const expr_t *expression, const expr_t *axis);
+
 /** @brief Identify the upper bound, step and function of a finite progression. */
 bool expr_finite_progression_parts(const expr_t *expr, const expr_t **upper, expr_t **step,
                                    const expr_ops_t **function);
+
+/**
+ * @brief Construct the digamma form of a finite rational arctangent moment.
+ * @param upper Borrowed inclusive integer upper bound; the lower bound is one.
+ * @param step Borrowed phase expression, independent of the summation index.
+ * @param coefficient Borrowed index-independent multiplier of the rational summand.
+ * @return Owned sum of k*coefficient/(1+k^2*step^2), released with expr_free(), or NULL on invalid input or
+ * allocation failure. The closed form has a removable singularity at zero step; numerical summation retains
+ * that value. Arguments are not consumed; use their owning thread or synchronise access externally.
+ */
+expr_t *expr_finite_atan_moment_form(const expr_t *upper, const expr_t *step, const expr_t *coefficient);
+
+/**
+ * @brief Recognise an entered rational sum with a linear numerator and a squared phase in its denominator.
+ * @param expression Borrowed finite sum with lower bound one, or its negation; not modified or consumed.
+ * @return Owned digamma closed form released with expr_free(), or NULL for another algebraic form or allocation
+ * failure. Recognition uses exact polynomial coefficients, preserving source bindings without substitution.
+ * Call on the source graph's owning thread or synchronise it externally.
+ */
+expr_t *expr_finite_rational_progression_closed_form(const expr_t *expression);
+
+/**
+ * @brief Recover the finite arctangent sum whose derivative equals a complete digamma integer-shift identity.
+ * @param[in] expression Borrowed candidate closed form, not modified or consumed.
+ * @param[in] axis Borrowed differentiation coordinate, independent of the fixed positive integer upper bound.
+ * @return Owned finite source sum released with expr_free(), or NULL for another expression, invalid arguments
+ * or allocation failure. Matching checks all four digamma operands and the complete coefficient and denominator;
+ * numerical coordinate values are never used as proof. Source bindings remain linked to the returned graph.
+ * Confine access to the source graph's owning thread or synchronise it externally.
+ */
+expr_t *expr_finite_atan_derivative_source(const expr_t *expression, const expr_t *axis);
 
 /** @brief Construct the closed form of a recognised exponential sine progression. */
 expr_t *expr_finite_exponential_sine_progression_closed_form(const expr_t *expr);

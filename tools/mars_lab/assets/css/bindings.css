@@ -382,6 +382,11 @@
   flex-basis: 100%;
 }
 
+#plotFeedback {
+  padding: 0.6rem 0.8rem;
+  border-bottom: 1px solid var(--line);
+}
+
 #plotCamera {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));

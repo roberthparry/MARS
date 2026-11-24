@@ -14,6 +14,7 @@
 #include <string.h>
 #include <time.h>
 
+#include "expression-t.h"
 #include "diffequation-t.h"
 #include "xml-t.h"
 #include "lab_presentation.h"
@@ -1639,6 +1640,18 @@ static void progression_plot_row(const void *data)
                                string_c_str(row->expected);
     number_t minimum = num_create_from_string(minimum_text), actual = num_create_from_long((long)paths);
     bool ok = status == 200u && test_lab_ok(response, true) && num_ge(actual, minimum);
+    if (!strcmp(lab_eval_text(expected, "real"), "yes")) {
+        const char *maximum = strstr(svg, "data-y-max=\"");
+        const char *minimum = strstr(svg, "data-y-min=\"");
+        double top = 0, bottom = 0;
+        number_t peak = num_create_from_string(lab_eval_text(expected, "peak"));
+        ok = ok && !*lab_eval_text(response, "plot_complex_plane") && !*lab_eval_text(response, "plot_components") &&
+             !*lab_eval_text(response, "plot_amplitude") && maximum && minimum &&
+             sscanf(maximum, "data-y-max=\"%lf", &top) == 1 &&
+             sscanf(minimum, "data-y-min=\"%lf", &bottom) == 1 &&
+             top >= num_to_double(peak) && top <= 1.5 * num_to_double(peak) && bottom <= num_to_double(peak);
+        num_destroy(&peak);
+    }
     if (is_complex) {
         const char *plane = lab_eval_text(response, "plot_complex_plane");
         const char *width = strstr(plane, "data-plot-width=\""), *height = strstr(plane, "data-plot-height=\"");
@@ -1840,6 +1853,29 @@ static void test_lab_extra_progression_samples(void)
     test_run_database_cases(__FILE__, __LINE__, "mars_lab.progression_samples", NULL, progression_sample_row);
 }
 
+static bool progression_card_value_matches(const json_t *response, const string_t *reference)
+{
+    size_t saved = num_get_default_prec_bits();
+    num_set_default_prec_digits(120u);
+    expr_t *expression = expr_from_text(reference, NULL);
+    number_t expected = expression ? expr_eval(expression) : NUM_NAN;
+    number_t value = num_create_from_string(lab_eval_text(response, "derivative_value"));
+    number_t difference = num_sub(value, expected), error = num_abs(difference);
+    number_t magnitude = num_abs(expected), relative = num_create_from_string("1e-95");
+    number_t tolerance = num_mul(magnitude, relative);
+    bool ok = expression && num_is_finite(value) && num_is_finite(expected) && num_le(error, tolerance);
+    num_destroy(&tolerance);
+    num_destroy(&relative);
+    num_destroy(&magnitude);
+    num_destroy(&error);
+    num_destroy(&difference);
+    num_destroy(&value);
+    num_destroy(&expected);
+    expr_free(expression);
+    num_set_default_prec_bits(saved);
+    return ok;
+}
+
 static void progression_card_row(const void *data)
 {
     const test_database_case_t *row = data;
@@ -1855,6 +1891,8 @@ static void progression_card_row(const void *data)
             const string_t *fragment = json_string_value(json_array_get(fields, i + 1u));
             if (name && strcmp(string_c_str(name), "run_output") == 0)
                 run_output = fragment;
+            else if (name && !strcmp(string_c_str(name), "reference_value"))
+                ok = ok && fragment && progression_card_value_matches(response, fragment);
             else
                 ok = ok && name && fragment && contains(response, string_c_str(name), string_c_str(fragment));
             if (name && fragment && !strcmp(string_c_str(name), "integral_plot_available")) {

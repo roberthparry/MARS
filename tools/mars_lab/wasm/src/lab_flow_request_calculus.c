@@ -253,8 +253,7 @@ static jsref lab_flow_request_calculus_accept(struct lab_flow_request_calculus_c
                                  lab_dom_text(ctx->wrt), "");
         if (ctx->plot && lab_flow_request_truth(ctx->frame, "live") &&
             !lab_dom_truth(lab_dom_get(ctx->data, "plot_slices"))) {
-            lab_dom_write(lab_dom_id("plotFeedback"), LAB_DOM_TEXT, "", error);
-            lab_dom_class(lab_dom_id("plotFeedback"), "hidden", 0);
+            lab_layout_plot(0, error);
             return lab_flow_done(0);
         }
         return lab_flow_call(ctx->frame,
@@ -343,7 +342,9 @@ static jsref lab_flow_request_calculus_commit_state(struct lab_flow_request_calc
 static jsref lab_flow_request_calculus_plot_result(struct lab_flow_request_calculus_context *ctx)
 {
     int mode = lab_dom_get(lab_dom_get(ctx->frame, "initial"), "mode");
-    int source = lab_dom_get(ctx->result, "expression");
+    int source = lab_dom_get(ctx->result, "plot_expression");
+    if (!lab_dom_truth(source))
+        source = lab_dom_get(ctx->result, "expression");
     int range = lab_dom_id("plotRange");
     if (lab_dom_equal(lab_dom_get(ctx->result, "plot_available"), lab_dom_string("no"))) {
         lab_dom_remove(range, "data-calculus-source");
@@ -382,8 +383,7 @@ static jsref lab_flow_request_calculus_error_clear(struct lab_flow_request_calcu
     if (!lab_flow_request_truth(ctx->frame, "current"))
         return lab_flow_done(0);
     if (lab_flow_request_truth(ctx->frame, "live")) {
-        lab_dom_write(lab_dom_id("plotFeedback"), LAB_DOM_TEXT, "", lab_dom_get(ctx->frame, "error"));
-        lab_dom_class(lab_dom_id("plotFeedback"), "hidden", 0);
+        lab_layout_plot(0, lab_dom_get(ctx->frame, "error"));
         return lab_flow_done(0);
     }
     if (ctx->plot)

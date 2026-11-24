@@ -189,6 +189,40 @@ bool expr_finite_growth_progression_sample_bounds(const expr_t *expression, cons
     return progression_bounds(expression, axis, true, lower, upper);
 }
 
+/* Resolve the narrow, finite central peak rather than treating the digamma quotient's zero as a pole. */
+bool expr_finite_atan_derivative_sample_bounds(const expr_t *expression, const expr_t *axis,
+                                               number_t *lower, number_t *upper)
+{
+    if (!lower || !upper || lower == upper)
+        return false;
+    *lower = *upper = NUM_NAN;
+    NUM_SCOPE(numbers);
+    expr_t *source = expr_finite_atan_derivative_source(expression, axis);
+    const expr_t *count = NULL;
+    const expr_ops_t *function = NULL;
+    expr_t *step = NULL;
+    bool ok = source && expr_finite_progression_parts(source, &count, &step, &function);
+    expr_t *slope = ok ? expr_create_deriv(step, axis) : NULL;
+    expr_t *offset = ok ? expr_substitute(step, axis, EXPR_ZERO) : NULL;
+    ok = ok && slope && offset && !contains_axis(slope, axis) && !contains_axis(offset, axis);
+    if (ok) {
+        number_t a = expr_eval(slope), b = expr_eval(offset), n = expr_eval(count);
+        ok = num_is_real(a) && num_is_finite(a) && !num_is_zero(a) && num_is_real(b) && num_is_finite(b) &&
+             num_is_real(n) && num_is_integer(n) && num_gt(n, NUM_ZERO) && num_is_finite(n);
+        if (ok) {
+            number_t centre = num_neg(num_div(b, a));
+            number_t radius = num_div(num_create_from_long(10), num_mul(n, num_abs(a)));
+            *lower = num_scope_detach(num_sub(centre, radius));
+            *upper = num_scope_detach(num_add(centre, radius));
+        }
+    }
+    expr_free(offset);
+    expr_free(slope);
+    expr_free(step);
+    expr_free(source);
+    return ok;
+}
+
 /* Affine endpoint phases bound every term throughout the whole interval. */
 bool expr_finite_circular_progression_sample_regular(const expr_t *expression, const expr_t *axis,
                                                      number_t lower, number_t upper)
@@ -205,4 +239,36 @@ bool expr_finite_circular_progression_sample_regular(const expr_t *expression, c
     number_t limit = num_div(num_mul_long(NUM_PI, progression.pole_at_zero ? 2 : 1), num_create_from_long(3));
     return num_lt(num_mul(progression.count, edge), limit) &&
            (!progression.pole_at_zero || num_gt(num_mul(first, last), NUM_ZERO));
+}
+
+/* Retain a finite loop for numerical tangents instead of evaluating complex closed-form derivatives. */
+expr_t *expr_finite_sum_sample_derivative(const expr_t *expression, const expr_t *axis)
+{
+    if (!expression || !expr_is_var(axis))
+        return NULL;
+    expr_t *sum = expression && expression->ops->kind == EXPR_KIND_SUMMATION ? expr_retain_expr(expression) :
+                  expr_finite_progression_from_qdigamma_form(expression);
+    if (!sum) {
+        expr_t *source = expr_finite_atan_derivative_source(expression, axis);
+        sum = source ? expr_finite_sum_sample_derivative(source, axis) : NULL;
+        expr_free(source);
+    }
+    expr_t *result = NULL;
+    if (sum && sum->b && sum->b->ops->kind == EXPR_KIND_ARGUMENT_LIST && expr_is_var(sum->b->a) &&
+        !contains_axis(sum->b, axis)) {
+        const expr_t *range = sum->b->b;
+        const expr_t *lower = range && range->ops->kind == EXPR_KIND_ARGUMENT_LIST ? range->a : EXPR_ONE;
+        const expr_t *upper = range && range->ops->kind == EXPR_KIND_ARGUMENT_LIST ? range->b : range;
+        number_t lo = lower ? expr_eval(lower) : NUM_NAN, hi = upper ? expr_eval(upper) : NUM_NAN;
+        if (num_is_real(lo) && num_is_integer(lo) && num_is_finite(lo) &&
+            num_is_real(hi) && num_is_integer(hi) && num_is_finite(hi) && num_ge(hi, lo)) {
+            expr_t *term = expr_create_deriv(sum->a, axis);
+            result = term ? expr_new_summation(term, sum->b) : NULL;
+            expr_free(term);
+        }
+        num_destroy(&hi);
+        num_destroy(&lo);
+    }
+    expr_free(sum);
+    return result;
 }

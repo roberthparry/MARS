@@ -283,6 +283,7 @@ window.checkLabResultDom = async function checkLabResultDom() {
         check(!WorksheetContext.value.closest('.result-card')!.hasAttribute('hidden'), 'matrix value visible');
         WorksheetResults.cards.displayCalculusResult({
             expression: 'integral expression',
+            input_expression: 'native reusable sum',
             function: 'integral function',
             full_function: 'full integral function',
             value: '',
@@ -293,6 +294,8 @@ window.checkLabResultDom = async function checkLabResultDom() {
             wrapped_svg: fullSvg
         });
         equal(WorksheetContext.valueTitle.textContent, 'Exact result', 'calculus native value title');
+        equal(WorksheetContext.parsed.textContent, 'integral expression', 'calculus closed-form card unchanged');
+        equal(call('input_get', 'expression'), 'native reusable sum', 'calculus reuses its explicit native sum');
         equal(WorksheetResults.clipboard.copyTextForTarget('function'), 'full integral function', 'calculus full function copy');
         check(WorksheetContext.value.closest('.result-card')!.hasAttribute('hidden'), 'absent numerical value hidden');
         equal(WorksheetWorkspace.presentation.state.resultInputBindings.length, 0, 'calculus clears matrix reuse bindings');

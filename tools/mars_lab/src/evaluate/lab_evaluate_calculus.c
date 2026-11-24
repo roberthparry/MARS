@@ -43,7 +43,11 @@ static bool lab_pres_calculus_card(json_t *cards, json_t *lines, const json_t *f
     const char *TeX = lab_pres_calculus_field(fields, "%s_TeX", action);
     const char *wrapped = lab_pres_calculus_field(fields, "%s_wrapped_TeX", action);
     const char *value = lab_pres_calculus_field(fields, "%s_value", action);
+    const char *input = lab_pres_calculus_field(fields, "%s_input_expression", action);
+    const char *plot_expression = lab_pres_calculus_field(fields, "%s_plot_expression", action);
     ok = ok && lab_eval_set(card, "expression", expression) &&
+         lab_eval_set(card, "input_expression", *input ? input : expression) &&
+         lab_eval_set(card, "plot_expression", *plot_expression ? plot_expression : expression) &&
          lab_eval_set(card, "function", *short_function ? short_function : (*function ? function : expression)) &&
          lab_eval_set(card, "full_function", *full_function ? full_function : (*function ? function : expression)) &&
          lab_eval_set(card, "TeX", TeX) && lab_eval_set(card, "wrapped_TeX", *wrapped ? wrapped : TeX) &&

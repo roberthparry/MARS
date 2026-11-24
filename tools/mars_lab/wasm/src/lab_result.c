@@ -456,7 +456,8 @@ void lab_result_display(jsref caches, jsref data, lab_result_kind_t kind)
     int full = fields[kind].full_fallback ? lab_result_or(lab_dom_get(data, fields[kind].full), function)
                                         : lab_result_field(data, fields[kind].full);
     lab_result_expandable(caches, lab_dom_query(0, "#functionStyle"), lab_dom_query(0, "#functionMore"), display, full);
-    lab_result_input_set(expression);
+    lab_result_input_set(kind == LAB_RESULT_CALCULUS ?
+                             lab_result_or(lab_dom_get(data, "input_expression"), expression) : expression);
     lab_result_value_visible(lab_dom_truth(lab_dom_get(data, "value")));
     int state = lab_dom_object(LAB_VALUE_OBJECT);
     lab_dom_set(state, "TeX", lab_result_render(caches, data, kind));

@@ -462,7 +462,7 @@ bool lab_presentation_adapt(json_t *fields)
     json_t *editors = json_new_array();
     static const char *const editor_fields[] = {
         "input", "expression", "binding_expression", "unbound_expression", "result", "display_expression",
-        "full_display_expression"
+        "full_display_expression", "input_expression", "derivative_input_expression"
     };
     for (size_t i = 0; editors && i < sizeof(editor_fields) / sizeof(*editor_fields); ++i) {
         const string_t *source = json_string_value(lab_eval_get(fields, editor_fields[i]));

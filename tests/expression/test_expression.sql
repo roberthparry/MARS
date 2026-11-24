@@ -420,6 +420,16 @@ INSERT INTO expression_cases(name, operation, input, expected) VALUES
 ON CONFLICT(name) DO UPDATE SET input=excluded.input, expected=excluded.expected;
 
 INSERT INTO expression_cases(name, operation, input, expected) VALUES
+    ('series_rational_atan_reuse', 'function_series_endpoint', '@Z_(k=1)^1000 k/(1+k^2*x^2)',
+     '["\\sum_{k=1}^{1000}",null," = ",false,"(digamma(1001+i/x)-digamma(1+i/x)+digamma(1001-i/x)-digamma(1-i/x))/(2*x^2)"]'),
+    ('series_rational_atan_bound', 'function_series_endpoint', '{sum(k,1,4,k/(1+k^2*x^2))|x=1}',
+     '["\\sum_{k=1}^{4}","122/85"," = ",true]'),
+    ('series_rational_atan_negative', 'function_series_endpoint', '{-sum(j,1,4,j/(1+j^2*t^2))|t=1}',
+     '["-\\sum_{j=1}^{4}","-122/85"," = ",true]'),
+    ('series_rational_atan_affine', 'function_series_endpoint', '{sum(j,1,4,2*j/(1+j^2*(2*t+1)^2))|t=0}',
+     '["\\sum_{j=1}^{4}","244/85"," = ",true]'),
+    ('series_rational_atan_zero', 'function_series_endpoint', '{sum(j,1,1000,j/(1+j^2*t^2))|t=0}',
+     '["\\sum_{j=1}^{1000}","500500"," = ",false]'),
     ('series_simplified_linear_cosine_1000', 'function_series_endpoint', '@Z_(k=1)^1000 k*cos(kx)',
      '["\\sum_{k=1}^{1000}",null," = ",false,"(1001*cos(1000*x)-1000*cos(1001*x)-1)/(4*sin(x/2)^2)"]'),
     ('series_simplified_linear_cosine_small', 'function_series_endpoint', '@Z_(k=1)^4 k*cos(kx)',
@@ -784,6 +794,32 @@ INSERT OR IGNORE INTO expression_cases(name, operation, input, expected) VALUES
     ('sample_root_cancellation_fallback', 'real_sample', '{sqrt(x)-sqrt(x+1e-30) | x=1}', 'fallback'),
     ('sample_power_overflow_fallback', 'real_sample', '{10^x | x=400}', 'fallback'),
     ('sample_power_underflow_fallback', 'real_sample', '{10^x | x=-400}', 'fallback');
+
+INSERT OR IGNORE INTO expression_cases(name, operation, input, expected) VALUES
+    ('sample_tangent', 'real_sample', '{tan(x) | x=0.37}', 'accept'),
+    ('sample_cotangent', 'real_sample', '{cot(x) | x=0.37}', 'accept'),
+    ('sample_secant', 'real_sample', '{sec(x) | x=0.37}', 'accept'),
+    ('sample_cosecant', 'real_sample', '{cosec(x) | x=0.37}', 'accept'),
+    ('sample_tangent_pole_fallback', 'real_sample', '{tan(x) | x=pi/2}', 'fallback'),
+    ('sample_cotangent_pole_fallback', 'real_sample', '{cot(x) | x=0}', 'fallback'),
+    ('sample_sum_tangent_1000', 'real_sample', '{sum(k,1,1000,tan(k*x)) | x=0.01}', 'accept'),
+    ('sample_sum_tangent_error_estimate', 'real_sample', '{sum(k,1,1000,tan(k*x)) | x=0.1}', 'estimate'),
+    ('sample_sum_tangent_derivative', 'real_sample', '{sum(k,1,1000,k*(1+tan(k*x)^2)) | x=0.01}', 'accept'),
+    ('sample_sum_shifted_index', 'real_sample', '{2+sum(j,3,27,sec(j*x)) | x=0.01}', 'accept'),
+    ('sample_sum_negative_index', 'real_sample', '{sum(j,-3,-1,tan(j*x)) | x=0.03}', 'accept'),
+    ('sample_sum_dependent_bound_fallback', 'real_sample', '{sum(k,1,x,tan(k*x)) | x=3}', 'fallback'),
+    ('sample_sum_nested_fallback', 'real_sample', '{sum(k,1,3,sum(j,1,2,tan(j*k*x))) | x=0.03}', 'fallback'),
+    ('sample_sum_work_limit_fallback', 'real_sample', '{sum(k,1,4097,tan(k*x)) | x=0.01}', 'fallback'),
+    ('sample_sum_cancellation_fallback', 'real_sample', '{sum(k,-3,3,tan(k*x)) | x=0.03}', 'fallback');
+
+INSERT INTO test_case_runner(module, source, parent, table_name, operation) VALUES (
+    'expression.real_sum_derivative', 'tests/expression/test_expression.c', 'tests.test_expr_real_sample',
+    'expression_cases', 'real_sum_derivative')
+ON CONFLICT(module) DO UPDATE SET table_name=excluded.table_name, operation=excluded.operation;
+INSERT OR IGNORE INTO expression_cases(name, operation, input, expected) VALUES
+    ('sample_sum_tangent_first', 'real_sum_derivative', '{sum(k,1,1000,tan(k*x)) | x=0.01}', 'accept'),
+    ('sample_sum_tangent_second', 'real_sum_derivative', '{sum(k,1,1000,k*(1+tan(k*x)^2)) | x=0.01}', 'accept'),
+    ('sample_sum_secant_derivative', 'real_sum_derivative', '{sum(k,1,20,sec(k*(2*x+1))) | x=0.01}', 'accept');
 
 INSERT OR IGNORE INTO expression_cases(name, operation, input, expected) VALUES ('exact_addition', 'evaluate', '1/3+1/6', '1/2');
 
@@ -1463,3 +1499,44 @@ INSERT OR IGNORE INTO expression_cases(name,operation,input,expected,precision) 
     ('appell_arity_f2','appell_parse_reject','F2(1,1,1,1,0,0)','0',80),
     ('appell_arity_f3','appell_parse_reject','F3(1,1,1,1,2,0)','0',80),
     ('appell_arity_f4','appell_parse_reject','F4(1,1,1,1,1,0,0)','0',80);
+
+INSERT INTO test_case_runner(module, source, parent, table_name, operation) VALUES (
+    'expression.atan_derivative_sample', 'tests/expression/test_expression.c',
+    'tests.test_expr_atan_derivative_sample', 'expression_cases', 'atan_derivative_sample')
+ON CONFLICT(module) DO UPDATE SET table_name=excluded.table_name, operation=excluded.operation;
+
+INSERT OR IGNORE INTO expression_cases(name, operation, input, expected) VALUES
+    ('atan_sample_origin', 'atan_derivative_sample',
+     '{(digamma(1001+i/x)-digamma(1+i/x)+digamma(1001-i/x)-digamma(1-i/x))/(2*x^2)|x=0}',
+     '500500'),
+    ('atan_sample_positive', 'atan_derivative_sample',
+     '{(digamma(1001+i/x)-digamma(1+i/x)+digamma(1001-i/x)-digamma(1-i/x))/(2*x^2)|x=0.001}',
+     '{sum(j,1,1000,j/(1+j^2*x^2))|x=0.001}'),
+    ('atan_sample_negative', 'atan_derivative_sample',
+     '{(digamma(1001+i/x)-digamma(1+i/x)+digamma(1001-i/x)-digamma(1-i/x))/(2*x^2)|x=-0.001}',
+     '{sum(j,1,1000,j/(1+j^2*x^2))|x=-0.001}'),
+    ('atan_sample_reordered', 'atan_derivative_sample',
+     '{(digamma(i/x+1001)+digamma(1001-i/x)-digamma(1-i/x)-digamma(i/x+1))/(2*x^2)|x=1}',
+     '{sum(j,1,1000,j/(1+j^2*x^2))|x=1}'),
+    ('atan_sample_affine_origin', 'atan_derivative_sample',
+     '{(digamma(26+i/(2*t+1))-digamma(1+i/(2*t+1))+digamma(26-i/(2*t+1))-digamma(1-i/(2*t+1)))/(2*t+1)^2|t=-1/2}',
+     '650'),
+    ('atan_sample_affine_shift', 'atan_derivative_sample',
+     '{(digamma(26+i/(2*t+1))-digamma(1+i/(2*t+1))+digamma(26-i/(2*t+1))-digamma(1-i/(2*t+1)))/(2*t+1)^2|t=0.1}',
+     '{sum(j,1,25,2*j/(1+j^2*(2*t+1)^2))|t=0.1}'),
+    ('atan_sample_wrong_coefficient', 'atan_derivative_sample',
+     '{(digamma(1001+i/x)-digamma(1+i/x)+digamma(1001-i/x)-digamma(1-i/x))/(3*x^2)|x=0}', 'reject'),
+    ('atan_sample_missing_conjugate', 'atan_derivative_sample',
+     '{(digamma(1001+i/x)-digamma(1+i/x))/(2*x^2)|x=1}', 'reject'),
+    ('atan_sample_wrong_shift', 'atan_derivative_sample',
+     '{(digamma(1001+i/x)-digamma(2+i/x)+digamma(1001-i/x)-digamma(1-i/x))/(2*x^2)|x=1}', 'reject');
+
+INSERT OR IGNORE INTO expression_cases(name, operation, input, expected) VALUES
+    ('atan_sample_complex_offset', 'atan_derivative_sample',
+     '{i+(digamma(1001+i/x)-digamma(1+i/x)+digamma(1001-i/x)-digamma(1-i/x))/(2*x^2)|x=1}', 'reject'),
+    ('atan_sample_negative_slope', 'atan_derivative_sample',
+     '{-(digamma(26+i/(1-2*t))-digamma(1+i/(1-2*t))+digamma(26-i/(1-2*t))-digamma(1-i/(1-2*t)))/(1-2*t)^2|t=1/2}',
+     '-650'),
+    ('atan_sample_bound_count', 'atan_derivative_sample',
+     '{(digamma(n+1+i/x)-digamma(1+i/x)+digamma(n+1-i/x)-digamma(1-i/x))/(2*x^2)|x=0,n=25}',
+     '325');

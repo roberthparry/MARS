@@ -3072,6 +3072,72 @@ static expr_t *expr_finite_exponential_progression_closed_form(const expr_t *upp
     return out;
 }
 
+/* The identity has exactly four digamma operands; this is a bounded syntax walk, not function dispatch. */
+static bool expr_collect_atan_digammas(const expr_t *expr, const expr_t **arguments, size_t *count)
+{
+    if (!expr)
+        return true;
+    if (expr->ops->kind == EXPR_KIND_DIGAMMA) {
+        if (*count == 4u)
+            return false;
+        arguments[(*count)++] = expr->a;
+        return true;
+    }
+    return expr_collect_atan_digammas(expr->a, arguments, count) &&
+           expr_collect_atan_digammas(expr->b, arguments, count);
+}
+
+/* Prove the complete integer-shift identity before replacing its numerical sampling graph. */
+expr_t *expr_finite_atan_derivative_source(const expr_t *expression, const expr_t *axis)
+{
+    const expr_t *arguments[4];
+    size_t count = 0u;
+    if (!expression || !expr_is_var(axis) || !expr_collect_atan_digammas(expression, arguments, &count) || count != 4u)
+        return NULL;
+    for (size_t i = 0u; i < count; ++i) {
+        const expr_t *argument = arguments[i];
+        if (argument->ops->kind != EXPR_KIND_ADD && argument->ops->kind != EXPR_KIND_SUB)
+            continue;
+        const expr_t *offset = argument->a, *remainder = argument->b;
+        if (expr_contains_progression_index(offset, axis) && argument->ops->kind == EXPR_KIND_ADD) {
+            offset = argument->b;
+            remainder = argument->a;
+        }
+        if (expr_contains_progression_index(offset, axis) || !expr_contains_progression_index(remainder, axis))
+            continue;
+        number_t value = expr_eval(offset);
+        bool fixed = num_is_real(value) && num_is_finite(value) && num_is_integer(value) && num_gt(value, NUM_ONE);
+        num_destroy(&value);
+        if (!fixed)
+            continue;
+        expr_t *signed_remainder = argument->ops->kind == EXPR_KIND_SUB ? expr_neg(remainder) :
+                                   expr_retain_expr(remainder);
+        expr_t *imaginary_unit = expr_new_const(NUM_I);
+        expr_t *raw_step = signed_remainder && imaginary_unit ? expr_div(imaginary_unit, signed_remainder) : NULL;
+        expr_t *step = raw_step ? expr_simplify(raw_step) : NULL;
+        expr_t *upper = expr_add_long(offset, -1L);
+        expr_t *index = expr_new_var(NUM_NAN);
+        expr_t *phase = index && step ? expr_mul(index, step) : NULL;
+        expr_t *term = phase ? expr_atan(phase) : NULL;
+        expr_t *source = term && upper ? expr_new_finite_summation_range(term, index, EXPR_ONE, upper) : NULL;
+        expr_t *candidate = source ? expr_finite_atan_progression_derivative_form(source, axis) : NULL;
+        bool matched = candidate && expr_matches_finite_qdigamma_candidate(expression, candidate);
+        expr_free(candidate);
+        expr_free(term);
+        expr_free(phase);
+        expr_free(index);
+        expr_free(upper);
+        expr_free(step);
+        expr_free(raw_step);
+        expr_free(imaginary_unit);
+        expr_free(signed_remainder);
+        if (matched)
+            return source;
+        expr_free(source);
+    }
+    return NULL;
+}
+
 static expr_t *expr_finite_atan_progression_closed_form(const expr_t *upper, const expr_t *step)
 {
     /* A real-domain identity must not project an explicitly complex input onto the real axis. */
@@ -3129,14 +3195,9 @@ static expr_t *expr_finite_atan_progression_closed_form(const expr_t *upper, con
     return out;
 }
 
-/* Build the compact conjugate-pair derivative of a finite arctangent progression. */
-expr_t *expr_finite_atan_progression_derivative_form(const expr_t *expr, const expr_t *wrt)
+/* Sum k*coefficient/(1+k^2*step^2) with a compact conjugate pair of digamma differences. */
+expr_t *expr_finite_atan_moment_form(const expr_t *upper, const expr_t *step, const expr_t *coefficient)
 {
-    const expr_t *upper;
-    expr_t *step = NULL;
-    const expr_ops_t *function_ops;
-    expr_t *upper_derivative = NULL;
-    expr_t *step_derivative = NULL;
     expr_t *imaginary_unit = NULL;
     expr_t *one = NULL;
     expr_t *i_over_step = NULL;
@@ -3158,14 +3219,7 @@ expr_t *expr_finite_atan_progression_derivative_form(const expr_t *expr, const e
     expr_t *raw = NULL;
     expr_t *out = NULL;
 
-    if (!expr || !wrt || !expr_finite_progression_parts(expr, &upper, &step, &function_ops) ||
-        function_ops != &ops_atan)
-        goto cleanup;
-    upper_derivative = expr_create_deriv(upper, wrt);
-    if (!upper_derivative || !expr_is_exact_zero(upper_derivative))
-        goto cleanup;
-    step_derivative = expr_create_deriv(step, wrt);
-    if (!step_derivative || expr_is_exact_zero(step_derivative))
+    if (!upper || !step || !coefficient)
         goto cleanup;
 
     imaginary_unit = expr_new_named_const(NUM_I, "i");
@@ -3189,7 +3243,7 @@ expr_t *expr_finite_atan_progression_derivative_form(const expr_t *expr, const e
     digamma_sum = plus_difference && minus_difference ? expr_add(plus_difference, minus_difference) : NULL;
     step_squared = step ? expr_pow_long(step, 2L) : NULL;
     denominator = step_squared ? expr_mul_long(step_squared, 2L) : NULL;
-    scaled_numerator = digamma_sum && step_derivative ? expr_mul(step_derivative, digamma_sum) : NULL;
+    scaled_numerator = digamma_sum ? expr_mul(coefficient, digamma_sum) : NULL;
     raw = scaled_numerator && denominator ? expr_div(scaled_numerator, denominator) : NULL;
     out = raw ? expr_simplify(raw) : NULL;
 
@@ -3213,7 +3267,26 @@ cleanup:
     expr_free(i_over_step);
     expr_free(one);
     expr_free(imaginary_unit);
-    expr_free(step_derivative);
+    return out;
+}
+
+/* Build the compact conjugate-pair derivative of a finite arctangent progression. */
+expr_t *expr_finite_atan_progression_derivative_form(const expr_t *expr, const expr_t *wrt)
+{
+    const expr_t *upper = NULL;
+    expr_t *step = NULL;
+    const expr_ops_t *function_ops = NULL;
+    if (!expr || !wrt || !expr_finite_progression_parts(expr, &upper, &step, &function_ops) ||
+        function_ops != &ops_atan) {
+        expr_free(step);
+        return NULL;
+    }
+    expr_t *upper_derivative = expr_create_deriv(upper, wrt);
+    expr_t *coefficient = upper_derivative && expr_is_exact_zero(upper_derivative) ?
+                              expr_create_deriv(step, wrt) : NULL;
+    expr_t *out = coefficient && !expr_is_exact_zero(coefficient) ?
+                      expr_finite_atan_moment_form(upper, step, coefficient) : NULL;
+    expr_free(coefficient);
     expr_free(upper_derivative);
     expr_free(step);
     return out;
@@ -4022,6 +4095,8 @@ expr_t *expr_finite_progression_closed_form(const expr_t *expr)
         out = expr_finite_weighted_progression_closed_form(expr, NULL);
     if (!out)
         out = expr_finite_quotient_derivative_closed_form(expr, NULL);
+    if (!out)
+        out = expr_finite_rational_progression_closed_form(expr);
     return expr_simplify_owned(out);
 }
 
@@ -4034,6 +4109,13 @@ expr_t *expr_finite_progression_sample_form(const expr_t *expr, const expr_t *co
     long terms = 0;
     if (!axes || !count || count > 3)
         return NULL;
+    if (count == 1u) {
+        expr_t *source = expr_finite_atan_derivative_source(expr, axes[0]);
+        expr_t *derivative = source ? expr_finite_sum_sample_derivative(source, axes[0]) : NULL;
+        expr_free(source);
+        if (derivative)
+            return derivative;
+    }
     bool ordinary = expr_finite_progression_parts(expr, &upper, &step, &function);
     if (!ordinary)
         closed = expr_finite_weighted_progression_closed_form(expr, &upper);

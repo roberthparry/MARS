@@ -70,7 +70,8 @@ Native plotting workers can additionally use the controlled internal
 `expr_real_sample_new()`, `expr_real_sample_eval()` and `expr_real_sample_free()`
 interface. This bounded plan snapshots finite real constants and accepts up to
 three double-precision coordinates. Addition, subtraction, multiplication,
-division, negation, absolute value, squares, sine, cosine, exponential, natural
+division, negation, absolute value, squares, sine, cosine, tangent, cotangent,
+secant, cosecant, exponential, natural
 and common logarithms, and inverse cosine have guarded fast implementations.
 General powers use the positive real branch; square, cube and constant
 positive-integer-order roots are also supported for positive radicands.
@@ -79,6 +80,18 @@ unsupported operations, non-finite intermediates, large trig
 arguments and excessive propagated round-off request ordinary native evaluation.
 Coordinate conversion and operation round-off are included in the guards. These
 are numerical heuristics, not certified interval arithmetic.
+The controlled `expr_real_sample_estimate()` companion returns the propagated
+absolute error so drawing callers can apply an explicit visual tolerance; the
+strict guard in `expr_real_sample_eval()` is unchanged. Native Lab plotting uses
+a relative guard of `1e-7`, substantially below its adaptive drawing tolerance,
+and retains independent higher-precision validation probes.
+Fixed finite sums compile their body once, with an additional private index
+coordinate. Non-nested sums of up to 4096 terms are supported when their integer
+bounds do not depend on the plotting coordinates and its indices lie between
+−1048576 and 1048576. Each body has at most 256
+instructions, and the whole plan has a 65536-operation work ceiling per point.
+Pole guards and accumulated round-off still request ordinary evaluation when
+the approximation is uncertain. Computation controls are checked between terms.
 Plans are limited to 256 instructions and depth 64; they neither modify source
 bindings nor change `expr_eval()` or worksheet precision. Rebuild a plan when
 non-coordinate bindings change. This interface is not an installed public API.
@@ -96,6 +109,16 @@ zeros so workers increase their working precision before accepting a value from
 an ill-conditioned quotient. Actual denominator zeros still use the finite sum.
 Coordinate-dependent or non-integer bounds retain ordinary summation semantics. This numerical sampling
 choice does not change the authored expression or its worksheet bindings.
+
+The same sampling interface recognises complete digamma integer-shift identities
+for derivatives of finite arctangent progressions. It checks the whole expression,
+then samples the equivalent rational summands. This preserves the finite value at
+zero step and proves real output for a real affine step, without suppressing
+imaginary components of other expressions. The controlled
+`expr_finite_atan_derivative_sample_bounds()` interface centres an automatic
+window at the zero of `a*x+b`, with radius `10/(n*abs(a))`, so a narrow central
+peak is resolved. Explicit plotting limits remain unchanged. Recognition also
+accepts reordered digamma terms and renamed coordinates.
 
 Generated closed forms receive a final native simplification pass before they
 are returned. It removes unit multipliers and folds exact arithmetic throughout
@@ -120,6 +143,10 @@ derivative checks. Explicit plotting bounds are preserved. These interfaces read
 parameter values without changing worksheet bindings and never evaluate the
 individual unit-circle q-digamma terms. Recognition also accepts exact numerical
 arguments such as `1001` in place of `1000 + 1` and equivalent Gaussian coefficients.
+For wider intervals, `expr_finite_sum_sample_derivative()` differentiates each
+summand while retaining the finite loop for guarded numerical tangent and
+curvature evaluation. It does not replace the symbolic closed form displayed
+in result cards.
 
 The controlled `expr_finite_qdigamma_progression_derivative_form()` interface
 differentiates all eight circular and hyperbolic quotient progressions into
@@ -4115,7 +4142,11 @@ The Lab input pane retains the user's notation during evaluation, binding update
 and goal seeking. Goal seeking changes the binding values, not the authored
 expression body; the saved input retains the same notation. Mathematical result
 cards continue to use native symbol formatting. **Use as input** explicitly
-replaces the input with the selected result.
+replaces the input with the selected result. For a finite-sum identity it selects
+the sum, including a differentiated summand, while the result cards retain the
+simplified closed form and Rendered TeX shows the equality. Directly entered
+rational arctangent derivative sums recover the same digamma identity; this does
+not depend on the worksheet's previous calculus action.
 
 ### `expr_to_calculus_function_text()`
 

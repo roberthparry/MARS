@@ -70,7 +70,8 @@ static void lab_evaluation_cards_expression(jsref plan, jsref data, jsref text,
                               lab_evaluation_cards_or(lab_dom_get(data, "display_expression"), compact), full);
     lab_dom_set(plan, "input", kind == LAB_EVALUATION_CARDS_GOAL
                                    ? full
-                                   : lab_evaluation_cards_or(lab_dom_get(data, "editor_expression"), full));
+                                   : lab_evaluation_cards_or(lab_dom_get(data, "input_expression"),
+                                         lab_evaluation_cards_or(lab_dom_get(data, "editor_expression"), full)));
     int function = lab_evaluation_cards_field(data, "function");
     lab_evaluation_cards_pair(plan, "function", "full_function",
                               lab_evaluation_cards_or(lab_dom_get(data, "display_function"), function),

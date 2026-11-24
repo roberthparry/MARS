@@ -12,6 +12,7 @@
  * always use the native evaluator, making reference probes independent of the fast
  * path. Graphs and bindings must remain private to the calling worker.
  */
+#include <math.h>
 #include <stdlib.h>
 
 #define MARS_SHARED_NUMBER_INTERNAL_ACCESS
@@ -59,8 +60,12 @@ lab_worker_sample_t *lab_worker_sample_new(expr_t *expression, expr_t *const *ax
     }
     if (sample->reduced)
         sample->guard = expr_finite_progression_sample_guard(expression);
-    if (bits <= 53)
+    if (bits <= 53) {
         sample->fast = expr_real_sample_new(sample->reduced ? sample->reduced : expression, inputs, count);
+        /* A special-function identity may be unavailable to the real compiler while its finite body is supported. */
+        if (!sample->fast && sample->reduced)
+            sample->fast = expr_real_sample_new(expression, inputs, count);
+    }
     return sample;
 }
 
@@ -69,11 +74,13 @@ number_t lab_worker_sample_eval(lab_worker_sample_t *sample, const number_t *coo
 {
     if (!sample)
         return num_clone(NUM_NAN);
-    double point[3], value;
+    double point[3], value, error;
     if (sample->fast) {
         for (size_t i = 0; i < sample->count; ++i)
             point[i] = num_to_double(coordinates[i]);
-        if (expr_real_sample_eval(sample->fast, point, &value))
+        /* This is much tighter than adaptive drawing tolerance; independent native probes still validate it. */
+        if (expr_real_sample_estimate(sample->fast, point, &value, &error) &&
+            error <= 1e-7 * fmax(1, fabs(value)))
             return num_create_from_double(value);
     }
     for (size_t i = 0; i < sample->count; ++i)

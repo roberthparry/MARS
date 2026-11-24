@@ -99,6 +99,13 @@ int lab_worker_plot(const char *source, const expr_t *expression, const expr_t *
     options.label_colour = 0xb8ccc5;
     options.legend = false;
     options.smart_y = !strcmp(scale, "auto");
+    number_t inverse_lower = NUM_NAN, inverse_upper = NUM_NAN;
+    /* This proved real rational family has no real poles; its narrow finite peak is not an outlier to trim. */
+    if (options.smart_y && expr_finite_atan_derivative_sample_bounds(expression, variable,
+                                                                    &inverse_lower, &inverse_upper))
+        options.smart_y = false;
+    num_destroy(&inverse_upper);
+    num_destroy(&inverse_lower);
     options.guard_gaps = true;
     plot_t *plot = samples ? plot_new(&options) : NULL;
     bool ok = plot && plot_add_sampler(plot, samples, "", PLOT_LINES, 0x78d8cb);

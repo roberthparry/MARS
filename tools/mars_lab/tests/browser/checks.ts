@@ -1770,6 +1770,40 @@
             const source = '@Z_(k=1)^1000 tan(kx)';
             await WorksheetRequests.presentation.prepareLabEditor(source);
             WorksheetBindings.controller.setExpressionEditor(source);
+            await WorksheetRequests.evaluation.evaluateExpression();
+            await plotted();
+            const automatic = plot.querySelector('[data-plot-chart]')!;
+            const lower = document.getElementById('plotLower')! as HTMLInputElement;
+            const upper = document.getElementById('plotUpper')! as HTMLInputElement;
+            lower.value = '-0.1';
+            upper.value = '0.1';
+            lower.dispatchEvent(new Event('input', {bubbles: true}));
+            upper.dispatchEvent(new Event('input', {bubbles: true}));
+            for (let attempt = 0; attempt < 1000 && automatic.isConnected; ++attempt)
+                await LabTestBrowser.wait(25);
+            const manual = plot.querySelector<SVGSVGElement>('[data-plot-chart]')!;
+            check(!automatic.isConnected && Number(manual?.dataset.xMin) === -0.1 &&
+                  Number(manual?.dataset.xMax) === 0.1 &&
+                  document.getElementById('plotFeedback')!.classList.contains('hidden'),
+                  'Editing a tangent sum range redraws the requested wider viewport without Evaluate: ' +
+                  document.getElementById('plotFeedback')!.textContent);
+            lower.value = '-';
+            lower.dispatchEvent(new Event('input', {bubbles: true}));
+            const feedback = document.getElementById('plotFeedback')!;
+            for (let attempt = 0; attempt < 400 && feedback.classList.contains('hidden'); ++attempt)
+                await LabTestBrowser.wait(25);
+            await LabTestBrowser.paint();
+            check(manual.isConnected && !feedback.classList.contains('hidden') &&
+                  feedback.textContent!.includes('Previous view retained.') &&
+                  feedback.getBoundingClientRect().bottom <=
+                      document.getElementById('plotStage')!.getBoundingClientRect().top + 1,
+                  'An invalid live range clearly labels the retained plot above the drawing: ' + JSON.stringify({
+                      connected: manual.isConnected, hidden: feedback.classList.contains('hidden'),
+                      text: feedback.textContent, feedback: feedback.getBoundingClientRect().toJSON(),
+                      stage: document.getElementById('plotStage')!.getBoundingClientRect().toJSON()
+                  }));
+            await WorksheetRequests.evaluation.evaluateExpression();
+            await waitForAutomaticPlot();
             inputs.length = 0;
             await WorksheetRequests.plots.takeDerivative('x');
             await plotted();
@@ -1782,7 +1816,44 @@
             check(Math.abs(Number(chart.dataset.xMin) + Math.PI / 4000) < 1e-12 &&
                   Math.abs(Number(chart.dataset.xMax) - Math.PI / 4000) < 1e-12,
                   'The tangent derivative uses a frequency-aware pole-free real window');
+            const arctangent = '@Z_(k=1)^1000 atan(kx)';
+            await WorksheetRequests.presentation.prepareLabEditor(arctangent);
+            WorksheetBindings.controller.setExpressionEditor(arctangent);
+            await WorksheetRequests.plots.takeDerivative('x');
+            await plotted();
+            const realChart = plot.querySelector<SVGSVGElement>('[data-plot-chart]')!;
+            check(!plot.querySelector('.complex-grid') && Number(realChart?.dataset.xMin) === -0.01 &&
+                  Number(realChart?.dataset.xMax) === 0.01 && Number(realChart?.dataset.yMax) >= 500500 &&
+                  Number(realChart?.dataset.yMax) < 750750 &&
+                  WorksheetWorkspace.presentation.state.lastTex.includes('\\sum'),
+                  'The arctangent derivative is one real curve resolving its finite central peak');
             await WorksheetResults.reuse.sendResultExpressionToInput();
+            const reusedSum = WorksheetBindings.editor.currentExpressionText();
+            check((reusedSum.includes('Σ') || reusedSum.includes('@Z_')) && !reusedSum.includes('ψ') &&
+                  !reusedSum.includes('digamma') && WorksheetWorkspace.presentation.state.lastTex.includes(' = '),
+                  'Use as input retains the differentiated sum, leaving its closed-form identity visible');
+            await WorksheetRequests.evaluation.evaluateExpression();
+            await plotted();
+            check(WorksheetWorkspace.presentation.state.lastTex.includes('\\sum') &&
+                  WorksheetWorkspace.presentation.state.lastTex.includes(' = ') &&
+                  WorksheetWorkspace.presentation.state.lastTex.includes('\\psi'),
+                  'Evaluating the reused rational sum restores its sum equals closed-form result');
+            await WorksheetRequests.plots.takeDerivative('x');
+            await plotted();
+            check(WorksheetWorkspace.presentation.state.lastTex.includes('\\sum') &&
+                  WorksheetWorkspace.presentation.state.lastTex.includes(' = ') &&
+                  WorksheetWorkspace.presentation.state.lastTex.includes('\\psi') &&
+                  WorksheetContext.functionStyle.textContent!.includes('trigamma(') &&
+                  !plot.querySelector('.complex-grid'),
+                  'Differentiating the reused sum differentiates its closed form and retains a real finite-sum plot');
+            await WorksheetRequests.presentation.prepareLabEditor(source);
+            WorksheetBindings.controller.setExpressionEditor(source);
+            await WorksheetRequests.plots.takeDerivative('x');
+            await plotted();
+            await WorksheetResults.reuse.sendResultExpressionToInput();
+            check(!WorksheetBindings.editor.currentExpressionText().includes('lambert_S') &&
+                  WorksheetBindings.editor.currentExpressionText().includes('tan'),
+                  'The tangent derivative also reuses its sum instead of its Lambert rendering');
             const x = document.querySelector<HTMLInputElement>('.binding-value-input[data-binding-name="x"]')!;
             check(!!x, 'The native Lambert result retains its x binding');
             x.value = '1';
