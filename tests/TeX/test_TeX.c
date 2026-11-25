@@ -683,6 +683,26 @@ static void test_TeX_sum_wrapping(void)
                      "an unavailable multiline alternative retains the complete ordinary body");
     TeX_free(notation);
     TeX_context_free(context);
+    context_test_node_t name = {.kind = TeX_NODE_IDENTIFIER, .text = "S"};
+    context_test_node_t equation = {.kind = TeX_NODE_EQUATION, .children = {&name, &difference}, .count = 2u};
+    context = TeX_context_new((TeX_node_ref_t){&context_test_provider, &state, &equation});
+    selection.fail = false;
+    selection.count_calls = selection.term_calls = 0u;
+    notation = TeX_wrap_sum(context, 100u, &provider, &selection);
+    TEST_ASSERT_TRUE(notation && !strcmp(TeX_source(notation), "S = x - 2") &&
+        !selection.count_calls && !selection.term_calls, "short identities retain a single equation row");
+    TeX_free(notation);
+    notation = TeX_wrap_sum(context, 1u, &provider, &selection);
+    TEST_ASSERT_TRUE(notation && !strcmp(TeX_source(notation),
+        "\\begin{aligned}[t]\nS = {} &x \\\\\n&{} - 2\n\\end{aligned}"),
+        "long identities align signed result terms while keeping the left side and equality together");
+    TeX_free(notation);
+    selection.fail = true;
+    notation = TeX_wrap_sum(context, 1u, &provider, &selection);
+    TEST_ASSERT_TRUE(notation && !strcmp(TeX_source(notation), "S = x - 2"),
+        "an unavailable equation wrapping alternative retains both complete sides");
+    TeX_free(notation);
+    TeX_context_free(context);
     context_test_node_t restriction = {.kind = TeX_NODE_TEXT, .text = "local restriction"};
     context_test_node_t domain = {.kind = TeX_NODE_DOMAIN, .children = {&difference, &restriction}, .count = 2u};
     context = TeX_context_new((TeX_node_ref_t){&context_test_provider, &state, &domain});

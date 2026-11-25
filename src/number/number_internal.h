@@ -575,7 +575,7 @@ typedef enum _number_kind_t {
     NUMBER_COMPLEX
 } number_kind_t;
 
-typedef enum number_math_family_t {
+typedef enum _number_math_family_t {
     NUMBER_MATH_INVALID,
     NUMBER_MATH_QREAL,
     NUMBER_MATH_QCOMPLEX,
@@ -654,7 +654,7 @@ typedef struct _number_cdouble_t {
     bool immortal;
 } number_cdouble_t;
 
-typedef struct {
+typedef struct _number_private_t {
     number_kind_t kind;
     union {
         double d;
@@ -677,7 +677,12 @@ typedef struct _complex_t {
     mpc_t mpc_cache;
 } complex_t;
 
-typedef enum number_binary_op_t { NUMBER_OP_ADD, NUMBER_OP_SUB, NUMBER_OP_MUL, NUMBER_OP_DIV } number_binary_op_t;
+typedef enum _number_binary_op_t { 
+    NUMBER_OP_ADD, 
+    NUMBER_OP_SUB, 
+    NUMBER_OP_MUL, 
+    NUMBER_OP_DIV 
+} number_binary_op_t;
 
 typedef struct _number_mpfr_t {
     number_const_id_t constant_id;

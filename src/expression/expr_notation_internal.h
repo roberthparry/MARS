@@ -75,6 +75,16 @@ TeX_t *expr_notation_append_primitive(TeX_t *body, const expr_t *initial);
 bool expr_notation_scaled_sum(const expr_t *expression, const expr_t **factor, const expr_t **sum);
 
 /**
+ * @brief Render an identity with long additive right-hand sides aligned term by term.
+ * @param left Borrowed expression on the left of the equality; not modified or retained.
+ * @param right Borrowed result whose signed additive terms may be placed on separate rows.
+ * @param line_limit Soft TeX source-line budget; zero selects the renderer's default.
+ * @return Owned UTF-8 TeX body released with free(), or NULL if semantic construction or rendering fails.
+ * @note Short identities and explicit companion definitions retain their ordinary layout.
+ */
+char *expr_notation_equation_wrapped(const expr_t *left, const expr_t *right, size_t line_limit);
+
+/**
  * @brief Select evaluated-result semantics for nodes subsequently added to this builder.
  * @param build Borrowed semantic snapshot builder; it owns all nodes added by this call.
  * @param enabled Whether to enable the documented snapshot interpretation for subsequently added nodes.

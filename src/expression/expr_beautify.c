@@ -2427,6 +2427,49 @@ static expr_t *expr_beautify_product_signs_owned(expr_t *expr)
     return rewrite;
 }
 
+/* Remove an explicit coefficient sign whilst retaining the phase of a purely imaginary number. */
+static expr_t *expr_beautify_unsigned_coefficient(expr_t *expr)
+{
+    expr_t *positive = expr_simplify_positive_part_if_negative(expr);
+    if (positive || !expr)
+        return positive;
+    if (expr_is_unnamed_const(expr) && !num_is_real(expr->c)) {
+        number_t real = num_real_part(expr->c), imaginary = num_imag_part(expr->c);
+        if (num_is_zero(real) && num_get_sign(imaginary) < 0) {
+            number_t reversed = num_neg(expr->c);
+            positive = expr_new_const(reversed);
+            num_destroy(&reversed);
+        }
+        num_destroy(&imaginary);
+        num_destroy(&real);
+        return positive;
+    }
+    if (expr_is_mul(expr) || expr_is_div(expr)) {
+        expr_t *left = expr_beautify_unsigned_coefficient(expr->a);
+        expr_t *right = expr_beautify_unsigned_coefficient(expr->b);
+        if ((left != NULL) != (right != NULL))
+            positive = expr_is_mul(expr) ? expr_mul(left ? left : expr->a, right ? right : expr->b) :
+                                          expr_div(left ? left : expr->a, right ? right : expr->b);
+        expr_free(right);
+        expr_free(left);
+    }
+    return positive;
+}
+
+/* Prefer a non-negated addend without assigning a numerical sign to symbolic terms. */
+static expr_t *expr_beautify_positive_first(const expr_t *expr)
+{
+    if (!expr_is_addsub(expr))
+        return NULL;
+    expr_t *left = expr_beautify_unsigned_coefficient(expr->a);
+    expr_t *right = left ? expr_beautify_unsigned_coefficient(expr->b) : NULL;
+    bool positive_right = expr_is_op(expr, &ops_sub) ? right != NULL : right == NULL;
+    expr_t *result = left && positive_right ? expr_sub(right ? right : expr->b, left) : NULL;
+    expr_free(right);
+    expr_free(left);
+    return result;
+}
+
 static expr_t *expr_beautify_node(const expr_t *expr, bool rewrite_negative_roots)
 {
     if (!expr_computation_step("expression.beautify"))
@@ -2570,6 +2613,12 @@ static expr_t *expr_beautify_node(const expr_t *expr, bool rewrite_negative_root
         rebuilt = rewrite;
         rewrite = NULL;
     }
+    rewrite = expr_beautify_positive_first(rebuilt);
+    if (rewrite) {
+        expr_free(rebuilt);
+        rebuilt = rewrite;
+        rewrite = NULL;
+    }
 
 cleanup:
     expr_free(rewrite);
@@ -2702,18 +2751,40 @@ static expr_t *expr_distribute_negative_terms_for_display(const expr_t *expr)
 
     if (!expr)
         return NULL;
+    if (expr_is_neg(expr))
+        return expr_clone(expr->a);
     if (expr_is_op(expr, &ops_add)) {
         left = expr_distribute_negative_terms_for_display(expr->a);
         right = expr_distribute_negative_terms_for_display(expr->b);
         out = (left && right) ? expr_add(left, right) : NULL;
+        expr_t *ordered = expr_beautify_positive_first(out);
+        if (ordered) {
+            expr_free(out);
+            out = ordered;
+        }
         expr_free(right);
         expr_free(left);
         return out;
     }
     if (expr_is_op(expr, &ops_sub)) {
+        left = expr_clone(expr->b);
+        right = expr_clone(expr->a);
+        out = (left && right) ? expr_sub(left, right) : NULL;
+        expr_free(right);
+        expr_free(left);
+        return out;
+    }
+    if (expr_is_div(expr)) {
         left = expr_distribute_negative_terms_for_display(expr->a);
-        right = expr_clone(expr->b);
-        out = (left && right) ? expr_add(left, right) : NULL;
+        out = left ? expr_div(left, expr->b) : NULL;
+        expr_free(left);
+        return out;
+    }
+    if (expr_is_mul(expr) && (expr_is_addsub(expr->a) || expr_is_addsub(expr->b))) {
+        bool left_sum = expr_is_addsub(expr->a);
+        left = left_sum ? expr_distribute_negative_terms_for_display(expr->a) : expr_clone(expr->a);
+        right = left_sum ? expr_clone(expr->b) : expr_distribute_negative_terms_for_display(expr->b);
+        out = left && right ? expr_mul(left, right) : NULL;
         expr_free(right);
         expr_free(left);
         return out;

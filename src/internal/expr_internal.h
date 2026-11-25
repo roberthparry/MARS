@@ -814,7 +814,7 @@ bool expr_finite_summation_exceeds_direct_limit(const expr_t *expr);
 expr_t *expr_finite_progression_closed_form(const expr_t *expr);
 
 /**
- * @brief Build a stable sampling graph for a fixed finite progression or a proved arctangent derivative identity.
+ * @brief Build a stable sampling graph for a fixed finite progression or proper rational derivative sum.
  * @param expr Borrowed authored sum or complete digamma derivative identity; not modified or consumed.
  * @param axes Borrowed array of count coordinate nodes, kept live by the caller during sampling.
  * @param count Number of coordinates, from one to three.
@@ -822,18 +822,23 @@ expr_t *expr_finite_progression_closed_form(const expr_t *expr);
  * coordinate-dependent or invalid bounds, invalid arguments or allocation failure. Rebuild after changing
  * non-coordinate bindings. Entire-function sums use compact closed forms; complete finite arctangent derivative
  * identities use rational summands, preserving their removable zero-step value. Non-finite closed-form evaluations
- * must fall back to expr to preserve removable points.
+ * must fall back to expr to preserve removable points. Proper rational sums with repeated quadratic
+ * denominators use digamma and polygamma identities with phase-dependent precision guards and
+ * the authored sum at removable zero-phase points.
  * Access to mutable linked graphs must remain confined to their owning thread.
  */
 expr_t *expr_finite_progression_sample_form(const expr_t *expr, const expr_t *const *axes, size_t count);
 
 /**
- * @brief Select a real automatic window resolving a finite arctangent progression derivative's central peak.
- * @param[in] expression Borrowed complete conjugate-pair digamma derivative identity; left unchanged.
+ * @brief Select a real regular window resolving a rational finite progression's central features.
+ * @param[in] expression Borrowed proper rational sum or complete conjugate-pair digamma derivative identity.
+ * Rational sums require a real polynomial numerator and a denominator (1+k^2*step^2)^m; outer negation is allowed.
+ * The expression and its bindings remain unchanged.
  * @param[in] axis Borrowed plotting coordinate with a non-constant real affine progression step.
  * @param[out] lower Output receiving an owned lower endpoint, released with num_destroy().
  * @param[out] upper Distinct output receiving an owned upper endpoint, released with num_destroy().
- * @return True for a structurally proved identity with a fixed positive integer count n and real step a*x+b.
+ * @return True for a structurally proved real regular progression with fixed positive integer count n
+ * and real step a*x+b, including higher rational derivatives.
  * The window is centred at -b/a with radius 10/(n*abs(a)). False for unsupported expressions, uncertain
  * domains, invalid arguments or allocation failure; valid distinct outputs receive NUM_NAN on failure.
  * The identity is real and regular throughout this window, including its removable zero-step point.
@@ -843,14 +848,15 @@ bool expr_finite_atan_derivative_sample_bounds(const expr_t *expression, const e
                                                number_t *lower, number_t *upper);
 
 /**
- * @brief Build a live denominator guard for polynomially weighted finite-progression sampling.
+ * @brief Build a live cancellation guard for weighted or proper rational finite-progression sampling.
  * @param expression Borrowed authored progression; not modified or consumed.
+ * @param[out] inverse_power Optional output receiving a conservative inverse-phase power for precision guards.
  * @return Owned guard released with expr_free(), or NULL when no weighted guard applies or allocation fails.
  * A small non-zero guard signals cancellation requiring extra working precision. At an actual zero,
  * evaluate the authored sum instead of its quotient identity to preserve the removable point.
  * The returned graph shares source bindings and must remain confined to their owning thread.
  */
-expr_t *expr_finite_progression_sample_guard(const expr_t *expression);
+expr_t *expr_finite_progression_sample_guard(const expr_t *expression, unsigned *inverse_power);
 
 /**
  * @brief Choose a frequency-scaled real window for a fixed finite circular progression.

@@ -102,6 +102,10 @@ delays increasing from one to eight seconds; existing imagery remains visible.
 Calendar calculations also retry connection failures without replacing the last
 worksheet with an error card. A reconnecting status identifies the retained result
 as the previous worksheet. Changing the selection cancels the obsolete retry.
+The initial globe overview also retries a failed image load, rather than leaving
+the blue placeholder indefinitely. Image loading and decoding have a ten-second
+deadline; three delayed retries are allowed. Reconnecting or returning to the app
+resumes a missing overview, and closing the page cancels its pending image work.
 Areas outside regional coverage retain NASA imagery. `make release` installs changed
 catalogue content while preserving the installed geographic and river data; an
 unchanged prepared catalogue does not require a fresh import.
@@ -984,6 +988,10 @@ no world-catalogue download. Changing country cancels obsolete country requests.
 Already fetched records are retained for reuse during the session.
 A failed later page leaves already-loaded towns and observer coordinates usable,
 with an incomplete-loading notice. Nearby-request failures do not stop country loading.
+Selected-country pages retry connection failures and temporary HTTP errors twice,
+at the same cursor. If loading still fails, reconnecting or returning to the app
+resumes from the last completed page. A country change cancels requests and retry
+delays for the previous selection. Successful recovery clears the warning.
 Routine town loading is silent; only loading failures display a notice.
 Interactive Almanac requests publish the observer card and body positions before
 the annual eclipse/transit search. The existing asynchronous weather refresh then
@@ -4704,10 +4712,24 @@ sum, it copies the sum into the editor while the result retains **sum = closed f
 Evaluating the copied sum recognises the identity again. The Expression and Function
 cards continue to show the simplified closed form. Further differentiation uses
 the recognised closed form when the differentiated summand has no direct reduction.
+Copying and evaluating later rational derivatives also restores their digamma
+and polygamma identities; recognition covers repeated quadratic denominators
+through power eight, independently of earlier calculus actions.
+Later derivatives collect the exact coefficients and cancel phase powers before
+assembling their symmetric polygamma terms. The displayed summand is simplified
+as well; repeated differentiation does not retain uncombined coefficients.
+Long additive closed forms place their signed terms on separate aligned rows
+beside the sum, with an outer minus absorbed by reversing numerator signs. Compact
+sum identities stay on one line.
 For real rational arctangent derivatives, numerical values use the closed form
 after agreement at two guarded precisions; removable points and unresolved
-cancellation fall back to the finite sum. Plots retain the faster compiled finite
-sum. Its binding-aware transfer preserves
+cancellation fall back to the finite sum. Plotting recognises these proper rational
+sums through higher derivatives, proves their real regular domain and selects a
+frequency-scaled automatic window. High-precision reference probes use the guarded
+digamma/polygamma closed form; ordinary drawing samples retain the faster compiled
+finite sum. The guard increases precision according to the rational derivative's
+inverse phase powers, with the finite sum preserving the removable zero-phase value.
+Its binding-aware transfer preserves
 the expression body's order and notation while applying the result bindings to
 the editor controls.
 

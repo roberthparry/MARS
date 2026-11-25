@@ -2272,11 +2272,12 @@ int lab_worker_expression(int argc, char **argv)
             /* The finite derivative remains the numerical source; differentiate the recognised identity for display. */
             expr_t *closed_derivative = expr_create_deriv(progression_closed_form, wrt);
             derivative_progression_closed_form = expr_simplify_owned(closed_derivative);
-            if (derivative_progression_closed_form) {
-                expr_free(derivative_progression_source);
-                derivative_progression_source = expr_retain_expr(deriv);
-                use_progression_plot_source = true;
-            }
+        }
+        if (derivative_progression_closed_form && progression_closed_form &&
+            expr_contains_summation_for_display(deriv)) {
+            expr_free(derivative_progression_source);
+            derivative_progression_source = expr_retain_expr(deriv);
+            use_progression_plot_source = true;
         }
         if (!derivative_progression_source && used_progression_derivative_form)
             derivative_progression_source = expr_summation_derivative_source(derivative_source, wrt);

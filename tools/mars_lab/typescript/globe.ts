@@ -164,6 +164,9 @@ class MarsAlmanacGlobe {
     private grid = false;
     private highResolutionRequested = false;
     private worldLoading = false;
+    private worldRetries = 0;
+    private worldRetryTimer = 0;
+    private readonly imageryLifetime = new AbortController();
     private highResolutionLoading = false;
     private palettesReady = false;
     private photo: import('./globe_photo.js').GlobePhoto | null = null;
@@ -496,6 +499,8 @@ class MarsAlmanacGlobe {
             this.saveCamera();
             if (event.persisted) return;
             this.shoreClosed = true;
+            this.imageryLifetime.abort();
+            window.clearTimeout(this.worldRetryTimer);
             this.photo?.dispose();
             this.photoAtlas?.dispose();
             this.riverRequest?.abort();
@@ -510,7 +515,10 @@ class MarsAlmanacGlobe {
         });
         document.addEventListener('visibilitychange', () => {
             if (document.hidden) this.saveCamera();
+            else this.resumeWorld();
         });
+        window.addEventListener('online', () => this.resumeWorld(), {signal: this.imageryLifetime.signal});
+        window.addEventListener('pageshow', () => this.resumeWorld(), {signal: this.imageryLifetime.signal});
         document.addEventListener('lab-town-catalogue-ready', () => {
             if (!this.started) return;
             this.markerSignature = '';
@@ -738,25 +746,67 @@ class MarsAlmanacGlobe {
         this.draw();
     }
 
+    /** Resume a missing overview after reconnecting or returning from a suspended mobile tab. */
+    private resumeWorld(): void {
+        if (document.hidden || this.imageryLifetime.signal.aborted) return;
+        this.worldRetries = 0;
+        window.clearTimeout(this.worldRetryTimer);
+        if (this.root.dataset.surface) {
+            if (!this.highResolutionLoading && this.root.dataset.resolution === '2048')
+                this.highResolutionRequested = false;
+            void this.loadHighResolution();
+            return;
+        }
+        void this.loadWorld();
+    }
+
+    /** Bound image loading and decoding, releasing the pending request when the page closes. */
+    private async earthImage(path: string): Promise<HTMLImageElement> {
+        const image = new Image();
+        const signal = AbortSignal.any([this.imageryLifetime.signal, AbortSignal.timeout(10000)]);
+        signal.throwIfAborted();
+        let abort!: () => void;
+        const cancelled = new Promise<never>((_resolve, reject) => {
+            abort = () => { image.removeAttribute('src'); reject(signal.reason); };
+            signal.addEventListener('abort', abort, {once: true});
+        });
+        try {
+            image.src = path;
+            await Promise.race([image.decode(), cancelled]);
+            signal.throwIfAborted();
+            return image;
+        } finally { signal.removeEventListener('abort', abort); }
+    }
+
     private async loadWorld(): Promise<void> {
+        if (!this.started || this.worldLoading || this.root.dataset.surface ||
+            this.imageryLifetime.signal.aborted || this.gl.isContextLost()) return;
         this.worldLoading = true;
         this.status.textContent = 'Loading Earth imagery…';
         try {
-            const image = new Image();
-            image.src = '/earth_surface.png';
-            await image.decode();
+            const image = await this.earthImage('/earth_surface.png');
+            if (this.gl.isContextLost()) throw new Error('Globe graphics context unavailable');
             this.upload(0, image);
             this.root.dataset.surface = 'blue-marble';
             this.root.dataset.resolution = '2048';
             await this.refreshPalettes();
             this.status.textContent = 'Drag to rotate · drag vertically at either side to roll · scroll or pinch to zoom · select a town or point';
+            this.worldRetries = 0;
             void this.loadHighResolution();
-        } catch (error) { this.status.textContent = String(error); }
+        } catch (error) {
+            if (this.imageryLifetime.signal.aborted) return;
+            this.status.textContent = `Earth imagery unavailable. ${String(error)}`;
+            if (this.worldRetries < 3) {
+                const delay = 1000 * 2 ** this.worldRetries++;
+                this.worldRetryTimer = window.setTimeout(() => { void this.loadWorld(); }, delay);
+            }
+        }
         finally { this.worldLoading = false; }
     }
 
     private async loadHighResolution(): Promise<void> {
-        if (this.flightTarget || this.highResolutionRequested || this.view[2] < 2 || !this.root.dataset.surface) return;
+        if (this.imageryLifetime.signal.aborted || this.flightTarget || this.highResolutionRequested ||
+            this.view[2] < 2 || !this.root.dataset.surface) return;
         const gl = this.gl, limit = gl.getParameter(gl.MAX_TEXTURE_SIZE) as number;
         let width = 8192;
         while (width > limit) width /= 2;
@@ -764,9 +814,7 @@ class MarsAlmanacGlobe {
         this.highResolutionRequested = true;
         this.highResolutionLoading = true;
         try {
-            const image = new Image();
-            image.src = '/earth_surface_detail.png';
-            await image.decode();
+            const image = await this.earthImage('/earth_surface_detail.png');
             if (image.naturalWidth !== 8192 || image.naturalHeight !== 4096) throw new Error('Invalid Earth detail image');
             // Navigation may have started during decoding. Keep the resident photograph until arrival;
             // uploading a 128 MiB texture and rebuilding its palettes would stall the animation's GPU queue.

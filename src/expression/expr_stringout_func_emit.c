@@ -497,12 +497,12 @@ void emit_func(const expr_t *f, sbuf_t *b, int parent_prec)
 
             if (emitted)
                 sbuf_putc(b, '.');
-            if ((n > 1 || factored_temporary) && !function_temporary_name(fac[i]) &&
-                mul_factor_needs_visible_parens(fac[i]))
+            bool grouped_factor = (n > 1 || factored_temporary) && !function_temporary_name(fac[i]) &&
+                                  mul_coefficient_needs_parens(fac[i], !emitted);
+            if (grouped_factor)
                 sbuf_putc(b, '(');
             emit_func(fac[i], b, PREC_MUL);
-            if ((n > 1 || factored_temporary) && !function_temporary_name(fac[i]) &&
-                mul_factor_needs_visible_parens(fac[i]))
+            if (grouped_factor)
                 sbuf_putc(b, ')');
             emitted = true;
         }

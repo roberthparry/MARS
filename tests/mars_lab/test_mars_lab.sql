@@ -43,9 +43,24 @@ INSERT INTO test_case_runner(module, source, parent, table_name, operation) VALU
 ON CONFLICT(module) DO UPDATE SET source=excluded.source, parent=excluded.parent,
     table_name=excluded.table_name, operation=excluded.operation;
 INSERT INTO mars_lab_cases(name, operation, input, expected) VALUES
+    ('progression_card_reuse_second_rational', 'progression_card',
+     '{"expression":"{-sum(k,1,1000,2*k^3*x/(k^2*x^2+1)^2)|x=1}","precision":97}',
+     '["tex","\\sum","tex"," = ","function","digamma(","function","trigamma(","input_expression","Σ_","input_expression","x = 1","value","-12.83297820529285428246924715088676509827","run_output","-12.83297820529285428246924715088676509827","tex","\\begin{aligned}","tex","\\\\\n","tex"," = {} &\\frac{","tex","&{} + \\frac{","tex","1001 + \\frac{i}{x}","tex","\\psi^{(0)}(1 + \\frac{i}{x})","tex","\\psi^{(0)}(1 -"]'),
+    ('progression_card_reuse_second_rational_unbound', 'progression_card',
+     '{"expression":"-Σ_(k=1)^1000 2k³x/(k²x²+1)²","precision":97}',
+     '["tex","\\sum","tex"," = ","function","digamma(","function","trigamma(","input_expression","Σ_","tex","\\begin{aligned}","tex","\\\\\n","tex"," = {} &\\frac{","tex","&{} + \\frac{","tex","1001 + \\frac{i}{x}","tex","\\psi^{(0)}(1 + \\frac{i}{x})","tex","\\psi^{(0)}(1 -"]'),
+    ('progression_card_reuse_third_rational', 'progression_card',
+     '{"expression":"{sum(k,1,4,2*k^3*(3*k^2*x^2-1)/(1+k^2*x^2)^3)|x=1}","precision":97}',
+     '["tex","\\sum","tex"," = ","function","polygamma(","input_expression","Σ_"]'),
     ('progression_card_reused_sum_next_derivative', 'progression_card',
      '{"expression":"{@Z_(k=1)^1000 k/(1+k^2*x^2)|x=1}","action":"derivative","wrt":"x","precision":97}',
      '["derivative_TeX","\\sum","derivative_TeX"," = ","derivative_function","trigamma(","derivative_input_expression","Σ_","derivative_plot_expression","Σ_","derivative_value_source","closed-form","reference_value","{sum(k,1,1000,-2*k^3*x/(1+k^2*x^2)^2)|x=1.0}"]'),
+    ('progression_card_reused_sum_third_derivative', 'progression_card',
+     '{"expression":"{-sum(k,1,1000,2*k^3*x/(1+k^2*x^2)^2)|x=1}","action":"derivative","wrt":"x","precision":97}',
+     '["absent:derivative_function","x^7","absent:derivative_function","x^8","absent:derivative_TeX"," - 8\\mkern-2mu","derivative_TeX","\\begin{aligned}","derivative_TeX","x^{4}","derivative_TeX","x^{5}","derivative_TeX","x^{6}","absent:derivative_TeX","x^{7}","absent:derivative_TeX","x^{8}","absent:derivative_TeX","1000 + 1","derivative_function","polygamma(2,","reference_value","{sum(k,1,1000,2*k^3*(3*k^2-1)/(1+k^2)^3)}","run_output","36.4847909151845534197046941840753214"]'),
+    ('progression_card_reused_sum_third_opposite', 'progression_card',
+     '{"expression":"{sum(j,1,4,2*j^3*t/(1+j^2*t^2)^2)|t=1}","action":"derivative","wrt":"t","precision":97}',
+     '["derivative_TeX","\\begin{aligned}","derivative_TeX","t^{4}","derivative_TeX","t^{5}","derivative_TeX","t^{6}","absent:derivative_TeX","t^{7}","absent:derivative_TeX","t^{8}","derivative_function","polygamma(2,","reference_value","{sum(j,1,4,2*j^3*(1-3*j^2)/(1+j^2)^3)}"]'),
     ('progression_card_reused_sum_next_zero', 'progression_card',
      '{"expression":"{@Z_(k=1)^4 k/(1+k^2*x^2)|x=0}","action":"derivative","wrt":"x","precision":97}',
      '["derivative_TeX","\\sum","derivative_TeX"," = ","derivative_function","trigamma(","derivative_value","0","derivative_value_source","finite-sum"]'),
@@ -678,3 +693,36 @@ INSERT OR IGNORE INTO mars_lab_cases(name, operation, input, expected) VALUES
     ('progression_plot_atan_derivative_manual', 'progression_plot',
      '{"expression":"(digamma(1001+i/x)-digamma(1+i/x)+digamma(1001-i/x)-digamma(1-i/x))/(2*x^2)","action":"plot","wrt":"x","plot_lower":"-0.1","plot_upper":"0.1","precision":97}',
      '{"segments":"20","lower":"-0.1","upper":"0.1","real":"yes","peak":"500500"}');
+
+INSERT INTO mars_lab_cases(name, operation, input, expected) VALUES
+    ('progression_plot_atan_fourth_authored', 'progression_plot',
+     '{"expression":"{Dxxxx(@Z_(k=1)^1000 atan(kx))|x=1}","action":"plot","wrt":"x","precision":97}',
+     '{"segments":"20","lower":"-0.01","upper":"0.01","real":"yes"}'),
+    ('progression_plot_atan_fourth_direct', 'progression_plot',
+     '{"expression":"sum(k,1,1000,24*k^5*x*(1-k^2*x^2)/(1+k^2*x^2)^4)","action":"plot","wrt":"x","precision":97}',
+     '{"segments":"20","lower":"-0.01","upper":"0.01","real":"yes"}'),
+    ('progression_plot_atan_fourth_affine', 'progression_plot',
+     '{"expression":"Dtttt(sum(j,1,25,atan(j*(2*t+1))))","action":"plot","wrt":"t","precision":97}',
+     '{"segments":"20","lower":"-0.7","upper":"-0.3","real":"yes"}'),
+    ('progression_plot_atan_fourth_manual', 'progression_plot',
+     '{"expression":"Dxxxx(sum(k,1,1000,atan(k*x)))","action":"plot","wrt":"x","plot_lower":"-0.1","plot_upper":"0.1","precision":97}',
+     '{"segments":"20","lower":"-0.1","upper":"0.1","real":"yes"}'),
+    ('progression_plot_atan_sixth', 'progression_plot',
+     '{"expression":"Dxxxxxx(sum(k,1,25,atan(k*x)))","action":"plot","wrt":"x","precision":97}',
+     '{"segments":"20","lower":"-0.4","upper":"0.4","real":"yes"}')
+ON CONFLICT(name) DO UPDATE SET input=excluded.input, expected=excluded.expected;
+
+INSERT INTO mars_lab_cases(name, operation, input, expected, precision) VALUES
+    ('progression_sample_atan_fourth_double', 'progression_sample',
+     '{"expression":"Dxxxx(sum(k,1,1000,atan(k*x)))","point":"0.001","reference":"{sum(k,1,1000,24*k^5*x*(1-k^2*x^2)/(1+k^2*x^2)^4)|x=0.001}","closed_fragment":"polygamma("}', '0', 53),
+    ('progression_sample_atan_fourth_precise', 'progression_sample',
+     '{"expression":"Dxxxx(sum(k,1,1000,atan(k*x)))","point":"0.001","reference":"{sum(k,1,1000,24*k^5*x*(1-k^2*x^2)/(1+k^2*x^2)^4)|x=0.001}","closed_fragment":"polygamma(","relative_tolerance":"1e-90"}', '0', 384),
+    ('progression_sample_atan_fourth_tiny', 'progression_sample',
+     '{"expression":"Dxxxx(sum(k,1,1000,atan(k*x)))","point":"1e-40","reference":"{sum(k,1,1000,24*k^5*x*(1-k^2*x^2)/(1+k^2*x^2)^4)|x=1e-40}","closed_fragment":"polygamma(","relative_tolerance":"1e-110"}', '0', 384),
+    ('progression_sample_atan_fourth_zero', 'progression_sample',
+     '{"expression":"Dxxxx(sum(k,1,1000,atan(k*x)))","point":"0","closed_fragment":"polygamma("}', '0', 384),
+    ('progression_sample_atan_first_zero', 'progression_sample',
+     '{"expression":"Dx(sum(k,1,1000,atan(k*x)))","point":"0","closed_fragment":"digamma("}', '500500', 384),
+    ('progression_sample_atan_fourth_negative', 'progression_sample',
+     '{"expression":"Dxxxx(sum(k,1,1000,atan(k*x)))","point":"-1","reference":"{sum(k,1,1000,24*k^5*x*(1-k^2*x^2)/(1+k^2*x^2)^4)|x=-1}","closed_fragment":"polygamma(","relative_tolerance":"1e-90"}', '0', 384)
+ON CONFLICT(name) DO UPDATE SET input=excluded.input, expected=excluded.expected, precision=excluded.precision;

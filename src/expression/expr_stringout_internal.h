@@ -126,9 +126,18 @@ bool expr_emit_conjugate_sum(const expr_t *expr, sbuf_t *buffer, int parent_prec
  */
 bool expr_emit_complex_shift(const expr_t *expr, sbuf_t *buffer, int parent_prec, style_t style);
 
-/** @brief Identify a symbolic real centre and imaginary displacement, with their signs. */
+/**
+ * @brief Identify an additive centre and a symbolic imaginary product or quotient, retaining their signs.
+ * @param expr Borrowed candidate sum or difference; neither modified nor retained.
+ * @param centre Required output borrowing the additive centre from expr.
+ * @param coefficient Required output borrowing the imaginary multiplier, or divisor when reciprocal is true.
+ * @param centre_negative Required output receiving the centre's explicit additive sign.
+ * @param coefficient_negative Required output receiving the imaginary displacement's explicit additive sign.
+ * @param reciprocal Required output receiving true for i divided by coefficient, false for their product.
+ * @return True on recognition; false leaves every output unchanged. Borrowed outputs remain valid with expr.
+ */
 bool expr_display_complex_shift(const expr_t *expr, const expr_t **centre, const expr_t **coefficient,
-                                bool *centre_negative, bool *coefficient_negative);
+                                bool *centre_negative, bool *coefficient_negative, bool *reciprocal);
 
 /* Recognise opposite shifts in paired function arguments or definite-integral bounds, without rewriting the DAG. */
 const expr_t *expr_display_symmetric_shift_centre(const expr_t *expr);

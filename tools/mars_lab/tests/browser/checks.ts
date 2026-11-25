@@ -123,6 +123,9 @@
     const failureCase = new URLSearchParams(location.search).get('failure');
     const catalogueCheck = new URLSearchParams(location.search).get('catalogue-check');
     let releaseTowns: () => void = () => {};
+    let releaseFailedTowns = false;
+    let failedTownPage = '';
+    let recoveredTownPage = '';
     const townGate = new Promise<void>(resolve => { releaseTowns = resolve; });
     if (catalogueCheck) {
         nativeSetTimeout(() => {
@@ -135,12 +138,16 @@
                 return new Response('unavailable', {status: 503});
             if (String(url).startsWith('/towns?after=')) {
                 if (String(url).startsWith('/towns?after=0&jurisdiction=')) await townGate;
-                else if (catalogueCheck === 'fail' && String(url).includes('&jurisdiction='))
+                else if (catalogueCheck === 'fail' && String(url).includes('&jurisdiction=') && !releaseFailedTowns) {
+                    failedTownPage = String(url);
                     return new Response('unavailable', {status: 503});
+                } else if (catalogueCheck === 'fail' && releaseFailedTowns &&
+                           String(url).includes('&jurisdiction=') && !recoveredTownPage) recoveredTownPage = String(url);
             }
             return nativeFetch(url, options);
         };
     }
+    const resourceRecovery = catalogueCheck === 'recovery' ? installLabResourceRecoveryFixture() : null;
     window.addEventListener('error', function recordError(event) {
         const target = event.target;
         const source = target instanceof Element ? target.getAttribute('src') || target.getAttribute('href') || target.tagName : 'unknown';
@@ -1807,11 +1814,11 @@
             inputs.length = 0;
             await WorksheetRequests.plots.takeDerivative('x');
             await plotted();
-            check(inputs.length === 1 && inputs[0].includes('lambert_S(') &&
+            check(inputs.length === 1 && WorksheetContext.functionStyle.textContent!.includes('lambert_S(') &&
                   WorksheetWorkspace.presentation.state.lastTex.includes('\\Lambda') &&
                   WorksheetWorkspace.presentation.state.lastTex.includes(':=') &&
                   WorksheetBindings.editor.currentExpressionText().includes('tan('),
-                  'The 1000-term tangent derivative plots its evaluable Lambert form and retains the defining identity');
+                  'The 1000-term tangent derivative retains its evaluable Lambert form and defining identity');
             const chart = plot.querySelector<SVGSVGElement>('[data-plot-chart]')!;
             check(Math.abs(Number(chart.dataset.xMin) + Math.PI / 4000) < 1e-12 &&
                   Math.abs(Number(chart.dataset.xMax) - Math.PI / 4000) < 1e-12,
@@ -1846,6 +1853,50 @@
                   WorksheetContext.functionStyle.textContent!.includes('trigamma(') &&
                   !plot.querySelector('.complex-grid'),
                   'Differentiating the reused sum differentiates its closed form and retains a real finite-sum plot');
+            await WorksheetResults.reuse.sendResultExpressionToInput();
+            check(WorksheetBindings.editor.currentExpressionText().includes('Σ') &&
+                  !WorksheetBindings.editor.currentExpressionText().includes('ψ'),
+                  'Reusing the second derivative keeps the rational sum in the editor');
+            await WorksheetRequests.evaluation.evaluateExpression();
+            await plotted();
+            check(WorksheetWorkspace.presentation.state.lastTex.includes('\\sum') &&
+                  WorksheetWorkspace.presentation.state.lastTex.includes(' = ') &&
+                  WorksheetContext.functionStyle.textContent!.includes('digamma(') &&
+                  WorksheetContext.functionStyle.textContent!.includes('trigamma(') &&
+                  WorksheetWorkspace.presentation.state.lastTex.includes('\\begin{aligned}') &&
+                  WorksheetWorkspace.presentation.state.lastTex.includes('\\\\') &&
+                  WorksheetWorkspace.presentation.state.lastTex.includes(' = {} &\\frac{') &&
+                  WorksheetWorkspace.presentation.state.lastTex.includes('&{} + \\frac{') &&
+                  WorksheetWorkspace.presentation.state.lastTex.includes('1001 + \\frac{i}{x}') &&
+                  !WorksheetWorkspace.presentation.state.lastTex.includes('\\frac{i}{x} + 1001') &&
+                  !WorksheetWorkspace.presentation.state.lastTex.includes('\\left(-\\psi') &&
+                  !plot.querySelector('.complex-grid'),
+                  'Evaluating the copied second derivative restores the complete closed-form identity');
+            await WorksheetRequests.plots.takeDerivative('x');
+            await plotted();
+            const thirdIdentity = WorksheetWorkspace.presentation.state.lastTex;
+            check(thirdIdentity.includes('\\sum') && thirdIdentity.includes(' = ') &&
+                  thirdIdentity.includes('\\begin{aligned}') &&
+                  thirdIdentity.split('\\\\').length === 3 &&
+                  thirdIdentity.includes('x^{4}') && thirdIdentity.includes('x^{5}') &&
+                  thirdIdentity.includes('x^{6}') && !thirdIdentity.includes('x^{7}') &&
+                  !thirdIdentity.includes('x^{8}') && !thirdIdentity.includes('1000 + 1') &&
+                  WorksheetContext.functionStyle.textContent!.includes('polygamma(2,') &&
+                  !plot.querySelector('.complex-grid'),
+                  'The next derivative combines coefficients and cancels powers into three symmetric closed-form rows');
+            const fourth = '{Dxxxx(@Z_(k=1)^1000 atan(kx))|x=1}';
+            await WorksheetRequests.presentation.prepareLabEditor(fourth);
+            WorksheetBindings.controller.setExpressionEditor(fourth);
+            await WorksheetRequests.evaluation.evaluateExpression();
+            await plotted();
+            const fourthChart = plot.querySelector<SVGSVGElement>('[data-plot-chart]');
+            check(!plot.querySelector('.complex-grid') && Number(fourthChart?.dataset.xMin) === -0.01 &&
+                  Number(fourthChart?.dataset.xMax) === 0.01 &&
+                  !!fourthChart?.querySelector('[data-series] path') &&
+                  WorksheetWorkspace.presentation.state.lastTex.includes('\\sum') &&
+                  WorksheetWorkspace.presentation.state.lastTex.includes(' = ') &&
+                  WorksheetContext.functionStyle.textContent!.includes('polygamma(3,'),
+                  'An authored fourth derivative plots its real curve and retains the closed-form identity');
             await WorksheetRequests.presentation.prepareLabEditor(source);
             WorksheetBindings.controller.setExpressionEditor(source);
             await WorksheetRequests.plots.takeDerivative('x');
@@ -1860,10 +1911,12 @@
             inputs.length = 0;
             await WorksheetRequests.plots.takeDerivative('x');
             await plotted();
-            check(inputs.length === 1 && inputs[0].includes('lambert_S(') &&
-                  inputs[0].includes('-2') && inputs[0].includes('x = 1') &&
-                  WorksheetWorkspace.presentation.state.lastTex.includes('\\Lambda'),
-                  'Differentiating the Lambert result again with x bound plots the second derivative: ' +
+            check(inputs.length === 1 && inputs[0].includes('x = 1') &&
+                  WorksheetContext.functionStyle.textContent!.includes('lambert_S(') &&
+                  WorksheetContext.functionStyle.textContent!.includes('-2') &&
+                  WorksheetWorkspace.presentation.state.lastTex.includes('\\Lambda') &&
+                  !plot.querySelector('.complex-grid'),
+                  'Differentiating the reused tangent sum with x bound retains its closed form and real plot: ' +
                   JSON.stringify({inputs, source: range.dataset.calculusSource}));
             const expanded = '{@Z_(k=1)^1000 k(tan^2(kx)+1)|x=1}';
             await WorksheetRequests.presentation.prepareLabEditor(expanded);
@@ -1886,10 +1939,13 @@
             derivativeButton!.click();
             await wait_for_mode_evaluation();
             await plotted();
-            check(inputs.length === 1 && inputs[0].includes('lambert_S(') && inputs[0].includes('-2') &&
+            check(inputs.length === 1 && inputs[0].includes('x = 1') &&
+                  WorksheetContext.functionStyle.textContent!.includes('lambert_S(') &&
+                  WorksheetContext.functionStyle.textContent!.includes('-2') &&
                   WorksheetContext.rightPaneTitle.textContent.toLowerCase().includes('derivative') &&
-                  WorksheetWorkspace.presentation.state.lastTex.includes('\\Lambda'),
-                  'The visible x derivative button differentiates the recognised sum and plots its closed form');
+                  WorksheetWorkspace.presentation.state.lastTex.includes('\\Lambda') &&
+                  !plot.querySelector('.complex-grid'),
+                  'The visible x derivative button retains the closed form and plots the recognised derivative');
         } finally {
             WorksheetRequests.evaluationTransport.fetchEvaluation = originalFetch;
             await WorksheetWorkspace.mode.selectWorksheetMode(originalMode);
@@ -3825,6 +3881,15 @@
                 } else if (catalogueCheck === 'fail') {
                     check((labDOM.call('lab_town_store_list', 'GB-WLS') as LabTown[] | null)?.[0].name === 'Rhyl', 'Later failure discarded loaded towns');
                     check(document.querySelector('[data-jurisdiction-notice]:not(.hidden)') !== null, 'Town error not shown');
+                    releaseFailedTowns = true;
+                    window.dispatchEvent(new Event('online'));
+                    await (Reflect.get(labApplication, 'townJobs') as Map<string, {promise: Promise<void>}>).get('GB')?.promise;
+                    check(recoveredTownPage === failedTownPage &&
+                          document.querySelector('[data-jurisdiction-notice]:not(.hidden)') === null,
+                          'reconnection resumes the failed cursor and clears the warning without reselecting a country');
+                    location.href = '/?catalogue-check=recovery';
+                } else if (resourceRecovery) {
+                    await resourceRecovery.run();
                     location.href = '/?catalogue-check=index-fail';
                 } else {
                     check(!labApplication.catalogue.available, 'Failed metadata did not fall back');

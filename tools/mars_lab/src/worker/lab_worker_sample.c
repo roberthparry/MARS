@@ -5,7 +5,7 @@
  * Coordinate precision belongs to the sampling caller. At ordinary precision a
  * compiled real plan avoids arbitrary-precision expression evaluation; unsupported
  * operations and uncertain results use native evaluation. Recognised entire-function
- * progressions use their native closed form, raising working precision according
+ * progressions and proper rational sums use their native closed form, raising working precision according
  * to the denominator guard near cancellation and using the authored sum at actual
  * removable singularities. Real circular quotient identities are recovered once
  * into their finite sum, rather than re-recognised at every numerical sample. Higher-precision passes
@@ -25,6 +25,7 @@
 typedef struct _lab_worker_sample_t {
     expr_t *expression, *reduced, *guard, *axes[3];
     size_t count;
+    unsigned guard_power;
     expr_real_sample_t *fast;
 } lab_worker_sample_t;
 
@@ -59,7 +60,7 @@ lab_worker_sample_t *lab_worker_sample_new(expr_t *expression, expr_t *const *ax
         num_destroy(&lower);
     }
     if (sample->reduced)
-        sample->guard = expr_finite_progression_sample_guard(expression);
+        sample->guard = expr_finite_progression_sample_guard(expression, &sample->guard_power);
     if (bits <= 53) {
         sample->fast = expr_real_sample_new(sample->reduced ? sample->reduced : expression, inputs, count);
         /* A special-function identity may be unavailable to the real compiler while its finite body is supported. */
@@ -92,11 +93,10 @@ number_t lab_worker_sample_eval(lab_worker_sample_t *sample, const number_t *coo
         number_t magnitude = num_abs(denominator);
         stable = num_is_finite(denominator) && !num_is_zero(denominator);
         if (stable) {
-            /* The sixth moment divides by the seventh power of this guard. Extra
-             * mantissa bits pay for cancellation in the numerator instead of summing
-             * every term. One extra power and 32 bits cover rounding in the graph. */
+            /* Native reduction supplies a conservative inverse-phase order for
+             * the actual identity, including higher rational derivatives. */
             long exponent = num_get_exponent2(magnitude);
-            size_t loss = exponent < 0 && exponent > -4096 ? (size_t)(-exponent) * 8u : 0u;
+            size_t loss = exponent < 0 && exponent > -4096 ? (size_t)(-exponent) * sample->guard_power : 0u;
             stable = (exponent >= 0 || exponent > -4096) && precision <= 32736u && loss <= 32736u - precision;
             if (stable)
                 working += loss + 32u;

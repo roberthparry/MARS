@@ -14,7 +14,7 @@
 #define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_internal.h"
 
-enum { WEIGHTED_PROGRESSION_DEGREE = 6 };
+enum { WEIGHTED_PROGRESSION_DEGREE = 6, RATIONAL_PROGRESSION_POWER = 8 };
 
 static bool same_index(const expr_t *expression, const expr_t *index)
 {
@@ -321,40 +321,291 @@ static bool polynomial_coefficients(const expr_t *polynomial, const expr_t *vari
     return ok;
 }
 
-/* Re-entered arctangent derivative sums retain their identity without relying on action history. */
-expr_t *expr_finite_rational_progression_closed_form(const expr_t *expression)
+/* Rebuild collected coefficients in Horner form, retaining zero coefficients only as powers of the bound index. */
+expr_t *expr_summation_normalise_polynomial(const expr_t *expression)
 {
     if (expr_is_neg(expression)) {
-        expr_t *inner = expr_finite_rational_progression_closed_form(expression->a);
-        expr_t *out = inner ? expr_neg(inner) : NULL;
-        expr_free(inner);
+        expr_t *sum = expr_summation_normalise_polynomial(expression->a);
+        expr_t *out = sum ? expr_neg(sum) : NULL;
+        expr_free(sum);
         return out;
     }
+    if (!expr_is_op(expression, &ops_summation) || !expr_is_div(expression->a) ||
+        !expr_is_op(expression->b, &ops_argument_list) || !expr_is_var(expression->b->a))
+        return NULL;
+    const expr_t *index = expression->b->a, *term = expression->a;
+    int degree = polynomial_degree(term->a, index, 2 * RATIONAL_PROGRESSION_POWER - 1);
+    expr_t *coefficients[2 * RATIONAL_PROGRESSION_POWER] = {0};
+    if (degree < 0)
+        return NULL;
+    bool ok = polynomial_coefficients(term->a, index, degree, coefficients);
+    expr_t *numerator = ok ? expr_retain_expr(coefficients[degree]) : NULL;
+    for (int j = degree - 1; numerator && j >= 0; --j) {
+        expr_t *product = expr_mul_simplify_owned(numerator, expr_retain_expr(index));
+        numerator = expr_add_simplify_owned(product, expr_retain_expr(coefficients[j]));
+    }
+    expr_t *normal_term = numerator ? expr_div(numerator, term->b) : NULL;
+    expr_t *out = normal_term ? expr_new_summation(normal_term, expression->b) : NULL;
+    expr_free(normal_term);
+    expr_free(numerator);
+    for (int j = 0; j <= degree; ++j)
+        expr_free(coefficients[j]);
+    return out;
+}
+
+/* Coefficient of (u-i)^(-order) in u^degree/(1+u^2)^power, using exact Gaussian rationals. */
+static number_t rational_residue(unsigned degree, unsigned power, unsigned order)
+{
+    NUM_SCOPE(numbers);
+    number_t total = NUM_ZERO, twice_i = num_mul_long(NUM_I, 2);
+    unsigned expansion = power - order;
+    for (unsigned a = 0; a <= degree && a <= expansion; ++a) {
+        unsigned b = expansion - a;
+        number_t choose_a = num_binomial(num_create_from_long(degree), num_create_from_long(a));
+        number_t choose_b = num_binomial(num_create_from_long(power + b - 1), num_create_from_long(b));
+        number_t numerator = num_mul(num_mul(choose_a, choose_b), num_pow_int(NUM_I, (int)(degree - a)));
+        number_t term = num_div(numerator, num_pow_int(twice_i, (int)(power + b)));
+        total = num_add(total, b & 1u ? num_neg(term) : term);
+    }
+    return num_scope_detach(total);
+}
+
+static expr_t *rational_polygamma(unsigned order, const expr_t *argument)
+{
+    if (order == 1u)
+        return expr_digamma(argument);
+    if (order == 2u)
+        return expr_trigamma(argument);
+    return expr_polygamma(order - 1u, argument);
+}
+
+/* Integer-shift polygamma differences sum the powers of each simple complex pole. */
+static expr_t *rational_pole_sum(const expr_t *upper, const expr_t *step, unsigned order, bool plus)
+{
+    expr_t *imaginary = expr_new_const(NUM_I), *shift = imaginary ? expr_div(imaginary, step) : NULL;
+    expr_t *end = expr_simplify_owned(expr_add_long(upper, 1));
+    expr_t *lower = shift ? (plus ? expr_add(EXPR_ONE, shift) : expr_sub(EXPR_ONE, shift)) : NULL;
+    expr_t *higher = end && shift ? (plus ? expr_add(end, shift) : expr_sub(end, shift)) : NULL;
+    expr_t *first = lower ? rational_polygamma(order, lower) : NULL;
+    expr_t *last = higher ? rational_polygamma(order, higher) : NULL;
+    expr_t *difference = first && last ? expr_sub(last, first) : NULL;
+    expr_free(last);
+    expr_free(first);
+    expr_free(higher);
+    expr_free(lower);
+    expr_free(end);
+    expr_free(shift);
+    expr_free(imaginary);
+    return difference;
+}
+
+/* Apply an already collected coefficient without expanding the paired special functions again. */
+static expr_t *rational_scale_pair(const expr_t *coefficient, const expr_t *pair)
+{
+    if (expr_is_neg(coefficient)) {
+        expr_t *reversed = expr_distribute_negative_for_display(pair);
+        expr_t *out = reversed ? rational_scale_pair(coefficient->a, reversed) : NULL;
+        expr_free(reversed);
+        return out;
+    }
+    if (expr_is_div(coefficient)) {
+        expr_t *top = rational_scale_pair(coefficient->a, pair);
+        expr_t *denominator = top && expr_is_div(top) ?
+            expr_simplify_owned(expr_mul(top->b, coefficient->b)) : expr_retain_expr(coefficient->b);
+        expr_t *out = top && denominator ? expr_div(expr_is_div(top) ? top->a : top, denominator) : NULL;
+        expr_free(denominator);
+        expr_free(top);
+        return out;
+    }
+    if (!expr_is_unnamed_const(coefficient))
+        return expr_mul(coefficient, pair);
+    NUM_SCOPE(numbers);
+    number_t real = num_real_part(coefficient->c), imaginary = num_imag_part(coefficient->c);
+    bool pure_imaginary = num_is_zero(real) && !num_is_zero(imaginary);
+    number_t component = pure_imaginary ? imaginary : real;
+    number_t numerator = num_clone(NUM_ZERO), denominator = num_clone(NUM_ONE);
+    if ((!pure_imaginary && !num_is_zero(imaginary)) ||
+        !num_get_fraction_parts(component, &numerator, &denominator))
+        return expr_mul(coefficient, pair);
+    bool negative = num_lt(numerator, NUM_ZERO);
+    number_t magnitude = negative ? num_neg(numerator) : numerator;
+    number_t factor = pure_imaginary ? num_mul(magnitude, NUM_I) : magnitude;
+    expr_t *selected = negative ? expr_distribute_negative_for_display(pair) : expr_retain_expr(pair);
+    expr_t *top = !selected ? NULL : num_is_one(factor) ? expr_retain_expr(selected) : expr_mul_num(selected, &factor);
+    expr_t *bottom = expr_new_const(denominator);
+    expr_t *out = !top || !bottom ? NULL : num_is_one(denominator) ? expr_retain_expr(top) : expr_div(top, bottom);
+    expr_free(bottom);
+    expr_free(top);
+    expr_free(selected);
+    return out;
+}
+
+/* Equal or opposite pole coefficients retain their symmetric sum or difference as one factor. */
+static expr_t *rational_paired_poles(const expr_t *positive, const expr_t *negative,
+                                    const expr_t *plus_sum, const expr_t *minus_sum)
+{
+    if (expr_is_exact_zero(positive) && expr_is_exact_zero(negative))
+        return expr_retain_expr(EXPR_ZERO);
+    expr_t *opposite = expr_simplify_owned(expr_add(positive, negative));
+    expr_t *pair = NULL, *out = NULL;
+    if (expr_struct_eq(positive, negative))
+        pair = expr_add(plus_sum, minus_sum);
+    else if (expr_is_exact_zero(opposite))
+        pair = expr_sub(plus_sum, minus_sum);
+    if (pair)
+        out = rational_scale_pair(positive, pair);
+    else {
+        expr_t *left = expr_mul(positive, plus_sum), *right = expr_mul(negative, minus_sum);
+        out = left && right ? expr_simplify_owned(expr_add(left, right)) : NULL;
+        expr_free(right);
+        expr_free(left);
+    }
+    expr_free(pair);
+    expr_free(opposite);
+    return out;
+}
+
+/* Cancel coefficient powers before attaching special functions, rather than creating a common artificial degree. */
+static expr_t *rational_moment_form(const expr_t *upper, const expr_t *step, expr_t *const *coefficients,
+                                   unsigned degree, unsigned power)
+{
+    expr_t *total = expr_retain_expr(EXPR_ZERO);
+    bool ok = total != NULL;
+    for (unsigned order = 1; ok && order <= power; ++order) {
+        expr_t *positive = expr_retain_expr(EXPR_ZERO), *negative = expr_retain_expr(EXPR_ZERO);
+        number_t factorial = num_factorial(order - 1u);
+        number_t scale = num_div(order & 1u ? NUM_ONE : NUM_NEG_ONE, factorial);
+        ok = positive && negative;
+        for (unsigned p = 0; ok && p <= degree; ++p) {
+            if (expr_is_exact_zero(coefficients[p]))
+                continue;
+            number_t raw_residue = rational_residue(p, power, order);
+            number_t residue = num_mul(raw_residue, scale), conjugate = num_conj(residue);
+            expr_t *phase = expr_pow_long(step, (long)(p + order));
+            expr_t *weight = phase ? expr_simplify_owned(expr_div(coefficients[p], phase)) : NULL;
+            expr_t *left = weight ? expr_simplify_owned(expr_mul_num(weight, &residue)) : NULL;
+            expr_t *right = weight ? expr_simplify_owned(expr_mul_num(weight, &conjugate)) : NULL;
+            expr_t *next_positive = left ? expr_simplify_owned(expr_add(positive, left)) : NULL;
+            expr_t *next_negative = right ? expr_simplify_owned(expr_add(negative, right)) : NULL;
+            expr_free(negative);
+            expr_free(positive);
+            negative = next_negative;
+            positive = next_positive;
+            ok = positive && negative;
+            expr_free(right);
+            expr_free(left);
+            expr_free(weight);
+            expr_free(phase);
+            num_destroy(&conjugate);
+            num_destroy(&residue);
+            num_destroy(&raw_residue);
+        }
+        num_destroy(&scale);
+        num_destroy(&factorial);
+        expr_t *plus_sum = ok ? rational_pole_sum(upper, step, order, false) : NULL;
+        expr_t *minus_sum = ok ? rational_pole_sum(upper, step, order, true) : NULL;
+        expr_t *term = plus_sum && minus_sum ? rational_paired_poles(positive, negative, plus_sum, minus_sum) : NULL;
+        expr_t *next = !term ? NULL : expr_is_exact_zero(total) ? expr_retain_expr(term) :
+                       expr_is_exact_zero(term) ? expr_retain_expr(total) : expr_add(total, term);
+        expr_free(total);
+        total = next;
+        ok = total != NULL;
+        expr_free(term);
+        expr_free(minus_sum);
+        expr_free(plus_sum);
+        expr_free(negative);
+        expr_free(positive);
+    }
+    return total;
+}
+
+/* Share the complete structural proof between mathematical reduction, range selection and cancellation guards. */
+static expr_t *rational_progression_step(const expr_t *expression, int *degree_out, unsigned *power_out)
+{
+    while (expr_is_neg(expression))
+        expression = expression->a;
     if (!expr_is_op(expression, &ops_summation) || !expr_is_op(expression->b, &ops_argument_list) ||
         !expr_is_div(expression->a))
         return NULL;
     const expr_t *index = expression->b->a, *bounds = expression->b->b, *term = expression->a;
+    const expr_t *quadratic = term->b;
+    unsigned power = 1;
+    const expr_t *base = NULL;
+    number_t exponent = NUM_NAN;
+    if (expr_match_pow_const(quadratic, &base, &exponent)) {
+        bool valid = num_is_real(exponent) && num_is_finite(exponent) && num_is_integer(exponent) &&
+                     num_ge(exponent, NUM_ONE) && num_to_double(exponent) <= RATIONAL_PROGRESSION_POWER;
+        if (valid) {
+            quadratic = base;
+            power = (unsigned)num_to_double(exponent);
+        }
+        num_destroy(&exponent);
+        if (!valid)
+            return NULL;
+    }
+    int degree = polynomial_degree(term->a, index, (int)(2u * power - 1u));
     if (!expr_is_var(index) || !expr_is_op(bounds, &ops_argument_list) ||
         !expr_is_unnamed_const(bounds->a) || !num_is_one(bounds->a->c) || uses_index(bounds->b, index) ||
-        polynomial_degree(term->a, index, 1) != 1 || polynomial_degree(term->b, index, 2) != 2)
+        degree < 0 || polynomial_degree(quadratic, index, 2) != 2)
         return NULL;
-    expr_t *numerator[2] = {0}, *denominator[3] = {0};
-    bool ok = polynomial_coefficients(term->a, index, 1, numerator) &&
-              polynomial_coefficients(term->b, index, 2, denominator) &&
-              expr_is_exact_zero(numerator[0]) && expr_is_unnamed_const(denominator[0]) &&
+    expr_t *denominator[3] = {0};
+    bool ok = polynomial_coefficients(quadratic, index, 2, denominator) &&
+              expr_is_unnamed_const(denominator[0]) &&
               num_is_one(denominator[0]->c) &&
               expr_is_exact_zero(denominator[1]);
     const expr_t *step = NULL;
-    number_t exponent = NUM_NAN;
     ok = ok && expr_match_pow_const(denominator[2], &step, &exponent) && num_eq(exponent, NUM_TWO);
-    expr_t *out = ok ? expr_finite_atan_moment_form(bounds->b, step, numerator[1]) : NULL;
-    expr_t *linked = out ? expr_clone_linked_symbols(out, expression) : NULL;
+    expr_t *linked = ok ? expr_clone_linked_symbols(step, expression) : NULL;
+    if (linked) {
+        *degree_out = degree;
+        *power_out = power;
+    }
     num_destroy(&exponent);
-    expr_free(out);
-    for (size_t i = 0; i < 2u; ++i)
-        expr_free(numerator[i]);
     for (size_t i = 0; i < 3u; ++i)
         expr_free(denominator[i]);
+    return linked;
+}
+
+/* Return the linked phase only after validating the complete proper rational summand. */
+expr_t *expr_finite_rational_progression_step(const expr_t *expression, const expr_t **upper)
+{
+    if (upper)
+        *upper = NULL;
+    int degree = 0;
+    unsigned power = 0;
+    expr_t *step = rational_progression_step(expression, &degree, &power);
+    while (expr_is_neg(expression))
+        expression = expression->a;
+    if (step && upper)
+        *upper = expression->b->b->b;
+    return step;
+}
+
+/* Re-entered rational derivatives retain their identity without relying on calculus-action history. */
+expr_t *expr_finite_rational_progression_closed_form(const expr_t *expression)
+{
+    if (expr_is_neg(expression)) {
+        expr_t *inner = expr_finite_rational_progression_closed_form(expression->a);
+        expr_t *out = inner ? expr_distribute_negative_for_display(inner) : NULL;
+        expr_free(inner);
+        return out;
+    }
+    int degree = 0;
+    unsigned power = 0;
+    expr_t *step = rational_progression_step(expression, &degree, &power);
+    if (!step)
+        return NULL;
+    const expr_t *index = expression->b->a, *upper = expression->b->b->b;
+    expr_t *numerator[2 * RATIONAL_PROGRESSION_POWER] = {0};
+    bool ok = polynomial_coefficients(expression->a->a, index, degree, numerator);
+    expr_t *out = !ok ? NULL : power == 1u && degree == 1 && expr_is_exact_zero(numerator[0]) ?
+                      expr_finite_atan_moment_form(upper, step, numerator[1]) :
+                      rational_moment_form(upper, step, numerator, (unsigned)degree, power);
+    expr_t *linked = out ? expr_clone_linked_symbols(out, expression) : NULL;
+    expr_free(out);
+    expr_free(step);
+    for (size_t i = 0; i < 2u * RATIONAL_PROGRESSION_POWER; ++i)
+        expr_free(numerator[i]);
     return linked;
 }
 
@@ -463,8 +714,18 @@ expr_t *expr_finite_quotient_derivative_closed_form(const expr_t *expression, co
 }
 
 /* Give sampling a cheap, live distance from the removable denominator zeros. */
-expr_t *expr_finite_progression_sample_guard(const expr_t *expression)
+expr_t *expr_finite_progression_sample_guard(const expr_t *expression, unsigned *inverse_power)
 {
+    if (inverse_power)
+        *inverse_power = 8u;
+    int rational_degree = 0;
+    unsigned rational_power = 0;
+    expr_t *rational_step = rational_progression_step(expression, &rational_degree, &rational_power);
+    if (rational_step) {
+        if (inverse_power)
+            *inverse_power = (unsigned)rational_degree + rational_power + 1u;
+        return rational_step;
+    }
     while (expr_is_neg(expression))
         expression = expression->a;
     if (!expr_is_op(expression, &ops_summation) || !expr_is_op(expression->b, &ops_argument_list))

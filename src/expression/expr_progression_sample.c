@@ -11,6 +11,8 @@
  * recogniser; individual unit-circle q-digamma terms are never evaluated here.
  * Their explicit finite Lambert derivatives retain the same pole-aware real windows,
  * including fixed scalar multiples and paired secant/cosecant terms.
+ * Proper rational sums from repeated arctangent differentiation share a real affine
+ * window proof, avoiding complex preflights and expensive derivative-guided sampling.
  */
 #define MARS_SHARED_EXPR_INTERNAL_ACCESS
 #include "internal/expr_internal.h"
@@ -189,19 +191,63 @@ bool expr_finite_growth_progression_sample_bounds(const expr_t *expression, cons
     return progression_bounds(expression, axis, true, lower, upper);
 }
 
-/* Resolve the narrow, finite central peak rather than treating the digamma quotient's zero as a pole. */
+/* A polynomial in the real coordinate and integer index introduces no hidden complex values or real poles. */
+static bool real_rational_weight(const expr_t *expression, const expr_t *axis, const expr_t *index)
+{
+    if (!expression)
+        return false;
+    expr_op_kind_t kind = expression->ops->kind;
+    if (kind == EXPR_KIND_VAR && (expression == axis || expression == index ||
+        (expression->var_id && (expression->var_id == axis->var_id || expression->var_id == index->var_id))))
+        return true;
+    if (kind == EXPR_KIND_NEG)
+        return real_rational_weight(expression->a, axis, index);
+    if (kind == EXPR_KIND_ADD || kind == EXPR_KIND_SUB || kind == EXPR_KIND_MUL)
+        return real_rational_weight(expression->a, axis, index) &&
+               real_rational_weight(expression->b, axis, index);
+    if (kind == EXPR_KIND_POW_D || kind == EXPR_KIND_POW) {
+        number_t power = kind == EXPR_KIND_POW_D ? expression->c :
+                         expr_is_unnamed_const(expression->b) ? expression->b->c : NUM_NAN;
+        if (num_is_real(power) && num_is_finite(power) && num_is_integer(power) && num_ge(power, NUM_ZERO))
+            return real_rational_weight(expression->a, axis, index);
+    }
+    if (kind == EXPR_KIND_DIV && !contains_axis(expression->b, axis) && !contains_axis(expression->b, index)) {
+        number_t denominator = expr_eval(expression->b);
+        bool valid = num_is_real(denominator) && num_is_finite(denominator) && !num_is_zero(denominator);
+        num_destroy(&denominator);
+        return valid && real_rational_weight(expression->a, axis, index);
+    }
+    if (contains_axis(expression, axis) || contains_axis(expression, index))
+        return false;
+    number_t value = expr_eval(expression);
+    bool real = num_is_real(value) && num_is_finite(value);
+    num_destroy(&value);
+    return real;
+}
+
+/* Resolve every supported real rational derivative's central features, including the removable zero-phase point. */
 bool expr_finite_atan_derivative_sample_bounds(const expr_t *expression, const expr_t *axis,
                                                number_t *lower, number_t *upper)
 {
     if (!lower || !upper || lower == upper)
         return false;
     *lower = *upper = NUM_NAN;
+    if (!expr_is_var(axis))
+        return false;
     NUM_SCOPE(numbers);
-    expr_t *source = expr_finite_atan_derivative_source(expression, axis);
     const expr_t *count = NULL;
     const expr_ops_t *function = NULL;
-    expr_t *step = NULL;
-    bool ok = source && expr_finite_progression_parts(source, &count, &step, &function);
+    expr_t *source = NULL, *step = expr_finite_rational_progression_step(expression, &count);
+    const expr_t *sum = expression;
+    while (expr_is_neg(sum))
+        sum = sum->a;
+    bool ok = step && !contains_axis(count, axis) && real_rational_weight(sum->a->a, axis, sum->b->a);
+    if (!ok) {
+        expr_free(step);
+        step = NULL;
+        source = expr_finite_atan_derivative_source(expression, axis);
+        ok = source && expr_finite_progression_parts(source, &count, &step, &function);
+    }
     expr_t *slope = ok ? expr_create_deriv(step, axis) : NULL;
     expr_t *offset = ok ? expr_substitute(step, axis, EXPR_ZERO) : NULL;
     ok = ok && slope && offset && !contains_axis(slope, axis) && !contains_axis(offset, axis);

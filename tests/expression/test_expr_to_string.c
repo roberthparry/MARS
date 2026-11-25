@@ -2899,8 +2899,55 @@ static void test_to_string_equal_conjugate_sums(void)
     }
 }
 
+static void test_to_string_shift_format_row(const void *data)
+{
+    const test_database_case_t *row = data;
+    json_t *expected = json_from_text(row->expected);
+    expr_t *source = expr_from_text(row->input, NULL);
+    char *before = source ? expr_to_string(source, style_EXPRESSION) : NULL;
+    string_t *beautify_key = string_new_with("beautify");
+    bool beautify = false;
+    json_bool_value(json_object_get(expected, beautify_key), &beautify);
+    expr_t *shown = beautify ? expr_beautify_presimplified(source) : expr_clone(source);
+    static const struct { style_t style; const char *key; } styles[] = {
+        {style_UNBOUND, "plain"}, {style_FUNCTION, "function"}, {style_LATEX, "TeX"}
+    };
+    ASSERT_NOT_NULL(source);
+    ASSERT_NOT_NULL(shown);
+    ASSERT_NOT_NULL(expected);
+    for (size_t i = 0u; i < sizeof styles / sizeof *styles; ++i) {
+        char *text = expr_to_string(shown, styles[i].style);
+        string_t *key = string_new_with(styles[i].key);
+        const json_t *fragments = json_object_get(expected, key);
+        ASSERT_NOT_NULL(text);
+        for (size_t j = 0u; j < json_array_size(fragments); ++j) {
+            const string_t *fragment = json_string_value(json_array_get(fragments, j));
+            bool ok = text && fragment && strstr(text, string_c_str(fragment));
+            if (!ok)
+                printf("Shift format %s, %s: %s; expected %s\n", string_c_str(row->name), styles[i].key,
+                       text ? text : "NULL", fragment ? string_c_str(fragment) : "NULL");
+            ASSERT_TRUE(ok);
+        }
+        string_free(key);
+        free(text);
+    }
+    char *bound = expr_to_string(shown, style_EXPRESSION);
+    expr_t *round_trip = bound ? expr_from_string(bound, NULL) : NULL;
+    number_t wanted = expr_eval(source), actual = round_trip ? expr_eval(round_trip) : num_clone(NUM_NAN);
+    ASSERT_TRUE(num_is_finite(wanted) && num_is_finite(actual));
+    TEST_ASSERT_EXPR_NUMBER_CLOSE(actual, wanted);
+    char *after = expr_to_string(source, style_EXPRESSION);
+    ASSERT_TRUE(before && after && !strcmp(before, after));
+    free(after); free(bound); free(before);
+    num_destroy(&actual); num_destroy(&wanted);
+    expr_free(round_trip); expr_free(shown); expr_free(source);
+    string_free(beautify_key);
+    json_free(expected);
+}
+
 static void test_to_string_symmetric_shifts_TeX(void)
 {
+    test_run_database_cases(__FILE__, __LINE__, "expression.shift_format", NULL, test_to_string_shift_format_row);
     static const struct { const char *source; const char *plus; const char *minus; } cases[] = {
         {"sin(t+x)+sin(x-t)", "x + t", "x - t"},
         {"cos(x-t)+sin(t+x)", "x + t", "x - t"},

@@ -4095,12 +4095,22 @@ expr_t *expr_finite_progression_closed_form(const expr_t *expr)
         out = expr_finite_weighted_progression_closed_form(expr, NULL);
     if (!out)
         out = expr_finite_quotient_derivative_closed_form(expr, NULL);
-    if (!out)
-        out = expr_finite_rational_progression_closed_form(expr);
-    return expr_simplify_owned(out);
+    if (!out) {
+        /* Rational moments simplify each pole coefficient before assembling the symmetric additive result. */
+        return expr_finite_rational_progression_closed_form(expr);
+    }
+    out = expr_simplify_owned(out);
+    if (expr_is_neg(out) && expr_is_addsub(out->a)) {
+        expr_t *distributed = expr_distribute_negative_for_display(out->a);
+        if (distributed) {
+            expr_free(out);
+            out = distributed;
+        }
+    }
+    return out;
 }
 
-/* Entire summands permit closed-form sampling; fixed integer bounds preserve the sum's discrete domain. */
+/* Guarded finite identities permit compact sampling; fixed integer bounds preserve the sum's discrete domain. */
 expr_t *expr_finite_progression_sample_form(const expr_t *expr, const expr_t *const *axes, size_t count)
 {
     const expr_t *upper = NULL;
@@ -4109,6 +4119,14 @@ expr_t *expr_finite_progression_sample_form(const expr_t *expr, const expr_t *co
     long terms = 0;
     if (!axes || !count || count > 3)
         return NULL;
+    step = expr_finite_rational_progression_step(expr, &upper);
+    bool fixed_rational = step && expr_summation_bound_to_long(upper, &terms) && terms >= 0;
+    for (size_t i = 0; fixed_rational && i < count; ++i)
+        fixed_rational = axes[i] && !expr_contains_progression_index(upper, axes[i]);
+    expr_free(step);
+    step = NULL;
+    if (fixed_rational)
+        return expr_finite_rational_progression_closed_form(expr);
     if (count == 1u) {
         expr_t *source = expr_finite_atan_derivative_source(expr, axes[0]);
         expr_t *derivative = source ? expr_finite_sum_sample_derivative(source, axes[0]) : NULL;

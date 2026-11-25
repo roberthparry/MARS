@@ -459,16 +459,22 @@ static const TeX_model_node_t *build_expression(notation_build_t *build, const e
         }
         if (kind == EXPR_KIND_ADD || kind == EXPR_KIND_SUB) {
             const expr_t *centre = NULL, *coefficient = NULL;
-            bool centre_negative = false, coefficient_negative = false;
+            bool centre_negative = false, coefficient_negative = false, reciprocal = false;
             if (expr_display_complex_shift(expression, &centre, &coefficient,
-                                           &centre_negative, &coefficient_negative)) {
+                                           &centre_negative, &coefficient_negative, &reciprocal)) {
                 const TeX_model_node_t *real = notation_build_expr(build, centre);
                 if (centre_negative)
                     real = notation_build_node(build,
                         (TeX_node_view_t){.kind = TeX_NODE_NEGATIVE, .child_count = 1u}, &real);
                 const TeX_model_node_t *imaginary = notation_build_expr(build, coefficient);
-                imaginary = notation_build_node(build,
-                    (TeX_node_view_t){.kind = TeX_NODE_IMAGINARY_DISPLACEMENT, .child_count = 1u}, &imaginary);
+                if (reciprocal) {
+                    const TeX_model_node_t *parts[] = {notation_build_number(build, NUM_I), imaginary};
+                    imaginary = notation_build_node(build,
+                        (TeX_node_view_t){.kind = TeX_NODE_FRACTION, .child_count = 2u}, parts);
+                } else {
+                    imaginary = notation_build_node(build,
+                        (TeX_node_view_t){.kind = TeX_NODE_IMAGINARY_DISPLACEMENT, .child_count = 1u}, &imaginary);
+                }
                 const TeX_model_node_t *parts[] = {real, imaginary};
                 return notation_build_node(build, (TeX_node_view_t){
                     .kind = coefficient_negative ? TeX_NODE_DIFFERENCE : TeX_NODE_SUM, .child_count = 2u}, parts);

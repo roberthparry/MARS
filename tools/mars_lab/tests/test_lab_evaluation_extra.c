@@ -19,6 +19,8 @@
 #include "xml-t.h"
 #include "lab_presentation.h"
 #include "lab_wire.h"
+#define MARS_SHARED_EXPR_INTERNAL_ACCESS
+#include "internal/expr_internal.h"
 #define MARS_SHARED_LAB_CALENDAR_INTERNAL_ACCESS
 #include "internal/lab_calendar_internal.h"
 #define MARS_SHARED_LAB_EVALUATE_INTERNAL_ACCESS
@@ -1644,12 +1646,14 @@ static void progression_plot_row(const void *data)
         const char *maximum = strstr(svg, "data-y-max=\"");
         const char *minimum = strstr(svg, "data-y-min=\"");
         double top = 0, bottom = 0;
-        number_t peak = num_create_from_string(lab_eval_text(expected, "peak"));
+        const char *peak_text = lab_eval_text(expected, "peak");
+        number_t peak = num_create_from_string(*peak_text ? peak_text : "0");
         ok = ok && !*lab_eval_text(response, "plot_complex_plane") && !*lab_eval_text(response, "plot_components") &&
              !*lab_eval_text(response, "plot_amplitude") && maximum && minimum &&
              sscanf(maximum, "data-y-max=\"%lf", &top) == 1 &&
-             sscanf(minimum, "data-y-min=\"%lf", &bottom) == 1 &&
-             top >= num_to_double(peak) && top <= 1.5 * num_to_double(peak) && bottom <= num_to_double(peak);
+             sscanf(minimum, "data-y-min=\"%lf", &bottom) == 1 && isfinite(top) && isfinite(bottom) && top > bottom;
+        if (*peak_text)
+            ok = ok && top >= num_to_double(peak) && top <= 1.5 * num_to_double(peak) && bottom <= num_to_double(peak);
         num_destroy(&peak);
     }
     if (is_complex) {
@@ -1825,16 +1829,30 @@ static void progression_sample_row(const void *data)
     lab_worker_sample_t *sample = lab_worker_sample_new(expression, &axis, 1, (size_t)row->precision);
     number_t point = point_expression ? expr_eval(point_expression) : NUM_NAN;
     number_t value = lab_worker_sample_eval(sample, &point);
-    number_t expected = num_create_from_text(row->expected);
-    number_t tolerance = num_add(num_mul(num_abs(expected), num_create_from_string("1e-12")),
-                                 num_create_from_string("1e-80"));
+    const char *reference_text = test_lab_text(input, "reference");
+    expr_t *reference = *reference_text ? expr_from_string(reference_text, NULL) : NULL;
+    number_t expected = *reference_text ? reference ? expr_eval(reference) : NUM_NAN : num_create_from_text(row->expected);
+    const char *relative_text = test_lab_text(input, "relative_tolerance");
+    number_t relative = num_create_from_string(*relative_text ? relative_text : "1e-12");
+    number_t tolerance = *relative_text ? num_mul(num_add(num_abs(expected), NUM_ONE), relative) :
+                         num_add(num_mul(num_abs(expected), relative), num_create_from_string("1e-80"));
     bool ok = sample && num_get_default_prec_bits() == (size_t)row->precision &&
                          (num_is_nan(expected) ? num_is_nan(value) :
                          num_is_finite(value) && num_le(num_abs(num_sub(value, expected)), tolerance));
+    const char *closed_fragment = test_lab_text(input, "closed_fragment");
+    if (*closed_fragment) {
+        const expr_t *axes[] = {axis};
+        expr_t *reduced = expr_finite_progression_sample_form(expression, axes, 1u);
+        char *formula = reduced ? expr_to_string(reduced, style_FUNCTION) : NULL;
+        ok = ok && formula && strstr(formula, closed_fragment);
+        free(formula);
+        expr_free(reduced);
+    }
     if (!ok)
         string_printf("Progression sample %S: got %.17g, expected %.17g\n", row->name,
                        num_to_double(value), num_to_double(expected));
     num_destroy(&tolerance);
+    num_destroy(&relative);
     num_destroy(&expected);
     num_destroy(&value);
     num_destroy(&point);
@@ -1842,6 +1860,7 @@ static void progression_sample_row(const void *data)
     if (owned)
         expr_free(axis);
     expr_free(point_expression);
+    expr_free(reference);
     expr_free(expression);
     expr_bindings_free(bindings);
     num_set_default_prec_bits(saved);
@@ -1893,6 +1912,8 @@ static void progression_card_row(const void *data)
                 run_output = fragment;
             else if (name && !strcmp(string_c_str(name), "reference_value"))
                 ok = ok && fragment && progression_card_value_matches(response, fragment);
+            else if (name && !strncmp(string_c_str(name), "absent:", 7u))
+                ok = ok && fragment && !contains(response, string_c_str(name) + 7u, string_c_str(fragment));
             else
                 ok = ok && name && fragment && contains(response, string_c_str(name), string_c_str(fragment));
             if (name && fragment && !strcmp(string_c_str(name), "integral_plot_available")) {
@@ -1909,6 +1930,8 @@ static void progression_card_row(const void *data)
         string_t *route = string_new_with("/function-run"), *key = string_new_with("source");
         json_t *input = json_new_object();
         const json_t *programme = test_lab_member(response, "derivative_function");
+        if (!programme)
+            programme = test_lab_member(response, "function");
         bool ready = route && key && input && programme && json_object_set(input, key, programme);
         json_t *run = ready ? lab_eval_request(route, input, &status) : NULL;
         ok = status == 200u && test_lab_ok(run, true) && contains(run, "output", string_c_str(run_output));

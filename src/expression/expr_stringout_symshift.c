@@ -49,7 +49,7 @@ static bool display_contains_imaginary_unit(const expr_t *expr)
 
 /* Select the mathematical centre and imaginary displacement without rendering either. */
 bool expr_display_complex_shift(const expr_t *expr, const expr_t **centre_out, const expr_t **coefficient_out,
-                                bool *centre_negative, bool *coefficient_negative)
+                                bool *centre_negative, bool *coefficient_negative, bool *reciprocal)
 {
     const expr_t *terms[2];
     bool negative[2];
@@ -57,16 +57,20 @@ bool expr_display_complex_shift(const expr_t *expr, const expr_t **centre_out, c
         return false;
     for (unsigned side = 0; side < 2; ++side) {
         const expr_t *term = terms[side], *centre = terms[1 - side];
-        if (!expr_is_mul(term) || display_contains_imaginary_unit(centre))
+        if (display_contains_imaginary_unit(centre))
             continue;
-        const expr_t *coefficient = display_imaginary_unit(term->a) ? term->b :
+        bool quotient = expr_is_div(term) && display_imaginary_unit(term->a);
+        const expr_t *coefficient = quotient ? term->b : !expr_is_mul(term) ? NULL :
+                                    display_imaginary_unit(term->a) ? term->b :
                                     display_imaginary_unit(term->b) ? term->a : NULL;
-        if (!coefficient || expr_is_const(coefficient) || display_contains_imaginary_unit(coefficient))
+        if (!coefficient || (expr_is_const(coefficient) && !expr_is_named_const(coefficient)) ||
+            display_contains_imaginary_unit(coefficient))
             continue;
         *centre_out = centre;
         *coefficient_out = coefficient;
         *centre_negative = negative[1u - side];
         *coefficient_negative = negative[side];
+        *reciprocal = quotient;
         return true;
     }
     return false;
@@ -76,8 +80,8 @@ bool expr_display_complex_shift(const expr_t *expr, const expr_t **centre_out, c
 bool expr_emit_complex_shift(const expr_t *expr, sbuf_t *buffer, int parent_prec, style_t style)
 {
     const expr_t *centre = NULL, *coefficient = NULL;
-    bool centre_negative = false, coefficient_negative = false;
-    if (expr_display_complex_shift(expr, &centre, &coefficient, &centre_negative, &coefficient_negative)) {
+    bool centre_negative = false, coefficient_negative = false, reciprocal = false;
+    if (expr_display_complex_shift(expr, &centre, &coefficient, &centre_negative, &coefficient_negative, &reciprocal)) {
         void (*emit)(const expr_t *, sbuf_t *, int) = style == style_FUNCTION ? emit_func : emit_expr;
         bool bracketed = parent_prec > PREC_ADD;
         if (bracketed)
@@ -86,8 +90,8 @@ bool expr_emit_complex_shift(const expr_t *expr, sbuf_t *buffer, int parent_prec
             sbuf_putc(buffer, '-');
         emit(centre, buffer, centre_negative ? PREC_MUL : PREC_ADD);
         sbuf_puts(buffer, coefficient_negative ? " - i" : " + i");
-        sbuf_puts(buffer, style == style_FUNCTION ? "." : "·");
-        emit(coefficient, buffer, PREC_MUL);
+        sbuf_puts(buffer, reciprocal ? "/" : style == style_FUNCTION ? "." : "·");
+        emit(coefficient, buffer, reciprocal ? PREC_MUL + 1 : PREC_MUL);
         if (bracketed)
             sbuf_putc(buffer, ')');
         return true;

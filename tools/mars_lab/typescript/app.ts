@@ -103,6 +103,7 @@ class LabApplication {
     public readonly restoredReady = new Promise<void>(resolve => { this.resolveRestored = resolve; });
     private readonly townJurisdictions = new Set<string>();
     private readonly failedTownCodes = new Set<string>();
+    private readonly townCursors = new Map<string, string>();
     private readonly townJobs = new Map<string, {controller: AbortController; promise: Promise<void>; ready: Promise<void>}>();
     private nearbyCentre: [number, number] | null = null;
     private nearbyComplete = false;
@@ -230,6 +231,10 @@ class LabApplication {
         for (const id of ['datetimeJurisdiction', 'almanacJurisdiction'])
             document.getElementById(id)?.addEventListener('change', refresh, {signal: this.lifetime.signal});
         document.addEventListener('mars-almanac-observer-committed', refresh, {signal: this.lifetime.signal});
+        const resume = () => { if (!document.hidden) refresh(); };
+        window.addEventListener('online', resume, {signal: this.lifetime.signal});
+        window.addEventListener('pageshow', resume, {signal: this.lifetime.signal});
+        document.addEventListener('visibilitychange', resume, {signal: this.lifetime.signal});
         const latitude = Number((document.getElementById('almanacLatitude') as HTMLInputElement).value);
         const longitude = Number((document.getElementById('almanacLongitude') as HTMLInputElement).value);
         void this.loadNearbyTowns(latitude, longitude);
@@ -286,25 +291,61 @@ class LabApplication {
     private async loadJurisdictionTowns(code: string, controller: AbortSignal, firstPage: () => void): Promise<void> {
         this.failedTownCodes.delete(code);
         this.townNotice('');
-        let cursor = '0';
+        let cursor = this.townCursors.get(code) || '0';
         do {
-            const signal = AbortSignal.any([controller, this.lifetime.signal, AbortSignal.timeout(10000)]);
-            const response = await labHttp.fetch(`/towns?after=${cursor}&jurisdiction=${code}`, {signal});
-            if (!response.ok) throw new Error(`HTTP ${response.status}`);
-            const batch = await response.labData() as LabCatalogue;
-            signal.throwIfAborted();
+            const batch = await this.readTownPage(`/towns?after=${cursor}&jurisdiction=${code}`, controller);
+            controller.throwIfAborted();
+            this.lifetime.signal.throwIfAborted();
             if (!batch.available || !batch.next || !/^\d+$/.test(batch.next))
                 throw new Error(batch.error || 'Invalid town catalogue page');
             if (batch.next !== '0' && BigInt(batch.next) <= BigInt(cursor))
                 throw new Error('Town catalogue cursor did not advance');
             await this.publishTowns(batch.towns);
+            this.townCursors.set(code, batch.next);
             firstPage();
             this.townNotice('');
             cursor = batch.next;
         } while (cursor !== '0');
         this.lifetime.signal.throwIfAborted();
         this.townJurisdictions.add(code);
+        this.townCursors.delete(code);
         this.townNotice('');
+    }
+
+    /** Retry a failed transfer at the same cursor; cancellation never waits for the backoff timer. */
+    private async readTownPage(url: string, controller: AbortSignal): Promise<LabCatalogue> {
+        const lifetime = AbortSignal.any([controller, this.lifetime.signal]);
+        for (let attempt = 0; ; ++attempt) {
+            lifetime.throwIfAborted();
+            let retryable = true;
+            try {
+                const signal = AbortSignal.any([lifetime, AbortSignal.timeout(10000)]);
+                const response = await labHttp.fetch(url, {signal});
+                if (!response.ok) {
+                    retryable = response.status === 408 || response.status === 429 || response.status >= 500;
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                const batch = await response.labData() as LabCatalogue;
+                signal.throwIfAborted();
+                return batch;
+            } catch (error) {
+                lifetime.throwIfAborted();
+                if (!retryable || attempt >= 2) throw error;
+                await new Promise<void>((resolve, reject) => {
+                    const abort = () => {
+                        window.clearTimeout(timer);
+                        lifetime.removeEventListener('abort', abort);
+                        reject(lifetime.reason);
+                    };
+                    const timer = window.setTimeout(() => {
+                        lifetime.removeEventListener('abort', abort);
+                        resolve();
+                    }, 500 * 2 ** attempt);
+                    lifetime.addEventListener('abort', abort, {once: true});
+                    if (lifetime.aborted) abort();
+                });
+            }
+        }
     }
 
     /** Load towns near the current view without downloading the world catalogue. */
@@ -372,6 +413,7 @@ class LabApplication {
         const status = labDOM.call<{evicted: string[]} | null>('lab_town_store_policy', {pins});
         for (const code of status?.evicted || []) {
             this.townJurisdictions.delete(code);
+            this.townCursors.delete(code);
             this.failedTownCodes.delete(code);
             this.nearbyComplete = false;
         }

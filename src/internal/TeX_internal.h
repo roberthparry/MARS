@@ -189,6 +189,7 @@ TeX_t *TeX_from_context(const TeX_context_t *context);
  * @details Callbacks run sequentially during TeX_wrap_sum. The caller owns state and keeps it alive throughout
  * the call. Count may prepare a selection; term returns an owned context which TeX renders and frees, and sets
  * sign to 1 or -1. TeX does not inspect the callback state or the caller's native mathematical objects.
+ * For an equation context, the selected terms belong to its right-hand side; the complete left-hand side is retained.
  */
 typedef struct _TeX_sum_provider_t {
     /**
@@ -229,6 +230,8 @@ typedef struct _TeX_sum_provider_t {
  * their combined source length does not trigger additive-term decomposition.
  * Nested operand conditions retain their local scope. If a multiline alternative is unavailable,
  * the valid ordinary body is retained.
+ * For equations, the equality and complete left-hand side precede the first selected right-hand-side term;
+ * subsequent signed terms align beneath that term.
  */
 TeX_t *TeX_wrap_sum(const TeX_context_t *context, size_t line_limit,
                     const TeX_sum_provider_t *provider, void *state);

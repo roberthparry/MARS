@@ -1035,7 +1035,7 @@ expr_t *expr_deriv_cosine_harmonic_antiderivative(const expr_t *expr, const expr
 expr_t *expr_finite_progression_closed_form(const expr_t *expr);
 
 /**
- * @brief Build a sampling identity for a fixed finite entire progression or expanded quotient derivative.
+ * @brief Build a sampling identity for a fixed finite progression or proper rational derivative sum.
  * @param expr Borrowed authored sum; not modified or consumed.
  * @param axes Borrowed array of count coordinate nodes, kept live by the caller during sampling.
  * @param count Number of coordinates, from one to three.
@@ -1043,19 +1043,22 @@ expr_t *expr_finite_progression_closed_form(const expr_t *expr);
  * coordinate-dependent or invalid bounds, invalid arguments or allocation failure. Rebuild after changing
  * non-coordinate bindings. Entire-function identities fall back to expr at removable points; quotient
  * derivatives retain their native poles and use the separate pole-aware interval classification.
+ * Proper rational sums with repeated quadratic denominators use digamma and polygamma identities,
+ * with phase-dependent precision guards and the authored sum at removable zero-phase points.
  * Access to mutable linked graphs must remain confined to their owning thread.
  */
 expr_t *expr_finite_progression_sample_form(const expr_t *expr, const expr_t *const *axes, size_t count);
 
 /**
- * @brief Build a live denominator guard for polynomially weighted finite-progression sampling.
+ * @brief Build a live cancellation guard for weighted or proper rational finite-progression sampling.
  * @param expression Borrowed authored progression; not modified or consumed.
+ * @param[out] inverse_power Optional output receiving a conservative inverse-phase power for precision guards.
  * @return Owned guard released with expr_free(), or NULL when no weighted guard applies or allocation fails.
  * A small non-zero guard signals cancellation requiring extra working precision. At an actual zero,
  * evaluate the authored sum instead of its quotient identity to preserve the removable point.
  * The guard shares mutable source symbols and must remain confined to their owning thread.
  */
-expr_t *expr_finite_progression_sample_guard(const expr_t *expression);
+expr_t *expr_finite_progression_sample_guard(const expr_t *expression, unsigned *inverse_power);
 
 /**
  * @brief Choose a frequency-scaled real window for a fixed finite circular progression.
@@ -1128,13 +1131,35 @@ bool expr_finite_progression_parts(const expr_t *expr, const expr_t **upper, exp
 expr_t *expr_finite_atan_moment_form(const expr_t *upper, const expr_t *step, const expr_t *coefficient);
 
 /**
- * @brief Recognise an entered rational sum with a linear numerator and a squared phase in its denominator.
+ * @brief Recognise a proper rational sum over a repeated unit quadratic denominator.
  * @param expression Borrowed finite sum with lower bound one, or its negation; not modified or consumed.
- * @return Owned digamma closed form released with expr_free(), or NULL for another algebraic form or allocation
- * failure. Recognition uses exact polynomial coefficients, preserving source bindings without substitution.
+ * @return Owned digamma/polygamma closed form released with expr_free(), or NULL for another algebraic form or
+ * allocation failure. The denominator is (1+k^2*step^2)^m, with integer m from one to eight and numerator degree
+ * below 2*m. Exact partial fractions retain general complex phases and symbolic numerator coefficients; source
+ * bindings are preserved without substitution. Zero-step singularities remain removable in the authored sum.
  * Call on the source graph's owning thread or synchronise it externally.
  */
 expr_t *expr_finite_rational_progression_closed_form(const expr_t *expression);
+
+/**
+ * @brief Recover the phase of a proper polynomial sum over a repeated unit quadratic denominator.
+ * @param[in] expression Borrowed sum or its negation; neither it nor its bindings are modified or consumed.
+ * @param[out] upper Optional output borrowing the inclusive upper bound on success; initialised to NULL otherwise.
+ * @return Owned linked phase, released with expr_free(), or NULL for unsupported structure or allocation failure.
+ * The denominator is (1+k^2*phase^2)^m with m from one to eight, lower bound one and numerator degree below 2*m.
+ * The upper bound may remain symbolic; callers must separately validate a fixed integer count and real domains.
+ * Access mutable linked symbols on their owning thread or with external synchronisation.
+ */
+expr_t *expr_finite_rational_progression_step(const expr_t *expression, const expr_t **upper);
+
+/**
+ * @brief Collect the polynomial numerator of a finite rational summand without expanding its bound sum.
+ * @param[in] expression Borrowed summation, or its negation, retained unchanged with its original index and bounds.
+ * @return Owned equivalent sum, released with expr_free(), or NULL for a non-polynomial numerator, degree above
+ * fifteen, unsupported structure or allocation failure. Symbolic coefficients retain their source bindings;
+ * supplied binding values are not substituted. Call on the graph's owning thread or synchronise access externally.
+ */
+expr_t *expr_summation_normalise_polynomial(const expr_t *expression);
 
 /**
  * @brief Recover the finite arctangent sum whose derivative equals a complete digamma integer-shift identity.
@@ -1480,6 +1505,13 @@ expr_t *expr_retain_expr(const expr_t *expr);
 expr_t *expr_simplify_owned(expr_t *expr);
 expr_t *expr_beautify(const expr_t *expr);
 expr_t *expr_beautify_presimplified(const expr_t *expr);
+
+/**
+ * @brief Negate an expression term by term without refactoring its additive display form.
+ * @param expr Borrowed expression; neither modified nor retained by the result.
+ * @return Owned algebraically negated expression released with expr_free(), or NULL on allocation failure.
+ */
+expr_t *expr_distribute_negative_for_display(const expr_t *expr);
 /* Return a replacement for rational radical factors, or NULL when no rewrite applies. */
 expr_t *expr_beautify_radical_factors_for_display(const expr_t *expr);
 expr_t *expr_negate_owned(expr_t *expr);

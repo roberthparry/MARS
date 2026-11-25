@@ -132,6 +132,27 @@ static const string_t *wrapped_definitions(void *context)
     return ((expr_wrap_state_t *)context)->definitions;
 }
 
+/* Keep the equality intact while supplying only the result's signed terms to the shared line wrapper. */
+char *expr_notation_equation_wrapped(const expr_t *left, const expr_t *right, size_t line_limit)
+{
+    if (!left || !right)
+        return NULL;
+    notation_build_t *build = notation_build_new();
+    const TeX_model_node_t *children[] = {notation_build_expr(build, left), notation_build_expr(build, right)};
+    const TeX_model_node_t *root = children[0] && children[1] ? notation_build_node(build,
+        (TeX_node_view_t){.kind = TeX_NODE_EQUATION, .child_count = 2u}, children) : NULL;
+    TeX_context_t *context = notation_build_context(build, root);
+    notation_build_free(build);
+    expr_wrap_state_t state = {.expression = right};
+    static const TeX_sum_provider_t provider = {.count = wrapped_term_count, .term = wrapped_term};
+    TeX_t *body = TeX_wrap_sum(context, line_limit, &provider, &state);
+    char *result = body ? strdup(TeX_source(body)) : NULL;
+    TeX_free(body);
+    TeX_context_free(context);
+    free(state.terms);
+    return result;
+}
+
 /* Keep expression selection and temporary names native while TeX owns every line-break command. */
 char *expr_to_TeX_body_wrapped_reserved(const expr_t *expression, size_t line_limit, const expr_t *reserved)
 {

@@ -36,15 +36,12 @@ char *expr_summation_identity_TeX(const expr_t *summation, const expr_t *result)
     const expr_t *body = expr_is_neg(summation) ? summation->a : summation;
     if (!expr_is_op(body, &ops_summation) || !result)
         return NULL;
-    notation_build_t *build = notation_build_new();
-    const TeX_model_node_t *left = build ? notation_build_expr(build, summation) : NULL;
-    const TeX_model_node_t *right = build ? notation_build_expr(build, result) : NULL;
-    const TeX_model_node_t *identity = left && right ? pair(build, TeX_NODE_EQUATION, left, right) : NULL;
-    string_t *output = identity ? notation_build_render(build, identity) : NULL;
-    char *text = output ? strdup(string_c_str(output)) : NULL;
-    string_free(output);
-    notation_build_free(build);
-    return text;
+    expr_t *source = expr_summation_normalise_polynomial(summation);
+    if (!source)
+        source = expr_retain_expr(summation);
+    char *identity = source ? expr_notation_equation_wrapped(source, result, 0u) : NULL;
+    expr_free(source);
+    return identity;
 }
 
 static const TeX_model_node_t *symbolic_closed_form(notation_build_t *build, const expr_t *upper,
@@ -91,16 +88,22 @@ char *expr_finite_progression_identity_TeX(const expr_t *expression)
         }
     } else
         symbolic = true;
+    if (closed) {
+        char *result = expr_summation_identity_TeX(expression, closed);
+        if (!result)
+            result = expr_notation_equation_wrapped(expression, closed, 0u);
+        expr_free(closed);
+        expr_free(step);
+        return result;
+    }
     notation_build_t *build = notation_build_new();
     const TeX_model_node_t *left = build ? notation_build_expr(build, expression) : NULL;
-    const TeX_model_node_t *right = !build ? NULL : closed ? notation_build_expr(build, closed)
-        : symbolic ? symbolic_closed_form(build, upper, step, function) : NULL;
+    const TeX_model_node_t *right = build && symbolic ? symbolic_closed_form(build, upper, step, function) : NULL;
     const TeX_model_node_t *identity = left && right ? pair(build, TeX_NODE_EQUATION, left, right) : NULL;
     string_t *output = identity ? notation_build_render(build, identity) : NULL;
     char *result = output ? strdup(string_c_str(output)) : NULL;
     string_free(output);
     notation_build_free(build);
-    expr_free(closed);
     expr_free(step);
     return result;
 }

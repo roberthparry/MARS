@@ -646,6 +646,13 @@ static void test_from_string_arithmetic(void)
                     13.0, __LINE__);
 }
 
+static size_t progression_additive_terms(const expr_t *expression)
+{
+    if (expr_is_addsub(expression))
+        return progression_additive_terms(expression->a) + progression_additive_terms(expression->b);
+    return expression ? 1u : 0u;
+}
+
 static void function_series_endpoint_row(const void *data)
 {
     const test_database_case_t *row = data;
@@ -680,13 +687,36 @@ static void function_series_endpoint_row(const void *data)
         if (closed_fragment) {
             TEST_ASSERT_TRUE(strstr(string_c_str(derivation_TeX), string_c_str(closed_fragment)) != NULL,
                              "literal progression bounds simplify constant arithmetic in the native identity");
-            TEST_ASSERT_TRUE(strstr(string_c_str(derivation_TeX), "\\\\") == NULL,
-                             "an ordinary series identity keeps its sum and closed form on one TeX line");
+            bool multiline = false;
+            json_bool_value(json_array_get(expected, 5u), &multiline);
+            TEST_ASSERT_TRUE((strstr(string_c_str(derivation_TeX), "\\\\") != NULL) == multiline,
+                             "long additive results wrap into signed rows while compact identities stay on one line");
+            if (multiline) {
+                expr_t *closed = expr_finite_progression_closed_form(expression);
+                TEST_ASSERT_TRUE(closed && !(expr_is_neg(closed) && expr_is_addsub(closed->a)),
+                                 "a common outer minus is distributed across the result's additive terms");
+                expr_free(closed);
+            }
         }
         ASSERT_NOT_NULL(plain);
         ASSERT_NOT_NULL(function);
         ASSERT_NOT_NULL(TeX);
         ASSERT_NOT_NULL(round_trip);
+        const json_t *normalisation = json_array_get(expected, 6u);
+        if (json_type(normalisation) == JSON_ARRAY) {
+            expr_t *closed = expr_finite_progression_closed_form(expression);
+            number_t terms = num_clone(NUM_ZERO);
+            bool valid_terms = json_number_value(json_array_get(normalisation, 0u), &terms);
+            TEST_ASSERT_TRUE(valid_terms && closed && progression_additive_terms(closed) == (size_t)num_to_double(terms),
+                             "normalised pole orders remain separate additive terms without an enclosing fraction");
+            for (size_t i = 1u; i < json_array_size(normalisation); ++i) {
+                const string_t *fragment = json_string_value(json_array_get(normalisation, i));
+                TEST_ASSERT_TRUE(fragment && !strstr(string_c_str(derivation_TeX), string_c_str(fragment)),
+                                 "closed identities cancel coefficient powers and evaluate literal arithmetic");
+            }
+            num_destroy(&terms);
+            expr_free(closed);
+        }
         const string_t *closed_reference = json_string_value(json_array_get(expected, 4u));
         if (closed_reference) {
             expr_t *closed = expr_finite_progression_closed_form(expression);
@@ -749,6 +779,31 @@ static void test_from_string_function_series_endpoints(void)
 {
     test_run_database_cases(__FILE__, __LINE__, "expression.function_series_endpoints", NULL,
                             function_series_endpoint_row);
+}
+
+static void rational_progression_row(const void *data)
+{
+    const test_database_case_t *row = data;
+    expr_t *source = expr_from_text(row->input, NULL);
+    expr_t *closed = source ? expr_finite_rational_progression_closed_form(source) : NULL;
+    bool recognised = !strcmp(string_c_str(row->expected), "true");
+    ASSERT_NOT_NULL(source);
+    TEST_ASSERT_TRUE((closed != NULL) == recognised,
+                     "rational reduction checks the complete quadratic power and proper polynomial numerator");
+    if (closed) {
+        number_t got = expr_eval(closed), want = expr_eval(source);
+        ASSERT_TRUE(num_is_finite(got));
+        TEST_ASSERT_EXPR_NUMBER_CLOSE(got, want);
+        num_destroy(&want);
+        num_destroy(&got);
+    }
+    expr_free(closed);
+    expr_free(source);
+}
+
+static void test_from_string_rational_progressions(void)
+{
+    test_run_database_cases(__FILE__, __LINE__, "expression.rational_progression", NULL, rational_progression_row);
 }
 
 static void atan_progression_row(const void *data)
@@ -973,6 +1028,37 @@ static void test_growth_progression_sampling(void)
 {
     test_run_database_cases(__FILE__, __LINE__, "expression.growth_progression_sampling", NULL,
                               growth_progression_sample_row);
+}
+
+static void rational_sampling_window_row(const void *data)
+{
+    NUM_SCOPE(numbers);
+    const test_database_case_t *row = data;
+    json_t *expected = json_from_text(row->expected);
+    expr_bindings_t *bindings = NULL;
+    expr_t *expression = expr_from_text(row->input, &bindings);
+    const string_t *name = json_string_value(json_array_get(expected, 0u));
+    expr_t *axis = name && bindings ? expr_bindings_get(bindings, string_c_str(name)) : NULL;
+    number_t before = axis ? expr_get_val(axis) : NUM_NAN, lower = NUM_NAN, upper = NUM_NAN;
+    bool bounded = expr_finite_atan_derivative_sample_bounds(expression, axis, &lower, &upper);
+    ASSERT_TRUE(bounded == (json_type(json_array_get(expected, 1u)) == JSON_STRING));
+    for (size_t i = 1u; bounded && i <= 2u; ++i) {
+        expr_t *reference = expr_from_text(json_string_value(json_array_get(expected, i)), NULL);
+        number_t value = reference ? expr_eval(reference) : NUM_NAN;
+        TEST_ASSERT_EXPR_NUMBER_CLOSE(i == 1u ? lower : upper, value);
+        expr_free(reference);
+    }
+    ASSERT_TRUE(bounded || (num_is_nan(lower) && num_is_nan(upper)));
+    number_t after = axis ? expr_get_val(axis) : NUM_NAN;
+    ASSERT_TRUE((num_is_nan(before) && num_is_nan(after)) || num_eq(before, after));
+    num_destroy(&upper); num_destroy(&lower);
+    expr_free(expression); expr_bindings_free(bindings); json_free(expected);
+}
+
+static void test_rational_progression_sampling(void)
+{
+    test_run_database_cases(__FILE__, __LINE__, "expression.rational_progression_sampling", NULL,
+                            rational_sampling_window_row);
 }
 
 static void test_from_string_series_ellipsis(void)
@@ -4684,11 +4770,13 @@ void test_expr_t_from_string(void)
     TEST_RUN_SUBTEST(test_from_string_arithmetic, NULL);
     TEST_RUN_SUBTEST(test_from_string_series_ellipsis, NULL);
     TEST_RUN_SUBTEST(test_from_string_function_series_endpoints, NULL);
+    TEST_RUN_SUBTEST(test_from_string_rational_progressions, NULL);
     TEST_RUN_SUBTEST(test_from_string_atan_progression, NULL);
     TEST_RUN_SUBTEST(test_from_string_quotient_progression_derivatives, NULL);
     TEST_RUN_SUBTEST(test_weighted_progression_linked_derivatives, NULL);
     TEST_RUN_SUBTEST(test_circular_progression_sampling, NULL);
     TEST_RUN_SUBTEST(test_growth_progression_sampling, NULL);
+    TEST_RUN_SUBTEST(test_rational_progression_sampling, NULL);
     TEST_RUN_SUBTEST(test_from_string_functions, NULL);
     TEST_RUN_SUBTEST(test_from_text_api, NULL);
     TEST_RUN_SUBTEST(test_from_string_special_functions, NULL);

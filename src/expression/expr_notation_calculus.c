@@ -152,7 +152,7 @@ static bool collect_factors(notation_build_t *build, const expr_t *expression,
         return collect_factors(build, magnitude, factors, depth + 1u);
     }
     if (expr_tostring_is_negative_const(expression)) {
-        number_t positive = num_abs(expression->c);
+        number_t positive = num_neg(expression->c);
         expr_t *value = expr_new_const(positive);
         num_destroy(&positive);
         factors->negative = !factors->negative;
@@ -270,7 +270,7 @@ const TeX_model_node_t *expr_notation_product(notation_build_t *build, const exp
                 negative = !negative;
             if (expr_tostring_is_negative_const(factor)) {
                 negative = !negative;
-                number_t positive = num_abs(factor->c);
+                number_t positive = num_neg(factor->c);
                 bool unit = num_eq(positive, NUM_ONE);
                 const expr_binding_expr_t *binding = expr_tostring_should_emit_binding_expr(factor)
                     ? factor->binding_expr : NULL;

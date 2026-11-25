@@ -419,7 +419,50 @@ INSERT INTO expression_cases(name, operation, input, expected) VALUES
      '["Π_(k=1)^4 -k", "product(k, 1, 4, -k)", "\\prod_{k=1}^{4}-k"]')
 ON CONFLICT(name) DO UPDATE SET input=excluded.input, expected=excluded.expected;
 
+INSERT INTO test_case_runner(module, source, parent, table_name, operation) VALUES (
+    'expression.rational_progression', 'tests/expression/test_expr_from_string.c',
+    'tests.test_expr_t_from_string.test_from_string_rational_progressions', 'expression_cases', 'rational_progression')
+ON CONFLICT(module) DO UPDATE SET source=excluded.source, parent=excluded.parent,
+    table_name=excluded.table_name, operation=excluded.operation;
 INSERT INTO expression_cases(name, operation, input, expected) VALUES
+    ('rational_wrong_constant', 'rational_progression', 'sum(k,1,4,k^3/(2+k^2*x^2)^2)', 'false'),
+    ('rational_linear_denominator_term', 'rational_progression', 'sum(k,1,4,k^3/(1+k+k^2*x^2)^2)', 'false'),
+    ('rational_cubic_denominator', 'rational_progression', 'sum(k,1,4,k^3/(1+k^3*x^2)^2)', 'false'),
+    ('rational_improper_numerator', 'rational_progression', 'sum(k,1,4,k^4/(1+k^2*x^2)^2)', 'false'),
+    ('rational_fractional_power', 'rational_progression', 'sum(k,1,4,k/(1+k^2*x^2)^(3/2))', 'false'),
+    ('rational_power_ceiling', 'rational_progression', 'sum(k,1,4,k/(1+k^2*x^2)^9)', 'false'),
+    ('rational_nonpolynomial_weight', 'rational_progression', 'sum(k,1,4,sin(k)/(1+k^2*x^2)^2)', 'false'),
+    ('rational_other_lower_bound', 'rational_progression', 'sum(k,2,4,k^3/(1+k^2*x^2)^2)', 'false'),
+    ('rational_symbolic_weight', 'rational_progression', '{sum(j,1,n,(a+b*j^2)/(1+j^2*t^2)^3)|t=1;n=4;a=2;b=3}', 'true')
+ON CONFLICT(name) DO UPDATE SET input=excluded.input, expected=excluded.expected;
+
+INSERT INTO expression_cases(name, operation, input, expected) VALUES
+    ('series_rational_squared_reuse', 'function_series_endpoint', '{-sum(k,1,4,2*k^3*x/(1+k^2*x^2)^2)|x=1}',
+     '["-\\sum_{k=1}^{4}","-2*(1/4+8/25+27/100+64/289)"," = ",true,null,true]'),
+    ('series_rational_squared_thousand', 'function_series_endpoint', '-@Z_(k=1)^1000 2k^3*x/(k^2*x^2+1)^2',
+     '["-\\sum_{k=1}^{1000}",null,"\\psi",false,null,true]'),
+    ('series_rational_squared_affine', 'function_series_endpoint', '{sum(j,1,4,3*j^3/(1+j^2*(2*t+1)^2)^2)|t=0}',
+     '["\\sum_{j=1}^{4}","3*(1/4+8/25+27/100+64/289)"," = ",true,null,true]'),
+    ('series_rational_squared_complex', 'function_series_endpoint', '{sum(k,1,4,k^3/(1+k^2*x^2)^2)|x=1+i/3}',
+     '["\\sum_{k=1}^{4}","{sum(k,1,4,k^3/(1+k^2*x^2)^2)|x=1+i/3}"," = ",true,null,true]'),
+    ('series_rational_squared_zero', 'function_series_endpoint', '{-sum(k,1,1000,2*k^3*x/(1+k^2*x^2)^2)|x=0}',
+     '["-\\sum_{k=1}^{1000}","0"," = ",false,null,true]'),
+    ('series_rational_cubed_reuse', 'function_series_endpoint', '{sum(k,1,4,2*k^3*(3*k^2*x^2-1)/(1+k^2*x^2)^3)|x=1}',
+     '["\\sum_{k=1}^{4}","{sum(k,1,4,2*k^3*(3*k^2-1)/(1+k^2)^3)}"," = ",true,null,true]'),
+    ('series_rational_cubed_collected', 'function_series_endpoint', '{sum(k,1,1000,(2*k^2*x^2-8*k^2*x^2+2)*k^3/(1+k^2*x^2)^3)|x=1}',
+     '["\\sum_{k=1}^{1000}","{sum(k,1,1000,2*k^3*(1-3*k^2)/(1+k^2)^3)}"," = ",true,null,true,[3,"x^{7}","x^{8}","1000 + 1","2k^{2}x^{2} - 8k^{2}x^{2}"]]'),
+    ('series_rational_cubed_affine', 'function_series_endpoint', '{sum(j,1,4,2*j^3*(3*j^2*(2*t+1)^2-1)/(1+j^2*(2*t+1)^2)^3)|t=0}',
+     '["\\sum_{j=1}^{4}","{sum(j,1,4,2*j^3*(3*j^2-1)/(1+j^2)^3)}"," = ",true,null,true,[3,"5 + 1"]]'),
+    ('series_rational_cubed_complex', 'function_series_endpoint', '{sum(k,1,4,2*k^3*(3*k^2*x^2-1)/(1+k^2*x^2)^3)|x=1+i/3}',
+     '["\\sum_{k=1}^{4}","{sum(k,1,4,2*k^3*(3*k^2*(1+i/3)^2-1)/(1+k^2*(1+i/3)^2)^3)}"," = ",true,null,true,[3,"x^{7}","x^{8}"]]'),
+    ('series_rational_fourth_collected', 'function_series_endpoint', '{sum(k,1,4,24*k^5*x*(1-k^2*x^2)/(1+k^2*x^2)^4)|x=1}',
+     '["\\sum_{k=1}^{4}","{sum(k,1,4,24*k^5*(1-k^2)/(1+k^2)^4)}"," = ",true,null,true,[4,"x^{9}","x^{10}","x^{11}"]]'),
+    ('series_rational_mixed_numerator', 'function_series_endpoint', '{sum(k,1,4,(1+2*k^3)/(1+k^2*x^2)^4)|x=1}',
+     '["\\sum_{k=1}^{4}","{sum(k,1,4,(1+2*k^3)/(1+k^2)^4)}"," = ",true,null,true]'),
+    ('series_rational_even_numerator', 'function_series_endpoint', '{sum(k,1,4,k^2/(1+k^2*x^2)^2)|x=1}',
+     '["\\sum_{k=1}^{4}","1/4+4/25+9/100+16/289"," = ",true,null,true]'),
+    ('series_rational_eighth_power', 'function_series_endpoint', '{sum(k,1,2,k^15/(1+k^2*x^2)^8)|x=1}',
+     '["\\sum_{k=1}^{2}","1/256+32768/390625"," = ",true,null,true]'),
     ('series_rational_atan_reuse', 'function_series_endpoint', '@Z_(k=1)^1000 k/(1+k^2*x^2)',
      '["\\sum_{k=1}^{1000}",null," = ",false,"(digamma(1001+i/x)-digamma(1+i/x)+digamma(1001-i/x)-digamma(1-i/x))/(2*x^2)"]'),
     ('series_rational_atan_bound', 'function_series_endpoint', '{sum(k,1,4,k/(1+k^2*x^2))|x=1}',
@@ -469,10 +512,10 @@ INSERT INTO expression_cases(name, operation, input, expected) VALUES
     ('series_weighted_sextic_cosh', 'function_series_endpoint', '{@Z_(k=1)^4 k^6*cosh(kx)|x=ln(2)}',
      '["\\sum_{k=1}^{4}","575917/16"," = ",true]'),
     ('series_weighted_shifted_polynomial', 'function_series_endpoint', '{@Z_(k=1)^4 (k+1)^2*sin(kx)|x=pi/2}',
-     '["\\sum_{k=1}^{4}","-12"," = ",true]'),
+     '["\\sum_{k=1}^{4}","-12"," = ",true,null,true]'),
     ('series_weighted_symbolic_coefficients', 'function_series_endpoint',
      '{@Z_(k=1)^4 (a*k^2+b*k+c)*sin(kx)|x=pi/2; a=2,b=3,c=4}',
-     '["\\sum_{k=1}^{4}","-22"," = ",true]'),
+     '["\\sum_{k=1}^{4}","-22"," = ",true,null,true]'),
     ('series_weighted_sinh', 'function_series_endpoint', '{@Z_(k=1)^4 k^2*sinh(kx)|x=ln(2)}',
      '["\\sum_{k=1}^{4}","2739/16"," = ",true]'),
     ('series_weighted_cosh', 'function_series_endpoint', '{@Z_(k=1)^4 k^2*cosh(kx)|x=ln(2)}',
@@ -543,6 +586,35 @@ INSERT INTO expression_cases(name, operation, input, expected) VALUES
     ('series_literal_negative_endpoint', 'function_series_endpoint', 'sin(x)+sin(2x)+sin(3x)+...+sin(-100x)', 'null'),
     ('series_literal_non_linear_endpoint', 'function_series_endpoint', 'sin(x)+sin(2x)+sin(3x)+...+sin(100x^2)', 'null'),
     ('series_literal_weight_mismatch', 'function_series_endpoint', 'sin(x)+sin(2x)/2+sin(3x)/3+...+sin(100x)/99', 'null')
+ON CONFLICT(name) DO UPDATE SET input=excluded.input, expected=excluded.expected;
+
+INSERT INTO test_case_runner(module, source, parent, table_name, operation) VALUES (
+    'expression.shift_format', 'tests/expression/test_expr_to_string.c',
+    'tests.test_expr_t_to_string.test_to_string_all.test_to_string_symmetric_shifts_TeX',
+    'expression_cases', 'shift_format')
+ON CONFLICT(module) DO UPDATE SET source=excluded.source, parent=excluded.parent,
+    table_name=excluded.table_name, operation=excluded.operation;
+INSERT INTO expression_cases(name, operation, input, expected) VALUES
+    ('shift_digamma_quotient', 'shift_format',
+     '{digamma(i/x+1001)+digamma(1001-i/x)+digamma(i/x+1)+digamma(1-i/x)|x=1+i}',
+     '{"plain":["1001 + i/x","1001 - i/x","1 + i/x","1 - i/x"],"function":["1001 + i/x","1001 - i/x","1 + i/x","1 - i/x"],"TeX":["1001 + \\frac{i}{x}","1001 - \\frac{i}{x}","1 + \\frac{i}{x}","1 - \\frac{i}{x}"]}'),
+    ('shift_trigamma_quotient', 'shift_format',
+     '{trigamma(i/t+7)+trigamma(7-i/t)|t=1+i}',
+     '{"plain":["7 + i/t","7 - i/t"],"function":["7 + i/t","7 - i/t"],"TeX":["7 + \\frac{i}{t}","7 - \\frac{i}{t}"]}'),
+    ('shift_different_functions', 'shift_format', '{sin(i/t+a)+cos(b-i/t)|a=2;b=3;t=1+i}',
+     '{"plain":["a + i/t","b - i/t"],"function":["a + i/t","b - i/t"],"TeX":["a + \\frac{i}{t}","b - \\frac{i}{t}"]}'),
+    ('shift_composite_divisor', 'shift_format', '{sin(i/(x+y)+c)+cos(c-i/(x+y))|x=1+i;y=2;c=3}',
+     '{"plain":["c + i/(x + y)","c - i/(x + y)"],"function":["v1 = x + y","c + i/v1","c - i/v1"],"TeX":["c + \\frac{i}{x + y}","c - \\frac{i}{x + y}"]}'),
+    ('shift_negative_centre', 'shift_format', '{sin(i/t-c)+cos(-c-i/t)|t=1+i;c=2}',
+     '{"beautify":true,"plain":["-c + i/t","-c - i/t"],"function":["-c + i/t","-c - i/t"],"TeX":["-c + \\frac{i}{t}","-c - \\frac{i}{t}"]}'),
+    ('shift_product_unchanged', 'shift_format', '{sin(i*t+c)+cos(c-i*t)|t=1+i;c=2}',
+     '{"plain":["c + i·t","c - i·t"],"function":["c + i.t","c - i.t"],"TeX":["c + i\\mkern-2mu t","c - i\\mkern-2mu t"]}'),
+    ('shift_positive_first', 'shift_format', '{-sin(t)+cos(t)|t=0.3}',
+     '{"beautify":true,"plain":["cos(t) - sin(t)"],"function":["cos(t) - sin(t)"],"TeX":["\\cos(t) - \\sin(t)"]}'),
+    ('shift_positive_numerator', 'shift_format', '{(-a+b)/x|a=2;b=5;x=1+i}',
+     '{"beautify":true,"plain":["(b - a)/x"],"function":["(b - a)/x"],"TeX":["\\frac{b - a}{x}"]}'),
+    ('shift_positive_imaginary_coefficient', 'shift_format', '{(-i*a+i*b)/x|a=2;b=5;x=1+i}',
+     '{"beautify":true,"plain":["b·i - a·i"],"function":["b.i - a.i"],"TeX":["\\frac{b"]}')
 ON CONFLICT(name) DO UPDATE SET input=excluded.input, expected=excluded.expected;
 
 INSERT INTO test_case_runner(module, source, parent, table_name, operation) VALUES (
@@ -1350,6 +1422,12 @@ INSERT INTO test_case_runner(module, source, parent, table_name, operation) VALU
     'expression.test_from_string_number_literals_check_parse_TeX_3', 'tests/expression/test_expr_from_string.c', 'tests.test_expr_t_from_string.test_from_string_number_literals', 'expression_cases', 'test_from_string_number_literals_check_parse_TeX_3')
 ON CONFLICT(module) DO UPDATE SET table_name=excluded.table_name, operation=excluded.operation;
 INSERT OR IGNORE INTO expression_cases(name, operation, input, expected) VALUES ('stacked unicode rational atom renders TeX', 'test_from_string_number_literals_check_parse_TeX_3', '{ ²³¹⁄₂₃₁₀ }', '\frac{1}{10}');
+INSERT INTO expression_cases(name, operation, input, expected) VALUES
+    ('negative_imaginary_product_TeX', 'test_from_string_number_literals_check_parse_TeX_3',
+     '-i/2*x', '\left\{ -\frac{1}{2}\mkern-2mu i\mkern-2mu x \;\middle|\; x = ? \right\}'),
+    ('negative_imaginary_unit_product_TeX', 'test_from_string_number_literals_check_parse_TeX_3',
+     '-i*x', '\left\{ -i\mkern-2mu x \;\middle|\; x = ? \right\}')
+ON CONFLICT(name) DO UPDATE SET input=excluded.input, expected=excluded.expected;
 
 INSERT INTO test_case_runner(module, source, parent, table_name, operation) VALUES (
     'expression.test_from_string_number_literals_check_parse_expr_4', 'tests/expression/test_expr_from_string.c', 'tests.test_expr_t_from_string.test_from_string_number_literals', 'expression_cases', 'test_from_string_number_literals_check_parse_expr_4')
@@ -1540,3 +1618,21 @@ INSERT OR IGNORE INTO expression_cases(name, operation, input, expected) VALUES
     ('atan_sample_bound_count', 'atan_derivative_sample',
      '{(digamma(n+1+i/x)-digamma(1+i/x)+digamma(n+1-i/x)-digamma(1-i/x))/(2*x^2)|x=0,n=25}',
      '325');
+
+INSERT INTO test_case_runner(module, source, parent, table_name, operation) VALUES (
+    'expression.rational_progression_sampling', 'tests/expression/test_expr_from_string.c',
+    'tests.test_expr_t_from_string.test_rational_progression_sampling', 'expression_cases', 'rational_sample')
+ON CONFLICT(module) DO UPDATE SET source=excluded.source, parent=excluded.parent,
+    table_name=excluded.table_name, operation=excluded.operation;
+INSERT INTO expression_cases(name, operation, input, expected) VALUES
+    ('rational_sample_fourth_derivative', 'rational_sample', '{Dxxxx(sum(k,1,1000,atan(k*x)))|x=1}', '["x","-1/100","1/100"]'),
+    ('rational_sample_affine', 'rational_sample', 'Dtttt(sum(j,1,25,atan(j*(2*t+1))))', '["t","-7/10","-3/10"]'),
+    ('rational_sample_negative', 'rational_sample', '-sum(j,1,25,j^3*t/(1+j^2*t^2)^2)', '["t","-2/5","2/5"]'),
+    ('rational_sample_fractional_bound', 'rational_sample', 'sum(k,1,3/2,k*x/(1+k^2*x^2)^2)', '["x"]'),
+    ('rational_sample_coordinate_bound', 'rational_sample', 'sum(k,1,x,k/(1+k^2*x^2)^2)', '["x"]'),
+    ('rational_sample_nonlinear_phase', 'rational_sample', 'sum(k,1,25,k/(1+k^2*x^4)^2)', '["x"]'),
+    ('rational_sample_complex_phase', 'rational_sample', 'sum(k,1,25,k/(1+k^2*(i*x)^2)^2)', '["x"]'),
+    ('rational_sample_complex_weight', 'rational_sample', 'sum(k,1,25,i*k/(1+k^2*x^2)^2)', '["x"]'),
+    ('rational_sample_nonreal_weight_domain', 'rational_sample', 'sum(k,1,25,sqrt(x)*k/(1+k^2*x^2)^2)', '["x"]'),
+    ('rational_sample_pole_in_weight', 'rational_sample', 'sum(k,1,25,k/(x-1)/(1+k^2*x^2)^2)', '["x"]')
+ON CONFLICT(name) DO UPDATE SET input=excluded.input, expected=excluded.expected;

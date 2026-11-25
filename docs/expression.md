@@ -1578,9 +1578,12 @@ titles retain the numerical coordinates and weights. No vertical scale is shown.
 Automatic bounds fit the preview and include zero, so a wholly non-positive
 spectrum places zero at the right edge. Horizontal range zoom remains available.
 
-Symbolic complex shifts are displayed centre-first, with the imaginary unit before
-the displacement, consistently in Expression, Function and TeX output. This is a
-general presentation rule, not a change to the algebra or a special case for zeta.
+Symbolic complex shifts, including imaginary quotients, are displayed centre-first,
+with the imaginary unit before the displacement, consistently in Expression,
+Function and TeX output. Native result beautification prefers a non-negated leading
+addend where possible; a recognised shared centre takes precedence, including a
+negative centre. These are general presentation rules, not changes to the algebra
+or special cases for a particular function.
 
 ### Periodic functions with real poles
 
@@ -4144,9 +4147,30 @@ expression body; the saved input retains the same notation. Mathematical result
 cards continue to use native symbol formatting. **Use as input** explicitly
 replaces the input with the selected result. For a finite-sum identity it selects
 the sum, including a differentiated summand, while the result cards retain the
-simplified closed form and Rendered TeX shows the equality. Directly entered
+simplified closed form and Rendered TeX shows the equality. Long additive closed
+forms use separate aligned rows for their signed terms; a common outer minus is
+absorbed into their numerators, reversing additive signs in the native result. Compact identities remain
+on one line. Directly entered
 rational arctangent derivative sums recover the same digamma identity; this does
 not depend on the worksheet's previous calculus action.
+Repeated rational derivatives also retain their identities after reuse. Native
+recognition reduces proper fractions with denominator `(1+k^2*step^2)^m` to
+digamma and polygamma differences using exact partial fractions. Integer powers
+from one to eight and polynomial numerators of degree below `2*m` are supported,
+including symbolic coefficients and general complex phases. The finite sum
+remains available for numerical evaluation at removable zero-step points and
+for stable plotting. High-precision plot probes use the closed form with
+order-aware cancellation guards; ordinary drawing samples can use the faster
+compiled finite sum. Real polynomial weights and an affine real phase provide a
+real regular sampling proof and a frequency-scaled automatic window, including
+for higher derivatives. Complex phases, non-integer bounds and weights with
+unproved real domains do not receive that real-window shortcut.
+Before attaching the special functions, the reducer collects exact pole
+coefficients and cancels common powers of the phase. Equal or opposite
+coefficients share a paired sum or difference of polygamma values. Each pole
+order remains a separate simplified term, rather than accumulating redundant
+powers or a fraction around several other fractions. The same algebra supplies
+Expression, Function and TeX output, and the identity's summand is simplified too.
 
 ### `expr_to_calculus_function_text()`
 

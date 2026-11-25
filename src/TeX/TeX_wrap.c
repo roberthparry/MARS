@@ -101,6 +101,15 @@ TeX_t *TeX_wrap_sum(const TeX_context_t *context, size_t line_limit,
     if (!source)
         return body;
     bool valid = true;
+    if (described && view.kind == TeX_NODE_EQUATION && view.child_count == 2u) {
+        TeX_node_ref_t left = {0};
+        bool found = root.provider->child(root.context, root.node, 0u, &left);
+        TeX_context_t *left_context = found ? TeX_context_new(left) : NULL;
+        TeX_t *notation = left_context ? TeX_from_context(left_context) : NULL;
+        TeX_context_free(left_context);
+        valid = notation && string_append_format(source, "%s = {} ", TeX_source(notation)) >= 0;
+        TeX_free(notation);
+    }
     for (size_t i = 0u; i < count && valid; ++i) {
         int sign = 0;
         TeX_context_t *term_context = provider->term(state, i, &sign);
