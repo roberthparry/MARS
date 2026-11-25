@@ -1740,9 +1740,13 @@ static void curve_continuity_row(const void *data)
     expr_t *pole_expression = *pole_text ? expr_from_string(pole_text, NULL) : NULL;
     number_t pole = pole_expression ? expr_eval(pole_expression) : NUM_NAN;
     bool crossed = false;
+    const char *peak_text = test_lab_text(expected, "peak");
+    double peak = *peak_text ? strtod(peak_text, NULL) : 0, maximum = -INFINITY;
     ok = ok && samples && sampler_count(samples) >= 20u;
     for (size_t i = 0u; ok && i < sampler_count(samples); ++i) {
         const sampler_point_t *point = sampler_point(samples, i);
+        if (point->valid)
+            maximum = fmax(maximum, num_to_double(point->y));
         gaps += i && point->break_before;
         if (continuous)
             ok = point->valid && (!i || !point->break_before);
@@ -1773,9 +1777,11 @@ static void curve_continuity_row(const void *data)
         }
     }
     ok = ok && (continuous || (crossed && gaps));
+    if (*peak_text)
+        ok = ok && maximum >= 0.995 * peak && maximum <= (1 + 1e-8) * peak;
     if (!ok)
-        string_printf("Curve continuity %S: points %zu, gaps %zu, crossed pole %u\n",
-                       row->name, sampler_count(samples), gaps, crossed);
+        string_printf("Curve continuity %S: points %zu, gaps %zu, crossed pole %u, maximum %.12g\n",
+                       row->name, sampler_count(samples), gaps, crossed, maximum);
     num_destroy(&pole);
     expr_free(pole_expression);
     sampler_free(samples);

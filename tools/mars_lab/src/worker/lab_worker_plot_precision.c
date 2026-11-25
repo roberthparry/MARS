@@ -58,7 +58,7 @@ size_t lab_worker_plot_range_precision(number_t lower, number_t upper)
     number_t magnitude = greater(num_abs(lower), num_abs(upper));
     if (!finite_real(span) || !num_gt(span, NUM_ZERO))
         return 0;
-    /* Fourteen subdivision bits plus guard bits keep neighbouring probes distinct. */
+    /* Thirty-one subdivision bits plus guard bits keep neighbouring probes distinct. */
     long offset = num_get_exponent2(magnitude), width = num_get_exponent2(span);
     if (offset > width && (long double)offset - (long double)width > plot_precision_limit - 48)
         return plot_precision_limit + 1;
@@ -197,6 +197,9 @@ static sampler_t *sample_at(const char *source, const char *variable, number_t l
     if (!probes && !preview && !regular_progression)
         regular_progression = expr_finite_atan_derivative_sample_bounds(expression, axis,
                                                                          &inverse_lower, &inverse_upper);
+    bool pole_progression = !probes && !preview && !regular_progression &&
+                            expr_finite_circular_progression_sample_bounds(expression, axis,
+                                                                             &inverse_lower, &inverse_upper);
     num_destroy(&inverse_upper);
     num_destroy(&inverse_lower);
     number_t lo = lab_worker_sample_coordinate(lower, bits), hi = lab_worker_sample_coordinate(upper, bits);
@@ -204,7 +207,14 @@ static sampler_t *sample_at(const char *source, const char *variable, number_t l
     options.intervals = probes || preview ? 16 : 64;
     options.max_evaluations = probes ? 17 : preview ? 513 : 8193;
     options.method = probes ? SAMPLER_UNIFORM : SAMPLER_ADAPTIVE;
-    options.max_depth = lab_worker_plot_depth(options.intervals, options.max_evaluations, preview ? 4u : 8u);
+    /* Full curves may spend their unused evaluation budget on a narrow local feature.
+     * A complete-tree depth allowance gives every interval the same tiny share,
+     * disconnecting steep finite arcs even when most of the budget remains unused.
+     * Dense circular poles outside a proved regular window retain their balanced
+     * allowance; chasing each singularity would consume the whole work budget.
+     * The sampler still enforces the unchanged total callback limit. */
+    options.max_depth = preview || pole_progression ?
+        lab_worker_plot_depth(options.intervals, options.max_evaluations, preview ? 4u : 8u) : 24u;
     options.absolute_tolerance = absolute_tolerance;
     options.relative_tolerance = preview ? 0.01 : 0.002;
     plot_evaluation_t evaluation = {.expression = derivative_source, .axis = axis};

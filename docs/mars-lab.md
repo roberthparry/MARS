@@ -3239,6 +3239,12 @@ and uses the corresponding Lambert form for the result cards and plotting.
 For this input the closed result is `-4*lambert_S(-1,exp(2i*x),1,1,-1,N)`;
 the rendered answer also includes the definition of `Λ`.
 
+Real curve sampling can concentrate deeper refinement around narrow finite peaks
+within its existing evaluation budget. A wide input range therefore retains steep
+smooth arcs instead of introducing artificial gaps. Dense circular progressions
+outside a proved pole-free window retain a balanced subdivision allowance, so
+refinement does not spend the whole budget chasing their singularities.
+
 Nested roots and powers use the expression module's guarded native sampler on
 their positive real branches. Uncertain points and branch boundaries retain
 ordinary native evaluation, and non-real surface regions remain gaps. When

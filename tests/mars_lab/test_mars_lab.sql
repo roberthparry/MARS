@@ -234,6 +234,10 @@ INSERT INTO mars_lab_cases(name, operation, input, expected) VALUES
     ('curve_continuity_sine_scaled', 'curve_continuity', '{"expression":"1e6*sin(500*x)*sin(1001*x/2)/sin(x/2)","lower":"0.0001","upper":"0.03125"}', '{"continuous":true,"sine_terms":"1000","amplitude":"1e6"}'),
     ('curve_continuity_cosine_1000', 'curve_continuity', '{"expression":"@Z_(k=1)^1000 cos(kx)","lower":"-0.03125","upper":"0.03125"}', '{"continuous":true}'),
     ('curve_continuity_generic_cosine', 'curve_continuity', '{"expression":"cos(1000*x)","lower":"-0.03125","upper":"0.03125"}', '{"continuous":true}'),
+    ('curve_continuity_rational_peak', 'curve_continuity', '{"expression":"sum(k,1,1000,k/(1+k^2*x^2))","lower":"-1","upper":"1"}', '{"continuous":true,"peak":"500500"}'),
+    ('curve_continuity_shifted_rational_peak', 'curve_continuity', '{"expression":"sum(k,1,1000,k/(1+k^2*(x-0.123)^2))","lower":"-1","upper":"1"}', '{"continuous":true,"peak":"500500"}'),
+    ('curve_continuity_narrow_peak', 'curve_continuity', '{"expression":"100/(1+1000000*(x-0.371)^2)","lower":"-1","upper":"1"}', '{"continuous":true,"peak":"100"}'),
+    ('curve_continuity_rational_fourth', 'curve_continuity', '{"expression":"Dxxxx(sum(k,1,1000,atan(k*x)))","lower":"-0.1","upper":"0.1"}', '{"continuous":true}'),
     ('curve_continuity_cubic_cosine', 'curve_continuity', '{"expression":"@Z_(k=1)^1000 k^3*cos(kx)","lower":"-0.01","upper":"0.01"}', '{"continuous":true,"cosine_terms":"1000","weight":"3","derivatives":true}'),
     ('curve_continuity_quartic_sine', 'curve_continuity', '{"expression":"@Z_(k=1)^1000 k^4*sin(kx)","lower":"-0.01","upper":"0.01"}', '{"continuous":true,"sine_terms":"1000","weight":"4","derivatives":true}'),
     ('curve_continuity_rational_pole', 'curve_continuity', '{"expression":"1/(x-1/3)","lower":"-1","upper":"1"}', '{"continuous":false,"pole":"1/3"}'),
@@ -692,7 +696,10 @@ INSERT OR IGNORE INTO mars_lab_cases(name, operation, input, expected) VALUES
      '{"segments":"20","lower":"-0.7","upper":"-0.3","real":"yes","peak":"650"}'),
     ('progression_plot_atan_derivative_manual', 'progression_plot',
      '{"expression":"(digamma(1001+i/x)-digamma(1+i/x)+digamma(1001-i/x)-digamma(1-i/x))/(2*x^2)","action":"plot","wrt":"x","plot_lower":"-0.1","plot_upper":"0.1","precision":97}',
-     '{"segments":"20","lower":"-0.1","upper":"0.1","real":"yes","peak":"500500"}');
+     '{"segments":"20","lower":"-0.1","upper":"0.1","real":"yes","peak":"500500"}'),
+    ('progression_plot_atan_derivative_wide', 'progression_plot',
+     '{"expression":"sum(k,1,1000,k/(1+k^2*x^2))","action":"plot","wrt":"x","plot_lower":"-1","plot_upper":"1","precision":97}',
+     '{"segments":"20","lower":"-1","upper":"1","real":"yes","peak":"500500"}');
 
 INSERT INTO mars_lab_cases(name, operation, input, expected) VALUES
     ('progression_plot_atan_fourth_authored', 'progression_plot',

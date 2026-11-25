@@ -6737,7 +6737,11 @@
         "curve_continuity_sine_auto": true,
         "curve_continuity_sine_scaled": true,
         "curve_continuity_tangent_pole": true,
-        "enabled": true
+        "enabled": true,
+        "curve_continuity_rational_peak": true,
+        "curve_continuity_shifted_rational_peak": true,
+        "curve_continuity_narrow_peak": true,
+        "curve_continuity_rational_fourth": true
       },
       "test_lab_extra_derivative": true,
       "test_lab_extra_diffequation": true,
@@ -6906,7 +6910,8 @@
         "progression_plot_weighted_cosine_100": true,
         "progression_plot_weighted_derivative": true,
         "progression_plot_weighted_renamed": true,
-        "progression_plot_weighted_sine_100": true
+        "progression_plot_weighted_sine_100": true,
+        "progression_plot_atan_derivative_wide": true
       },
       "test_lab_extra_progression_samples": {
         "enabled": true,
