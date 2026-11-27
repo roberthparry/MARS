@@ -33,6 +33,8 @@
  * shared work budgets are cooperative; callers must check operation failure and
  * computation_status() before using outputs. See docs/matrix.md for checkpoint
  * coverage, ownership and the corresponding executable example.
+ *
+ * Including this header also enables FMT() selection through the module-owned fmt_arg_matrix() adapter.
  */
 
 #ifndef MARS_MATRIX_H
@@ -42,6 +44,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 
+#include "format-t.h"
 #include "expression-t.h"
 #include "expr_context-t.h"
 
@@ -2027,5 +2030,19 @@ bool mat_serialize(const matrix_t *A, string_t **out_type, string_t **out_encodi
  * @return Newly allocated matrix on success, otherwise @c NULL.
  */
 matrix_t *mat_deserialise(const void *data, size_t len, const string_t *type, const string_t *encoding);
+
+/**
+ * @brief Borrow a matrix for typed native presentation.
+ * @param value Borrowed matrix, never modified or released; NULL is rejected when rendered.
+ * @return Allocation-free descriptor, valid while the matrix remains alive and unchanged.
+ * @note Including this header enables FMT() selection. Capturing cannot fail
+ * or change formatting diagnostics. Native presentations and their validation are owned by this module.
+ */
+fmt_arg_t fmt_arg_matrix(const matrix_t *value);
+
+#undef MARS_FMT_SELECT_MAT_
+/** @brief Enable this module's constructor in FMT() without changing other type associations. */
+#define MARS_FMT_SELECT_MAT_(value, next) \
+    _Generic((value), matrix_t *: fmt_arg_matrix, const matrix_t *: fmt_arg_matrix, default: next)
 
 #endif /* MARS_MATRIX_H */

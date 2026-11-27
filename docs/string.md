@@ -385,6 +385,10 @@ All declarations are in `include/string-t.h`.
 
 ### Printf-Style Formatting
 
+For typed brace placeholders, named bindings and reusable templates, use the
+[format module](format.md), with `fmt_` functions and `FMT(value)`. Its append
+API accepts both `string_t` and `string_builder_t` destinations.
+
 - `int string_append_format(string_t *s, const char *fmt, ...)` — append formatted text
 - `int string_append_vformat(string_t *s, const char *fmt, va_list ap)` — `va_list` append variant
 - `string_t *string_sprintf(const char *fmt, ...)` — create a new formatted string
@@ -718,3 +722,9 @@ Output:
 ```text
 pa'ss word
 ```
+
+`FMT()` directly accepts mutable and const `string_t *` values, views and runes;
+no conversion through `string_c_str()` is required. A binding borrows its input.
+Excel custom codes support `@` insertion and a fourth text section, including
+explicit ANSI colour directives. See the [owned-string example](format.md#native-strings)
+and [custom-code conventions](format.md#excel-custom-codes).

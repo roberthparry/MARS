@@ -2,6 +2,14 @@
 
 `expr_t` is a reference-counted expression DAG for differentiable values.
 
+With `expression-t.h` included, the [format module](format.md) accepts `FMT(expression_pointer)` and selects the
+native `expression`, `function`, `latex` or `unbound` renderer. It borrows the
+expression and preserves its algebra and bindings without evaluating it.
+Use `fmt_arg_expression()` for an explicit binding. No additional formatting
+header or runtime registration is needed. Capturing allocates no memory;
+the immutable module-owned adapter validates presentations and preserves native
+rendering and borrowing rules.
+
 ## Nearest-integer rounding
 
 `round(x)` and the public constructor `expr_round(x)` round to the nearest
@@ -4326,3 +4334,8 @@ body p:has(> .katex) {
     text-align: left;
 }
 </style>
+
+The format guide includes a [runnable example of expressions, equations and TeX](format.md#expressions-equations-and-tex).
+Typed interpolation delegates its `expression`, `function`, `unbound` and
+`latex` presentations to the native style renderer, retaining that style's
+binding notation without evaluating or substituting the mathematics.

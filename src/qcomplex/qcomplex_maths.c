@@ -17,6 +17,8 @@
 #include "qcomplex-t.h"
 #define MARS_SHARED_QFLOAT_INTERNAL_ACCESS
 #include "internal/qfloat_internal.h"
+#define MARS_QCOMPLEX_INTERNAL_ACCESS
+#include "qcomplex_internal.h"
 
 enum {
     QC_GAMMAINV_NEWTON_MAX_STEPS = 20,
@@ -98,7 +100,7 @@ qcomplex_t qc_digamma(qcomplex_t z)
     if (qf_lt(qc_real(z), qf_from_double(0.5))) {
         /* Reflection: ψ(z) = ψ(1-z) - π cot(πz) */
         qcomplex_t pi_z = qc_mul(z, QC_PI);
-        qcomplex_t cotpz = qc_div(qc_cos(pi_z), qc_sin(pi_z));
+        qcomplex_t cotpz = qc_cot(pi_z);
         return qc_sub(qc_digamma(qc_sub(QC_ONE, z)), qc_mul(QC_PI, cotpz));
     }
 
@@ -223,10 +225,11 @@ qcomplex_t qc_tetragamma(qcomplex_t z)
     if (qf_lt(qc_real(z), qf_from_double(0.5))) {
         /* Reflection: ψ₂(z) = ψ₂(1-z) + 2π³ csc²(πz) cot(πz) */
         qcomplex_t pi_z = qc_mul(z, QC_PI);
-        qcomplex_t sin_pz = qc_sin(pi_z);
+        qcomplex_t sin_pz, cos_pz;
+        qci_sin_cos(pi_z, &sin_pz, &cos_pz);
         qcomplex_t csc = qc_div(QC_ONE, sin_pz);
         qcomplex_t csc2 = qc_mul(csc, csc);
-        qcomplex_t cot_pz = qc_div(qc_cos(pi_z), sin_pz);
+        qcomplex_t cot_pz = qc_div(cos_pz, sin_pz);
         qcomplex_t term = qc_mul(qc_make(QF_2PI_CUBED, QF_ZERO), qc_mul(csc2, cot_pz));
         return qc_add(qc_tetragamma(qc_sub(QC_ONE, z)), term);
     }

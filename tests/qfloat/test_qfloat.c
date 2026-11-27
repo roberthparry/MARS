@@ -4,12 +4,15 @@
  *
  * Registers arithmetic, function, parsing and formatting groups and checks difficult numeric cases. Documented
  * examples are included after ordinary assertions.
+ * Independent exponential reference rows live in the module SQL table; their numerical assertions remain in C.
  *
  * Used by the project test harness for regression verification. Select cases through tests/test_config.json and
  * run suites sequentially; this source is not part of the installed library.
  */
 
 #include "string-t.h"
+#include "test_harness.h"
+#include "test_database.h"
 #include "test_qfloat.h"
 
 TEST_SUITE_CONFIG(TEST_CONFIG_GLOBAL);
@@ -23,6 +26,28 @@ static const test_validity_contract_t qfloat_close_contract = TEST_VALIDITY_CONT
     "qfloat-close", qfloat_validity_equal, qfloat_validity_format, (void *)&qfloat_validity_rel_tol);
 
 TEST_SUITE_SETUP(test_qfloat_suite_setup);
+
+static void test_qf_exp_reference_case(const void *data)
+{
+    const test_database_case_t *row = data;
+    qfloat_t input = qf_from_text(row->input);
+    qfloat_t expected = qf_from_text(row->expected);
+    qfloat_t got = qf_exp(input);
+    qfloat_t tolerance = qf_pow10(-(int)row->precision);
+    qfloat_t error = qf_abs(qf_sub(qf_div(got, expected), QF_ONE));
+    bool ok = !qf_isnan(got) && !qf_isinf(got) && qf_gt(expected, QF_ZERO) && qf_le(error, tolerance);
+
+    if (!ok)
+        qf_printf("exp(%q): got %q, expected %q, relative error %q, tolerance %q\n",
+                  input, got, expected, error, tolerance);
+    TEST_ASSERT_TRUE(ok, "native exponential satisfies its independent high-precision reference");
+}
+
+static void test_qf_exp_references(void)
+{
+    test_run_database_cases(__FILE__, __LINE__, "qfloat.exp_references", "tests.test_qf_exp_references",
+                            test_qf_exp_reference_case);
+}
 
 /* Helper to print qfloat_t */
 void print_q(const char *label, qfloat_t x)
@@ -196,6 +221,7 @@ int tests_main()
     TEST_SECTION("Core and Elementary");
 
     TEST_RUN_IN_GROUP(test_arithmetic, tests, NULL);
+    TEST_RUN_IN_GROUP(test_qf_exp_references, tests, "qfloat,exp,reference,precision");
     TEST_RUN_IN_GROUP(test_arithmetic_extensions, tests, NULL);
     TEST_RUN_IN_GROUP(test_strings, tests, NULL);
     TEST_RUN_IN_GROUP(test_printf, tests, NULL);

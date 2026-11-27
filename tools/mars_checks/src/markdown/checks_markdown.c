@@ -151,6 +151,7 @@ int checks_markdown_api(const string_t *root)
         {"expr_context-t.h", "expr_context.md"},
         {"expression-t.h", "expression.md"},
         {"file-t.h", "file.md"},
+        {"format-t.h", "format.md"},
         {"globe-t.h", "globe.md"},
         {"http-t.h", "http.md"},
         {"image-t.h", "image.md"},

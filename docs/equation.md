@@ -856,3 +856,12 @@ body p:has(> .katex) {
     text-align: left;
 }
 </style>
+
+## Typed interpolation
+
+Including `equation-t.h` enables `FMT(equation)` and `fmt_arg_equation()` for
+mutable or const pointers. Bindings borrow the equation without evaluating it.
+The default/`expression`, `function`, `unbound` and `latex` presentations delegate
+to `equ_to_text()` with the corresponding native style. Precision and numeric
+flags are rejected. Release the equation with `equ_free()` after formatting.
+See the [runnable expression, equation and TeX example](format.md#expressions-equations-and-tex).

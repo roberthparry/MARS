@@ -90,27 +90,19 @@ static qfloat_t qf_exp_kernel(qfloat_t r)
          -9.6280561970482323e-68},                        /* 1.56259579706360721898274205704425841416460611722259e-50 */
         {4.0692333959407629e-53, 8.5660473081783288e-70}, /* 4.06923339594076296494422544885785424193219373742892e-53 */
         {1.0173022354240444e-55, 1.6882208569445479e-72}, /* 1.01730223542404441594846828423852626437220498786958e-55 */
-        {2.4454244585301151e-58,
-         -9.4360149305200058e-75},                        /* 2.44542445853011503523119037491844433737859505921607e-58 */
-        {5.660675516561292e-61, 2.4417881040627945e-77},  /* 5.66067551656129229308827245342002270944323569890047e-61 */
-        {1.2635375636764616e-63, 9.425695195996618e-80},  /* 1.26353756367646170566750409945268991172372910631121e-63 */
-        {2.7231290743851696e-66, 2.2865795958219742e-82}, /* 2.72312907438516978540878719719049209293026262692022e-66 */
-        {5.6731617429252378e-69, 7.0681120929698254e-86}, /* 5.67316174292523782683995630158060408724742022221520e-69 */
-        {1.1437781055628525e-71, 5.2653811344675536e-88}, /* 1.14377810556285256081724318021310515009202569273747e-71 */
-        {2.2339333489125188e-74,
-         -1.1023367961606344e-90}, /* 2.23393334891251864301277236025427909727862373965758e-74 */
     };
     static const int N_EXP_COEF = sizeof(EXP_COEF) / sizeof(EXP_COEF[0]);
 
-    /* map r ∈ [-0.125, 0.125] to x ∈ [-1,1] */
+    /* The omitted stored tail contributes < 5e-39 relatively for |r| <= 0.35, below 106-bit rounding precision. */
+    /* Scale the reduced exponent for the existing Chebyshev coefficient table. */
     qfloat_t x = qf_mul_double(r, 8.0);
+    qfloat_t two_x = qf_mul_double(x, 2.0);
 
     qfloat_t b_kplus1 = QF_ZERO;
     qfloat_t b_kplus2 = QF_ZERO;
 
     for (int k = N_EXP_COEF - 1; k >= 1; k--) {
-        qfloat_t t = qf_mul_double(x, 2.0);
-        t = qf_mul(t, b_kplus1);
+        qfloat_t t = qf_mul(two_x, b_kplus1);
         t = qf_sub(t, b_kplus2);
         t = qf_add(t, EXP_COEF[k]);
 
@@ -127,7 +119,7 @@ static qfloat_t qf_exp_kernel(qfloat_t r)
 
 /* qf_exp_reduce: */
 /*   Input:  x  (qf) */
-/*   Output: *k (int), *r (qf) with |r| <= 0.1733 */
+/*   Output: *k (int), *r (qf) with |r| approximately <= ln(2)/2 */
 /*  */
 /*   x = k*ln2 + r */
 /*  */
@@ -341,10 +333,7 @@ static int qf_range_reduce_pi_over_2(qfloat_t x, qfloat_t *r_out)
     return q;
 }
 
-/* Kernel on small interval [-pi/4, pi/4].
- * Currently uses libm on the reduced argument as a placeholder.
- * We will replace this with a true quad-precision polynomial kernel.
- */
+/* Double-double polynomial kernels on the reduced interval [-pi/4, pi/4]. */
 
 /* sin(r) coefficients (odd powers), highest degree first */
 static const qfloat_t SIN_COEF[] = {
@@ -388,25 +377,21 @@ static const qfloat_t COS_COEF[] = {
 
 static const int NCOS = sizeof(COS_COEF) / sizeof(COS_COEF[0]);
 
-static void qf_sin_cos_kernel(qfloat_t x, qfloat_t *s_out, qfloat_t *c_out)
+static qfloat_t qf_sin_kernel(qfloat_t x, qfloat_t x2)
 {
-    qfloat_t x2 = qf_mul(x, x);
-
-    /* sin */
     qfloat_t p = SIN_COEF[0];
     for (int i = 1; i < NSIN; ++i)
         p = qf_add(SIN_COEF[i], qf_mul(p, x2));
     qfloat_t x3 = qf_mul(x, x2);
-    qfloat_t s = qf_add(x, qf_mul(x3, p));
+    return qf_add(x, qf_mul(x3, p));
+}
 
-    /* cos */
+static qfloat_t qf_cos_kernel(qfloat_t x2)
+{
     qfloat_t q = COS_COEF[0];
     for (int i = 1; i < NCOS; ++i)
         q = qf_add(COS_COEF[i], qf_mul(q, x2));
-    qfloat_t c = qf_add(QF_ONE, qf_mul(x2, q));
-
-    *s_out = s;
-    *c_out = c;
+    return qf_add(QF_ONE, qf_mul(x2, q));
 }
 
 typedef struct {
@@ -424,6 +409,27 @@ static qfloat_t qf_finish_sincos_dispatch(const qfloat_sincos_dispatch_t *dispat
 static const qfloat_sincos_dispatch_t qf_sin_dispatch[] = {{0, 0}, {1, 0}, {0, 1}, {1, 1}};
 
 static const qfloat_sincos_dispatch_t qf_cos_dispatch[] = {{1, 0}, {0, 1}, {1, 1}, {0, 0}};
+
+static qfloat_t qf_trig_kernel(qfloat_t r, const qfloat_sincos_dispatch_t *dispatch)
+{
+    qfloat_t r2 = qf_mul(r, r);
+    qfloat_t out = dispatch->use_cos ? qf_cos_kernel(r2) : qf_sin_kernel(r, r2);
+
+    return dispatch->negate ? qf_neg(out) : out;
+}
+
+/* Share reduction and both polynomials with authorised native numeric callers. */
+void qfi_sin_cos(qfloat_t x, qfloat_t *s_out, qfloat_t *c_out)
+{
+    qfloat_t r;
+    int q = qf_range_reduce_pi_over_2(x, &r);
+    qfloat_t r2 = qf_mul(r, r);
+    qfloat_t s = qf_sin_kernel(r, r2);
+    qfloat_t c = qf_cos_kernel(r2);
+
+    *s_out = qf_finish_sincos_dispatch(&qf_sin_dispatch[q], s, c);
+    *c_out = qf_finish_sincos_dispatch(&qf_cos_dispatch[q], s, c);
+}
 
 qfloat_t qf_hypot(qfloat_t x, qfloat_t y)
 {
@@ -464,32 +470,27 @@ qfloat_t qf_hypot(qfloat_t x, qfloat_t y)
     return qf_mul(axq, t);
 }
 
+/* Evaluate only the polynomial needed for sine in the reduced quadrant. */
 qfloat_t qf_sin(qfloat_t x)
 {
     qfloat_t r;
     int q = qf_range_reduce_pi_over_2(x, &r);
-    qfloat_t s, c;
-
-    qf_sin_cos_kernel(r, &s, &c);
-
-    return qf_finish_sincos_dispatch(&qf_sin_dispatch[q & 3], s, c);
+    return qf_trig_kernel(r, &qf_sin_dispatch[q]);
 }
 
+/* Evaluate only the polynomial needed for cosine in the reduced quadrant. */
 qfloat_t qf_cos(qfloat_t x)
 {
     qfloat_t r;
     int q = qf_range_reduce_pi_over_2(x, &r);
-    qfloat_t s, c;
-
-    qf_sin_cos_kernel(r, &s, &c);
-
-    return qf_finish_sincos_dispatch(&qf_cos_dispatch[q & 3], s, c);
+    return qf_trig_kernel(r, &qf_cos_dispatch[q]);
 }
 
+/* Share sine and cosine evaluation while retaining the existing tangent pole check. */
 qfloat_t qf_tan(qfloat_t x)
 {
-    qfloat_t s = qf_sin(x);
-    qfloat_t c = qf_cos(x);
+    qfloat_t s, c;
+    qfi_sin_cos(x, &s, &c);
 
     double cd = qf_to_double(c);
     if (fabs(cd) < 1e-30) {
@@ -510,9 +511,12 @@ qfloat_t qf_cosec(qfloat_t x)
     return qf_div(QF_ONE, qf_sin(x));
 }
 
+/* Evaluate the cotangent ratio with one shared sine/cosine reduction. */
 qfloat_t qf_cot(qfloat_t x)
 {
-    return qf_div(qf_cos(x), qf_sin(x));
+    qfloat_t s, c;
+    qfi_sin_cos(x, &s, &c);
+    return qf_div(c, s);
 }
 
 qfloat_t qf_versin(qfloat_t x)
@@ -794,6 +798,16 @@ qfloat_t qf_archacovercos(qfloat_t x)
     return qf_asin(qf_sub(qf_mul_double(x, 2.0), QF_ONE));
 }
 
+/* Reuse both exponentials without changing either hyperbolic function's arithmetic. */
+void qfi_sinh_cosh(qfloat_t x, qfloat_t *sine, qfloat_t *cosine)
+{
+    qfloat_t ex = qf_exp(x);
+    qfloat_t emx = qf_exp(qf_neg(x));
+
+    *sine = qf_div(qf_sub(ex, emx), QF_TWO);
+    *cosine = qf_div(qf_add(ex, emx), QF_TWO);
+}
+
 qfloat_t qf_sinh(qfloat_t x)
 {
     qfloat_t ex = qf_exp(x);
@@ -837,9 +851,12 @@ qfloat_t qf_cosech(qfloat_t x)
     return qf_div(QF_ONE, qf_sinh(x));
 }
 
+/* Form the hyperbolic cotangent ratio from a shared pair of exponentials. */
 qfloat_t qf_coth(qfloat_t x)
 {
-    return qf_div(qf_cosh(x), qf_sinh(x));
+    qfloat_t sine, cosine;
+    qfi_sinh_cosh(x, &sine, &cosine);
+    return qf_div(cosine, sine);
 }
 
 qfloat_t qf_asinh(qfloat_t x)
@@ -1606,8 +1623,8 @@ qfloat_t qf_digamma(qfloat_t x)
         qfloat_t psi_1mx = qf_digamma(one_minus_x);
 
         qfloat_t pix = qf_mul(pi, x);
-        qfloat_t sinx = qf_sin(pix);
-        qfloat_t cosx = qf_cos(pix);
+        qfloat_t sinx, cosx;
+        qfi_sin_cos(pix, &sinx, &cosx);
         qfloat_t cot = qf_div(cosx, sinx);
 
         return qf_sub(psi_1mx, qf_mul(pi, cot));
@@ -1782,8 +1799,8 @@ qfloat_t qf_tetragamma(qfloat_t x)
     /* Reflection: ψ''(x) = ψ''(1-x) + 2π³cos(πx)/sin³(πx) */
     if (x.hi < 0.5) {
         qfloat_t px = qf_mul(QF_PI, x);
-        qfloat_t spx = qf_sin(px);
-        qfloat_t cpx = qf_cos(px);
+        qfloat_t spx, cpx;
+        qfi_sin_cos(px, &spx, &cpx);
         qfloat_t pi3 = qf_mul(QF_PI, qf_mul(QF_PI, QF_PI));
         qfloat_t refl = qf_div(qf_mul(QF_TWO, qf_mul(pi3, cpx)), qf_mul(spx, qf_mul(spx, spx)));
         return qf_add(qf_tetragamma(qf_sub(one, x)), refl);

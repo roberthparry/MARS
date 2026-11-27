@@ -4,6 +4,7 @@
  *
  * Adapts qfloat values to formatted string and stream output. Numeric decimal conversion is shared with the
  * string-conversion implementation rather than delegated to ordinary double formatting.
+ * Native digits and exponents feed output directly, and resolved conversion options are shared with qcomplex.
  *
  * This implements fixed double-double real arithmetic for qfloat_t. Its approximately 106-bit representation
  * is not arbitrary precision or a universal accuracy guarantee.
@@ -16,6 +17,8 @@
 #include <string.h>
 
 #include "string-t.h"
+#define MARS_SHARED_QFLOAT_FORMAT_INTERNAL_ACCESS
+#include "internal/qfloat_format_internal.h"
 #define MARS_QFLOAT_INTERNAL_ACCESS
 #include "qfloat_internal.h"
 
@@ -32,6 +35,7 @@ static int qf_append_repeated_char(string_t *out, char ch, int count)
     return 0;
 }
 
+/* Conversion text is native ASCII; byte offsets also give its display width and character positions. */
 static string_t *qf_pad_text(const string_t *text, int width, int flag_minus, int flag_zero, int sign_aware_zero)
 {
     string_t *out;
@@ -41,7 +45,7 @@ static string_t *qf_pad_text(const string_t *text, int width, int flag_minus, in
     if (!text)
         return NULL;
 
-    len = string_length(text);
+    len = string_byte_length(text);
     pad = (width > (int)len) ? (width - (int)len) : 0;
     if (pad < 0)
         pad = 0;
@@ -59,12 +63,12 @@ static string_t *qf_pad_text(const string_t *text, int width, int flag_minus, in
     }
 
     if (flag_zero) {
-        rune_t first = string_at(text, 0);
+        char first = string_c_str(text)[0];
 
-        if (sign_aware_zero && (rune_is_equal(first, '+') || rune_is_equal(first, '-') || rune_is_equal(first, ' '))) {
-            string_t *rest = string_substring(text, 1, len > 0u ? len - 1u : 0u);
+        if (sign_aware_zero && (first == '+' || first == '-' || first == ' ')) {
+            string_t *rest = string_substr(text, 1, len > 0u ? len - 1u : 0u);
 
-            if (!rest || string_append_rune(out, first) != 0 || qf_append_repeated_char(out, '0', pad) != 0 ||
+            if (!rest || string_append_char(out, first) != 0 || qf_append_repeated_char(out, '0', pad) != 0 ||
                 string_append_string(out, rest) != 0) {
                 string_free(rest);
                 string_free(out);
@@ -97,7 +101,7 @@ static string_t *qf_text_with_sign_prefix(const string_t *text, int flag_plus, i
     if (!text)
         return NULL;
 
-    if (rune_is_equal(string_at(text, 0), '-'))
+    if (string_c_str(text)[0] == '-')
         return string_clone(text);
 
     out = string_new();
@@ -137,114 +141,14 @@ static string_t *qf_signed_padded_text(const string_t *text, int flag_plus, int 
     return padded;
 }
 
-static string_offset_t qf_exponent_marker_pos(const string_t *text)
-{
-    string_offset_t pos;
-
-    if (!text)
-        return -1;
-
-    pos = string_find(text, "e");
-    return pos >= 0 ? pos : string_find(text, "E");
-}
-
-static int qf_parse_exp10_text(const string_t *text, string_offset_t marker_pos, int *exp10_out)
-{
-    size_t len;
-    string_t *exp_text;
-
-    if (!text || marker_pos < 0 || !exp10_out)
-        return -1;
-
-    len = string_view_length(string_view_all(text));
-    if ((size_t)marker_pos + 1u > len)
-        return -1;
-
-    exp_text = string_substr(text, (size_t)marker_pos + 1u, len - (size_t)marker_pos - 1u);
-    if (!exp_text)
-        return -1;
-
-    *exp10_out = atoi(string_c_str(exp_text));
-    string_free(exp_text);
-    return 0;
-}
-
-static string_t *qf_trim_scientific_mantissa_text(const string_t *mantissa)
-{
-    size_t len;
-
-    if (!mantissa)
-        return NULL;
-
-    len = string_length(mantissa);
-    while (len > 0u && rune_is_equal(string_at(mantissa, len - 1u), '0'))
-        len--;
-    if (len > 0u && rune_is_equal(string_at(mantissa, len - 1u), '.'))
-        len--;
-    if (len == 0u)
-        return string_new_with("0");
-    return string_substring(mantissa, 0u, len);
-}
-
-static string_t *qf_normalised_scientific_text(const string_t *text, string_offset_t marker_pos)
-{
-    string_t *mantissa = NULL;
-    string_t *trimmed = NULL;
-    string_t *exponent = NULL;
-    string_t *out = NULL;
-    size_t len;
-
-    if (!text)
-        return NULL;
-    if (marker_pos < 0)
-        return string_clone(text);
-
-    len = string_view_length(string_view_all(text));
-    mantissa = string_substr(text, 0u, (size_t)marker_pos);
-    exponent = string_substr(text, (size_t)marker_pos, len - (size_t)marker_pos);
-    if (!mantissa || !exponent)
-        goto done;
-
-    if (string_replace(exponent, "E", "e") != 0)
-        goto done;
-
-    trimmed = qf_trim_scientific_mantissa_text(mantissa);
-    if (trimmed)
-        out = string_sprintf("%S%S", trimmed, exponent);
-
-done:
-    string_free(mantissa);
-    string_free(trimmed);
-    string_free(exponent);
-    return out;
-}
-
-static string_t *qf_unsigned_mantissa_text(const string_t *mantissa, int *negative_out)
-{
-    size_t len;
-
-    if (negative_out)
-        *negative_out = 0;
-    if (!mantissa)
-        return NULL;
-
-    len = string_length(mantissa);
-    if (len > 0u && rune_is_equal(string_at(mantissa, 0u), '-')) {
-        if (negative_out)
-            *negative_out = 1;
-        return string_substring(mantissa, 1u, len - 1u);
-    }
-
-    return string_clone(mantissa);
-}
-
+/* Native decimal extraction produces ASCII digits, so their positions are byte indices. */
 static int qf_digit_text_length(const string_t *digits)
 {
     size_t len;
 
     if (!digits)
         return 0;
-    len = string_length(digits);
+    len = string_byte_length(digits);
     return len <= (size_t)INT_MAX ? (int)len : INT_MAX;
 }
 
@@ -255,10 +159,11 @@ static char qf_digit_text_at(const string_t *digits, int index)
 
     if (!digits || index < 0)
         return '0';
-    len = string_length(digits);
+    len = string_byte_length(digits);
     if ((size_t)index >= len)
         return '0';
-    return rune_to_ascii(string_at(digits, (size_t)index), &ch) && ch >= '0' && ch <= '9' ? ch : '0';
+    ch = string_c_str(digits)[index];
+    return ch >= '0' && ch <= '9' ? ch : '0';
 }
 
 static bool qf_digit_text_replace_at(string_t **digits_ptr, int index, char digit)
@@ -274,12 +179,12 @@ static bool qf_digit_text_replace_at(string_t **digits_ptr, int index, char digi
         return false;
 
     digits = *digits_ptr;
-    len = string_length(digits);
+    len = string_byte_length(digits);
     if ((size_t)index >= len)
         return false;
 
-    prefix = string_substring(digits, 0u, (size_t)index);
-    suffix = string_substring(digits, (size_t)index + 1u, len - (size_t)index - 1u);
+    prefix = string_substr(digits, 0u, (size_t)index);
+    suffix = string_substr(digits, (size_t)index + 1u, len - (size_t)index - 1u);
     next = string_new();
     ok = prefix && suffix && next && string_append_string(next, prefix) == 0 && string_append_char(next, digit) == 0 &&
          string_append_string(next, suffix) == 0;
@@ -326,11 +231,11 @@ static bool qf_digit_text_truncate(string_t **digits_ptr, int keep_digits)
     if (keep_digits < 0)
         keep_digits = 0;
 
-    len = string_length(*digits_ptr);
+    len = string_byte_length(*digits_ptr);
     if ((size_t)keep_digits >= len)
         return true;
 
-    next = string_substring(*digits_ptr, 0u, (size_t)keep_digits);
+    next = string_substr(*digits_ptr, 0u, (size_t)keep_digits);
     if (!next)
         return false;
 
@@ -385,9 +290,10 @@ static string_t *qf_finalise_fixed_q_text(string_t *text)
     if (!text)
         return NULL;
 
-    len = string_length(text);
-    if (len >= 2u && rune_is_equal(string_at(text, 0u), '0') && rune_is_digit(string_at(text, 1u))) {
-        string_t *trimmed = string_substring(text, 1u, len - 1u);
+    len = string_byte_length(text);
+    const char *bytes = string_c_str(text);
+    if (len >= 2u && bytes[0] == '0' && bytes[1] >= '0' && bytes[1] <= '9') {
+        string_t *trimmed = string_substr(text, 1u, len - 1u);
 
         string_free(text);
         return trimmed;
@@ -401,18 +307,8 @@ static string_t *qf_finalise_fixed_q_text(string_t *text)
     return text;
 }
 
-typedef struct {
-    char conversion;
-    int flag_plus;
-    int flag_space;
-    int flag_minus;
-    int flag_zero;
-    int flag_hash;
-    int width;
-    int precision;
-} qf_format_options_t;
-
-static int qf_format_options_from_spec(qf_format_options_t *opts, const string_format_spec_t *spec, va_list ap)
+/* Resolve shared conversion options once, consuming only dynamic width and precision arguments. */
+int qfi_format_options_from_spec(qfi_format_options_t *opts, const string_format_spec_t *spec, va_list ap)
 {
     if (!opts || !spec || spec->length[0] != '\0')
         return -1;
@@ -433,33 +329,44 @@ static int qf_format_options_from_spec(qf_format_options_t *opts, const string_f
     return 0;
 }
 
-static string_t *qf_format_q_value_text(qfloat_t x, const qf_format_options_t *opts)
+static string_t *qf_scientific_q_text(const string_t *digits, int negative, int exp10)
 {
-    string_t *sci_text = NULL;
-    string_t *mantissa = NULL;
-    string_t *unsigned_mantissa = NULL;
-    string_t *intpart = NULL;
-    string_t *fracpart = NULL;
+    int count = qf_digit_text_length(digits);
+    string_t *out = string_new();
+
+    if (!out)
+        return NULL;
+    while (count > 1 && qf_digit_text_at(digits, count - 1) == '0')
+        count--;
+    if ((negative && string_append_char(out, '-') != 0) ||
+        string_append_char(out, qf_digit_text_at(digits, 0)) != 0 ||
+        (count > 1 && string_append_char(out, '.') != 0))
+        goto fail;
+    for (int i = 1; i < count; ++i) {
+        if (string_append_char(out, qf_digit_text_at(digits, i)) != 0)
+            goto fail;
+    }
+    if (string_append_format(out, "e%+d", exp10) < 0)
+        goto fail;
+    return out;
+
+fail:
+    string_free(out);
+    return NULL;
+}
+
+static string_t *qf_format_q_value_text(qfloat_t x, const qfi_format_options_t *opts)
+{
     string_t *digits_text = NULL;
     string_t *out = NULL;
     string_t *padded = NULL;
-    string_offset_t marker_pos;
     int exp10 = 0;
     int negative = 0;
     int nd;
     int fixed_dp;
-    string_offset_t dot_pos;
 
-    sci_text = qf_to_string(x);
-    if (!sci_text)
-        return NULL;
-
-    marker_pos = qf_exponent_marker_pos(sci_text);
-    if (marker_pos >= 0 && qf_parse_exp10_text(sci_text, marker_pos, &exp10) != 0)
-        goto done;
-
-    if (marker_pos < 0 || exp10 < -6 || exp10 > 32) {
-        string_t *core = qf_normalised_scientific_text(sci_text, marker_pos);
+    if ((x.hi == 0.0 && x.lo == 0.0) || isnan(x.hi) || isnan(x.lo) || isinf(x.hi)) {
+        string_t *core = qf_to_text(x);
 
         if (core)
             padded = qf_signed_padded_text(core, opts->flag_plus, opts->flag_space, opts->width, opts->flag_minus,
@@ -468,28 +375,24 @@ static string_t *qf_format_q_value_text(qfloat_t x, const qf_format_options_t *o
         goto done;
     }
 
-    mantissa = string_substr(sci_text, 0u, (size_t)marker_pos);
-    unsigned_mantissa = qf_unsigned_mantissa_text(mantissa, &negative);
-    if (!mantissa || !unsigned_mantissa)
-        goto done;
-
-    dot_pos = string_find(unsigned_mantissa, ".");
-    if (dot_pos >= 0) {
-        size_t mantissa_len = string_view_length(string_view_all(unsigned_mantissa));
-
-        intpart = string_substr(unsigned_mantissa, 0u, (size_t)dot_pos);
-        fracpart = string_substr(unsigned_mantissa, (size_t)dot_pos + 1u, mantissa_len - (size_t)dot_pos - 1u);
-    } else {
-        intpart = string_clone(unsigned_mantissa);
-        fracpart = string_new();
+    negative = x.hi < 0.0 || (x.hi == 0.0 && x.lo < 0.0);
+    if (negative) {
+        x.hi = -x.hi;
+        x.lo = -x.lo;
     }
-    if (!intpart || !fracpart)
-        goto done;
-
-    digits_text = string_sprintf("%S%S", intpart, fracpart);
+    digits_text = qf_decimal_digits_text(x, 34, &exp10);
     if (!digits_text)
         goto done;
-    fixed_dp = (int)string_length(intpart) + exp10;
+    if (exp10 < -6 || exp10 > 32) {
+        string_t *core = qf_scientific_q_text(digits_text, negative, exp10);
+
+        if (core)
+            padded = qf_signed_padded_text(core, opts->flag_plus, opts->flag_space, opts->width, opts->flag_minus,
+                                           opts->flag_zero, 0);
+        string_free(core);
+        goto done;
+    }
+    fixed_dp = 1 + exp10;
     nd = qf_digit_text_length(digits_text);
 
     if (nd > 32) {
@@ -590,16 +493,11 @@ static string_t *qf_format_q_value_text(qfloat_t x, const qf_format_options_t *o
     padded = qf_pad_text(out, opts->width, opts->flag_minus, opts->flag_zero, 0);
 
 done:
-    string_free(sci_text);
-    string_free(mantissa);
-    string_free(unsigned_mantissa);
-    string_free(intpart);
-    string_free(fracpart);
     string_free(digits_text);
     string_free(out);
     return padded;
 }
-static string_t *qf_format_Q_value_text(qfloat_t x, const qf_format_options_t *opts)
+static string_t *qf_format_Q_value_text(qfloat_t x, const qfi_format_options_t *opts)
 {
     string_t *digits_text = NULL;
     string_t *out = NULL;
@@ -710,9 +608,18 @@ fail:
     return NULL;
 }
 
-static string_t *qf_format_value_text(qfloat_t x, const qf_format_options_t *opts)
+/* Share native conversion formatting without reconstructing or parsing a format string. */
+string_t *qfi_format_value_text(qfloat_t x, const qfi_format_options_t *opts)
 {
     if (!opts)
+        return NULL;
+    if (strchr("fFeEgG", opts->conversion) && opts->conversion) {
+        string_t *core = qfi_format_decimal_text(x, opts);
+        string_t *out = core ? qf_pad_text(core, opts->width, opts->flag_minus, opts->flag_zero, 1) : NULL;
+        string_free(core);
+        return out;
+    }
+    if (opts->conversion != 'q' && opts->conversion != 'Q')
         return NULL;
     return opts->conversion == 'Q' ? qf_format_Q_value_text(x, opts) : qf_format_q_value_text(x, opts);
 }
@@ -720,7 +627,7 @@ static string_t *qf_format_value_text(qfloat_t x, const qf_format_options_t *opt
 static string_format_result_t qf_format_callback(string_t *out, const string_format_spec_t *spec, va_list ap,
                                                  void *user)
 {
-    qf_format_options_t opts;
+    qfi_format_options_t opts;
     string_t *text;
     qfloat_t value;
 
@@ -731,11 +638,11 @@ static string_format_result_t qf_format_callback(string_t *out, const string_for
     if (spec->conversion != 'q' && spec->conversion != 'Q')
         return STRING_FORMAT_UNHANDLED;
 
-    if (qf_format_options_from_spec(&opts, spec, ap) != 0)
+    if (qfi_format_options_from_spec(&opts, spec, ap) != 0)
         return STRING_FORMAT_ERROR;
 
     value = va_arg(ap, qfloat_t);
-    text = qf_format_value_text(value, &opts);
+    text = qfi_format_value_text(value, &opts);
     if (!text)
         return STRING_FORMAT_ERROR;
 

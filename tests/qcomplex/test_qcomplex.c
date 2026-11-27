@@ -4,20 +4,23 @@
  *
  * Checks value construction, arithmetic, mathematical functions, parsing and output against expected complex
  * behaviour. It exercises the native fixed-precision layer rather than the generic number dispatcher.
+ * Database-backed coefficient cases check exact component signs alongside the executable parsing assertions.
  *
  * Used by the project test harness for regression verification. Select cases through tests/test_config.json and
  * run suites sequentially; this source is not part of the installed library.
  */
 
+#include <limits.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-#include "qcomplex-t.h"
-#include "qfloat-t.h"
 #include "string-t.h"
+#include "qfloat-t.h"
+#include "qcomplex-t.h"
 #include "test_harness.h"
+#include "test_database.h"
 
 TEST_SUITE_CONFIG(TEST_CONFIG_GLOBAL);
 static int qcomplex_validity_equal(const void *got_input, const void *want_input, void *ctx);
@@ -371,6 +374,9 @@ static void test_log(void)
 static void test_pow_sqrt(void)
 {
     printf(C_CYAN "TEST: pow/sqrt\n" C_RESET);
+
+    check_qc("integer powers accept the minimum int exponent", qc_pow(QC_NEG_ONE, qcr((double)INT_MIN)),
+             INT_MIN % 2 == 0 ? QC_ONE : QC_NEG_ONE, 1e-30);
 
     check_qc("sqrt(-1) = i", qc_sqrt(qcr(-1.0)), qci(1.0), 1e-30);
     check_qc("sqrt(2i) = 1+i", qc_sqrt(qci(2.0)), qcz(1.0, 1.0), 1e-30);
@@ -1288,6 +1294,18 @@ static void test_printf(void)
     qc_sprintf(buf, sizeof(buf), "%-20.2z|", z35);
     check_str("%-20.2z left-align", buf, "3.00                 + 5.00                i|");
 
+    qc_sprintf(buf, sizeof(buf), "%*.*z/%d", -8, 2, z35, 7);
+    check_str("dynamic complex fields consume arguments once", buf, "3.00     + 5.00    i/7");
+
+    qc_sprintf(buf, sizeof(buf), "%*.*Z/%d", 0, 2, z35, 7);
+    check_str("dynamic scientific fields consume arguments once", buf, "3.00e+0 + 5.00e+0i/7");
+
+    qc_sprintf(buf, sizeof(buf), "%*.*q/%d", -8, 2, qf_from_double(1.25), 7);
+    check_str("dynamic real fields consume arguments once", buf, "1.25    /7");
+
+    qc_sprintf(buf, sizeof(buf), "%.*z", -1, z35);
+    check_str("negative dynamic precision retains defaults", buf, "3 + 5i");
+
     /* Pure imaginary / pure real */
     qc_sprintf(buf, sizeof(buf), "%.1z", pure_im);
     check_str("%.1z pure imaginary", buf, "2.5i");
@@ -1715,6 +1733,29 @@ static void test_from_string(void)
    Entry point
    ==================================================================== */
 
+static bool exact_qfloat_components(qfloat_t got, qfloat_t want)
+{
+    return got.hi == want.hi && got.lo == want.lo && !!signbit(got.hi) == !!signbit(want.hi) &&
+           !!signbit(got.lo) == !!signbit(want.lo);
+}
+
+static void test_native_coefficient_case(const void *data)
+{
+    const test_database_case_t *row = data;
+    qcomplex_t got = qc_from_text(row->input);
+    qcomplex_t want = qc_from_text(row->expected);
+
+    TEST_ASSERT_TRUE(exact_qfloat_components(qc_real(got), qc_real(want)) &&
+                     exact_qfloat_components(qc_imag(got), qc_imag(want)),
+                     "implicit coefficients retain exact native components, including signed zeros");
+}
+
+static void test_native_coefficients(void)
+{
+    test_run_database_cases(__FILE__, __LINE__, "qcomplex.native_coefficients", "tests.test_native_coefficients",
+                            test_native_coefficient_case);
+}
+
 int tests_main(void)
 {
     TEST_RUN_IN_GROUP(test_arithmetic_group, tests, NULL);
@@ -1723,6 +1764,7 @@ int tests_main(void)
     TEST_RUN_IN_GROUP(test_special_group, tests, NULL);
     TEST_RUN_IN_GROUP(test_util_group, tests, NULL);
     TEST_RUN_IN_GROUP(test_from_string, tests, NULL);
+    TEST_RUN_IN_GROUP(test_native_coefficients, tests, "qcomplex,parse,coefficients");
     TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_euler_identity, readme_examples, "qcomplex,readme,output");
     TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_struve_l, readme_examples, "qcomplex,readme,output");
     TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_bessel_i, readme_examples, "qcomplex,readme,output");

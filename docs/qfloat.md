@@ -149,11 +149,49 @@ built from argument reduction, polynomial or rational approximation,
 Newton-style refinement, and renormalisation back into `(hi, lo)` form.
 Special functions build on the same arithmetic core.
 
+`qf_sin` and `qf_cos` evaluate only the polynomial required by the reduced
+quadrant. `qf_tan`, `qf_cot` and the digamma and tetragamma reflection formulas
+share argument reduction and the two polynomials when both sine and cosine
+are needed. The coefficients, arithmetic within each polynomial and existing
+pole handling are unchanged.
+
+`qf_coth` shares the two exponentials needed for hyperbolic sine and cosine.
+Controlled internal helpers also let the native complex module reuse paired
+circular and hyperbolic evaluations without changing the public API.
+
+The exponential kernel hoists invariant scaling out of its polynomial recurrence
+and uses degree 25. Over the conservative reduced interval `|r| <= 0.35`, the
+omitted stored Chebyshev coefficients contribute less than `5e-39` relative error,
+well below the roughly `1e-32` rounding scale of double-double arithmetic.
+Independent 256-bit reference values in `tests/qfloat/test_qfloat.sql` cover
+reduction boundaries and finite arguments from -600 to 600, with assertions in C.
+Square root retains its four-step Newton limit but returns early when both native
+components stop changing, without a tolerance-based convergence shortcut.
+Integer powers omit the final unused square and form negative exponent magnitudes
+without signed overflow, including `INT_MIN`.
+
 ### Formatting and Parsing
 
 `qfloat_t` supports decimal parsing and high-precision formatting, making it
 suitable for both numeric work and regression tests. The `%q`/`%Q` specifiers
 extend `printf` for `qfloat_t` arguments passed by value.
+Decimal parsing scales the significand directly, retaining trailing-component
+precision when a long decimal significand has a small scientific exponent.
+The `%q` formatter takes its digits and exponent directly from native decimal
+conversion, avoiding a scientific-text round trip. The complex formatter shares
+resolved real-format options through a controlled internal interface; public
+format strings are parsed once, including dynamic width and precision.
+Generated decimal digits are ASCII, so native output uses direct byte indexing
+and copying rather than repeated grapheme scans.
+With `qfloat-t.h` included, the [format module](format.md) additionally accepts `FMT(qfloat_value)` and
+explicit `f`/`e`/`g` presentations. Those round the exact sum of the stored
+binary components to nearest with ties to even, using native bounded integer
+conversion. More digits reveal the stored approximation rather than adding
+mathematical precision; existing `q`/`Q` conventions remain available.
+Use `fmt_arg_qfloat()` for an explicit binding. No additional formatting
+header or runtime registration is needed. Capturing allocates no memory;
+the immutable module-owned adapter validates presentations and preserves native
+rendering and borrowing rules.
 
 ## Tradeoffs
 
@@ -989,3 +1027,9 @@ body p:has(> .katex) {
     text-align: left;
 }
 </style>
+
+Typed interpolation also accepts [Excel custom codes](format.md#excel-custom-codes).
+Its decimal and scientific fields use the exact sum of the stored components,
+with halves rounded away from zero. This does not change native `q`/`Q` output
+or the ties-to-even rule for ordinary typed `f`/`e`/`g` presentations. Custom codes
+support signed zero, sign sections, conditions, ANSI colours and numeric dates.

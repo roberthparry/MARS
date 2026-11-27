@@ -232,7 +232,7 @@ bool checks_fixtures_settings(checks_fixtures_t *fixtures, const string_t *code)
          string_find(code, "globe_open_configured(") >= 0);
     if (!installed || fixtures->settings_loaded) return true;
     if (!mars_settings_isolate() || !mars_settings_load()) {
-        fputs("Cannot load configured databases for the README example.\n", stderr);
+        fputs("Cannot load README settings; check mars.json and access to the desktop key store.\n", stderr);
         return false;
     }
     fixtures->settings_loaded = true;

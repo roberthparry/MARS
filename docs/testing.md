@@ -133,6 +133,8 @@ empty database keys, take precedence. The runner reads settings through an isola
 helper and never puts credentials in command arguments or result files. It does not
 install missing data. Other examples, including the disposable globe-reader fixture,
 need no installed configuration or desktop key store.
+Installed-data examples require access to the desktop D-Bus session; a restricted
+execution environment can block that connection even when the key store is unlocked.
 
 ```sh
 make test_qfloat
@@ -274,10 +276,14 @@ names, durations and sample counts reflect your recorded runs.
 Profiles are loaded into dictionary indexes and the connection is closed before
 tests run. Reports are written afterwards in a transaction. A reporting failure
 prints a warning and leaves the console result and exit status intact. Storage
-is capped at 64 MiB of SQLite pages, 200 runs and 50,000 detailed results, with
-each detail limited to 4,096 characters. Lifetime statistics survive detailed
-report pruning. A counted duration distribution preserves the exact lifetime
-median, alongside lifetime count, fastest, slowest and mean durations. It also
+retains at most 200 runs and 50,000 detailed results, with each detail limited
+to 4,096 characters. Lifetime counts, fastest, slowest and mean durations survive
+report pruning in one aggregate row per case. A bounded window holds the latest
+31 accepted ordinary timings recorded for each case and supplies their exact
+recent median. Sample rows use compact numeric case identifiers, so they do not
+repeat source filenames and group paths. The metrics view exposes `median_samples`;
+statistics details and TSV exports include this window count. The summary's
+`Samples` column remains the lifetime accepted count used for the mean. Storage also
 keeps the last execution date, outcome and duration, the last two ordinary run
 durations, their absolute and percentage change, whether the latest ordinary run
 took longer, and the last memory-test date. Unexecuted tests have no fabricated
@@ -299,6 +305,18 @@ absolute deviations, and that median plus 0.05 ms. These settings live in
 jitter; an outlier is a reason to investigate, not proof that a fix is faulty.
 Insufficient history never produces a regression warning. Skips and memory-tool
 runs are never classified as ordinary timing outliers.
+`test_timing_policy.window_samples` controls the retained window, with 31 as the
+default. The effective limit is at least `minimum_samples`, so increasing that
+minimum cannot make a complete baseline impossible. Only accepted timings advance
+the window; repeated outliers cannot age out the baseline or become normal.
+
+Upgrading an older database replaces its unbounded duration distribution with
+recent accepted observations from retained reports. A compact copy of each old
+baseline's median, median absolute deviation and sample count keeps warnings
+active until a recent window has enough observations. Older samples have no
+recorded chronology, so the migration does not present them as recent timings.
+Lifetime aggregates, saved selections, cases and recorded outlier evidence are
+preserved, and repeating synchronisation does not rebuild or reset the window.
 
 Ordinary timing statistics include executed passes and failures and exclude skips,
 disabled cases and memory-tool runs. Valgrind is detected through its client
@@ -309,9 +327,12 @@ checker. Memory-test dates record execution, not a claim that a later Valgrind
 leak report was clean. Older reports did not record instrumentation, and retain
 their original ordinary classification when imported.
 
-The 64 MiB limit applies to the complete database, including lifetime duration
-samples. Reaching it causes a reporting warning and transaction rollback; it
-never silently discards case definitions or lifetime statistics. SQLite journal
+Repeated runs retain at most one configured timing window per case alongside the
+bounded detailed reports. Lifetime aggregates and migration fallback estimates
+use constant space per case; adding new cases or increasing the configured window
+can still increase storage. Pruned pages are reused by later writes. Storage
+exhaustion causes a reporting warning and transaction rollback;
+it never silently discards case definitions or lifetime statistics. SQLite journal
 files can temporarily require additional space.
 
 Storage implementation details stay private to `tests/test_config`. Authorised

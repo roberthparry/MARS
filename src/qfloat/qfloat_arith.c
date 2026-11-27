@@ -82,28 +82,26 @@ qfloat_t qf_div(qfloat_t a, qfloat_t b)
     return qf_add(q1q, q2q);
 }
 
+/* Evaluate integer powers without a discarded final square or signed-magnitude overflow. */
 qfloat_t qf_pow_int(qfloat_t x, int n)
 {
     if (n == 0) {
         return QF_ONE;
     }
 
-    if (n < 0) {
-        qfloat_t r = qf_pow_int(x, -n);
-        return qf_div(QF_ONE, r);
-    }
-
+    unsigned int exponent = n < 0 ? 0u - (unsigned int)n : (unsigned int)n;
     qfloat_t result = QF_ONE;
     qfloat_t base = x;
 
-    while (n > 0) {
-        if (n & 1)
+    while (exponent > 0u) {
+        if (exponent & 1u)
             result = qf_mul(result, base);
-        base = qf_mul(base, base);
-        n >>= 1;
+        exponent >>= 1;
+        if (exponent > 0u)
+            base = qf_mul(base, base);
     }
 
-    return result;
+    return n < 0 ? qf_div(QF_ONE, result) : result;
 }
 
 qfloat_t qf_pow(qfloat_t x, qfloat_t y)
@@ -159,6 +157,7 @@ qfloat_t qf_ldexp(qfloat_t x, int e)
     return r;
 }
 
+/* Retain four Newton steps as the upper bound, stopping only at an unchanged native value. */
 qfloat_t qf_sqrt(qfloat_t x)
 {
     qfloat_t zero = QF_ZERO;
@@ -176,7 +175,10 @@ qfloat_t qf_sqrt(qfloat_t x)
     for (int i = 0; i < 4; ++i) {
         qfloat_t x_over_y = qf_div(x, y);
         qfloat_t sum = qf_add(y, x_over_y);
-        y = qf_mul(QF_HALF, sum);
+        qfloat_t next = qf_mul(QF_HALF, sum);
+        if (next.hi == y.hi && next.lo == y.lo)
+            return next;
+        y = next;
     }
 
     return y;

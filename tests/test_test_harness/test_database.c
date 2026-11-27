@@ -112,7 +112,7 @@ static void test_checkpoint_upgrade_preserves_history(void)
     bool matched = false;
     const char *fingerprint = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
     size_t passed = 37, saved_passed = 0;
-    ok = fixture.database && scalar(&fixture, "PRAGMA user_version") == 7 &&
+    ok = fixture.database && scalar(&fixture, "PRAGMA user_version") == 8 &&
         scalar(&fixture, "SELECT count(*) FROM test_run") == 1 &&
         scalar(&fixture, "SELECT count(*) FROM test_result WHERE timing_outlier=1") == 1 &&
         scalar(&fixture, "SELECT normal_count FROM test_case_statistics WHERE path='group.original'") == 1 &&
@@ -134,7 +134,7 @@ static void test_checkpoint_upgrade_preserves_history(void)
         "PRAGMA user_version=6;");
     test_database_close(fixture.database);
     fixture.database = ok ? test_database_open(fixture.root, fixture.path, true, NULL) : NULL;
-    ok = fixture.database && scalar(&fixture, "PRAGMA user_version") == 7 &&
+    ok = fixture.database && scalar(&fixture, "PRAGMA user_version") == 8 &&
         scalar(&fixture, "SELECT count(*) FROM test_checkpoint") == 1 &&
         test_database_checkpoint_read(fixture.database, "suite", fingerprint, &matched, NULL) && matched &&
         test_database_checkpoint_read(fixture.database, "suite", fingerprint, &matched, &saved_passed) && !matched &&
@@ -173,7 +173,7 @@ static void test_source_relocation_preserves_history(void)
         scalar(&fixture, "SELECT normal_count = 7 AND ordinary_count = 8 AND memory_test_count = 1"
                          " AND timing_outlier_count = 1 AND median_ms = 2.5 AND mean_ms = 2.5"
                          " FROM test_case_metrics WHERE source = 'tests/test_test_harness/test_test_harness.c'") == 1 &&
-        scalar(&fixture, "SELECT sum(sample_count) FROM test_timing_sample"
+        scalar(&fixture, "SELECT count(*) FROM test_timing_observation JOIN test_timing_window ON case_id=id"
                          " WHERE source = 'tests/test_test_harness/test_test_harness.c'") == 7 &&
         scalar(&fixture, "SELECT enabled = 0 FROM test_selection"
                          " WHERE source = 'tests/test_test_harness/test_test_harness.c'") == 1 &&
@@ -300,7 +300,7 @@ static void test_run_report_transactions_and_limits(void)
     fixture.database = test_database_open(fixture.root, fixture.path, false, NULL);
     ok = ok && fixture.database && scalar(&fixture, "SELECT count(*) FROM test_run") == 0;
     ok = ok && scalar(&fixture, "SELECT count(*) FROM test_case_statistics") == 0 &&
-         scalar(&fixture, "SELECT count(*) FROM test_timing_sample") == 0;
+         scalar(&fixture, "SELECT count(*) FROM test_timing_observation") == 0;
     char detail[5001];
     memset(detail, 'x', sizeof detail - 1u);
     detail[sizeof detail - 1u] = '\0';
@@ -314,8 +314,7 @@ static void test_run_report_transactions_and_limits(void)
          scalar(&fixture, "SELECT count(*) FROM test_run WHERE exit_code = 1 AND elapsed_ms = 4"
                           " AND started_utc <= finished_utc") == 200 &&
          scalar(&fixture, "SELECT normal_count FROM test_case_metrics WHERE path = 'group.original'") == 201 &&
-         scalar(&fixture, "SELECT sum(sample_count) FROM test_timing_sample") == 201 &&
-         scalar(&fixture, "PRAGMA max_page_count") * scalar(&fixture, "PRAGMA page_size") <= 67108864;
+         scalar(&fixture, "SELECT count(*) FROM test_timing_observation") == 31;
     ok = ok && test_database_run_begin(fixture.database, "many-results", NULL, false) &&
          test_database_exec(fixture.database,
              "WITH RECURSIVE indices(n) AS (VALUES(0) UNION ALL SELECT n+1 FROM indices WHERE n < 50000)\n"
@@ -420,7 +419,7 @@ static void test_lifetime_statistics_exclude_memory_and_skips(void)
          scalar(&fixture, "SELECT normal_count = 0 AND memory_test_count = 1 AND median_ms IS NULL"
                           " AND mean_ms IS NULL AND fastest_ms IS NULL AND slowest_ms IS NULL"
                           " FROM test_case_metrics WHERE path = 'only_memory'") == 1 &&
-         scalar(&fixture, "SELECT sum(sample_count) FROM test_timing_sample") == 8;
+         scalar(&fixture, "SELECT count(*) FROM test_timing_observation") == 8;
     fixture_close(&fixture);
     TEST_ASSERT_TRUE(ok, "exact even/odd medians, chronological comparisons and zero times exclude memory tools and skips");
 }
@@ -441,7 +440,7 @@ static void test_timing_outliers_preserve_evidence_and_baseline(void)
                           " FROM test_case_metrics WHERE path = 'group.original'") == 1 &&
          scalar(&fixture, "SELECT count(*) FROM test_result WHERE timing_outlier = 1"
                           " AND baseline_median_ms = 10 AND outlier_threshold_ms = 15 AND outcome = 'pass'") == 2 &&
-         scalar(&fixture, "SELECT sum(sample_count) FROM test_timing_sample") == 7 &&
+         scalar(&fixture, "SELECT count(*) FROM test_timing_observation") == 7 &&
          report_sample(&fixture, 10, "pass", "2024-03-04T00:00:00.000Z", false) &&
          report_sample(&fixture, 1000, "pass", "2024-03-05T00:00:00.000Z", true) &&
          scalar(&fixture, "SELECT normal_count = 8 AND ordinary_count = 10 AND timing_outlier_count = 2"
@@ -477,6 +476,144 @@ static void test_timing_outliers_allow_prior_variability(void)
                           " AND baseline_median_ms = 10 AND outlier_threshold_ms = 16") == 1;
     fixture_close(&fixture);
     TEST_ASSERT_TRUE(ok, "weighted median absolute deviation distinguishes ordinary variation from a significant slowdown");
+}
+
+static void test_recent_timing_window_preserves_lifetime_statistics(void)
+{
+    database_fixture_t fixture = {0};
+    TEST_ASSERT_TRUE(fixture_open(&fixture, true), "prepare a bounded recent timing window");
+    bool ok = true;
+    for (unsigned i = 0; ok && i < 100u; ++i)
+        ok = report_sample(&fixture, 100.0 - i, "pass", "2024-05-01T00:00:00.000Z", false);
+    ok = ok && scalar(&fixture, "SELECT count(*) FROM test_timing_observation") == 31 &&
+         scalar(&fixture, "SELECT min(sample_ordinal) FROM test_timing_observation") == 70 &&
+         scalar(&fixture, "SELECT normal_count=100 AND median_samples=31 AND median_ms=16 AND mean_ms=50.5\n"
+                          " AND fastest_ms=1 AND slowest_ms=100 FROM test_case_metrics WHERE path='group.original'") == 1 &&
+         report_sample(&fixture, 1000, "pass", "2024-05-02T00:00:00.000Z", false) &&
+         report_sample(&fixture, 5000, "pass", "2024-05-03T00:00:00.000Z", true) &&
+         report_sample(&fixture, 0, "skip", "2024-05-04T00:00:00.000Z", false) &&
+         scalar(&fixture, "SELECT count(*) FROM test_timing_observation") == 31 &&
+         scalar(&fixture, "SELECT normal_count=100 AND ordinary_count=101 AND timing_outlier_count=1\n"
+                          " AND memory_test_count=1 AND median_ms=16 AND mean_ms=50.5 AND slowest_ms=1000\n"
+                          " FROM test_case_metrics WHERE path='group.original'") == 1 &&
+         scalar(&fixture, "SELECT count(*) FROM test_result WHERE elapsed_ms=1000 AND timing_outlier=1\n"
+                          " AND baseline_median_ms=16 AND outlier_threshold_ms=64") == 1 &&
+         test_database_exec(fixture.database, "UPDATE test_timing_policy SET window_samples=3 WHERE name='default'") &&
+         report_sample(&fixture, 0.5, "pass", "2024-05-05T00:00:00.000Z", false) &&
+         scalar(&fixture, "SELECT count(*) FROM test_timing_observation") == 7 &&
+         scalar(&fixture, "SELECT normal_count=101 AND median_samples=7 AND median_ms=3\n"
+                          " FROM test_case_metrics WHERE path='group.original'") == 1;
+    fixture_close(&fixture);
+    TEST_ASSERT_TRUE(ok, "recent timings stay bounded, lifetime aggregates survive and excluded runs cannot move the baseline");
+}
+
+static bool report_named_timing(database_fixture_t *fixture, const char *path, double milliseconds, bool memory_test)
+{
+    test_database_result_t row = result_record();
+    row.path = path;
+    row.name = path;
+    row.elapsed_ms = milliseconds;
+    row.finished_utc = "2024-06-01T00:00:00.000Z";
+    return test_database_run_begin(fixture->database, "migration-fixture", NULL, memory_test) &&
+           test_database_run_record(fixture->database, &row) &&
+           test_database_run_finish(fixture->database, 0, milliseconds);
+}
+
+static void test_timing_window_upgrade_preserves_baselines(void)
+{
+    database_fixture_t fixture = {0};
+    TEST_ASSERT_TRUE(fixture_open(&fixture, true), "prepare an older counted timing distribution");
+    bool ok = true;
+    for (unsigned i = 0; ok && i < 7u; ++i)
+        ok = report_sample(&fixture, 10, "pass", "2024-06-01T00:00:00.000Z", false);
+    ok = ok && report_sample(&fixture, 25, "pass", "2024-06-02T00:00:00.000Z", false) &&
+         report_sample(&fixture, 10, "pass", "2024-06-03T00:00:00.000Z", false);
+    const double ordinary[] = {8, 9, 10, 10, 10, 11, 12};
+    for (size_t i = 0; ok && i < sizeof ordinary / sizeof *ordinary; ++i)
+        ok = report_named_timing(&fixture, "pruned", ordinary[i], false);
+    ok = ok && report_named_timing(&fixture, "pruned", 17, false) &&
+         report_named_timing(&fixture, "pruned", 999, true) &&
+         test_database_profile_create(fixture.database, "saved", false) &&
+         test_database_profile_set(fixture.database, "saved", "tests/example.c", "group.original", false) &&
+         test_database_exec(fixture.database,
+             "CREATE TABLE test_timing_sample(source TEXT,path TEXT,elapsed_ms REAL,sample_count INTEGER,\n"
+             "    PRIMARY KEY(source,path,elapsed_ms)) WITHOUT ROWID;\n"
+             "INSERT INTO test_timing_sample\n"
+             "SELECT source,path,elapsed_ms,count(*) FROM test_timing_observation\n"
+             "JOIN test_timing_window ON case_id=id GROUP BY source,path,elapsed_ms;\n"
+             "DELETE FROM test_result WHERE path='pruned' AND timing_outlier=0\n"
+             "    AND run_id IN (SELECT id FROM test_run WHERE memory_test=0);\n"
+             "DROP TABLE test_timing_observation; DROP TABLE test_timing_window;\n"
+             "DROP TABLE test_timing_policy;\n"
+             "CREATE TABLE test_timing_policy(name TEXT PRIMARY KEY,minimum_samples INTEGER,\n"
+             "    median_multiplier REAL,deviation_multiplier REAL,minimum_change_ms REAL) WITHOUT ROWID;\n"
+             "INSERT INTO test_timing_policy VALUES ('default',7,1.4,6,0.05);\n"
+             "PRAGMA user_version=7;");
+    test_database_close(fixture.database);
+    string_t *error = NULL;
+    fixture.database = ok ? test_database_open(fixture.root, fixture.path, true, &error) : NULL;
+    if (ok && !fixture.database) printf("Timing upgrade: %s\n", error ? string_c_str(error) : "no diagnostic");
+    string_free(error);
+    ok = ok && fixture.database && scalar(&fixture, "PRAGMA user_version") == 8 &&
+         scalar(&fixture, "SELECT count(*) FROM sqlite_master WHERE name='test_timing_sample'") == 0 &&
+         scalar(&fixture, "SELECT normal_count=8 AND median_samples=8 AND median_ms=10 AND mean_ms=10\n"
+                          " AND timing_outlier_count=1 FROM test_case_metrics WHERE path='group.original'") == 1 &&
+         scalar(&fixture, "SELECT normal_count=7 AND median_samples=0 AND median_ms IS NULL AND mean_ms=10\n"
+                          " AND timing_outlier_count=1 AND memory_test_count=1\n"
+                          " FROM test_case_metrics WHERE path='pruned'") == 1 &&
+         scalar(&fixture, "SELECT legacy_median_ms=10 AND legacy_mad_ms=1 AND legacy_sample_count=7\n"
+                          " FROM test_timing_window WHERE path='pruned'") == 1 &&
+         scalar(&fixture, "SELECT count(*) FROM test_result WHERE elapsed_ms=25 AND timing_outlier=1\n"
+                          " AND baseline_median_ms=10 AND outlier_threshold_ms=15") == 1 &&
+         scalar(&fixture, "SELECT median_multiplier=1.4 AND window_samples=31 FROM test_timing_policy") == 1 &&
+         scalar(&fixture, "SELECT enabled FROM test_selection WHERE profile='saved'") == 0 &&
+         report_named_timing(&fixture, "pruned", 17, false) &&
+         scalar(&fixture, "SELECT count(*) FROM test_result WHERE path='pruned' AND elapsed_ms=17\n"
+                          " AND timing_outlier=1 AND baseline_median_ms=10 AND outlier_threshold_ms=16") == 2 &&
+         report_named_timing(&fixture, "pruned", 10, false) &&
+         scalar(&fixture, "SELECT normal_count=8 AND median_samples=1 AND timing_outlier_count=2\n"
+                          " FROM test_case_metrics WHERE path='pruned'") == 1;
+    test_database_close(fixture.database);
+    fixture.database = ok ? test_database_open(fixture.root, fixture.path, true, NULL) : NULL;
+    ok = ok && fixture.database && scalar(&fixture, "SELECT count(*) FROM test_timing_observation") == 9 &&
+         scalar(&fixture, "SELECT normal_count=8 AND timing_outlier_count=2\n"
+                          " FROM test_case_metrics WHERE path='pruned'") == 1;
+    fixture_close(&fixture);
+    TEST_ASSERT_TRUE(ok, "migration is idempotent, preserves lifetime evidence and keeps warnings active for pruned histories");
+}
+
+static void test_lifetime_storage_grows_past_former_limit(void)
+{
+    database_fixture_t fixture = {0};
+    TEST_ASSERT_TRUE(fixture_open(&fixture, true), "prepare storage at the former page limit");
+    bool ok = true;
+    for (unsigned i = 0; ok && i < 7u; ++i)
+        ok = report_sample(&fixture, 10, "pass", "2024-05-01T00:00:00.000Z", false);
+    ok = ok && report_sample(&fixture, 25, "pass", "2024-05-02T00:00:00.000Z", false) &&
+         test_database_profile_create(fixture.database, "saved", false) &&
+         test_database_profile_set(fixture.database, "saved", "tests/example.c", "group.original", false) &&
+         test_database_exec(fixture.database,
+             "INSERT INTO expression_cases(name,operation,input,expected,enabled)\n"
+             "VALUES ('capacity_custom','evaluate','1+1','2',0);\n"
+             "CREATE TABLE capacity_fixture(payload BLOB NOT NULL);\n"
+             "INSERT INTO capacity_fixture VALUES (zeroblob(67108864));") &&
+         scalar(&fixture, "PRAGMA page_count") * scalar(&fixture, "PRAGMA page_size") > 67108864;
+    test_database_close(fixture.database);
+    fixture.database = ok ? test_database_open(fixture.root, fixture.path, false, NULL) : NULL;
+    ok = ok && fixture.database && report_sample(&fixture, 10, "pass", "2024-05-03T00:00:00.000Z", false) &&
+         scalar(&fixture, "SELECT count(*) FROM test_run") == 9 &&
+         scalar(&fixture, "SELECT count(*) FROM test_result") == 9 &&
+         scalar(&fixture, "SELECT count(*) FROM test_result WHERE timing_outlier=1\n"
+                          " AND elapsed_ms=25 AND baseline_median_ms=10 AND outlier_threshold_ms=15") == 1 &&
+         scalar(&fixture, "SELECT normal_count=8 AND timing_outlier_count=1 AND mean_ms=10 AND median_ms=10\n"
+                          " FROM test_case_metrics WHERE path='group.original'") == 1 &&
+         scalar(&fixture, "SELECT count(*) FROM test_timing_observation") == 8 &&
+         scalar(&fixture, "SELECT enabled FROM test_selection WHERE profile='saved'") == 0 &&
+         scalar(&fixture, "SELECT enabled FROM expression_cases WHERE name='capacity_custom'") == 0 &&
+         scalar(&fixture, "SELECT length(payload) FROM capacity_fixture") == 67108864 &&
+         scalar(&fixture, "SELECT count(*) FROM pragma_foreign_key_check") == 0;
+    fixture_close(&fixture);
+    TEST_ASSERT_TRUE(ok, "storage grows beyond 64 MiB and reopens without losing cases, selections or timing evidence");
 }
 
 static bool create_legacy_reports(const string_t *path)
@@ -557,7 +694,7 @@ static void test_legacy_reports_merge_once_and_upgrade(void)
     file_t *old_single = file_new(fixture.path);
     ok = ok && old_single && file_copy(copy, old_single, false);
     fixture.database = test_database_open(fixture.root, fixture.path, true, NULL);
-    ok = ok && fixture.database && scalar(&fixture, "PRAGMA user_version") == 7 &&
+    ok = ok && fixture.database && scalar(&fixture, "PRAGMA user_version") == 8 &&
          scalar(&fixture, "SELECT normal_count = 2 AND median_ms = 25 FROM test_case_metrics"
                           " WHERE path = 'legacy_case'") == 1 &&
          test_database_import(fixture.database, fixture.root, NULL, true) &&
@@ -719,7 +856,7 @@ static void test_conditional_sync_retries_failed_import(void)
          file_write_all_text(file, original) && append_sql(source, addition) && conditional_sync(&fixture) == 0 &&
          scalar(&fixture, "SELECT count(*) FROM expression_cases WHERE name = 'conditional_retry_case'") == 1;
     ok = ok && test_database_exec(fixture.database, "DROP TABLE test_source_sync; PRAGMA user_version = 4;") &&
-         conditional_sync(&fixture) == 0 && scalar(&fixture, "PRAGMA user_version") == 7 &&
+         conditional_sync(&fixture) == 0 && scalar(&fixture, "PRAGMA user_version") == 8 &&
          scalar(&fixture, "SELECT count(*) FROM test_source_sync") == 1;
     string_free(original);
     file_free(file);
@@ -1141,6 +1278,9 @@ void test_harness_database_cases(void)
     TEST_RUN_CASE(test_lifetime_statistics_exclude_memory_and_skips, "database,statistics,median,memory-exclusion");
     TEST_RUN_CASE(test_timing_outliers_preserve_evidence_and_baseline, "database,statistics,outliers,preservation");
     TEST_RUN_CASE(test_timing_outliers_allow_prior_variability, "database,statistics,outliers,variation");
+    TEST_RUN_CASE(test_recent_timing_window_preserves_lifetime_statistics, "database,statistics,window,preservation");
+    TEST_RUN_CASE(test_timing_window_upgrade_preserves_baselines, "database,migration,window,preservation");
+    TEST_RUN_CASE(test_lifetime_storage_grows_past_former_limit, "database,statistics,capacity,preservation");
     TEST_RUN_CASE(test_legacy_reports_merge_once_and_upgrade, "database,migration,statistics,preservation");
     TEST_RUN_CASE(test_checkpoint_upgrade_preserves_history, "database,migration,checkpoint,preservation");
     TEST_RUN_CASE(test_fixture_and_unrelated_database_protection, "database,fixtures");

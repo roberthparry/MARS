@@ -14,6 +14,8 @@
  * Use qfloat_t for the underlying real arithmetic and number_t for the common
  * MARS numeric interface, exact values or configurable multiprecision. Complex
  * functions follow their documented branch and domain conventions.
+ *
+ * Including this header also enables FMT() selection through the module-owned fmt_arg_qcomplex() adapter.
  */
 
 #ifndef MARS_QCOMPLEX_H
@@ -22,6 +24,7 @@
 #include <stdarg.h>
 #include <stddef.h>
 
+#include "format-t.h"
 #include "qfloat-t.h"
 
 typedef struct _string_t string_t;
@@ -891,5 +894,18 @@ string_t *qc_sprintf_text(const char *fmt, ...);
  * @return Number of characters written.
  */
 int qc_printf(const char *fmt, ...);
+
+/**
+ * @brief Copy native complex components into a typed formatting binding.
+ * @param value Copied scalar; both coordinates retain their native precision.
+ * @return Allocation-free descriptor requiring no release.
+ * @note Including this header enables FMT() selection. Capturing cannot fail
+ * or change formatting diagnostics. Native presentations and their validation are owned by this module.
+ */
+fmt_arg_t fmt_arg_qcomplex(qcomplex_t value);
+
+#undef MARS_FMT_SELECT_QC_
+/** @brief Enable this module's constructor in FMT() without changing other type associations. */
+#define MARS_FMT_SELECT_QC_(value, next) _Generic((value), qcomplex_t: fmt_arg_qcomplex, default: next)
 
 #endif /* MARS_QCOMPLEX_H */

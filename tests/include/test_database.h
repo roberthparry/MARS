@@ -3,7 +3,8 @@
  * @brief Test-only catalogue, selection profiles, bounded run history and disposable SQLite fixtures.
  *
  * Compiled test functions remain in C. The versioned tests/tests.db holds cases, catalogue, shared profiles,
- * lifetime statistics and bounded detailed reports. It survives make clean. The SQLite C API is used independently
+ * lifetime aggregates, bounded recent timing windows and bounded detailed reports. It survives make clean.
+ * The SQLite C API is used independently
  * of the MARS sqlite module being tested. Nothing opens
  * a database merely by linking this support. Normal builds, installation and applications never initialise it.
  * Callers run sequentially; close all management handles before running test cases. SQLite and storage suites use
@@ -114,7 +115,9 @@ typedef struct {
  * @param[in] create True permits creation; false requires an existing compatible database.
  * @param[out] error Optional destination for an owned diagnostic released with string_free(); initially set to NULL.
  * @return Owned connection released with test_database_close(), or NULL on I/O, schema or SQLite failure.
- * @note Existing unrelated databases are rejected. Connections have a one-second busy timeout and a 64 MiB page cap.
+ * @note Existing unrelated databases are rejected. Connections have a one-second busy timeout. Lifetime aggregates
+ * use one row per case; recent timing windows and completed detailed reports retain separate row-count limits.
+ * The default window retains 31 accepted observations, never fewer than the configured minimum baseline samples.
  * Compatible older schemas are upgraded when create is true. New module case definitions otherwise require
  * explicit synchronisation or release's conditional synchronisation of existing storage.
  * Opening the default database for writing imports and removes a validated legacy test_results.db after commit.
@@ -218,7 +221,7 @@ bool test_database_run_record(test_database_t *database, const test_database_res
  * @param[in] exit_code Actual process outcome, including setup failures.
  * @param[in] elapsed_ms Non-negative measured run duration.
  * @return True on success; false on failure. Retains at most 200 runs and 50000 detailed results.
- * Lifetime counts, extrema, means, exact median distributions and memory-test dates are preserved.
+ * Lifetime counts, extrema, means, bounded recent timing windows and memory-test dates are preserved.
  */
 bool test_database_run_finish(test_database_t *database, int exit_code, double elapsed_ms);
 

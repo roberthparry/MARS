@@ -48,6 +48,8 @@
  *
  * Pure arithmetic helpers never mutate their by-value inputs. Functions that
  * write to an existing `number_t` take a `number_t *` destination.
+ *
+ * Including this header also enables FMT() selection through the module-owned fmt_arg_number() adapter.
  */
 
 #ifndef MARS_NUMBER_H
@@ -58,8 +60,9 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "qcomplex-t.h"
+#include "format-t.h"
 #include "qfloat-t.h"
+#include "qcomplex-t.h"
 
 typedef struct _string_t string_t;
 
@@ -1328,5 +1331,18 @@ number_t num_Ei(const number_t number);
 number_t num_Li(const number_t number);
 number_t num_E1(const number_t number);
 /** @} */
+
+/**
+ * @brief Borrow a native numerical handle for typed formatting.
+ * @param value Borrowed shallow handle; never modified or destroyed by formatting.
+ * @return Allocation-free descriptor, valid until the caller destroys or changes the borrowed payload.
+ * @note Including this header enables FMT() selection. Capturing cannot fail
+ * or change formatting diagnostics. Native presentations and their validation are owned by this module.
+ */
+fmt_arg_t fmt_arg_number(number_t value);
+
+#undef MARS_FMT_SELECT_NUM_
+/** @brief Enable this module's constructor in FMT() without changing other type associations. */
+#define MARS_FMT_SELECT_NUM_(value, next) _Generic((value), number_t: fmt_arg_number, default: next)
 
 #endif

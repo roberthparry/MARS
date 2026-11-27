@@ -71,6 +71,26 @@ extern const qfloat_t QFI_BERNOULLI_B10;
 qfloat_t qfi_zetap_difference_at_one(qfloat_t a);
 
 /**
+ * @brief Evaluate sine and cosine with shared native argument reduction and polynomial kernels.
+ * @param[in] x Angle in radians within the native trigonometric reduction range, passed by value.
+ * @param[out] sine Required caller-owned destination, distinct from cosine.
+ * @param[out] cosine Required caller-owned destination, distinct from sine.
+ * @return No value; scalar outputs follow qf_sin and qf_cos, including their existing domain behaviour.
+ * @note Allocates no storage and retains no pointers. Reentrant when callers use separate output storage.
+ */
+void qfi_sin_cos(qfloat_t x, qfloat_t *sine, qfloat_t *cosine);
+
+/**
+ * @brief Evaluate hyperbolic sine and cosine from one shared pair of native exponentials.
+ * @param[in] x Real argument, passed by value.
+ * @param[out] sine Required caller-owned destination, distinct from cosine.
+ * @param[out] cosine Required caller-owned destination, distinct from sine.
+ * @return No value; scalar outputs follow qf_sinh and qf_cosh, including their existing domain behaviour.
+ * @note Allocates no storage and retains no pointers. Reentrant when callers use separate output storage.
+ */
+void qfi_sinh_cosh(qfloat_t x, qfloat_t *sine, qfloat_t *cosine);
+
+/**
  * @brief Reduce a finite Clausen angle to [-pi, pi] without a machine-integer quotient.
  * @param theta Finite double-double angle in radians to reduce to the principal interval.
  * @return Double-double numeric result, with no separate storage to release.

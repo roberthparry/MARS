@@ -23,6 +23,29 @@ larger mathematical algorithms remain separate. Error-function adapters use
 All four Appell entry points live in `src/qcomplex/qcomplex_appell.c`; F₁ delegates to
 the complex two-variable Lauricella F_D implementation, while F₂–F₄ use the native Appell series.
 
+Circular and hyperbolic functions share their real sine/cosine and exponential
+factors. Tangent and cotangent evaluate both components of their ratios together;
+digamma and tetragamma reflection formulas reuse the same paired evaluations.
+Polar construction, complex exponentials, square roots and polar parsing also
+share trigonometric argument reduction. Sharing preserves the arithmetic within
+each component and the existing branch conventions; the underlying real-kernel
+optimisations are described in the [qfloat guide](qfloat.md).
+
+Integer powers omit the unused final square and safely form the magnitude of
+`INT_MIN`. The logarithm's existing near-axis threshold is stored in native
+double-double form instead of being parsed from text during evaluation.
+Implicit imaginary coefficients use native zero and unit values rather than
+manufactured numeric strings. Complex output forwards resolved formatting options
+to the real formatter without constructing another format string. Accepted input
+forms, component signs and output conventions are preserved.
+With `qcomplex-t.h` included, the [format module](format.md) accepts `FMT(complex_value)` with native defaults
+or component-wise `f`/`e`/`g` presentation. Decimal modes round exact stored
+components without narrowing; native zero and unit conventions still apply.
+Use `fmt_arg_qcomplex()` for an explicit binding. No additional formatting
+header or runtime registration is needed. Capturing allocates no memory;
+the immutable module-owned adapter validates presentations and preserves native
+rendering and borrowing rules.
+
 ## Signal functions
 
 `qc_sinc` is the entire complex continuation of normalised sinc, with value one
@@ -862,3 +885,9 @@ body p:has(> .katex) {
     text-align: left;
 }
 </style>
+
+[Excel custom codes](format.md#excel-custom-codes) are accepted by typed
+interpolation when the imaginary component is zero; the real component retains
+its native precision. Non-real values produce a checked type error because
+Excel numeric codes have no complex-number presentation. Use the ordinary
+native complex modes to display both components.

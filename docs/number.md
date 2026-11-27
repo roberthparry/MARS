@@ -2,6 +2,14 @@
 
 `number_t` is MARS's generic numeric value cluster.
 
+With `number-t.h` included, the [format module](format.md) accepts `FMT(number_value)` with native `n`/`N`
+presentations. It borrows the handle and preserves its backend precision and
+exact output, including Unicode fractions; callers retain normal ownership.
+Use `fmt_arg_number()` for an explicit binding. No additional formatting
+header or runtime registration is needed. Capturing allocates no memory;
+the immutable module-owned adapter validates presentations and preserves native
+rendering and borrowing rules.
+
 ## Implementation organisation
 
 Related algorithms are grouped by function family, with common numerical kernels shared where needed:
@@ -3050,3 +3058,11 @@ body td > .katex:has(.mfrac) {
     margin: 0.6em 0;
 }
 </style>
+
+Excel custom codes are also accepted by typed interpolation. Exact integers,
+MPFR values and native low components retain their stored precision in decimal
+and scientific fields; rational fields use a guarded decimal coefficient.
+Positive/negative/zero/text sections, conditions, ANSI colours, percentages,
+scaling, fractions and numeric date serials follow the
+[format module's documented conventions](format.md#excel-custom-codes).
+Non-real complex values require the ordinary native presentations.

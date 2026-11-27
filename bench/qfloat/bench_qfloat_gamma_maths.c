@@ -1,6 +1,6 @@
 /**
  * @file bench_qfloat_gamma_maths.c
- * @brief Double-double gamma-family performance measurements.
+ * @brief Double-double elementary and gamma-family performance measurements.
  *
  * Times selected real mathematical functions with emphasis on gamma-related operations. The executable supports
  * algorithm comparison without changing the qfloat public precision contract.
@@ -47,6 +47,12 @@ static void run_unary_case(const char *label, const char *text, qfloat_t (*fn)(q
 static void run_binary_case(const char *label, const char *lhs_text, const char *rhs_text,
                             qfloat_t (*fn)(qfloat_t, qfloat_t), int iters);
 
+/* Adapt the integer-exponent API to the unary timing runner. */
+static qfloat_t bench_qf_pow_int_two(qfloat_t x)
+{
+    return qf_pow_int(x, 2);
+}
+
 #define BENCH_UNARY_CASE(label, display, text, iters, fn)                                                              \
     {                                                                                                                  \
         label, display, BENCH_CASE_UNARY, text, NULL, iters,                                                           \
@@ -67,7 +73,17 @@ static bench_result_t bench_results[64];
 static size_t bench_result_count = 0u;
 
 static const bench_case_t bench_cases[] = {
+    BENCH_UNARY_CASE("sqrt_2", "qf_sqrt(2)", "2", 4000, qf_sqrt),
+    BENCH_UNARY_CASE("sqrt_4", "qf_sqrt(4)", "4", 4000, qf_sqrt),
+    BENCH_BINARY_CASE("pow_2_5_2", "qf_pow(2.5, 2)", "2.5", "2", 2000, qf_pow),
+    BENCH_UNARY_CASE("pow_int_2_5_2", "qf_pow_int(2.5, 2)", "2.5", 4000, bench_qf_pow_int_two),
+    BENCH_UNARY_CASE("sin_1", "qf_sin(1)", "1", 2000, qf_sin),
+    BENCH_UNARY_CASE("cos_1", "qf_cos(1)", "1", 2000, qf_cos),
+    BENCH_UNARY_CASE("tan_1", "qf_tan(1)", "1", 2000, qf_tan),
+    BENCH_UNARY_CASE("cot_1", "qf_cot(1)", "1", 2000, qf_cot),
+    BENCH_UNARY_CASE("coth_1", "qf_coth(1)", "1", 2000, qf_coth),
     BENCH_UNARY_CASE("exp_1", "qf_exp(1)", "1", 2000, qf_exp),
+    BENCH_UNARY_CASE("exp_neg_10", "qf_exp(-10)", "-10", 2000, qf_exp),
     BENCH_UNARY_CASE("log_10", "qf_log(10)", "10", 2000, qf_log),
     BENCH_UNARY_CASE("erf_0_5", "qf_erf(0.5)", "0.5", 2000, qf_erf),
     BENCH_UNARY_CASE("erfc_0_5", "qf_erfc(0.5)", "0.5", 2000, qf_erfc),

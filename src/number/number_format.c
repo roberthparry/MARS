@@ -15,10 +15,16 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "string-t.h"
 #include "number-t.h"
+#define MARS_SHARED_NUMBER_FORMAT_INTERNAL_ACCESS
+#include "internal/number_format_internal.h"
+#define MARS_SHARED_QFLOAT_FORMAT_INTERNAL_ACCESS
+#include "internal/qfloat_format_internal.h"
+#define MARS_SHARED_QCOMPLEX_FORMAT_INTERNAL_ACCESS
+#include "internal/qcomplex_format_internal.h"
 #define MARS_NUMBER_INTERNAL_ACCESS
 #include "number_internal.h"
-#include "string-t.h"
 
 char *number_strdup(const char *text)
 {
@@ -52,43 +58,29 @@ char *number_cstring_from_text(string_t *text)
 
 string_t *number_format_double_text(const number_t *number, bool scientific, int precision)
 {
-    char fmt[32];
     double value;
 
     if (!number)
         return NULL;
     value = number_impl_const(number)->value.d;
-    if (precision >= 0)
-        snprintf(fmt, sizeof(fmt), scientific ? "%%.%dE" : "%%.%dg", precision);
-    else
-        snprintf(fmt, sizeof(fmt), scientific ? "%%.16E" : "%%.17g");
-    return string_sprintf(fmt, value);
+    int digits = precision >= 0 ? precision : scientific ? 16 : 17;
+    return string_sprintf(scientific ? "%.*E" : "%.*g", digits, value);
 }
 
 string_t *number_format_qfloat_text(const number_t *number, bool scientific, int precision)
 {
-    char fmt[32];
-
     if (!number)
         return NULL;
-    if (precision >= 0)
-        snprintf(fmt, sizeof(fmt), scientific ? "%%.%dQ" : "%%.%dq", precision);
-    else
-        snprintf(fmt, sizeof(fmt), scientific ? "%%Q" : "%%q");
-    return qf_sprintf_text(fmt, number_impl_const(number)->value.qf);
+    qfi_format_options_t options = {.conversion = scientific ? 'Q' : 'q', .precision = precision};
+    return qfi_format_value_text(number_impl_const(number)->value.qf, &options);
 }
 
 string_t *number_format_qcomplex_text(const number_t *number, bool scientific, int precision)
 {
-    char fmt[32];
-
     if (!number)
         return NULL;
-    if (precision >= 0)
-        snprintf(fmt, sizeof(fmt), scientific ? "%%.%dZ" : "%%.%dz", precision);
-    else
-        snprintf(fmt, sizeof(fmt), scientific ? "%%Z" : "%%z");
-    return qc_sprintf_text(fmt, number_impl_const(number)->value.qc);
+    qfi_format_options_t options = {.conversion = scientific ? 'Z' : 'z', .precision = precision};
+    return qci_format_value_text(number_impl_const(number)->value.qc, &options);
 }
 
 string_t *number_format_mpfr_text(const number_t *number, bool scientific, int precision)
@@ -96,26 +88,19 @@ string_t *number_format_mpfr_text(const number_t *number, bool scientific, int p
     mpfr_srcptr value = number ? number_mpfr_value(number_impl_const(number)->value.mpfr) : NULL;
     int needed;
     char *out;
-    char fmt[32];
     string_t *text;
 
     if (!value)
         return NULL;
-    if (precision >= 0)
-        snprintf(fmt, sizeof(fmt), scientific ? "%%.%dRE" : "%%.%dRg", precision);
-    else
-        snprintf(fmt, sizeof(fmt), scientific ? "%%.*RE" : "%%.*Rg");
-    needed = precision >= 0 ? mpfr_snprintf(NULL, 0u, fmt, value)
-                            : mpfr_snprintf(NULL, 0u, fmt, (int)num_get_prec_digits(*number), value);
+    const char *fmt = scientific ? "%.*RE" : "%.*Rg";
+    int digits = precision >= 0 ? precision : (int)num_get_prec_digits(*number);
+    needed = mpfr_snprintf(NULL, 0u, fmt, digits, value);
     if (needed < 0)
         return NULL;
     out = malloc((size_t)needed + 1u);
     if (!out)
         return NULL;
-    if (precision >= 0)
-        mpfr_snprintf(out, (size_t)needed + 1u, fmt, value);
-    else
-        mpfr_snprintf(out, (size_t)needed + 1u, fmt, (int)num_get_prec_digits(*number), value);
+    mpfr_snprintf(out, (size_t)needed + 1u, fmt, digits, value);
     text = string_new_with(out);
     free(out);
     return text;
@@ -135,7 +120,6 @@ string_t *number_format_complex_text(const number_t *number, bool scientific, in
     int real_needed;
     int imag_needed;
     int digits;
-    char fmt[32];
 
     if (!value)
         return NULL;
@@ -144,7 +128,7 @@ string_t *number_format_complex_text(const number_t *number, bool scientific, in
     digits = precision >= 0 ? precision : (int)num_get_prec_digits(*number);
     if (digits <= 0)
         digits = (int)num_get_default_prec_digits();
-    snprintf(fmt, sizeof(fmt), scientific ? "%%.%dRE" : "%%.%dRg", digits);
+    const char *fmt = scientific ? "%.*RE" : "%.*Rg";
     mpc_init2(tmp, (mpfr_prec_t)precision_bits);
     mpfr_init2(imag_abs, (mpfr_prec_t)precision_bits);
     if (number_complex_get_mpc(tmp, value, precision_bits) != 0) {
@@ -153,16 +137,16 @@ string_t *number_format_complex_text(const number_t *number, bool scientific, in
         return NULL;
     }
     mpfr_abs(imag_abs, mpc_imagref(tmp), MPFR_RNDN);
-    real_needed = mpfr_snprintf(NULL, 0u, fmt, mpc_realref(tmp));
-    imag_needed = mpfr_snprintf(NULL, 0u, fmt, imag_abs);
+    real_needed = mpfr_snprintf(NULL, 0u, fmt, digits, mpc_realref(tmp));
+    imag_needed = mpfr_snprintf(NULL, 0u, fmt, digits, imag_abs);
     if (real_needed < 0 || imag_needed < 0)
         goto done;
     real_buffer = malloc((size_t)real_needed + 1u);
     imag_buffer = malloc((size_t)imag_needed + 1u);
     if (!real_buffer || !imag_buffer)
         goto done;
-    mpfr_snprintf(real_buffer, (size_t)real_needed + 1u, fmt, mpc_realref(tmp));
-    mpfr_snprintf(imag_buffer, (size_t)imag_needed + 1u, fmt, imag_abs);
+    mpfr_snprintf(real_buffer, (size_t)real_needed + 1u, fmt, digits, mpc_realref(tmp));
+    mpfr_snprintf(imag_buffer, (size_t)imag_needed + 1u, fmt, digits, imag_abs);
     real = string_new_with(real_buffer);
     imag = string_new_with(imag_buffer);
     if (!real || !imag)
@@ -217,14 +201,17 @@ static bool number_format_text_starts_with_ascii(const string_t *text, char ch)
     return found;
 }
 
-static string_t *number_format_value_text(number_t value, char spec, int precision)
+/* Expose the native numeric presentation path to typed format consumers. */
+string_t *numi_format_value_text(number_t value, char spec, int precision)
 {
+    if ((spec != 'n' && spec != 'N') || !number_is_valid_value(&value))
+        return NULL;
     /* Exact complex zero has no imaginary component, irrespective of its storage backend. */
     if (number_vt(&value)->is_complex && num_is_zero(value))
         return string_new_with("0");
     if (number_vt(&value)->is_complex && num_is_real(value)) {
         number_t real = num_real_part(value);
-        string_t *text = number_format_value_text(real, spec, precision);
+        string_t *text = numi_format_value_text(real, spec, precision);
         num_destroy(&real);
         return text;
     }
@@ -275,7 +262,7 @@ static string_format_result_t number_format_callback(string_t *out, const string
         precision = -1;
 
     value = va_arg(ap, number_t);
-    core = number_format_value_text(value, spec->conversion, precision);
+    core = numi_format_value_text(value, spec->conversion, precision);
     if (!core)
         return STRING_FORMAT_ERROR;
 
@@ -347,7 +334,7 @@ int num_vsprintf(char *out, size_t out_size, const char *fmt, va_list ap)
     if (number_format_plain_number_spec(fmt, &spec)) {
         number_t value = va_arg(ap, number_t);
 
-        return number_format_write_and_free_text(out, out_size, number_format_value_text(value, spec, -1));
+        return number_format_write_and_free_text(out, out_size, numi_format_value_text(value, spec, -1));
     }
 
     text = num_vsprintf_text(fmt, ap);

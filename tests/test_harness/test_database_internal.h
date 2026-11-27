@@ -172,6 +172,22 @@ bool test_database_history_assess(test_database_t *database, const test_database
 bool test_database_history_upgrade(test_database_t *database);
 
 /**
+ * @brief Migrate an unbounded duration distribution into bounded recent observations and legacy baseline estimates.
+ * @param[in,out] database Borrowed connection inside a schema-import transaction; the new timing tables must exist.
+ * @return True when no migration is needed or all data is converted; false leaves rollback to the caller.
+ * @note Preserves lifetime aggregates, result flags, authored cases and selections. Does not invent sample chronology.
+ */
+bool test_database_timing_upgrade(test_database_t *database);
+
+/**
+ * @brief Append one accepted ordinary timing and prune its indexed per-case window.
+ * @param[in,out] database Borrowed connection inside the report transaction, after updating lifetime aggregates.
+ * @param[in] result Borrowed accepted completed record; memory runs, skips and outliers must be excluded by the caller.
+ * @return True after inserting and pruning; false with a retained SQL diagnostic. No argument ownership transfers.
+ */
+bool test_database_timing_record(test_database_t *database, const test_database_result_t *result);
+
+/**
  * @brief Consolidate a validated legacy report database into the default test database.
  * @param[in,out] database Borrowed default connection, with no active transaction.
  * @param[in] root Borrowed repository root; NULL selects the current directory.

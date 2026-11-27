@@ -4,6 +4,7 @@
  *
  * Implements arithmetic and supported elementary complex operations using qfloat components. Branch and domain
  * conventions must remain consistent with the public qcomplex interface.
+ * Paired evaluations share real elementary factors with reciprocal functions and complex reflection formulas.
  *
  * This implements fixed double-double complex arithmetic for qcomplex_t. It is distinct from configurable
  * multiprecision complex arithmetic in the number module.
@@ -12,6 +13,13 @@
 #include <math.h>
 
 #include "qcomplex-t.h"
+#define MARS_SHARED_QFLOAT_INTERNAL_ACCESS
+#include "internal/qfloat_internal.h"
+#define MARS_QCOMPLEX_INTERNAL_ACCESS
+#include "qcomplex_internal.h"
+
+/* Native conversion of 1e-18, preserving the existing branch threshold exactly. */
+static const qfloat_t QC_LOG_AXIS_TOLERANCE = {0x1.2725dd1d243acp-60, -0x1.7c628066e8ceep-114};
 
 static qcomplex_t qc_pow_int(qcomplex_t z, int n)
 {
@@ -21,17 +29,16 @@ static qcomplex_t qc_pow_int(qcomplex_t z, int n)
     if (n == 0)
         return QC_ONE;
 
-    if (n < 0)
-        return qc_div(QC_ONE, qc_pow_int(z, -n));
-
-    while (n > 0) {
-        if (n & 1)
+    unsigned int exponent = n < 0 ? 0u - (unsigned int)n : (unsigned int)n;
+    while (exponent > 0u) {
+        if (exponent & 1u)
             result = qc_mul(result, base);
-        base = qc_mul(base, base);
-        n >>= 1;
+        exponent >>= 1;
+        if (exponent > 0u)
+            base = qc_mul(base, base);
     }
 
-    return result;
+    return n < 0 ? qc_div(QC_ONE, result) : result;
 }
 
 qcomplex_t qc_add(qcomplex_t a, qcomplex_t b)
@@ -71,15 +78,16 @@ qcomplex_t qc_div(qcomplex_t a, qcomplex_t b)
     return qc_make(re, im);
 }
 
-/* Elementary functions */
+/* Evaluate the complex exponential with one paired polar construction. */
 qcomplex_t qc_exp(qcomplex_t z)
 {
     qfloat_t exp_re = qf_exp(qc_real(z));
-    return qc_make(qf_mul(exp_re, qf_cos(qc_imag(z))), qf_mul(exp_re, qf_sin(qc_imag(z))));
+    return qc_from_polar(exp_re, qc_imag(z));
 }
+/* Evaluate the principal logarithm with the existing branch threshold held as a native constant. */
 qcomplex_t qc_log(qcomplex_t z)
 {
-    if (qf_eq(qc_real(z), qf_from_double(-1.0)) && qf_lt(qf_abs(qc_imag(z)), qf_from_string("1e-18")) &&
+    if (qf_eq(qc_real(z), QF_NEG_ONE) && qf_lt(qf_abs(qc_imag(z)), QC_LOG_AXIS_TOLERANCE) &&
         !qf_eq(qc_imag(z), QF_ZERO)) {
         return qc_make(QF_ZERO, qf_signbit(qc_imag(z)) ? qf_neg(QF_PI) : QF_PI);
     }
@@ -128,7 +136,7 @@ qcomplex_t qc_pow(qcomplex_t a, qcomplex_t b)
 
         qfloat_t mag = qf_pow(qf_abs(qc_real(a)), qc_real(b));
         qfloat_t theta = qf_mul(qc_real(b), QF_PI);
-        return qc_make(qf_mul(mag, qf_cos(theta)), qf_mul(mag, qf_sin(theta)));
+        return qc_from_polar(mag, theta);
     }
 
     qcomplex_t log_a = qc_log(a);
@@ -140,7 +148,7 @@ qcomplex_t qc_sqrt(qcomplex_t z)
     qfloat_t r = qc_abs(z);
     qfloat_t sqrt_r = qf_sqrt(r);
     qfloat_t half_theta = qf_ldexp(qc_arg(z), -1);
-    return qc_make(qf_mul(sqrt_r, qf_cos(half_theta)), qf_mul(sqrt_r, qf_sin(half_theta)));
+    return qc_from_polar(sqrt_r, half_theta);
 }
 
 /* Return the single principal n-th root. */
@@ -165,20 +173,41 @@ qcomplex_t qc_cubrt(qcomplex_t z)
 }
 
 /* Trigonometric */
+/* Share real trigonometric and hyperbolic factors for paired complex consumers. */
+void qci_sin_cos(qcomplex_t z, qcomplex_t *sine, qcomplex_t *cosine)
+{
+    qfloat_t s, c, sh, ch;
+    qfi_sin_cos(qc_real(z), &s, &c);
+    qfi_sinh_cosh(qc_imag(z), &sh, &ch);
+
+    *sine = qc_make(qf_mul(s, ch), qf_mul(c, sh));
+    *cosine = qc_make(qf_mul(c, ch), qf_neg(qf_mul(s, sh)));
+}
+
+/* Evaluate complex sine with a shared pair of real exponentials. */
 qcomplex_t qc_sin(qcomplex_t z)
 {
-    /* sin(z) = sin(x)cosh(y) + i cos(x)sinh(y) */
-    return qc_make(qf_mul(qf_sin(qc_real(z)), qf_cosh(qc_imag(z))), qf_mul(qf_cos(qc_real(z)), qf_sinh(qc_imag(z))));
+    qfloat_t s, c, sh, ch;
+    qfi_sin_cos(qc_real(z), &s, &c);
+    qfi_sinh_cosh(qc_imag(z), &sh, &ch);
+    return qc_make(qf_mul(s, ch), qf_mul(c, sh));
 }
+
+/* Evaluate complex cosine with a shared pair of real exponentials. */
 qcomplex_t qc_cos(qcomplex_t z)
 {
-    /* cos(z) = cos(x)cosh(y) - i sin(x)sinh(y) */
-    return qc_make(qf_mul(qf_cos(qc_real(z)), qf_cosh(qc_imag(z))),
-                   qf_neg(qf_mul(qf_sin(qc_real(z)), qf_sinh(qc_imag(z)))));
+    qfloat_t s, c, sh, ch;
+    qfi_sin_cos(qc_real(z), &s, &c);
+    qfi_sinh_cosh(qc_imag(z), &sh, &ch);
+    return qc_make(qf_mul(c, ch), qf_neg(qf_mul(s, sh)));
 }
+
+/* Form the complex tangent from one paired sine/cosine evaluation. */
 qcomplex_t qc_tan(qcomplex_t z)
 {
-    return qc_div(qc_sin(z), qc_cos(z));
+    qcomplex_t sine, cosine;
+    qci_sin_cos(z, &sine, &cosine);
+    return qc_div(sine, cosine);
 }
 qcomplex_t qc_sec(qcomplex_t z)
 {
@@ -188,9 +217,12 @@ qcomplex_t qc_cosec(qcomplex_t z)
 {
     return qc_div(QC_ONE, qc_sin(z));
 }
+/* Form the complex cotangent from one paired sine/cosine evaluation. */
 qcomplex_t qc_cot(qcomplex_t z)
 {
-    return qc_div(qc_cos(z), qc_sin(z));
+    qcomplex_t sine, cosine;
+    qci_sin_cos(z, &sine, &cosine);
+    return qc_div(cosine, sine);
 }
 qcomplex_t qc_versin(qcomplex_t z)
 {
@@ -335,19 +367,41 @@ qcomplex_t qc_atan2(qcomplex_t y, qcomplex_t x)
 }
 
 /* Hyperbolic */
+/* Share real hyperbolic and trigonometric factors for paired complex consumers. */
+void qci_sinh_cosh(qcomplex_t z, qcomplex_t *sine, qcomplex_t *cosine)
+{
+    qfloat_t s, c, sh, ch;
+    qfi_sin_cos(qc_imag(z), &s, &c);
+    qfi_sinh_cosh(qc_real(z), &sh, &ch);
+
+    *sine = qc_make(qf_mul(sh, c), qf_mul(ch, s));
+    *cosine = qc_make(qf_mul(ch, c), qf_mul(sh, s));
+}
+
+/* Evaluate complex hyperbolic sine with shared real elementary factors. */
 qcomplex_t qc_sinh(qcomplex_t z)
 {
-    /* sinh(z) = sinh(x)cos(y) + i cosh(x)sin(y) */
-    return qc_make(qf_mul(qf_sinh(qc_real(z)), qf_cos(qc_imag(z))), qf_mul(qf_cosh(qc_real(z)), qf_sin(qc_imag(z))));
+    qfloat_t s, c, sh, ch;
+    qfi_sin_cos(qc_imag(z), &s, &c);
+    qfi_sinh_cosh(qc_real(z), &sh, &ch);
+    return qc_make(qf_mul(sh, c), qf_mul(ch, s));
 }
+
+/* Evaluate complex hyperbolic cosine with shared real elementary factors. */
 qcomplex_t qc_cosh(qcomplex_t z)
 {
-    /* cosh(z) = cosh(x)cos(y) + i sinh(x)sin(y) */
-    return qc_make(qf_mul(qf_cosh(qc_real(z)), qf_cos(qc_imag(z))), qf_mul(qf_sinh(qc_real(z)), qf_sin(qc_imag(z))));
+    qfloat_t s, c, sh, ch;
+    qfi_sin_cos(qc_imag(z), &s, &c);
+    qfi_sinh_cosh(qc_real(z), &sh, &ch);
+    return qc_make(qf_mul(ch, c), qf_mul(sh, s));
 }
+
+/* Form complex hyperbolic tangent from one paired evaluation. */
 qcomplex_t qc_tanh(qcomplex_t z)
 {
-    return qc_div(qc_sinh(z), qc_cosh(z));
+    qcomplex_t sine, cosine;
+    qci_sinh_cosh(z, &sine, &cosine);
+    return qc_div(sine, cosine);
 }
 qcomplex_t qc_sech(qcomplex_t z)
 {
@@ -357,9 +411,12 @@ qcomplex_t qc_cosech(qcomplex_t z)
 {
     return qc_div(QC_ONE, qc_sinh(z));
 }
+/* Form complex hyperbolic cotangent from one paired evaluation. */
 qcomplex_t qc_coth(qcomplex_t z)
 {
-    return qc_div(qc_cosh(z), qc_sinh(z));
+    qcomplex_t sine, cosine;
+    qci_sinh_cosh(z, &sine, &cosine);
+    return qc_div(cosine, sine);
 }
 qcomplex_t qc_asinh(qcomplex_t z)
 {

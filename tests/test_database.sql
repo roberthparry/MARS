@@ -1,6 +1,6 @@
 -- Portable test definitions, persistent statistics and bounded detailed reports; used only by test tools.
 PRAGMA application_id = 1297371988;
-PRAGMA user_version = 7;
+PRAGMA user_version = 8;
 
 -- Derived verification checkpoints, never new measurements or replacements for recorded test history.
 CREATE TABLE IF NOT EXISTS test_checkpoint (
@@ -103,17 +103,29 @@ CREATE TABLE IF NOT EXISTS test_timing_policy (
     minimum_samples INTEGER NOT NULL CHECK (minimum_samples >= 3),
     median_multiplier REAL NOT NULL CHECK (median_multiplier > 1),
     deviation_multiplier REAL NOT NULL CHECK (deviation_multiplier > 0),
-    minimum_change_ms REAL NOT NULL CHECK (minimum_change_ms >= 0)
+    minimum_change_ms REAL NOT NULL CHECK (minimum_change_ms >= 0),
+    window_samples INTEGER NOT NULL DEFAULT 31 CHECK (window_samples >= 3)
 ) WITHOUT ROWID;
-INSERT OR IGNORE INTO test_timing_policy VALUES ('default', 7, 1.5, 6, 0.05);
+INSERT OR IGNORE INTO test_timing_policy(name,minimum_samples,median_multiplier,deviation_multiplier,minimum_change_ms)
+VALUES ('default', 7, 1.5, 6, 0.05);
 
--- A counted distribution preserves an exact lifetime median without keeping every detailed report.
-CREATE TABLE IF NOT EXISTS test_timing_sample (
+-- Case identities are stored once; legacy estimates preserve warnings during the rolling-window transition.
+CREATE TABLE IF NOT EXISTS test_timing_window (
+    id INTEGER PRIMARY KEY,
     source TEXT NOT NULL,
     path TEXT NOT NULL,
+    legacy_median_ms REAL,
+    legacy_mad_ms REAL,
+    legacy_sample_count INTEGER NOT NULL DEFAULT 0,
+    UNIQUE (source, path)
+);
+
+-- Only the most recently recorded accepted observations are retained for each case.
+CREATE TABLE IF NOT EXISTS test_timing_observation (
+    case_id INTEGER NOT NULL REFERENCES test_timing_window(id) ON DELETE CASCADE,
+    sample_ordinal INTEGER NOT NULL CHECK (sample_ordinal > 0),
     elapsed_ms REAL NOT NULL CHECK (elapsed_ms >= 0),
-    sample_count INTEGER NOT NULL CHECK (sample_count > 0),
-    PRIMARY KEY (source, path, elapsed_ms)
+    PRIMARY KEY (case_id, sample_ordinal)
 ) WITHOUT ROWID;
 
 -- Completed legacy reports are fingerprinted so an interrupted cleanup never imports them twice.
@@ -125,20 +137,14 @@ CREATE TABLE IF NOT EXISTS test_imported_report (
 DROP VIEW IF EXISTS test_case_metrics;
 CREATE VIEW test_case_metrics AS
 WITH ranked AS (
-    SELECT source, path, elapsed_ms, sample_count,
-           sum(sample_count) OVER (
-               PARTITION BY source, path ORDER BY elapsed_ms ROWS UNBOUNDED PRECEDING
-           ) AS through_count
-    FROM test_timing_sample
+    SELECT case_id, elapsed_ms,
+           row_number() OVER (PARTITION BY case_id ORDER BY elapsed_ms, sample_ordinal) AS rank,
+           count(*) OVER (PARTITION BY case_id) AS sample_count
+    FROM test_timing_observation
 ), medians AS (
-    SELECT r.source, r.path,
-           sum(CASE WHEN r.through_count - r.sample_count < (s.normal_count + 1) / 2
-                         AND r.through_count >= (s.normal_count + 1) / 2 THEN r.elapsed_ms ELSE 0 END
-             + CASE WHEN r.through_count - r.sample_count < (s.normal_count + 2) / 2
-                         AND r.through_count >= (s.normal_count + 2) / 2 THEN r.elapsed_ms ELSE 0 END) / 2 AS median_ms
-    FROM ranked r
-    JOIN test_case_statistics s ON s.source = r.source AND s.path = r.path
-    GROUP BY r.source, r.path
+    SELECT case_id, avg(elapsed_ms) AS median_ms, max(sample_count) AS median_samples
+    FROM ranked WHERE rank IN ((sample_count + 1) / 2, (sample_count + 2) / 2)
+    GROUP BY case_id
 )
 SELECT c.source, c.path, c.name, c.kind,
        coalesce(s.run_count, 0) AS run_count,
@@ -154,7 +160,7 @@ SELECT c.source, c.path, c.name, c.kind,
             THEN s.last_normal_ms > s.previous_normal_ms END AS took_longer,
        s.fastest_ms, s.slowest_ms,
        CASE WHEN s.normal_count > 0 THEN s.total_normal_ms / s.normal_count END AS mean_ms,
-       m.median_ms,
+       m.median_ms, coalesce(m.median_samples, 0) AS median_samples,
        coalesce(s.timing_outlier_count, 0) AS timing_outlier_count,
        s.last_normal_outlier,
        s.last_timing_outlier_utc, s.last_timing_outlier_ms,
@@ -162,7 +168,8 @@ SELECT c.source, c.path, c.name, c.kind,
        s.last_memory_test_utc
 FROM test_catalogue c
 LEFT JOIN test_case_statistics s ON s.source = c.source AND s.path = c.path
-LEFT JOIN medians m ON m.source = c.source AND m.path = c.path;
+LEFT JOIN test_timing_window w ON w.source = c.source AND w.path = c.path
+LEFT JOIN medians m ON m.case_id = w.id;
 INSERT OR IGNORE INTO test_profile(name, default_enabled) VALUES ('all', 1);
 
 -- Module SQL files register their indexed case table and optional operation group.

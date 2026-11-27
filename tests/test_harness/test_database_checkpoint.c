@@ -85,7 +85,7 @@ bool test_database_checkpoint_read(test_database_t *database, const char *scope,
         return test_database_fail(database, "Invalid verification checkpoint lookup.");
     sqlite3_stmt *exists = test_database_prepare(database,
         "SELECT count(*) FROM sqlite_master WHERE type='table' AND name='test_checkpoint'\n"
-        "AND (SELECT user_version FROM pragma_user_version) = 7");
+        "AND (SELECT user_version FROM pragma_user_version) = 8");
     bool ok = exists && sqlite3_step(exists) == SQLITE_ROW;
     bool present = ok && sqlite3_column_int(exists, 0);
     sqlite3_finalize(exists);

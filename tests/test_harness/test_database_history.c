@@ -1,9 +1,9 @@
 /**
  * @file test_database_history.c
- * @brief Transactional lifetime test statistics and exact duration distributions.
+ * @brief Transactional lifetime test aggregates and preserved outlier evidence.
  *
- * Detailed reports have bounded retention. Counts, extrema, means and counted duration samples survive pruning,
- * preserving an exact lifetime median. Skips never count as executions; memory-tool runs update their own dates
+ * Detailed reports and recent timing windows have bounded retention. Lifetime counts, extrema and means survive pruning.
+ * Skips never count as executions; memory-tool runs update their own dates
  * and counts without entering ordinary timing statistics. All work uses the raw test-management connection.
  */
 #include <stdio.h>
@@ -95,16 +95,7 @@ bool test_database_history_record(test_database_t *database, const test_database
     bool ok = test_database_write(database, statement);
     if (!ok || memory_test || timing_outlier)
         return ok;
-    statement = test_database_prepare(database,
-        "INSERT INTO test_timing_sample(source, path, elapsed_ms, sample_count)\n"
-        "VALUES (?1, ?2, ?3, 1)\n"
-        "ON CONFLICT(source, path, elapsed_ms) DO UPDATE SET sample_count = sample_count + 1");
-    if (!statement)
-        return false;
-    sqlite3_bind_text(statement, 1, result->source, -1, SQLITE_TRANSIENT);
-    sqlite3_bind_text(statement, 2, result->path, -1, SQLITE_TRANSIENT);
-    sqlite3_bind_double(statement, 3, result->elapsed_ms);
-    return test_database_write(database, statement);
+    return test_database_timing_record(database, result);
 }
 
 static bool test_history_column(test_database_t *database, const char *table, const char *column, bool *present)
@@ -151,12 +142,16 @@ bool test_database_history_upgrade(test_database_t *database)
         {"test_case_statistics", "last_timing_outlier_ms",
          "ALTER TABLE test_case_statistics ADD COLUMN last_timing_outlier_ms REAL"},
         {"test_case_statistics", "last_normal_outlier",
-         "ALTER TABLE test_case_statistics ADD COLUMN last_normal_outlier INTEGER"}
+         "ALTER TABLE test_case_statistics ADD COLUMN last_normal_outlier INTEGER"},
+        {"test_timing_policy", "window_samples",
+         "ALTER TABLE test_timing_policy ADD COLUMN window_samples INTEGER NOT NULL DEFAULT 31 CHECK (window_samples >= 3)"}
     };
     for (size_t i = 0; ok && i < sizeof additions / sizeof *additions; ++i)
         ok = test_history_add_column(database, additions[i].table, additions[i].column, additions[i].sql);
-    if (!ok || (memory_column && time_column))
-        return ok;
+    if (!ok || !test_database_timing_upgrade(database))
+        return false;
+    if (memory_column && time_column)
+        return true;
     sqlite3_stmt *statement = test_database_prepare(database,
         "SELECT r.source, r.path, r.outcome, r.enabled, r.elapsed_ms, r.finished_utc, u.memory_test\n"
         "FROM test_result r\n"
@@ -178,79 +173,6 @@ bool test_database_history_upgrade(test_database_t *database)
     return (ok && status == SQLITE_DONE) || test_database_fail(database, "Cannot upgrade existing report statistics.");
 }
 
-/* Compare with prior accepted measurements; never let a flagged slowdown redefine the baseline. */
-bool test_database_history_assess(test_database_t *database, const test_database_result_t *result, bool memory_test,
-                                  test_timing_assessment_t *assessment)
-{
-    *assessment = (test_timing_assessment_t){0};
-    if (memory_test || !result->enabled || !strcmp(result->outcome, "skip"))
-        return true;
-    sqlite3_stmt *statement = test_database_prepare(database,
-        "SELECT coalesce(s.normal_count, 0), p.minimum_samples\n"
-        "FROM test_timing_policy p\n"
-        "LEFT JOIN test_case_statistics s ON s.source = ?1 AND s.path = ?2\n"
-        "WHERE p.name = 'default'");
-    if (!statement)
-        return false;
-    sqlite3_bind_text(statement, 1, result->source, -1, SQLITE_TRANSIENT);
-    sqlite3_bind_text(statement, 2, result->path, -1, SQLITE_TRANSIENT);
-    bool ok = sqlite3_step(statement) == SQLITE_ROW;
-    sqlite3_int64 count = ok ? sqlite3_column_int64(statement, 0) : 0;
-    sqlite3_int64 minimum = ok ? sqlite3_column_int64(statement, 1) : 0;
-    sqlite3_finalize(statement);
-    if (!ok)
-        return test_database_fail(database, "The default timing-outlier policy is missing.");
-    if (count < minimum)
-        return true;
-    statement = test_database_prepare(database,
-        "WITH ranked AS (\n"
-        "    SELECT elapsed_ms, sample_count,\n"
-        "           sum(sample_count) OVER (ORDER BY elapsed_ms ROWS UNBOUNDED PRECEDING) AS through_count\n"
-        "    FROM test_timing_sample WHERE source = ?1 AND path = ?2\n"
-        "), centre AS (\n"
-        "    SELECT sum(\n"
-        "        CASE WHEN through_count - sample_count < (?3 + 1) / 2 AND through_count >= (?3 + 1) / 2\n"
-        "             THEN elapsed_ms ELSE 0 END\n"
-        "      + CASE WHEN through_count - sample_count < (?3 + 2) / 2 AND through_count >= (?3 + 2) / 2\n"
-        "             THEN elapsed_ms ELSE 0 END) / 2 AS median_ms\n"
-        "    FROM ranked\n"
-        "), deviations AS (\n"
-        "    SELECT abs(r.elapsed_ms - c.median_ms) AS deviation, r.sample_count,\n"
-        "           sum(r.sample_count) OVER (\n"
-        "               ORDER BY abs(r.elapsed_ms - c.median_ms), r.elapsed_ms ROWS UNBOUNDED PRECEDING\n"
-        "           ) AS through_count\n"
-        "    FROM ranked r CROSS JOIN centre c\n"
-        "), spread AS (\n"
-        "    SELECT sum(\n"
-        "        CASE WHEN through_count - sample_count < (?3 + 1) / 2 AND through_count >= (?3 + 1) / 2\n"
-        "             THEN deviation ELSE 0 END\n"
-        "      + CASE WHEN through_count - sample_count < (?3 + 2) / 2 AND through_count >= (?3 + 2) / 2\n"
-        "             THEN deviation ELSE 0 END) / 2 AS mad_ms\n"
-        "    FROM deviations\n"
-        ")\n"
-        "SELECT c.median_ms, max(\n"
-        "    c.median_ms * p.median_multiplier,\n"
-        "    c.median_ms + s.mad_ms * p.deviation_multiplier,\n"
-        "    c.median_ms + p.minimum_change_ms\n"
-        ")\n"
-        "FROM centre c CROSS JOIN spread s CROSS JOIN test_timing_policy p\n"
-        "WHERE p.name = 'default'");
-    if (!statement)
-        return false;
-    sqlite3_bind_text(statement, 1, result->source, -1, SQLITE_TRANSIENT);
-    sqlite3_bind_text(statement, 2, result->path, -1, SQLITE_TRANSIENT);
-    sqlite3_bind_int64(statement, 3, count);
-    ok = sqlite3_step(statement) == SQLITE_ROW && sqlite3_column_type(statement, 0) != SQLITE_NULL &&
-         sqlite3_column_type(statement, 1) != SQLITE_NULL;
-    if (ok) {
-        assessment->available = true;
-        assessment->median_ms = sqlite3_column_double(statement, 0);
-        assessment->threshold_ms = sqlite3_column_double(statement, 1);
-        assessment->outlier = result->elapsed_ms > assessment->threshold_ms;
-    }
-    sqlite3_finalize(statement);
-    return ok || test_database_fail(database, "Cannot assess the prior timing baseline.");
-}
 
 /* Warnings identify candidates for investigation; successful assertions keep their actual outcome. */
 static void test_database_history_warn(test_database_t *database, sqlite3_int64 run_id)

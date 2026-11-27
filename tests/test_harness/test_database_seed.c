@@ -136,7 +136,7 @@ bool test_database_sync_current(test_database_t *database, const string_t *root,
     *current = false;
     sqlite3_stmt *statement = test_database_prepare(database,
         "SELECT count(*) FROM sqlite_master WHERE type = 'table' AND name = 'test_source_sync'\n"
-        "    AND (SELECT user_version FROM pragma_user_version) = 7");
+        "    AND (SELECT user_version FROM pragma_user_version) = 8");
     bool ok = statement && sqlite3_step(statement) == SQLITE_ROW;
     bool present = ok && sqlite3_column_int(statement, 0) != 0;
     sqlite3_finalize(statement);

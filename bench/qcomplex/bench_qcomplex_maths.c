@@ -68,6 +68,18 @@ static bench_result_t bench_results[64];
 static size_t bench_result_count = 0u;
 
 static const bench_case_t bench_cases[] = {
+    BENCH_UNARY_CASE("sqrt_1_plus_1i", "qc_sqrt(1+i)", "(1,1)", 2000, qc_sqrt),
+    BENCH_UNARY_CASE("log_neg_1_plus_1i", "qc_log(-1+i)", "(-1,1)", 1000, qc_log),
+    BENCH_UNARY_CASE("log_neg_1_plus_small_i", "qc_log(-1+1e-20i)", "(-1,1e-20)", 2000, qc_log),
+    BENCH_BINARY_CASE("pow_1_plus_1i_2", "qc_pow(1+i, 2)", "(1,1)", "2", 4000, qc_pow),
+    BENCH_UNARY_CASE("sin_1_plus_1i", "qc_sin(1+i)", "(1,1)", 1000, qc_sin),
+    BENCH_UNARY_CASE("cos_1_plus_1i", "qc_cos(1+i)", "(1,1)", 1000, qc_cos),
+    BENCH_UNARY_CASE("tan_1_plus_1i", "qc_tan(1+i)", "(1,1)", 1000, qc_tan),
+    BENCH_UNARY_CASE("cot_1_plus_1i", "qc_cot(1+i)", "(1,1)", 1000, qc_cot),
+    BENCH_UNARY_CASE("sinh_1_plus_1i", "qc_sinh(1+i)", "(1,1)", 1000, qc_sinh),
+    BENCH_UNARY_CASE("cosh_1_plus_1i", "qc_cosh(1+i)", "(1,1)", 1000, qc_cosh),
+    BENCH_UNARY_CASE("tanh_1_plus_1i", "qc_tanh(1+i)", "(1,1)", 1000, qc_tanh),
+    BENCH_UNARY_CASE("coth_1_plus_1i", "qc_coth(1+i)", "(1,1)", 1000, qc_coth),
     BENCH_UNARY_CASE("exp_1_plus_1i", "qc_exp(1+i)", "(1,1)", 1000, qc_exp),
     BENCH_UNARY_CASE("log_1_plus_1i", "qc_log(1+i)", "(1,1)", 1000, qc_log),
     BENCH_UNARY_CASE("erf_0_5_plus_0_5i", "qc_erf(0.5+0.5i)", "(0.5,0.5)", 500, qc_erf),

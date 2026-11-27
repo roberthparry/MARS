@@ -7,7 +7,7 @@
  * Timezone and daylight-saving helpers support local-time calculations, while
  * Julian dates and basic solar and lunar calculations connect dates to astronomy.
  *
- * datetime_t represents dates and times at second resolution. Use the jurisdiction module
+ * datetime_t stores civil seconds as a double, including fractional seconds. Use the jurisdiction module
  * for configured public-holiday and working-day rules, and the almanac module for
  * catalogue-backed astronomical positions rather than civil calendar operations.
  *
@@ -21,6 +21,9 @@
  *
  * All datetime_t values are heap-allocated; callers must call datetime_dealloc()
  * exactly once for each handle returned by a constructor.
+ *
+ * Including this header enables typed FMT() bindings through fmt_arg_datetime().
+ * Typed native date codes distinguish M (month) from m (minute); excel: selects contextual Excel date codes.
  */
 
 #ifndef MARS_DATETIME_H
@@ -29,6 +32,8 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <stddef.h>
+
+#include "format-t.h"
 
 /**
  * @brief the datetime type
@@ -1308,5 +1313,19 @@ datetime_t *datetime_next_moon_phase(const datetime_t *dttm, moon_phase_t phase)
  * no longer needed.
  */
 datetime_t *datetime_next_weekday(const datetime_t *dttm, weekday_t weekday);
+
+/**
+ * @brief Borrow a datetime value for typed formatting without taking ownership.
+ * @param value Borrowed value, never released by formatting; NULL is rejected when rendered.
+ * @return Allocation-free binding, valid while the value remains alive and unchanged; capturing cannot fail.
+ * @note This header enables FMT() selection. Release the original value with its owning module's API after use.
+ * Do not mutate or destroy it while a formatter call is using it; synchronise shared mutable values externally.
+ */
+fmt_arg_t fmt_arg_datetime(const datetime_t *value);
+
+#undef MARS_FMT_SELECT_DATETIME_
+/** @brief Enable this module's typed bindings without changing other constructor associations. */
+#define MARS_FMT_SELECT_DATETIME_(value, next) \
+    _Generic((value), datetime_t *: fmt_arg_datetime, const datetime_t *: fmt_arg_datetime, default: next)
 
 #endif //MARS_DATETIME_H

@@ -4,6 +4,7 @@
  *
  * Formats complex values through the MARS string and output helpers. It preserves real and imaginary components
  * rather than narrowing the result to ordinary complex double.
+ * Real components use resolved native formatting options without constructing and reparsing a format string.
  *
  * This implements fixed double-double complex arithmetic for qcomplex_t. It is distinct from configurable
  * multiprecision complex arithmetic in the number module.
@@ -15,93 +16,35 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "qcomplex-t.h"
 #include "string-t.h"
+#include "qcomplex-t.h"
+#define MARS_SHARED_QFLOAT_FORMAT_INTERNAL_ACCESS
+#include "internal/qfloat_format_internal.h"
+#define MARS_SHARED_QCOMPLEX_FORMAT_INTERNAL_ACCESS
+#include "internal/qcomplex_format_internal.h"
 
-typedef struct {
-    char conversion;
-    int flag_plus;
-    int flag_space;
-    int flag_minus;
-    int flag_zero;
-    int flag_hash;
-    int width;
-    int precision;
-} qc_format_options_t;
-
-static string_t *qc_build_qfloat_format(char spec, int width, int precision, int flag_plus, int flag_space,
-                                        int flag_minus, int flag_zero, int flag_hash)
-{
-    string_t *fmt = string_new_with("%");
-
-    if (!fmt)
-        return NULL;
-
-    if ((flag_plus && string_append_char(fmt, '+') != 0) || (flag_space && string_append_char(fmt, ' ') != 0) ||
-        (flag_minus && string_append_char(fmt, '-') != 0) || (flag_zero && string_append_char(fmt, '0') != 0) ||
-        (flag_hash && string_append_char(fmt, '#') != 0))
-        goto fail;
-
-    if (width > 0 && string_append_format(fmt, "%d", width) < 0)
-        goto fail;
-    if (precision >= 0) {
-        if (string_append_char(fmt, '.') != 0 || string_append_format(fmt, "%d", precision) < 0)
-            goto fail;
-    }
-    if (string_append_char(fmt, spec) != 0)
-        goto fail;
-
-    return fmt;
-
-fail:
-    string_free(fmt);
-    return NULL;
-}
-
-static int qc_format_options_from_spec(qc_format_options_t *opts, const string_format_spec_t *spec, va_list ap)
-{
-    if (!opts || !spec || spec->length[0] != '\0')
-        return -1;
-
-    opts->conversion = spec->conversion;
-    opts->flag_plus = spec->flag_sign;
-    opts->flag_space = spec->flag_space;
-    opts->flag_minus = spec->flag_left;
-    opts->flag_zero = spec->flag_zero;
-    opts->flag_hash = spec->flag_alternate;
-    opts->width = spec->width_from_argument ? va_arg(ap, int) : spec->width;
-    opts->precision = spec->precision_from_argument ? va_arg(ap, int) : spec->precision;
-
-    if (opts->width < 0) {
-        opts->flag_minus = 1;
-        opts->width = -opts->width;
-    }
-
-    return 0;
-}
-
-static string_t *qc_format_qfloat_text(qfloat_t value, char conversion, const qc_format_options_t *opts, int flag_plus,
+static string_t *qc_format_qfloat_text(qfloat_t value, char conversion, const qfi_format_options_t *opts, int flag_plus,
                                        int flag_space, int lower_exponent)
 {
-    string_t *fmt;
+    qfi_format_options_t real_options = *opts;
     string_t *text;
 
-    fmt = qc_build_qfloat_format(conversion, opts->width, opts->precision, flag_plus, flag_space, opts->flag_minus,
-                                 opts->flag_zero, opts->flag_hash);
-    if (!fmt)
-        return NULL;
-
-    text = qf_sprintf_text(string_c_str(fmt), value);
-    string_free(fmt);
+    real_options.conversion = conversion;
+    real_options.flag_plus = flag_plus;
+    real_options.flag_space = flag_space;
+    text = qfi_format_value_text(value, &real_options);
     if (text && lower_exponent)
         string_replace(text, "E", "e");
 
     return text;
 }
 
-static string_t *qc_format_qcomplex_text(qcomplex_t value, const qc_format_options_t *opts)
+/* Share native complex formatting without reparsing a generated format string. */
+string_t *qci_format_value_text(qcomplex_t value, const qfi_format_options_t *opts)
 {
-    char qfmt = opts->conversion == 'Z' ? 'Q' : 'q';
+    if (!opts || !opts->conversion || !strchr("zZqQfFeEgG", opts->conversion))
+        return NULL;
+    char qfmt = opts->conversion == 'Z' ? 'Q' : opts->conversion == 'z' ? 'q' : opts->conversion;
     int lower_exponent = opts->conversion == 'Z';
     qfloat_t real = qc_real(value);
     qfloat_t imag = qc_imag(value);
@@ -167,7 +110,7 @@ static string_format_result_t qc_format_callback(string_t *out, const string_for
                                                  void *user)
 {
     string_t *text;
-    qc_format_options_t opts;
+    qfi_format_options_t opts;
 
     (void)user;
 
@@ -177,13 +120,13 @@ static string_format_result_t qc_format_callback(string_t *out, const string_for
     if (spec->conversion != 'z' && spec->conversion != 'Z' && spec->conversion != 'q' && spec->conversion != 'Q')
         return STRING_FORMAT_UNHANDLED;
 
-    if (qc_format_options_from_spec(&opts, spec, ap) != 0)
+    if (qfi_format_options_from_spec(&opts, spec, ap) != 0)
         return STRING_FORMAT_ERROR;
 
     if (spec->conversion == 'z' || spec->conversion == 'Z') {
         qcomplex_t value = va_arg(ap, qcomplex_t);
 
-        text = qc_format_qcomplex_text(value, &opts);
+        text = qci_format_value_text(value, &opts);
     } else {
         qfloat_t value = va_arg(ap, qfloat_t);
 

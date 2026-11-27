@@ -14,6 +14,7 @@ The public API remains in `include/datetime-t.h`. Implementation files under
 | `datetime_julian.c` | Julian-date conversion, lazy field access, civil-date validation and weekday navigation |
 | `datetime_arithmetic.c` | Date/time arithmetic, calendar spans and durations |
 | `datetime_format.c` | Date/time format tokens and string-builder helpers |
+| `datetime_format_adapter.c` | Typed interpolation of native civil fields and Excel custom codes |
 | `datetime_time_conversion.c` | Host timezone and DST queries, GMT conversion, Delta T, TT and TDB |
 | `datetime_lunar.c` | Lunar phase estimates and local new-moon searches |
 | `datetime_solar.c` | Solar position estimates, solstices and sunrise/sunset calculations |
@@ -366,6 +367,7 @@ All counts may be negative (subtract by passing a negative value).
 | `%DDDD` | full weekday, uppercase (MONDAY, …) |
 | `%o` | ordinal suffix, lowercase (st, nd, rd, th) |
 | `%O` | ordinal suffix, uppercase (ST, ND, RD, TH) |
+| `%q` | superscript ordinal suffix (ˢᵗ, ⁿᵈ, ʳᵈ, ᵗʰ) |
 | `%m` | month number, minimum digits |
 | `%mm` | month number, always 2 digits |
 | `%mmm` | abbreviated month, lowercase (jan, …) |
@@ -669,3 +671,30 @@ Returns the public result described by weekday name.
 ```c
 const char *datetime_weekday_name(weekday_t weekday);
 ```
+
+## Typed interpolation
+
+Including `datetime-t.h` enables `FMT(value)` through `fmt_arg_datetime()` for
+mutable or const datetime pointers. The binding borrows its datetime and leaves
+release to `datetime_dealloc()`. Default/`iso`, `date` and `time` presentations
+use native civil fields. Excel custom codes add English month/weekday names,
+contextual minutes, twelve-hour periods, elapsed fields and fractional seconds
+(up to nine places). Fractional seconds are stored as a `double` and are passed
+directly to the formatter, avoiding a serial-day round trip. The default ISO
+presentation retains whole-second output. Lazy calendar caches follow the
+module's usual synchronisation requirements.
+
+MARS adds `do` for an English ordinal day such as `10th`, and `do^` for
+`10ᵗʰ` with a superscript suffix. Both choose the suffix from the actual day,
+including the 11th–13th exceptions. Existing native format strings can use
+`%d%o` or `%d%q` with `datetime_format_text()`.
+
+Native date codes use `M`/`MM` for months and `m`/`mm` for minutes; a doubled
+letter pads to two digits. `MMM`, `MMMM` and `MMMMM` select the abbreviated
+month name, full name and initial. `am/pm` and `AM/PM` select lower-case or
+upper-case period text and switch hours to twelve-hour form. Prefix a code with
+`excel:` to retain Excel's case-insensitive, contextual `m`/`mm` rules.
+
+See the [runnable datetime example and custom-code conventions](format.md#datetimes).
+Locale selectors preserve explicit currency text but do not change MARS's
+Gregorian calendar or English names; no external locale dependency is needed.

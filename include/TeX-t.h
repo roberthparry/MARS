@@ -23,6 +23,8 @@
  * The TeX module owns typesetting for expressions, matrices, equations and differential equations;
  * those modules retain their mathematical models and delegate notation to this module.
  * Trusted fragments support composition; never use them for untrusted text.
+ *
+ * Including this header enables typed FMT() bindings through fmt_arg_TeX().
  */
 #ifndef MARS_TEX_H
 #define MARS_TEX_H
@@ -31,6 +33,7 @@
 #include <stddef.h>
 
 #include "string-t.h"
+#include "format-t.h"
 
 /**
  * @brief Opaque, immutable mathematical notation owned by the caller.
@@ -841,5 +844,19 @@ string_t *TeX_render(const TeX_t *notation);
  * @note Any pointer previously returned by TeX_source() for this value becomes invalid.
  */
 void TeX_free(TeX_t *notation);
+
+/**
+ * @brief Borrow a TeX value for typed formatting without taking ownership.
+ * @param value Borrowed value, never released by formatting; NULL is rejected when rendered.
+ * @return Allocation-free binding, valid while the value remains alive and unchanged; capturing cannot fail.
+ * @note This header enables FMT() selection. Release the original value with its owning module's API after use.
+ * Do not mutate or destroy it while a formatter call is using it; synchronise shared mutable values externally.
+ */
+fmt_arg_t fmt_arg_TeX(const TeX_t *value);
+
+#undef MARS_FMT_SELECT_TeX_
+/** @brief Enable this module's typed bindings without changing other constructor associations. */
+#define MARS_FMT_SELECT_TeX_(value, next) \
+    _Generic((value), TeX_t *: fmt_arg_TeX, const TeX_t *: fmt_arg_TeX, default: next)
 
 #endif

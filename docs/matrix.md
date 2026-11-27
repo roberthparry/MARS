@@ -1,5 +1,14 @@
 # `matrix_t`
 
+With `matrix-t.h` included, the [format module](format.md) accepts `FMT(matrix_pointer)` with native
+`expression`, `function`, `latex`, `pretty`, `scientific` and `layout` styles.
+It borrows the matrix and delegates presentation without changing its entries
+or bindings.
+Use `fmt_arg_matrix()` for an explicit binding. No additional formatting
+header or runtime registration is needed. Capturing allocates no memory;
+the immutable module-owned adapter validates presentations and preserves native
+rendering and borrowing rules.
+
 `mat_round(A)` applies nearest-integer rounding to supported matrix spectra,
 using the same spectral engine as `mat_sgn`. Exact halfway eigenvalues round
 away from zero; complex eigenvalues are rounded component-wise. This is not

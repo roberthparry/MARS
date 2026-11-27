@@ -10,6 +10,9 @@
  */
 
 #include "qcomplex-t.h"
+#define MARS_SHARED_QFLOAT_INTERNAL_ACCESS
+#include "internal/qfloat_internal.h"
+
 qfloat_t qc_abs(qcomplex_t z)
 {
     return qf_hypot(qc_real(z), qc_imag(z));
@@ -19,9 +22,12 @@ qfloat_t qc_arg(qcomplex_t z)
     return qf_atan2(qc_imag(z), qc_real(z));
 }
 
+/* Construct both polar coordinates with shared trigonometric reduction. */
 qcomplex_t qc_from_polar(qfloat_t r, qfloat_t theta)
 {
-    return qc_make(qf_mul(r, qf_cos(theta)), qf_mul(r, qf_sin(theta)));
+    qfloat_t sine, cosine;
+    qfi_sin_cos(theta, &sine, &cosine);
+    return qc_make(qf_mul(r, cosine), qf_mul(r, sine));
 }
 void qc_to_polar(qcomplex_t z, qfloat_t *r, qfloat_t *theta)
 {

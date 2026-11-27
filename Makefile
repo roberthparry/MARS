@@ -153,7 +153,7 @@ TEST_OBJS         := $(TEST_SRCS:tests/%.c=$(TEST_BUILD_DIR)/%.o)
 TEST_HELPER_OBJS  := $(TEST_HELPER_SRCS:tests/%.c=$(TEST_BUILD_DIR)/%.o)
 TEST_COMMON_HELPER_OBJS := $(TEST_COMMON_SRCS:tests/%.c=$(TEST_BUILD_DIR)/%.o)
 TEST_DATABASE_OBJS := $(filter %/test_database_store.o %/test_database_profile.o %/test_database_cases.o \
-    %/test_database_command.o %/test_database_stats.o %/test_database_seed.o %/test_database_history.o \
+    %/test_database_command.o %/test_database_stats.o %/test_database_seed.o %/test_database_history.o %/test_database_timing.o \
     %/test_database_migrate.o %/test_database_relocate.o %/test_database_checkpoint.o,\
     $(TEST_COMMON_HELPER_OBJS))
 BENCH_SRCS        := $(shell find bench -name 'bench_*.c' 2>/dev/null | sort)

@@ -24,6 +24,8 @@
  * shared work budgets are cooperative; callers must check operation failure and
  * computation_status() before using outputs. See docs/equation.md for checkpoint
  * coverage, ownership and the corresponding executable example.
+ *
+ * Including this header enables typed FMT() bindings through fmt_arg_equation().
  */
 
 #ifndef MARS_EQUATION_H
@@ -33,6 +35,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 
+#include "format-t.h"
 #include "expression-t.h"
 #include "expr_context-t.h"
 
@@ -467,5 +470,19 @@ bool equ_serialize(const equation_t *equation, string_t **out_type, string_t **o
  * @return Caller-owned equation, or NULL on invalid input or failure; release with equ_free.
  */
 equation_t *equ_deserialise(const void *data, size_t len, const string_t *type, const string_t *encoding);
+
+/**
+ * @brief Borrow a equation value for typed formatting without taking ownership.
+ * @param value Borrowed value, never released by formatting; NULL is rejected when rendered.
+ * @return Allocation-free binding, valid while the value remains alive and unchanged; capturing cannot fail.
+ * @note This header enables FMT() selection. Release the original value with its owning module's API after use.
+ * Do not mutate or destroy it while a formatter call is using it; synchronise shared mutable values externally.
+ */
+fmt_arg_t fmt_arg_equation(const equation_t *value);
+
+#undef MARS_FMT_SELECT_EQU_
+/** @brief Enable this module's typed bindings without changing other constructor associations. */
+#define MARS_FMT_SELECT_EQU_(value, next) \
+    _Generic((value), equation_t *: fmt_arg_equation, const equation_t *: fmt_arg_equation, default: next)
 
 #endif

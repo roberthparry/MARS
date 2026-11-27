@@ -39,6 +39,8 @@
  *   • expr_t is currently a single-threaded type.
  *   • Do not read, evaluate, differentiate, or mutate the same DAG from
  *     multiple threads concurrently without external synchronisation.
+ *
+ * Including this header also enables FMT() selection through the module-owned fmt_arg_expression() adapter.
  */
 
 #ifndef MARS_EXPRESSION_H
@@ -48,8 +50,9 @@
 #include <stdbool.h>
 #include <stddef.h>
 
-#include "number-t.h"
 #include "string-t.h"
+#include "format-t.h"
+#include "number-t.h"
 
 /** @brief Opaque reference-counted expression graph node. */
 typedef struct _expr_t expr_t;
@@ -2726,5 +2729,19 @@ expr_t *expr_from_expression_string(const char *expr, const char *const *names, 
  */
 expr_t *expr_from_expression_text(const string_t *expr, const string_t *const *names, expr_t *const *symbols,
                                   size_t nsymbols);
+
+/**
+ * @brief Borrow an expression for typed native presentation.
+ * @param value Borrowed expression, never evaluated, modified or released; NULL fails when rendered.
+ * @return Allocation-free descriptor, valid while the expression remains alive and unchanged.
+ * @note Including this header enables FMT() selection. Capturing cannot fail
+ * or change formatting diagnostics. Native presentations and their validation are owned by this module.
+ */
+fmt_arg_t fmt_arg_expression(const expr_t *value);
+
+#undef MARS_FMT_SELECT_EXPR_
+/** @brief Enable this module's constructor in FMT() without changing other type associations. */
+#define MARS_FMT_SELECT_EXPR_(value, next) \
+    _Generic((value), expr_t *: fmt_arg_expression, const expr_t *: fmt_arg_expression, default: next)
 
 #endif /* MARS_EXPRESSION_H */

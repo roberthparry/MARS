@@ -3887,3 +3887,12 @@ body p:has(> .katex) {
     text-align: left;
 }
 </style>
+
+## Typed interpolation
+
+Including `TeX-t.h` enables `FMT(notation)` and `fmt_arg_TeX()` for mutable or
+const `TeX_t` pointers. Default and `latex` presentations return the object's
+native TeX source without mathematical delimiters or evaluation. The descriptor
+borrows the immutable notation; release it with `TeX_free()` after the call.
+Precision and numeric flags are rejected. See the
+[runnable expression, equation and TeX example](format.md#expressions-equations-and-tex).

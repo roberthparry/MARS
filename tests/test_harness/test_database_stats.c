@@ -22,7 +22,7 @@
 
 enum {
     SOURCE, PATH, LAST_RUN, OUTCOME, LAST_MS, NORMAL_COUNT, ORDINARY_COUNT, LAST_NORMAL_MS, PREVIOUS_MS,
-    TOOK_LONGER, CHANGE_MS, CHANGE_PERCENT, FASTEST_MS, SLOWEST_MS, MEAN_MS, MEDIAN_MS,
+    TOOK_LONGER, CHANGE_MS, CHANGE_PERCENT, FASTEST_MS, SLOWEST_MS, MEAN_MS, MEDIAN_MS, MEDIAN_SAMPLES,
     OUTLIER_COUNT, LAST_OUTLIER, OUTLIER_UTC, OUTLIER_MS, MEMORY_UTC, FIELD_COUNT
 };
 
@@ -46,6 +46,7 @@ static const struct {
     [SLOWEST_MS]     = {"slowest_ms",              "Slowest ms",              true},
     [MEAN_MS]        = {"mean_ms",                 "Mean ms",                 true},
     [MEDIAN_MS]      = {"median_ms",               "Median ms",               true},
+    [MEDIAN_SAMPLES] = {"median_samples",          "Median samples",          true},
     [OUTLIER_COUNT]  = {"timing_outlier_count",     "Timing outliers",         true},
     [LAST_OUTLIER]   = {"last_normal_outlier",      "Last ordinary an outlier", false},
     [OUTLIER_UTC]    = {"last_timing_outlier_utc",   "Last outlier (UTC)",      false},
@@ -354,7 +355,7 @@ bool test_database_stats_print(test_database_t *database, const char *prefix, te
     sqlite3_stmt *query = rows ? test_database_prepare(database,
         "SELECT source, path, last_run_utc, last_outcome, last_elapsed_ms, normal_count, ordinary_count,\n"
         "       last_normal_ms, previous_normal_ms, took_longer, change_ms, change_percent,\n"
-        "       fastest_ms, slowest_ms, mean_ms, median_ms, timing_outlier_count, last_normal_outlier,\n"
+        "       fastest_ms, slowest_ms, mean_ms, median_ms, median_samples, timing_outlier_count, last_normal_outlier,\n"
         "       last_timing_outlier_utc, last_timing_outlier_ms, last_memory_test_utc\n"
         "FROM test_case_metrics\n"
         "WHERE run_count > 0 AND (?1 = '' OR substr(source, 1, length(?1)) = ?1)\n"
@@ -410,6 +411,7 @@ bool test_database_stats_print(test_database_t *database, const char *prefix, te
     } else if (ok) {
         puts("\nTest statistics — durations in milliseconds; dates in UTC.");
         puts("Mean/median and samples exclude memory runs and timing outliers; fastest/slowest include ordinary outliers.");
+        puts("Mean and Samples cover lifetime accepted timings; median uses the bounded recent window (--details shows its size).");
         puts("Change % compares the last two ordinary runs. The latest run may be a memory run. '-' means unavailable.");
         if (!details) puts("Use --details for timestamps, memory-test dates, comparisons and outlier records.");
         if (!array_size(rows)) puts("No recorded tests match this source prefix.");

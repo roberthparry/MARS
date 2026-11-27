@@ -1,10 +1,11 @@
 /**
  * @file test_database_store.c
- * @brief Lazy, bounded raw-SQLite storage for the test catalogue and transactional result history.
+ * @brief Lazy raw-SQLite storage for the test catalogue and transactional result history.
  *
  * Called only by test execution or explicit administration. Validates the application identifier and schema
  * version before writing, rejects unrelated databases, and uses a separate connection from any test fixture.
  * File access uses the public file module; SQL execution bypasses the MARS sqlite wrapper under test.
+ * Detailed reports and per-case timing windows have bounded retention; lifetime aggregates remain intact.
  */
 #include <math.h>
 #include <stdio.h>
@@ -94,18 +95,13 @@ test_database_t *test_database_open(const string_t *root, const string_t *path, 
         int version = test_database_integer(database, "PRAGMA user_version");
         bool empty = application == 0 && version == 0 &&
                      test_database_integer(database, "SELECT count(*) FROM sqlite_master WHERE name NOT LIKE 'sqlite_%'") == 0;
-        initialise = create && (empty || (application == 1297371988 && version > 0 && version < 7));
-        ok = (application == 1297371988 && version >= 1 && version <= 7) || (create && empty);
+        initialise = create && (empty || (application == 1297371988 && version > 0 && version < 8));
+        ok = (application == 1297371988 && version >= 1 && version <= 8) || (create && empty);
         if (!ok)
             test_database_fail(database, "Not a compatible MARS test database; the file was left unchanged.");
     }
-    if (ok) {
-        int page_size = test_database_integer(database, "PRAGMA page_size");
-        string_t *limit = page_size > 0 ? string_sprintf("PRAGMA max_page_count = %u", 67108864u / (unsigned)page_size) : NULL;
-        ok = limit && test_database_exec(database, "PRAGMA foreign_keys = ON") &&
-             test_database_exec(database, string_c_str(limit));
-        string_free(limit);
-    }
+    if (ok)
+        ok = test_database_exec(database, "PRAGMA foreign_keys = ON");
     if (ok && initialise)
         ok = test_database_exec(database, "BEGIN IMMEDIATE") && test_database_checkpoint_upgrade(database) &&
              test_database_seed(database, root) &&

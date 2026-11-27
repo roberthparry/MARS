@@ -4,6 +4,7 @@
  *
  * Parses supported real and imaginary spellings and constructs or formats qcomplex_t values. String-backed
  * scanning separates component signs and suffixes without exposing graph or matrix parsing.
+ * Implicit zero and unit coefficients use native values while preserving the signs of their components.
  *
  * This implements fixed double-double complex arithmetic for qcomplex_t. It is distinct from configurable
  * multiprecision complex arithmetic in the number module.
@@ -11,8 +12,8 @@
 
 #include <stdio.h>
 
-#include "qcomplex-t.h"
 #include "string-t.h"
+#include "qcomplex-t.h"
 
 string_t *qc_to_text(qcomplex_t z)
 {
@@ -47,23 +48,22 @@ static bool qc_text_equals_literal(const string_t *text, const char *literal)
     return text && string_view_equals_literal(string_view_all(text), literal);
 }
 
-static void qc_normalise_unit_imag_text(string_t *text)
+static qfloat_t qc_parse_imag_coefficient_text(const string_t *text)
 {
     if (!text)
-        return;
-    if (string_length(text) == 0u || qc_text_equals_literal(text, "+")) {
-        string_clear(text);
-        string_append_cstr(text, "1");
-    } else if (qc_text_equals_literal(text, "-")) {
-        string_clear(text);
-        string_append_cstr(text, "-1");
-    }
+        return QF_NAN;
+    if (string_length(text) == 0u || qc_text_equals_literal(text, "+"))
+        return QF_ONE;
+    if (qc_text_equals_literal(text, "-"))
+        return qf_neg(QF_ONE);
+    return qf_from_text(text);
 }
 
-static int qc_parse_real_imag_parts_text(const string_t *re_text, const string_t *im_text, qcomplex_t *out)
+static int qc_parse_real_imag_parts_text(const string_t *re_text, const string_t *im_text, bool implicit_unit,
+                                        qcomplex_t *out)
 {
     qfloat_t re = qf_from_text(re_text);
-    qfloat_t im = qf_from_text(im_text);
+    qfloat_t im = implicit_unit ? qc_parse_imag_coefficient_text(im_text) : qf_from_text(im_text);
 
     if (qf_isnan(re) || qf_isnan(im))
         return -1;
@@ -262,7 +262,7 @@ qcomplex_t qc_from_text(const string_t *text)
 
         left = qc_slice(compact, 1u, comma_pos);
         right = qc_slice(compact, comma_pos + 1u, close_pos);
-        if (!left || !right || qc_parse_real_imag_parts_text(left, right, &z) != 0) {
+        if (!left || !right || qc_parse_real_imag_parts_text(left, right, false, &z) != 0) {
             string_free(left);
             string_free(right);
             z = qc_parse_fail_text("invalid numbers in (a,b)", text);
@@ -334,7 +334,7 @@ qcomplex_t qc_from_text(const string_t *text)
                     return qc_parse_fail_text("invalid imaginary part in exp(a+bi)", text);
                 }
 
-                if (qc_parse_real_imag_parts_text(left, right, &e) != 0) {
+                if (qc_parse_real_imag_parts_text(left, right, false, &e) != 0) {
                     string_free(left);
                     string_free(right_with_i);
                     string_free(right);
@@ -381,9 +381,7 @@ qcomplex_t qc_from_text(const string_t *text)
                 return qc_parse_fail_text("invalid angle in exp(theta i)", text);
             }
 
-            qfloat_t re = qf_mul(r, qf_cos(theta));
-            qfloat_t im = qf_mul(r, qf_sin(theta));
-            out = qc_make(re, im);
+            out = qc_from_polar(r, theta);
             string_free(inside);
             string_free(compact);
             return out;
@@ -412,9 +410,7 @@ qcomplex_t qc_from_text(const string_t *text)
 
             if (right && qc_has_imag_suffix_text(right)) {
                 imag = qc_without_imag_suffix(right);
-                qc_normalise_unit_imag_text(imag);
-
-                if (left && imag && qc_parse_real_imag_parts_text(left, imag, &z) == 0) {
+                if (left && imag && qc_parse_real_imag_parts_text(left, imag, true, &z) == 0) {
                     string_free(left);
                     string_free(right);
                     string_free(imag);
@@ -427,9 +423,7 @@ qcomplex_t qc_from_text(const string_t *text)
             if (left && qc_has_imag_suffix_text(left)) {
                 imag = qc_without_imag_suffix(left);
                 real = string_clone(right);
-                qc_normalise_unit_imag_text(imag);
-
-                if (real && imag && qc_parse_real_imag_parts_text(real, imag, &z) == 0) {
+                if (real && imag && qc_parse_real_imag_parts_text(real, imag, true, &z) == 0) {
                     string_free(left);
                     string_free(right);
                     string_free(real);
@@ -450,22 +444,18 @@ qcomplex_t qc_from_text(const string_t *text)
        Pure imaginary
        ------------------------------------------------------------ */
     if (qc_has_imag_suffix_text(compact)) {
-        string_t *zero = string_new_with("0");
         string_t *imag = qc_without_imag_suffix(compact);
-        qcomplex_t z;
+        qfloat_t coefficient = qc_parse_imag_coefficient_text(imag);
 
-        qc_normalise_unit_imag_text(imag);
-        if (!zero || !imag || qc_parse_real_imag_parts_text(zero, imag, &z) != 0) {
-            string_free(zero);
+        if (qf_isnan(coefficient)) {
             string_free(imag);
             string_free(compact);
             return qc_parse_fail_text("invalid imaginary number", text);
         }
 
-        string_free(zero);
         string_free(imag);
         string_free(compact);
-        return z;
+        return qc_make(QF_ZERO, coefficient);
     }
 
     /* ------------------------------------------------------------

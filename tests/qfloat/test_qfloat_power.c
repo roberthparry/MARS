@@ -9,11 +9,16 @@
  * run suites sequentially; this source is not part of the installed library.
  */
 
+#include <limits.h>
+
 #include "test_qfloat.h"
 
 static void test_qf_pow_int()
 {
     printf("%sTEST: qf_pow_int%s\n", C_CYAN, C_RESET);
+
+    TEST_ASSERT_QFLOAT_CLOSE(qf_pow_int(QF_ONE, INT_MIN), QF_ONE);
+    TEST_ASSERT_QFLOAT_CLOSE(qf_pow_int(QF_NEG_ONE, INT_MIN), INT_MIN % 2 == 0 ? QF_ONE : QF_NEG_ONE);
 
     struct {
         const char *x;

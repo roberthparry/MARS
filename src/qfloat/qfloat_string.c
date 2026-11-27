@@ -9,6 +9,7 @@
  * is not arbitrary precision or a universal accuracy guarantee.
  */
 
+#include <float.h>
 #include <math.h>
 #include <stdio.h>
 
@@ -177,7 +178,11 @@ qfloat_t qf_from_text(const string_t *text)
         if (exp10 == 308 && qf_eq(result, QF_ONE)) {
             result = (qfloat_t){1.0000000000000000e+308, -1.0979063629440455e+291};
         } else {
-            result = qf_mul(result, qf_pow10(exp10));
+            /* Avoid a subnormal trailing component in a tiny intermediate scale; retain ordinary parsing rounds. */
+            if (exp10 < DBL_MIN_10_EXP + DBL_DIG + 1)
+                result = qf_scale_pow10(result, exp10);
+            else
+                result = qf_mul(result, qf_pow10(exp10));
         }
     }
 
@@ -304,19 +309,13 @@ string_t *qf_to_text(qfloat_t x)
         return NULL;
     }
 
-    if ((sign && string_append_char(out, '-') != 0) || string_append_rune(out, string_at(digits, 0u)) != 0 ||
-        string_append_char(out, '.') != 0) {
+    /* Decimal extraction produces ASCII digits; copy their bytes without grapheme indexing. */
+    const char *digit_bytes = string_c_str(digits);
+    if ((sign && string_append_char(out, '-') != 0) || string_append_char(out, digit_bytes[0]) != 0 ||
+        string_append_char(out, '.') != 0 || string_append_bytes(out, digit_bytes + 1, 33u) != 0) {
         string_free(digits);
         string_free(out);
         return NULL;
-    }
-
-    for (int i = 1; i < 34; i++) {
-        if (string_append_rune(out, string_at(digits, (size_t)i)) != 0) {
-            string_free(digits);
-            string_free(out);
-            return NULL;
-        }
     }
 
     if (string_append_format(out, "e%+d", exp10) < 0) {

@@ -32,6 +32,8 @@
  *      |lo| <= 0.5 * ulp(hi)
  *
  * ensuring a unique, normalised representation.
+ *
+ * Including this header also enables FMT() selection through the module-owned fmt_arg_qfloat() adapter.
  */
 
 #ifndef MARS_QFLOAT_H
@@ -41,6 +43,8 @@
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stddef.h>
+
+#include "format-t.h"
 
 typedef struct _string_t string_t;
 
@@ -1622,5 +1626,18 @@ qfloat_t qf_Li(qfloat_t x);
  * @brief Exponential integral E1(x) = ∫_{x}^{∞} (e^{-t} / t) dt,  x > 0
  */
 qfloat_t qf_E1(qfloat_t x);
+
+/**
+ * @brief Copy native real components into a typed formatting binding.
+ * @param value Copied scalar; all components retain their native precision.
+ * @return Allocation-free descriptor requiring no release.
+ * @note Including this header enables FMT() selection. Capturing cannot fail
+ * or change formatting diagnostics. Native presentations and their validation are owned by this module.
+ */
+fmt_arg_t fmt_arg_qfloat(qfloat_t value);
+
+#undef MARS_FMT_SELECT_QF_
+/** @brief Enable this module's constructor in FMT() without changing other type associations. */
+#define MARS_FMT_SELECT_QF_(value, next) _Generic((value), qfloat_t: fmt_arg_qfloat, default: next)
 
 #endif /* MARS_QFLOAT_H */

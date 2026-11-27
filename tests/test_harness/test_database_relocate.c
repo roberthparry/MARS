@@ -20,7 +20,7 @@ typedef struct {
 static bool test_database_source_move(test_database_t *database, const test_source_move_t *move)
 {
     static const char *const tables[] = {
-        "test_catalogue", "test_selection", "test_result", "test_case_statistics", "test_timing_sample", "test_case_runner"
+        "test_catalogue", "test_selection", "test_result", "test_case_statistics", "test_timing_window", "test_case_runner"
     };
     for (size_t i = 0; i < sizeof tables / sizeof *tables; ++i) {
         char *sql = sqlite3_mprintf("UPDATE \"%w\" SET source = ?1 WHERE source = ?2", tables[i]);
