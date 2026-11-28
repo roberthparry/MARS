@@ -11,6 +11,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 
+#include "format-t.h"
 #include "thread-t.h"
 #include "test_harness.h"
 
@@ -164,7 +165,7 @@ static void example_thread_join(void)
     bool joined = thread && thread_join(thread, &result);
     bool ok = completed && joined;
     if (ok)
-        printf("Result: %d\n", *(int *)result);
+        fmt_print("Result: {result}\n", FMT(result, *(int *)result));
     ok = thread_free(thread) && ok;
     TEST_ASSERT_TRUE(ok && value == 42 && result == &value, "README callback result");
 }
@@ -216,7 +217,7 @@ static void example_thread_counter(void)
     }
     ok = lock_free(mutex) && ok;
     if (ok)
-        printf("Counter: %d\n", value);
+        fmt_print("Counter: {value}\n", FMT(value));
     TEST_ASSERT_TRUE(ok && value == 2000, "README lock-backed concurrent counter");
 }
 
@@ -254,7 +255,7 @@ static void example_thread_event(void)
     ok = thread_free(thread) && ok;
     ok = lock_free(ready) && ok;
     if (ok)
-        printf("Completion signalled; result: %d\n", work.value);
+        fmt_print("Completion signalled; result: {result}\n", FMT(result, work.value));
     TEST_ASSERT_TRUE(ok, "README worker completion event");
 }
 

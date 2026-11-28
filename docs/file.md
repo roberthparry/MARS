@@ -1404,6 +1404,8 @@ hashes it, and removes the file afterwards.
 
 ```c
 #include <assert.h>
+
+#include "format-t.h"
 #include "file-t.h"
 #include "string-t.h"
 
@@ -1415,7 +1417,7 @@ int main(int argc, char **argv)
     assert(file_write_all_bytes(source, "abc", 3));
     string_t *digest = file_sha256(source);
     assert(digest);
-    string_printf("%S\n", digest);
+    fmt_print("{digest}\n", FMT(digest));
     string_free(digest);
     assert(file_delete(source));
     file_free(source);
@@ -1434,6 +1436,8 @@ ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad
 ```c
 #include <assert.h>
 #include <stdio.h>
+
+#include "format-t.h"
 #include "file-t.h"
 #include "string-t.h"
 
@@ -1448,7 +1452,7 @@ void file_lines_example(const char *path)
     assert(file_open_text(file));
     string_t *line = NULL;
     while (file_read_line(file, &line) && line) {
-        printf("%s\n", string_c_str(line));
+        fmt_print("{line}\n", FMT(line));
         string_free(line);
     }
     assert(file_last_error(file) == 0);
@@ -1462,7 +1466,7 @@ void file_lines_example(const char *path)
 int main(int argc, char **argv)
 {
     if (argc != 2) {
-        fprintf(stderr, "Supply 1 fresh, disposable paths.\n");
+        fmt_fprint(stderr, "Supply 1 fresh, disposable paths.\n");
         return 1;
     }
     file_lines_example(argv[1]);
@@ -1483,6 +1487,8 @@ falcon
 ```c
 #include <assert.h>
 #include <stdio.h>
+
+#include "format-t.h"
 #include "file-t.h"
 #include "string-t.h"
 
@@ -1500,7 +1506,7 @@ void file_replace_example(const char *current_path, const char *replacement_path
     string_t *current_text = file_read_all_text(current);
     string_t *backup_text = file_read_all_text(backup);
     assert(current_text && backup_text);
-    printf("current: %s\nbackup: %s\n", string_c_str(current_text), string_c_str(backup_text));
+    fmt_print("current: {current_text}\nbackup: {backup_text}\n", FMT(current_text), FMT(backup_text));
     assert(file_delete(current));
     assert(file_delete(backup));
     string_free(current_text);
@@ -1515,7 +1521,7 @@ void file_replace_example(const char *current_path, const char *replacement_path
 int main(int argc, char **argv)
 {
     if (argc != 4) {
-        fprintf(stderr, "Supply 3 fresh, disposable paths.\n");
+        fmt_fprint(stderr, "Supply 3 fresh, disposable paths.\n");
         return 1;
     }
     file_replace_example(argv[1], argv[2], argv[3]);
@@ -1539,6 +1545,8 @@ different path. Compression does not encrypt the contents.
 ```c
 #include <assert.h>
 #include <stdio.h>
+
+#include "format-t.h"
 #include "file-t.h"
 #include "string-t.h"
 
@@ -1555,7 +1563,7 @@ void compressed_file_example(const char *source_path, const char *compressed_pat
     assert(file_decompress_zstd(compressed, restored, 1024, false));
     string_t *text = file_read_all_text(restored);
     assert(text);
-    printf("decompressed: %s", string_c_str(text));
+    fmt_print("decompressed: {text}", FMT(text));
     assert(file_delete(restored));
     assert(file_delete(compressed));
     assert(file_delete(source));
@@ -1568,7 +1576,7 @@ void compressed_file_example(const char *source_path, const char *compressed_pat
 int main(int argc, char **argv)
 {
     if (argc != 4) {
-        fprintf(stderr, "Supply 3 fresh, disposable paths.\n");
+        fmt_fprint(stderr, "Supply 3 fresh, disposable paths.\n");
         return 1;
     }
     compressed_file_example(argv[1], argv[2], argv[3]);
@@ -1592,6 +1600,8 @@ A password is not a replacement for a raw encryption key.
 ```c
 #include <assert.h>
 #include <stdio.h>
+
+#include "format-t.h"
 #include "file-t.h"
 #include "string-t.h"
 
@@ -1609,7 +1619,7 @@ void encrypted_only_example(const char *source_path, const char *encrypted_path,
     assert(file_decrypt(encrypted, restored, key, 1024, false));
     string_t *text = file_read_all_text(restored);
     assert(text);
-    printf("decrypted: %s", string_c_str(text));
+    fmt_print("decrypted: {text}", FMT(text));
     assert(file_delete(restored));
     assert(file_delete(encrypted));
     assert(file_delete(source));
@@ -1623,7 +1633,7 @@ void encrypted_only_example(const char *source_path, const char *encrypted_path,
 int main(int argc, char **argv)
 {
     if (argc != 4) {
-        fprintf(stderr, "Supply 3 fresh, disposable paths.\n");
+        fmt_fprint(stderr, "Supply 3 fresh, disposable paths.\n");
         return 1;
     }
     encrypted_only_example(argv[1], argv[2], argv[3]);
@@ -1650,6 +1660,8 @@ securely if the encrypted file is to be read in a later process.
 ```c
 #include <assert.h>
 #include <stdio.h>
+
+#include "format-t.h"
 #include "file-t.h"
 #include "string-t.h"
 
@@ -1666,7 +1678,7 @@ void encrypted_file_example(const char *source_path, const char *encrypted_path,
     assert(file_decrypt(encrypted, restored, key, 1024, false));
     string_t *text = file_read_all_text(restored);
     assert(text);
-    printf("restored: %s\n", string_c_str(text));
+    fmt_print("restored: {text}\n", FMT(text));
     assert(file_delete(restored));
     assert(file_delete(encrypted));
     assert(file_delete(source));
@@ -1681,7 +1693,7 @@ void encrypted_file_example(const char *source_path, const char *encrypted_path,
 int main(int argc, char **argv)
 {
     if (argc != 4) {
-        fprintf(stderr, "Supply 3 fresh, disposable paths.\n");
+        fmt_fprint(stderr, "Supply 3 fresh, disposable paths.\n");
         return 1;
     }
     encrypted_file_example(argv[1], argv[2], argv[3]);
@@ -1704,6 +1716,8 @@ files remain afterwards for inspection. The literal key is only for this example
 ```c
 #include <assert.h>
 #include <stdio.h>
+
+#include "format-t.h"
 #include "file-t.h"
 #include "sqlite-t.h"
 #include "string-t.h"
@@ -1723,7 +1737,7 @@ void stored_file_example(const char *database_path, const char *source_path, con
     assert(file_export_sqlite(db, name, destination, 1024, false, false));
     string_t *restored = file_read_all_text(destination);
     assert(restored);
-    printf("restored: %s", string_c_str(restored));
+    fmt_print("restored: {restored}", FMT(restored));
     string_free(restored);
     sqlite_close(db);
     file_free(destination);
@@ -1736,7 +1750,7 @@ void stored_file_example(const char *database_path, const char *source_path, con
 int main(int argc, char **argv)
 {
     if (argc != 4) {
-        fprintf(stderr, "Supply 3 fresh, disposable paths.\n");
+        fmt_fprint(stderr, "Supply 3 fresh, disposable paths.\n");
         return 1;
     }
     stored_file_example(argv[1], argv[2], argv[3]);
@@ -1759,6 +1773,8 @@ Pass a fresh directory path and paths for its children named `documents` and
 ```c
 #include <assert.h>
 #include <stdio.h>
+
+#include "format-t.h"
 #include "file-t.h"
 #include "array-t.h"
 
@@ -1781,8 +1797,10 @@ void symlink_listing_example(const char *directory_path, const char *documents_p
         assert(target);
         assert(file_info_target_error(entry) == 0);
         assert(file_info_type(target) == FILE_TYPE_DIRECTORY);
-        printf("%s -> %s: %s\n", file_info_name(entry), file_info_link_target(entry),
-               file_info_type(target) == FILE_TYPE_DIRECTORY ? "directory" : "not a directory");
+        fmt_print("{name} -> {target}: {type}\n",
+            FMT(name, file_info_name(entry)),
+            FMT(target, file_info_link_target(entry)),
+            FMT(type, file_info_type(target) == FILE_TYPE_DIRECTORY ? "directory" : "not a directory"));
     }
     array_destroy(entries);
     assert(file_delete(link));
@@ -1797,7 +1815,7 @@ void symlink_listing_example(const char *directory_path, const char *documents_p
 int main(int argc, char **argv)
 {
     if (argc != 4) {
-        fprintf(stderr, "Supply 3 fresh, disposable paths.\n");
+        fmt_fprint(stderr, "Supply 3 fresh, disposable paths.\n");
         return 1;
     }
     symlink_listing_example(argv[1], argv[2], argv[3]);

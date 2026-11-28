@@ -272,17 +272,20 @@ presentation and plotting. The public calculus API preserves the same finite-sum
 semantics and live bindings:
 
 ```c
+#include "format-t.h"
 #include "expression-t.h"
 #include "string-t.h"
 
 int main(void)
 {
+    NUM_SCOPE(readme_numbers);
+
     expr_bindings_t *bindings = NULL;
     expr_t *sum = expr_from_string("{@Z_(k=1)^4 sin(kx) | x=pi/2}", &bindings);
     expr_t *x = expr_bindings_get(bindings, "x");
     expr_t *second = expr_create_2nd_deriv(sum, x, x);
     number_t value = expr_eval(second);
-    string_printf("Second derivative at x=pi/2: %g\n", num_to_double(value));
+    fmt_print("Second derivative at x=pi/2: {value:g}\n", FMT(value, num_to_double(value)));
     num_destroy(&value);
     expr_free(second);
     expr_free(sum);
@@ -2100,6 +2103,8 @@ specialised pattern code remains local to the module that owns the rule family.
 
 ```c
 #include <stdio.h>
+
+#include "format-t.h"
 #include "expression-t.h"
 
 int main(void)
@@ -2111,7 +2116,7 @@ int main(void)
     expr_t *f = expr_exp(two_x);
     expr_t *F = expr_integrate(f, x);  /* exp(2*x) / 2, or NULL if unsupported */
 
-    printf("antiderivative available: %s\n", F ? "yes" : "no");
+    fmt_print("antiderivative available: {antiderivative_available}\n", FMT(antiderivative_available, F ? "yes" : "no"));
     expr_free(F);
     expr_free(f);
     expr_free(two_x);
@@ -2154,6 +2159,8 @@ tested for non-linear monomial arguments, Bessel J, Bessel Y and Lommel s.
 
 ```c
 #include <stdio.h>
+
+#include "format-t.h"
 #include "expression-t.h"
 #include "number-t.h"
 
@@ -2182,6 +2189,8 @@ static expr_t *make_f(expr_t *x) {
 }
 
 int main(void) {
+    NUM_SCOPE(readme_numbers);
+
     num_set_default_prec_bits(384);
     number_t x0 = num_create_from_string("1.25");
     expr_t *x;
@@ -2198,19 +2207,18 @@ int main(void) {
     df_dx = expr_create_deriv(f, x);
     d2f_dx = expr_get_deriv(df_dx, x);
 
-    printf("f(x)    = "); expr_print(f);
-    printf("f'(x)   = "); expr_print(df_dx);
-    printf("f''(x)  = "); expr_print(d2f_dx);
+    fmt_print("f(x)    = {f}\n", FMT(f));
+    fmt_print("f'(x)   = {df_dx}\n", FMT(df_dx));
+    fmt_print("f''(x)  = {d2f_dx}\n", FMT(d2f_dx));
 
     f_val = expr_eval(f);
     d1_val = expr_eval(df_dx);
     d2_val = expr_eval(d2f_dx);
 
-    printf("\nAt x = 1.25 (384 bits, %zu significant digits):\n",
-           num_get_prec_digits(f_val));
-    num_printf("f(x)     = %.114N\n", f_val);
-    num_printf("f'(x)    = %.114N\n", d1_val);
-    num_printf("f''(x)   = %.114N\n", d2_val);
+    fmt_print("\nAt x = 1.25 (384 bits, {digits} significant digits):\n", FMT(digits, num_get_prec_digits(f_val)));
+    fmt_print("f(x)     = {f_val:.114N}\n", FMT(f_val));
+    fmt_print("f'(x)    = {d1_val:.114N}\n", FMT(d1_val));
+    fmt_print("f''(x)   = {d2_val:.114N}\n", FMT(d2_val));
 
     num_destroy(&d2_val);
     num_destroy(&d1_val);
@@ -2282,10 +2290,14 @@ independent, and an unnamed numerical `NaN` is not treated as such a symbol.
 ```c
 #include <stdio.h>
 #include <stdlib.h>
+
+#include "format-t.h"
 #include "expression-t.h"
 #include "number-t.h"
 
 int main(void) {
+    NUM_SCOPE(readme_numbers);
+
     expr_bindings_t *bindings = NULL;
     expr_t *f = expr_from_string(
         "{ exp(sin(x)) + 3*x^2 - 7 | x = 1.25 }",
@@ -2313,19 +2325,18 @@ int main(void) {
     df_dx = expr_create_deriv(f, x);
     d2f_dx = expr_get_deriv(df_dx, x);
 
-    printf("f(x)    = "); expr_print(f);
-    printf("f'(x)   = "); expr_print(df_dx);
-    printf("f''(x)  = "); expr_print(d2f_dx);
+    fmt_print("f(x)    = {f}\n", FMT(f));
+    fmt_print("f'(x)   = {df_dx}\n", FMT(df_dx));
+    fmt_print("f''(x)  = {d2f_dx}\n", FMT(d2f_dx));
 
     f_val = expr_eval(f);
     d1_val = expr_eval(df_dx);
     d2_val = expr_eval(d2f_dx);
 
-    printf("\nAt x = 1.25 (384 bits, %zu significant digits):\n",
-           num_get_prec_digits(f_val));
-    num_printf("f(x)     = %.114N\n", f_val);
-    num_printf("f'(x)    = %.114N\n", d1_val);
-    num_printf("f''(x)   = %.114N\n", d2_val);
+    fmt_print("\nAt x = 1.25 (384 bits, {digits} significant digits):\n", FMT(digits, num_get_prec_digits(f_val)));
+    fmt_print("f(x)     = {f_val:.114N}\n", FMT(f_val));
+    fmt_print("f'(x)    = {d1_val:.114N}\n", FMT(d1_val));
+    fmt_print("f''(x)   = {d2_val:.114N}\n", FMT(d2_val));
 
     num_destroy(&d2_val);
     num_destroy(&d1_val);
@@ -2360,11 +2371,15 @@ undefined and the derivative routines return a symbolic `NaN` node.
 
 ```c
 #include <stdio.h>
+
+#include "format-t.h"
 #include "expression-t.h"
 #include "number-t.h"
 
 /* f(x, y) = x² + x·y + y² */
 int main(void) {
+    NUM_SCOPE(readme_numbers);
+
     number_t two = num_create_from_long(2);
     number_t x0 = num_create_from_string("1");
     number_t y0 = num_create_from_string("2");
@@ -2388,19 +2403,17 @@ int main(void) {
     num_destroy(&two);
     num_destroy(&y0);
     num_destroy(&x0);
-    printf("At x=1, y=2 (384 bits):\n");
-    num_printf("f          = %.101N\n", expr_eval(f));          /* 7 */
-    num_printf("∂f/∂x      = %.101N\n", expr_eval(df_dx));     /* 4 */
-    num_printf("∂f/∂y      = %.101N\n", expr_eval(df_dy));     /* 5 */
-    num_printf("∂²f/∂x∂y   = %.101N\n", expr_eval(d2f_dxdy)); /* 1 */
+    fmt_print("At x=1, y=2 (384 bits):\nf          = {value:.101N}\n", FMT(value, expr_eval(f)));          /* 7 */
+    fmt_print("∂f/∂x      = {dx:.101N}\n", FMT(dx, expr_eval(df_dx)));     /* 4 */
+    fmt_print("∂f/∂y      = {dy:.101N}\n", FMT(dy, expr_eval(df_dy)));     /* 5 */
+    fmt_print("∂²f/∂x∂y   = {dxy:.101N}\n", FMT(dxy, expr_eval(d2f_dxdy))); /* 1 */
 
     /* Update x=3 — cached partials recompute automatically */
     x0 = num_create_from_string("3");
     expr_set_val(x, x0);
     num_destroy(&x0);
-    printf("\nAfter x=3:\n");
-    num_printf("∂f/∂x      = %.101N\n", expr_eval(df_dx));     /* 8 */
-    num_printf("∂f/∂y      = %.101N\n", expr_eval(df_dy));     /* 7 */
+    fmt_print("\nAfter x=3:\n∂f/∂x      = {dx:.101N}\n", FMT(dx, expr_eval(df_dx)));     /* 8 */
+    fmt_print("∂f/∂y      = {dy:.101N}\n", FMT(dy, expr_eval(df_dy)));     /* 7 */
 
     expr_free(d2f_dxdy);
     expr_free(df_dy);
@@ -2434,6 +2447,8 @@ you only need to evaluate it and don't want to manage another owning handle:
 
 ```c
 #include <stdio.h>
+
+#include "format-t.h"
 #include "expression-t.h"
 
 int main(void)
@@ -2443,7 +2458,7 @@ int main(void)
     expr_t *x = expr_new_named_var(value, "x");
     expr_t *f = expr_mul(x, x);
     const expr_t *p = expr_get_deriv(f, x);   /* borrowed — do NOT free */
-    num_printf("∂f/∂x = %.0n\n", expr_eval(p));
+    fmt_print("∂f/∂x = {dx:.0n}\n", FMT(dx, expr_eval(p)));
     expr_free(f);
     expr_free(x);
     return 0;
@@ -2467,6 +2482,8 @@ in a single pass than to build one symbolic derivative expression per variable.
 
 ```c
 #include <stdio.h>
+
+#include "format-t.h"
 #include "expression-t.h"
 #include "number-t.h"
 
@@ -2493,9 +2510,9 @@ int main(void) {
     if (expr_eval_derivatives(f, 2, vars, &value, grads) != 0)
         return 1;
 
-    num_printf("f      = %.101N\n", value);
-    num_printf("∂f/∂x  = %.101N\n", grads[0]);
-    num_printf("∂f/∂y  = %.101N\n", grads[1]);
+    fmt_print("f      = {value:.101N}\n", FMT(value));
+    fmt_print("∂f/∂x  = {dx:.101N}\n", FMT(dx, grads[0]));
+    fmt_print("∂f/∂y  = {dy:.101N}\n", FMT(dy, grads[1]));
 
     num_destroy(&grads[1]);
     num_destroy(&grads[0]);
@@ -2921,6 +2938,7 @@ then simplifies three exact rational powers:
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "format-t.h"
 #include "expression-t.h"
 
 int main(void)
@@ -2929,15 +2947,15 @@ int main(void)
     for (size_t i = 0; i < sizeof(sources) / sizeof(*sources); ++i) {
         expr_t *expr = expr_from_string(sources[i], NULL);
         expr_t *simplified = expr_simplify(expr);
-        char *text = simplified ? expr_to_string(simplified, style_UNBOUND) : NULL;
-        expr_free(simplified);
-        if (!text) {
+        if (!simplified) {
             expr_free(expr);
             return EXIT_FAILURE;
         }
-        puts(text);
-        free(text);
+        int bytes = fmt_print("{simplified:unbound}\n", FMT(simplified));
+        expr_free(simplified);
         expr_free(expr);
+        if (bytes < 0)
+            return EXIT_FAILURE;
     }
     return EXIT_SUCCESS;
 }
@@ -3212,19 +3230,20 @@ retaining their source for recomputation when precision increases.
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "format-t.h"
 #include "expression-t.h"
 
 int main(void)
 {
+    NUM_SCOPE(readme_numbers);
+
     const char *sources[] = {"powmod(4,13,497)", "bit_length(2^1024)", "test_bit(set_bit(0,701),701)",
                              "divmod(17,5,0)", "divmod(17,5,1)", "gcdext(30,21,0)"};
     for (size_t i = 0; i < sizeof sources / sizeof *sources; ++i) {
         expr_t *expression = expr_from_string(sources[i], NULL);
         number_t value = expression ? expr_eval(expression) : NUM_NAN;
-        string_t *text = num_to_string(value);
-        int printed = text ? printf("%s = %s\n", sources[i], string_c_str(text)) : -1;
-        bool ok = expression && text && !num_is_nan(value) && printed >= 0;
-        string_free(text);
+        int printed = fmt_print("{source} = {value}\n", FMT(source, sources[i]), FMT(value));
+        bool ok = expression && !num_is_nan(value) && printed >= 0;
         num_destroy(&value);
         expr_free(expression);
         if (!ok)
@@ -3255,14 +3274,13 @@ $2^{512}3^{256}5^{128}$:
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "format-t.h"
 #include "expression-t.h"
 
 int main(void)
 {
     expr_t *expression = expr_from_string("factors(2^512*3^256*5^128)", NULL);
-    string_t *text = expression ? expr_to_text(expression, style_EXPRESSION) : NULL;
-    int status = text && puts(string_c_str(text)) != EOF ? EXIT_SUCCESS : EXIT_FAILURE;
-    string_free(text);
+    int status = expression && fmt_print("{expression}\n", FMT(expression)) >= 0 ? EXIT_SUCCESS : EXIT_FAILURE;
     expr_free(expression);
     return status;
 }
@@ -4292,14 +4310,17 @@ This example evaluates the MARS-defined Lambert sum introduced above.
 ```c
 #include <stdio.h>
 
+#include "format-t.h"
 #include "expression-t.h"
 #include "number-t.h"
 
 int main(void)
 {
+    NUM_SCOPE(readme_numbers);
+
     expr_t *expression = expr_from_string("lambert_S(-1,1,1,1,-1,4)", NULL);
     number_t value = expr_eval(expression);
-    printf("%.1f\n", num_to_double(value));
+    fmt_print("{value:.1f}\n", FMT(value, num_to_double(value)));
     num_destroy(&value);
     expr_free(expression);
     return 0;

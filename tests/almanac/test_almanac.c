@@ -15,6 +15,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "format-t.h"
 #include "string-t.h"
 #include "file-t.h"
 #include "sqlite-t.h"
@@ -1111,9 +1112,9 @@ static void example_almanac_shrewsbury_eclipse_watch(void)
     events = almanac_find_solar_eclipses(almanac, &observer, start, end);
     TEST_ASSERT_NOT_NULL(events);
 
-    printf("Shrewsbury eclipse watch\n");
+    fmt_print("Shrewsbury eclipse watch\n");
     if (array_size(events) == 0u) {
-        printf("No local solar eclipse found in August 2026.\n");
+        fmt_print("No local solar eclipse found in August 2026.\n");
         array_destroy(events);
         almanac_close(almanac);
         datetime_dealloc(start);
@@ -1139,19 +1140,13 @@ static void example_almanac_shrewsbury_eclipse_watch(void)
     kind = event_kind == ALMANAC_SOLAR_ECLIPSE_TOTAL     ? "total"
            : event_kind == ALMANAC_SOLAR_ECLIPSE_ANNULAR ? "annular"
                                                          : "partial";
-    printf("Local solar eclipse found in August 2026.\n");
-    printf("Greatest local circumstance: %04d-%02d-%02d %02u:%02u:%04.1f local time\n", datetime_year(greatest_time),
-           (int)datetime_month(greatest_time), datetime_day(greatest_time), datetime_hour(greatest_time),
-           datetime_minute(greatest_time), datetime_second(greatest_time));
-    printf("Kind: %s\n", kind);
-    printf("Magnitude: %.3f\n", almanac_solar_eclipse_magnitude(event));
-    printf("Obscuration: %.1f%%\n", almanac_solar_eclipse_totality_percent(event));
-    printf("First contact: %04d-%02d-%02d %02u:%02u:%04.1f local time\n", datetime_year(first_time),
-           (int)datetime_month(first_time), datetime_day(first_time), datetime_hour(first_time),
-           datetime_minute(first_time), datetime_second(first_time));
-    printf("Fourth contact: %04d-%02d-%02d %02u:%02u:%04.1f local time\n", datetime_year(fourth_time),
-           (int)datetime_month(fourth_time), datetime_day(fourth_time), datetime_hour(fourth_time),
-           datetime_minute(fourth_time), datetime_second(fourth_time));
+    fmt_print("Local solar eclipse found in August 2026.\n");
+    fmt_print("Greatest local circumstance: {greatest_time:yyyy-MM-dd hh:mm:ss.0} local time\n", FMT(greatest_time));
+    fmt_print("Kind: {kind}\n", FMT(kind));
+    fmt_print("Magnitude: {magnitude:.3f}\n", FMT(magnitude, almanac_solar_eclipse_magnitude(event)));
+    fmt_print("Obscuration: {obscuration:.1f}%\n", FMT(obscuration, almanac_solar_eclipse_totality_percent(event)));
+    fmt_print("First contact: {first_time:yyyy-MM-dd hh:mm:ss.0} local time\n", FMT(first_time));
+    fmt_print("Fourth contact: {fourth_time:yyyy-MM-dd hh:mm:ss.0} local time\n", FMT(fourth_time));
 
     datetime_dealloc(fourth_time);
     datetime_dealloc(first_time);
@@ -1251,8 +1246,9 @@ static void example_almanac_eclipse_preview(void)
     double separation = almanac_solar_eclipse_separation_degrees(event);
     double orientation = almanac_solar_eclipse_orientation_degrees(event);
     bool geometry = disc > 0 && cover > 0 && isfinite(separation);
-    printf("Solar preview geometry: %s\nLocal orientation: %s\n",
-           geometry ? "available" : "unavailable", isfinite(orientation) ? "available" : "unavailable");
+    fmt_print("Solar preview geometry: {solar_preview_geometry}\nLocal orientation: {local_orientation}\n",
+        FMT(solar_preview_geometry, geometry ? "available" : "unavailable"),
+        FMT(local_orientation, isfinite(orientation) ? "available" : "unavailable"));
     TEST_ASSERT_TRUE(geometry && isfinite(orientation), "README example supplies geometry and local tilt");
     array_destroy(events);
     datetime_dealloc(end);

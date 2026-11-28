@@ -123,6 +123,7 @@ chunk; a real adapter runs the same operations from its asynchronous callbacks:
 #include <stdlib.h>
 #include <string.h>
 
+#include "format-t.h"
 #include "http-t.h"
 
 int main(void)
@@ -134,7 +135,9 @@ int main(void)
     if (!http_receive_commit(receiver, 3) || !http_receive_finish(receiver, 200)) {
         http_receive_free(receiver); return EXIT_FAILURE;
     }
-    printf("%u: %zu bytes\n", http_receive_status(receiver), http_receive_size(receiver));
+    fmt_print("{receive_status}: {receive_size} bytes\n",
+        FMT(receive_status, http_receive_status(receiver)),
+        FMT(receive_size, http_receive_size(receiver)));
     http_receive_free(receiver);
     return EXIT_SUCCESS;
 }
@@ -223,13 +226,15 @@ Save as `scratch/http_get.c` (already supplied):
 
 ```c
 #include <stdlib.h>
+
+#include "format-t.h"
 #include "http-t.h"
 
 /* Run the documented example; an optional URL allows deterministic offline tests. */
 int main(int argc, char **argv)
 {
     if (argc > 2) {
-        string_printf("Usage: %s [URL]\n", argv[0]);
+        fmt_print("Usage: {usage} [URL]\n", FMT(usage, argv[0]));
         return EXIT_FAILURE;
     }
     string_t *url = string_new_with(argc == 2 ? argv[1] : "https://httpbin.org/get?message=MARS");
@@ -243,10 +248,11 @@ int main(int argc, char **argv)
     bool valid = http_response_status(response) == 200 && message &&
                  string_view_equals_literal(string_view_all(message), "MARS");
     if (valid)
-        string_printf("status=%ld\nmessage=%S\n", http_response_status(response), message);
+        fmt_print("status={status}\nmessage={message}\n", FMT(status, http_response_status(response)), FMT(message));
     else
-        string_printf("request failed: status=%ld error=%d\n",
-                      http_response_status(response), (int)http_client_error(client));
+        fmt_print("request failed: status={status} error={error}\n",
+            FMT(status, http_response_status(response)),
+            FMT(error, (int)http_client_error(client)));
     json_free(json); string_free(args_key); string_free(message_key);
     http_response_free(response); http_request_free(request); http_client_free(client); string_free(url);
     return valid ? EXIT_SUCCESS : EXIT_FAILURE;
@@ -273,13 +279,15 @@ Source: `scratch/http_post_json.c`.
 
 ```c
 #include <stdlib.h>
+
+#include "format-t.h"
 #include "http-t.h"
 
 /* Run the documented example; an optional URL allows deterministic offline tests. */
 int main(int argc, char **argv)
 {
     if (argc > 2) {
-        string_printf("Usage: %s [URL]\n", argv[0]);
+        fmt_print("Usage: {usage} [URL]\n", FMT(usage, argv[0]));
         return EXIT_FAILURE;
     }
     string_t *url = string_new_with(argc == 2 ? argv[1] : "https://httpbin.org/post");
@@ -296,10 +304,11 @@ int main(int argc, char **argv)
     bool valid = http_response_status(response) == 200 && answer &&
                  string_view_equals_literal(string_view_all(answer), "42");
     if (valid)
-        string_printf("status=%ld\nanswer=%S\n", http_response_status(response), answer);
+        fmt_print("status={status}\nanswer={answer}\n", FMT(status, http_response_status(response)), FMT(answer));
     else
-        string_printf("request failed: status=%ld error=%d\n",
-                      http_response_status(response), (int)http_client_error(client));
+        fmt_print("request failed: status={status} error={error}\n",
+            FMT(status, http_response_status(response)),
+            FMT(error, (int)http_client_error(client)));
     json_free(reply); json_free(payload);
     string_free(text); string_free(json_key); string_free(answer_key);
     http_response_free(response); http_request_free(request); http_client_free(client); string_free(url);
@@ -331,13 +340,15 @@ Source: `scratch/http_post_xml.c`.
 
 ```c
 #include <stdlib.h>
+
+#include "format-t.h"
 #include "http-t.h"
 
 /* Run the documented example; an optional URL allows deterministic offline tests. */
 int main(int argc, char **argv)
 {
     if (argc > 2) {
-        string_printf("Usage: %s [URL]\n", argv[0]);
+        fmt_print("Usage: {usage} [URL]\n", FMT(usage, argv[0]));
         return EXIT_FAILURE;
     }
     string_t *url = string_new_with(argc == 2 ? argv[1] : "https://httpbin.org/post");
@@ -356,10 +367,11 @@ int main(int argc, char **argv)
     bool valid = http_response_status(response) == 200 && output &&
                  string_view_equals_literal(string_view_all(output), "<answer>42</answer>");
     if (valid)
-        string_printf("status=%ld\n%S\n", http_response_status(response), output);
+        fmt_print("status={status}\n{output}\n", FMT(status, http_response_status(response)), FMT(output));
     else
-        string_printf("request failed: status=%ld error=%d\n",
-                      http_response_status(response), (int)http_client_error(client));
+        fmt_print("request failed: status={status} error={error}\n",
+            FMT(status, http_response_status(response)),
+            FMT(error, (int)http_client_error(client)));
     string_free(output); xml_free(reply); xml_free(document); json_free(envelope);
     string_free(text); string_free(data_key);
     http_response_free(response); http_request_free(request); http_client_free(client); string_free(url);
@@ -857,9 +869,11 @@ event stream. It is also `scratch/http_services.c`; its README test runs after
 the ordinary HTTP tests.
 
 ```c
-#include "http-t.h"
 #include <stdio.h>
 #include <stdlib.h>
+
+#include "format-t.h"
+#include "http-t.h"
 
 static bool show_event(const string_t *event, const string_t *data, const string_t *id, bool has_retry,
                        uint64_t retry_ms, void *context)
@@ -869,7 +883,7 @@ static bool show_event(const string_t *event, const string_t *data, const string
     (void)retry_ms;
     unsigned *count = context;
     ++*count;
-    string_printf("%S: %S\n", event, data);
+    fmt_print("{event}: {data}\n", FMT(event), FMT(data));
     return true;
 }
 
@@ -880,7 +894,7 @@ int main(void)
     bool ok = form && name && value && http_form_add_text(form, name, value);
     string_t *encoded = ok ? http_form_encode(form) : NULL;
     if (encoded)
-        string_printf("%S\n", encoded);
+        fmt_print("{encoded}\n", FMT(encoded));
     else
         ok = false;
 
@@ -889,7 +903,8 @@ int main(void)
     xml_t *envelope = document ? http_soap_envelope(HTTP_SOAP_12, xml_child_at(document, 0), NULL) : NULL;
     http_soap_t *soap = envelope ? http_soap_parse(envelope) : NULL;
     if (soap)
-        printf("SOAP body children: %zu\n", xml_child_count(http_soap_body(soap)));
+        fmt_print("SOAP body children: {soap_body_children}\n",
+            FMT(soap_body_children, xml_child_count(http_soap_body(soap))));
     else
         ok = false;
 
@@ -959,11 +974,13 @@ unary echo method accepting an unsigned integer field 1. The test runner
 supplies an offline HTTP/2 fixture.
 
 ```c
-#include "http-t.h"
-#include "protobuf-t.h"
 #include <inttypes.h>
 #include <stdio.h>
 #include <stdlib.h>
+
+#include "format-t.h"
+#include "http-t.h"
+#include "protobuf-t.h"
 
 int main(int argc, char **argv)
 {
@@ -980,7 +997,9 @@ int main(int argc, char **argv)
     uint64_t value = 0;
     bool ok = http_grpc_status(result) == 0 && protobuf_integer(http_grpc_payload(result), 0, &value);
     if (ok)
-        printf("gRPC status: %d\nReply: %" PRIu64 "\n", http_grpc_status(result), value);
+        fmt_print("gRPC status: {grpc_status}\nReply: {value}\n",
+            FMT(grpc_status, http_grpc_status(result)),
+            FMT(value));
     http_grpc_free(result);
     http_response_free(response);
     protobuf_free(message);
@@ -1043,6 +1062,7 @@ The README test runs against the local WebSocket fixture.
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "format-t.h"
 #include "http-t.h"
 #include "array-t.h"
 
@@ -1060,12 +1080,14 @@ int main(int argc, char **argv)
     string_t *output = string_new();
     bool ok = reply && text && output && !string_append_utf8_exact(output, array_get(reply, 0), array_size(reply));
     if (ok)
-        string_printf("WebSocket echo: %S\n", output);
+        fmt_print("WebSocket echo: {output}\n", FMT(output));
     if (http_websocket_is_open(socket))
         ok = http_websocket_close(socket, 1000, NULL) && ok;
     if (!ok) {
         const string_t *error = http_client_error_text(client);
-        fprintf(stderr, "WebSocket echo failed: %s\n", error ? string_c_str(error) : "no text reply or clean close");
+        fmt_fprint(stderr,
+            "WebSocket echo failed: {websocket_echo_failed}\n",
+            FMT(websocket_echo_failed, error ? string_c_str(error) : "no text reply or clean close"));
     }
     string_free(output);
     array_destroy(reply);

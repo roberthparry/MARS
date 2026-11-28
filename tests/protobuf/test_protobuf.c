@@ -13,6 +13,7 @@
 #include <stdint.h>
 #include <string.h>
 
+#include "format-t.h"
 #include "protobuf-t.h"
 #include "test_harness.h"
 
@@ -20,6 +21,7 @@ TEST_SUITE_CONFIG(TEST_CONFIG_GLOBAL);
 
 #define main protobuf_example_main
 #include "../../scratch/protobuf_roundtrip.c"
+
 #undef main
 
 static void test_protobuf_bounded_primitives(void)
@@ -218,7 +220,10 @@ static void example_protobuf_wire_buffer(void)
     ok = ok && protobuf_wire_read_field(bytes, written, &offset, &field);
     TEST_ASSERT_TRUE(ok && offset == written && field.field == 1 && field.integer == 150, "borrowed wire example");
     if (ok)
-        printf("Field %u: %llu (%zu bytes)\n", (unsigned)field.field, (unsigned long long)field.integer, written);
+        fmt_print("Field {field}: {integer} ({written} bytes)\n",
+            FMT(field, (unsigned)field.field),
+            FMT(integer, (unsigned long long)field.integer),
+            FMT(written));
 }
 
 int tests_main(void)

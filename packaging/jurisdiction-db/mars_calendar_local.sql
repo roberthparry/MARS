@@ -4,6 +4,38 @@
 -- the installation year plus seven. Reinstall to refresh policy and coverage.
 
 drop view if exists calendar_local;
+-- Shared by the SQL Lingua view and native date presentation; Unicode-3.0, see THIRD_PARTY_NOTICES.md.
+create table if not exists calendar_native_month (
+    calendar text not null, month_no integer not null, full_name text not null,
+    leap_name text not null, ordinary_length integer not null,
+    primary key (calendar, month_no)
+);
+insert or replace into calendar_native_month values
+    ('islamic', 1, 'محرم', 'محرم', 30),
+    ('islamic', 2, 'صفر', 'صفر', 29),
+    ('islamic', 3, 'ربيع الأول', 'ربيع الأول', 30),
+    ('islamic', 4, 'ربيع الآخر', 'ربيع الآخر', 29),
+    ('islamic', 5, 'جمادى الأولى', 'جمادى الأولى', 30),
+    ('islamic', 6, 'جمادى الآخرة', 'جمادى الآخرة', 29),
+    ('islamic', 7, 'رجب', 'رجب', 30),
+    ('islamic', 8, 'شعبان', 'شعبان', 29),
+    ('islamic', 9, 'رمضان', 'رمضان', 30),
+    ('islamic', 10, 'شوال', 'شوال', 29),
+    ('islamic', 11, 'ذو القعدة', 'ذو القعدة', 30),
+    ('islamic', 12, 'ذو الحجة', 'ذو الحجة', 29),
+    ('hebrew', 1, 'תשרי', 'תשרי', 30),
+    ('hebrew', 2, 'חשוון', 'חשוון', 29),
+    ('hebrew', 3, 'כסלו', 'כסלו', 30),
+    ('hebrew', 4, 'טבת', 'טבת', 29),
+    ('hebrew', 5, 'שבט', 'שבט', 30),
+    ('hebrew', 6, 'אדר א׳', 'אדר א׳', 30),
+    ('hebrew', 7, 'אדר', 'אדר ב׳', 29),
+    ('hebrew', 8, 'ניסן', 'ניסן', 30),
+    ('hebrew', 9, 'אייר', 'אייר', 29),
+    ('hebrew', 10, 'סיוון', 'סיוון', 30),
+    ('hebrew', 11, 'תמוז', 'תמוז', 29),
+    ('hebrew', 12, 'אב', 'אב', 30),
+    ('hebrew', 13, 'אלול', 'אלול', 29);
 create table if not exists calendar_local_settings (
     singleton integer primary key check (singleton = 1),
     location text not null,
@@ -100,9 +132,7 @@ hijri_dates as materialized (
     from hijri_months
 ),
 hijri_month_names(month_no, full_name) as (
-    values (1, 'محرم'), (2, 'صفر'), (3, 'ربيع الأول'), (4, 'ربيع الآخر'),
-           (5, 'جمادى الأولى'), (6, 'جمادى الآخرة'), (7, 'رجب'), (8, 'شعبان'),
-           (9, 'رمضان'), (10, 'شوال'), (11, 'ذو القعدة'), (12, 'ذو الحجة')
+    select month_no, full_name from calendar_native_month where calendar = 'islamic'
 ),
 -- Fixed Hebrew calendar, including both exceptional new-year postponements.
 -- Calculate starts once per candidate year, not separately for every date.
@@ -144,17 +174,16 @@ hebrew_years as materialized (
 -- Stable month slots: slot 6 (Adar I) is absent in a common year.
 -- Hebrew spellings follow Unicode CLDR (Unicode-3.0); see THIRD_PARTY_NOTICES.md.
 hebrew_month_names(month_no, full_name, ordinary_length) as (
-    values (1, 'תשרי', 30), (2, 'חשוון', 29), (3, 'כסלו', 30), (4, 'טבת', 29),
-           (5, 'שבט', 30), (6, 'אדר א׳', 30), (7, 'אדר', 29), (8, 'ניסן', 30),
-           (9, 'אייר', 29), (10, 'סיוון', 30), (11, 'תמוז', 29), (12, 'אב', 30), (13, 'אלול', 29)
+    select month_no, full_name, ordinary_length from calendar_native_month where calendar = 'hebrew'
 ),
 hebrew_month_lengths as (
     select y.*, m.month_no,
-           case when m.month_no = 7 and y.is_leap then 'אדר ב׳' else m.full_name end as full_name,
+           case when y.is_leap then n.leap_name else m.full_name end as full_name,
            case when m.month_no = 2 then 29 + (y.year_length % 10 = 5)
                 when m.month_no = 3 then 30 - (y.year_length % 10 = 3)
                 else m.ordinary_length end as month_length
     from hebrew_years as y cross join hebrew_month_names as m
+    join calendar_native_month as n on n.calendar = 'hebrew' and n.month_no = m.month_no
     where m.month_no <> 6 or y.is_leap
 ),
 hebrew_months as materialized (

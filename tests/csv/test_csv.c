@@ -10,6 +10,7 @@
 #include <string.h>
 #include <unistd.h>
 
+#include "format-t.h"
 #include "string-t.h"
 #include "csv-t.h"
 #include "test_harness.h"
@@ -390,7 +391,7 @@ static void example_csv_read(void)
     bool ok = csv && text && name && csv_feed(csv, text, true) && csv_next(csv) == CSV_ROW &&
               csv_column(csv, name, &column);
     TEST_ASSERT_TRUE(ok, "README input");
-    string_printf("%S: %S\n", csv_field(csv, 0), csv_field(csv, column));
+    fmt_print("{first}: {selected}\n", FMT(first, csv_field(csv, 0)), FMT(selected, csv_field(csv, column)));
     TEST_ASSERT_STR_EQ(string_c_str(csv_field(csv, 0)), "Zoë");
     TEST_ASSERT_STR_EQ(string_c_str(csv_field(csv, column)), "hello, world");
     string_free(name);
@@ -410,7 +411,7 @@ static void example_csv_write(void)
     bool ok = csv && name && note && person && message && csv_set_header(csv, headers, 2) &&
               csv_write(csv, fields, 2) && csv_finish(csv);
     TEST_ASSERT_TRUE(ok, "README output");
-    string_printf("%S", csv_output(csv));
+    fmt_print("{output}", FMT(output, csv_output(csv)));
     TEST_ASSERT_STR_EQ(string_c_str(csv_output(csv)), "name,note\nZoë,\"hello, world\"\n");
     string_free(message);
     string_free(person);
@@ -455,7 +456,10 @@ static void example_csv_diagnostic(void)
     string_free(input);
     bool ok = error && diagnostic_location(error);
     if (ok)
-        printf("%s: %s; line %zu\n", diagnostic_domain(error), diagnostic_message(error), diagnostic_location(error)->line);
+        fmt_print("{domain}: {message}; line {line}\n",
+            FMT(domain, diagnostic_domain(error)),
+            FMT(message, diagnostic_message(error)),
+            FMT(line, diagnostic_location(error)->line));
     diagnostic_free(error);
     TEST_ASSERT_TRUE(ok, "README retained CSV failure");
 }

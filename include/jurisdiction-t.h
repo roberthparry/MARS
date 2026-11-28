@@ -11,6 +11,8 @@
  * A separate visitor exposes the machine's installed calendar origin without substituting a selected jurisdiction.
  * Indexed country presentation metadata supplies catalogue-owned names and offline flag artwork by ISO code.
  * Optional local cultural display codes supply regional/parent flag sequences without changing jurisdiction rules.
+ * Immutable Lingua date snapshots reuse catalogue names, grammatical month forms and compiled date order,
+ * supporting native datetime interpolation without SQL during repeated rendering or an ICU dependency.
  * Geographic country identification belongs to globe_t; choosing a jurisdiction does not establish a point's country.
  * A geographic adapter opens independent globe_t readers on the same catalogue;
  * river geometry remains separate from calendar policy and shoreline classification.
@@ -266,6 +268,44 @@ typedef bool (*jurisdict_visit_fn)(const holiday_event_t *event, void *ctx);
  * @return newly allocated jurisdiction engine, or @c NULL on allocation or database-open failure.
  */
 jurisdiction_t *jurisdict_open(const char *jurisdiction_code);
+
+/** @brief Owned, immutable snapshot of a jurisdiction catalogue's Lingua date presentation. */
+typedef struct _jurisdict_date_locale_t jurisdict_date_locale_t;
+
+/**
+ * @brief Load a Lingua date presentation once for repeated native rendering.
+ * @param jurisdiction Borrowed open engine; serialise this load with its other operations.
+ * @param locale Exact catalogue locale, such as fr_FR, es_ES or cy_GB; NULL or empty selects the installed
+ * Lingua setting and then the configured jurisdiction's territory default. Host language variables do not
+ * override an installed Lingua choice.
+ * @return Owned immutable snapshot, or NULL for missing catalogue data, invalid input or allocation failure.
+ * Inspect jurisdict_last_error() on failure. Release with jurisdict_date_locale_free(). The snapshot owns its
+ * names and compiled date parts, survives closing the engine, and can be shared by rendering threads.
+ */
+jurisdict_date_locale_t *jurisdict_date_locale_load(jurisdiction_t *jurisdiction, const char *locale);
+
+/**
+ * @brief Release an immutable Lingua presentation snapshot.
+ * @param locale Owned snapshot, or NULL; no rendering operation may still use it.
+ */
+void jurisdict_date_locale_free(jurisdict_date_locale_t *locale);
+
+/**
+ * @brief Clear this thread's bounded datetime interpolation locale cache after changing configuration.
+ * No formatting operation may be active on the calling thread. Other threads keep their own snapshots;
+ * each must clear them separately when required. Does not release explicitly loaded snapshots or access a database.
+ */
+void jurisdict_date_locale_cache_clear(void);
+
+/**
+ * @brief Render a Lingua calendar date without database access or reparsing a format.
+ * @param locale Borrowed immutable snapshot.
+ * @param date Borrowed civil datetime; synchronise shared lazy datetime caches externally.
+ * @return Owned date text, or NULL for invalid input or allocation failure; release with string_free().
+ * Uses the catalogue's wording and date order, British English ordinal policy, French first-day suffix,
+ * Arabic civil Islamic dates and digits, or fixed Hebrew dates as appropriate. Time of day is omitted.
+ */
+string_t *jurisdict_date_locale_text(const jurisdict_date_locale_t *locale, const datetime_t *date);
 
 /**
  * @brief Destroy a jurisdiction engine.

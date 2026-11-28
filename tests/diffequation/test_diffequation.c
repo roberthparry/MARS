@@ -14,13 +14,13 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "format-t.h"
 #include "string-t.h"
 #include "diffequation-t.h"
 #define MARS_EXPR_INTERNAL_ACCESS
 #include "expression/expr_internal.h"
 #define MARS_SHARED_EQUATION_INTERNAL_ACCESS
 #include "internal/equation_internal.h"
-
 #include "test_harness.h"
 #include "test_database.h"
 #include "test_diffequ_wave_ivp.h"
@@ -832,7 +832,7 @@ static void example_diffequation_compact_coefficients(void)
     string_t *text = solution ? equ_to_text(solution, style_UNBOUND) : NULL;
     bool ok = text && de_solve_result_status(result) == DE_SOLVE_STATUS_SOLVED;
     if (ok) {
-        puts(string_c_str(text));
+        fmt_print("{text}\n", FMT(text));
         WANT_TEXT("README symbolic oscillator solution", string_c_str(text),
                   "y = C₁·exp(½·(√(c² - 4km) - c)·x/m) + C₂·exp(-½·(√(c² - 4km) + c)·x/m)");
     }
@@ -1286,7 +1286,7 @@ static void test_diffequ_linear_solution_retains_formal_integral(void)
     char *TeX = solution ? equ_to_TeX_body_wrapped(solution, SIZE_MAX) : NULL;
     ASSERT_TRUE(TeX && strstr(TeX, "e^{-x}\\,\\int^{x} e^{\\cosh(t) + t}"));
     ASSERT_TRUE(!strstr(TeX, "\\frac"));
-    printf("  %s\n", TeX ? TeX : "NULL");
+    fmt_print("  {value}\n", FMT(value, TeX ? TeX : "NULL"));
     free(TeX);
 
     string_free(text);
@@ -2014,7 +2014,7 @@ static void test_diffequ_series_quartic_coefficients(void)
     WANT_POINTER("coefficient out of range", de_solve_result_series_coefficient(result, 9u), false);
     string_t *text = equ_to_text(de_solve_result_at(result, 0u), style_LATEX);
     WANT_POINTER("explicit remainder in native TeX", strstr(string_c_str(text), "O"), true);
-    printf("  local series: %s\n", string_c_str(text));
+    fmt_print("  local series: {text}\n", FMT(text));
     string_free(text);
     de_solve_result_free(result);
     de_free(de);
@@ -2947,7 +2947,7 @@ static void example_diffequation_partial_linear_data(void)
     string_t *text = solution ? equ_to_text(solution, style_UNBOUND) : NULL;
     bool ok = text && de_solve_result_status(result) == DE_SOLVE_STATUS_SOLVED;
     if (ok) {
-        puts(string_c_str(text));
+        fmt_print("{text}\n", FMT(text));
         WANT_TEXT("README oscillator with partial initial data", string_c_str(text),
                   "x = C₁·exp(-½·(√(c² - 4km) + c)·t/m) + "
                   "(1 - C₁)·exp(½·(√(c² - 4km) - c)·t/m)");
@@ -3208,11 +3208,10 @@ static bool test_diffequ_want_pde_solution(const char *source, const char *want,
                  de_solve_result_solver(result) == want_solver && de_solve_result_count(result) == 1u && got &&
                  strcmp(got, want) == 0;
 
-    printf("  partial differential equation\n"
-           "    input:    %s\n"
-           "    want: %s\n"
-           "    got:   %s\n",
-           source, want, got ? got : "NULL");
+    fmt_print("  partial differential equation\n    input:    {source}\n    want: {want}\n    got:   {got}\n",
+        FMT(source),
+        FMT(want),
+        FMT(got, got ? got : "NULL"));
 
     string_free(text);
     de_solve_result_free(result);
@@ -4699,12 +4698,12 @@ static bool test_diffequ_square_branches_match(const char *source, const char *p
                   de_solve_result_solver(result) == DE_SOLVER_CHARACTERISTICS && de_solve_result_count(result) == 2u;
     const char *expected[2] = {positive, negative};
 
-    printf("%s\n", source);
+    fmt_print("{source}\n", FMT(source));
     for (size_t i = 0u; i < 2u; ++i) {
         const equation_t *solution = de_solve_result_at(result, i);
         string_t *text = solution ? equ_to_text(solution, style_UNBOUND) : NULL;
 
-        printf("%s\n", text ? string_c_str(text) : "NULL");
+        fmt_print("{c_str}\n", FMT(c_str, text ? string_c_str(text) : "NULL"));
         solved = solved && text && strcmp(string_c_str(text), expected[i]) == 0;
         string_free(text);
     }
@@ -5037,9 +5036,9 @@ static void example_diffequation_quartic_lie_analysis(void)
         char *eta_text = expr_to_string(eta, style_UNBOUND);
         valid = xi_text && eta_text && strcmp(xi_text, "1") == 0 && strcmp(eta_text, "0") == 0;
         if (valid) {
-            printf("input = %s\nsolution status = local series (not a closed form)\n", source);
-            printf("I₁ = %s\nI₂ = %s\n", first_text, second_text);
-            printf("degree-two generators = (ξ, η) = (%s, %s)\n", xi_text, eta_text);
+            fmt_print("input = {source}\nsolution status = local series (not a closed form)\n", FMT(source));
+            fmt_print("I₁ = {first_text}\nI₂ = {second_text}\n", FMT(first_text), FMT(second_text));
+            fmt_print("degree-two generators = (ξ, η) = ({xi_text}, {eta_text})\n", FMT(xi_text), FMT(eta_text));
         }
         free(eta_text);
         free(xi_text);
@@ -5066,9 +5065,11 @@ static void example_diffequation_deriving_a_lie_algebra(void)
                  mat_get_row_count(constants) == 64u && mat_get_col_count(constants) == 8u;
 
     if (generators && constants) {
-        printf("polynomial generators = %zu\n", mat_get_col_count(generators));
-        printf("structure constants = %zu x %zu\n",
-               mat_get_row_count(constants), mat_get_col_count(constants));
+        fmt_print("polynomial generators = {polynomial_generators}\n",
+            FMT(polynomial_generators, mat_get_col_count(generators)));
+        fmt_print("structure constants = {structure_constants} x {x}\n",
+            FMT(structure_constants, mat_get_row_count(constants)),
+            FMT(x, mat_get_col_count(constants)));
     }
 
     mat_free(constants);
@@ -5088,7 +5089,9 @@ static void example_diffequation_prime_time_ivp(void)
     const equation_t *solution = result ? de_solve_result_at(result, 0u) : NULL;
     string_t *text = solution ? equ_to_text(solution, style_UNBOUND) : NULL;
 
-    printf("input = %s\nsolution = %s\n", source, text ? string_c_str(text) : "NULL");
+    fmt_print("input = {source}\nsolution = {solution}\n",
+        FMT(source),
+        FMT(solution, text ? string_c_str(text) : "NULL"));
     WANT_LONG("time IVP solved", result ? (long)de_solve_result_status(result) : -1L,
               (long)DE_SOLVE_STATUS_SOLVED);
     WANT_LONG("constant-coefficient solver", result ? (long)de_solve_result_solver(result) : -1L,
@@ -5115,9 +5118,9 @@ static void example_diffequation_solving_an_ode(void)
                  de_solve_result_solver(result) == DE_SOLVER_SEPARABLE && de_solve_result_count(result) == 1u &&
                  solution_text && strcmp(string_c_str(solution_text), want_solution) == 0;
 
-    printf("input = %s\n", source);
-    printf("problem = %s\n", problem_text ? problem_text : "NULL");
-    printf("solution = %s\n", solution_text ? string_c_str(solution_text) : "NULL");
+    fmt_print("input = {source}\n", FMT(source));
+    fmt_print("problem = {problem}\n", FMT(problem, problem_text ? problem_text : "NULL"));
+    fmt_print("solution = {solution}\n", FMT(solution, solution_text ? string_c_str(solution_text) : "NULL"));
 
     string_free(solution_text);
     free(problem_text);
@@ -5144,9 +5147,9 @@ static void example_diffequation_linearising_a_lie_symmetric_ode(void)
                  de_solve_result_count(result) == 1u && symmetry && strcmp(symmetry, want_symmetry) == 0 && solution_text &&
                  strcmp(string_c_str(solution_text), want_solution) == 0;
 
-    printf("input = %s\n", source);
-    printf("symmetry = %s\n", symmetry ? symmetry : "NULL");
-    printf("solution = %s\n", solution_text ? string_c_str(solution_text) : "NULL");
+    fmt_print("input = {source}\n", FMT(source));
+    fmt_print("symmetry = {symmetry}\n", FMT(symmetry, symmetry ? symmetry : "NULL"));
+    fmt_print("solution = {solution}\n", FMT(solution, solution_text ? string_c_str(solution_text) : "NULL"));
 
     string_free(solution_text);
     de_solve_result_free(result);
@@ -5165,7 +5168,9 @@ static void example_diffequation_emden_initial_value(void)
     bool ok = de_solve_result_status(result) == DE_SOLVE_STATUS_SOLVED &&
               de_solve_result_solver(result) == DE_SOLVER_LINEAR_TRANSFORMATION && text &&
               !strcmp(string_c_str(text), "y = (2x + 1)/(2x² + 2x + 1)");
-    printf("input = %s\nsolver = linear transformation\nsolution = %s\n", source, text ? string_c_str(text) : "NULL");
+    fmt_print("input = {source}\nsolver = linear transformation\nsolution = {solution}\n",
+        FMT(source),
+        FMT(solution, text ? string_c_str(text) : "NULL"));
     string_free(text);
     de_solve_result_free(result);
     de_free(de);
@@ -5183,7 +5188,7 @@ static void example_diffequation_weighted_cyclic_pde(void)
     bool valid = result && de_solve_result_status(result) == DE_SOLVE_STATUS_SOLVED && text &&
                  strcmp(string_c_str(text), "F(x - y + z, x² - y² + z²) = 0") == 0;
 
-    printf("input = %s\n%s\n", source, text ? string_c_str(text) : "NULL");
+    fmt_print("input = {source}\n{c_str}\n", FMT(source), FMT(c_str, text ? string_c_str(text) : "NULL"));
     string_free(text);
     de_solve_result_free(result);
     de_free(de);
@@ -5214,7 +5219,7 @@ static void example_diffequation_compact_parameter_derivatives(void)
     WANT_TEXT("README compact parameter coefficients", TeX,
         "\\frac{\\partial u}{\\partial y} + a\\mkern-2mu \\frac{\\partial^{2} u}{\\partial x^{2}} + "
         "b\\mkern-2mu \\frac{\\partial^{2} u}{\\partial y^{2}} = 0");
-    printf("  %s\n  %s\n", source, TeX ? TeX : "NULL");
+    fmt_print("  {source}\n  {value_2}\n", FMT(source), FMT(value_2, TeX ? TeX : "NULL"));
     free(TeX);
     de_free(de);
 }
@@ -5231,7 +5236,7 @@ static void example_diffequation_wave_ivp(void)
     const equation_t *solution = de_solve_result_at(result, 0u);
     char *TeX = solution ? equ_to_TeX_body_wrapped(solution, SIZE_MAX) : NULL;
     ASSERT_TRUE(TeX && strstr(TeX, "\\int_{0}^{t}") && strstr(TeX, "d\\xi\\, ds"));
-    printf("  %s\n  %s\n", source, TeX);
+    fmt_print("  {source}\n  {TeX}\n", FMT(source), FMT(TeX));
     free(TeX);
     de_solve_result_free(result);
     de_free(de);
@@ -5252,7 +5257,7 @@ static void example_diffequation_symbolic_wave_ivp(void)
     ASSERT_TRUE(strstr(TeX, "g\\left(x + c\\mkern-2mu t\\right)"));
     ASSERT_TRUE(strstr(TeX, "^{x + c\\mkern-2mu t}"));
     ASSERT_TRUE(!strstr(TeX, "c\\mkern-2mu t + x") && !strstr(TeX, "\\\\"));
-    printf("  %s\n  %s\n  %s\n", source, problem_TeX, TeX);
+    fmt_print("  {source}\n  {problem_TeX}\n  {TeX}\n", FMT(source), FMT(problem_TeX), FMT(TeX));
     free(TeX);
     free(problem_TeX);
     de_solve_result_free(result);
@@ -5267,7 +5272,7 @@ static void example_diffequation_wave_kirchhoff(void)
     char *problem_TeX = de ? de_to_string(de, style_LATEX) : NULL;
     ASSERT_TRUE(problem_TeX && strstr(problem_TeX,
         "\\frac{1}{v^{2}}\\,\\frac{\\partial^{2} \\psi}{\\partial t^{2}}"));
-    printf("  %s\n", problem_TeX ? problem_TeX : "NULL");
+    fmt_print("  {value}\n", FMT(value, problem_TeX ? problem_TeX : "NULL"));
     free(problem_TeX);
     diffequ_solve_result_t *result = de ? de_solve(de) : NULL;
     WANT_LONG(source, de_solve_result_status(result), DE_SOLVE_STATUS_SOLVED);
@@ -5279,7 +5284,7 @@ static void example_diffequation_wave_kirchhoff(void)
                 strstr(TeX, "G\\left(\\boldsymbol{r}\\right)"));
     ASSERT_TRUE(strstr(TeX, "v\\in \\mathbb{R}\\quad v \\ne 0") && !strstr(TeX, "\\sqrt"));
     ASSERT_TRUE(strstr(TeX, "\\boldsymbol{r} = \\left( x,\\;y,\\;z \\right)"));
-    printf("  %s\n  %s\n", source, TeX);
+    fmt_print("  {source}\n  {TeX}\n", FMT(source), FMT(TeX));
     free(TeX);
     de_solve_result_free(result);
     de_free(de);

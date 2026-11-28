@@ -13,6 +13,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "format-t.h"
 #include "string-t.h"
 #include "file-t.h"
 #include "xml-t.h"
@@ -320,7 +321,7 @@ static void example_xml_dictionary(void)
     dictionary_entry_t *entry = NULL;
     bool found = dictionary_get_entry(xml_attributes(book), &key, &entry);
     const string_t *language = found ? *(string_t *const *)dictionary_entry_value(entry) : NULL;
-    string_printf("%S: %S\n", xml_name(book), language);
+    fmt_print("{name}: {language}\n", FMT(name, xml_name(book)), FMT(language));
     TEST_ASSERT_TRUE(found, "README dictionary lookup");
     TEST_ASSERT_STR_EQ(string_c_str(language), "cy");
     xml_free(document);
@@ -337,7 +338,7 @@ static void example_xml_build(void)
     xml_t *text = xml_new_text(value);
     bool appended = xml_append_child(message, text);
     string_t *output = xml_to_string(message);
-    string_printf("%S\n", output);
+    fmt_print("{output}\n", FMT(output));
     TEST_ASSERT_TRUE(appended, "README append");
     TEST_ASSERT_STR_EQ(string_c_str(output), "<message>Hello &amp; goodbye</message>");
     string_free(output);
@@ -354,7 +355,7 @@ static void example_xml_stream(void)
     xml_reader_t *reader = xml_reader_new(NULL, count_events, &counts);
     bool ok = xml_reader_feed(reader, "<items><item", 12) &&
               xml_reader_feed(reader, "/><item/></items>", 17) && xml_reader_finish(reader);
-    string_printf("elements=%zu complete=%d\n", counts.starts, (int)ok);
+    fmt_print("elements={elements} complete={ok:d}\n", FMT(elements, counts.starts), FMT(ok));
     TEST_ASSERT_TRUE(ok && counts.starts == 3, "README streaming");
     xml_reader_free(reader);
 }

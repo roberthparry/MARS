@@ -10,6 +10,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "format-t.h"
 #include "string-t.h"
 #include "diffequation-t.h"
 #include "test_harness.h"
@@ -159,7 +160,7 @@ void example_diffequation_autonomous_energy(void)
               de_solve_result_count(result) == 3u;
     for (size_t i = 0; ok && i < de_solve_result_count(result); ++i) {
         string_t *text = equ_to_text(de_solve_result_at(result, i), style_UNBOUND);
-        ok = text && strcmp(string_c_str(text), expected[i]) == 0 && puts(string_c_str(text)) != EOF;
+        ok = text && strcmp(string_c_str(text), expected[i]) == 0 && fmt_print("{text}\n", FMT(text)) != EOF;
         string_free(text);
     }
     de_solve_result_free(result); de_free(problem);

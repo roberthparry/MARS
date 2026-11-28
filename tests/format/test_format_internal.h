@@ -14,6 +14,29 @@
 #error "Private header requires MARS_TEST_FORMAT_INTERNAL_ACCESS."
 #endif
 
+#include <stdbool.h>
+
+/** @brief Prepare an owned disposable locale fixture, returning false on failure; run sequentially. */
+bool test_format_locale_setup(void);
+
+/** @brief Restore saved configuration and release the locale fixture; takes no arguments and transfers no ownership. */
+void test_format_locale_cleanup(void);
+
+/** @brief Check immutable locale snapshot ownership; releases all local resources and reports harness assertions. */
+void test_format_locale_snapshot(void);
+
+/** @brief Verify cache refresh and missing-database behaviour; restores fixture settings and releases local values. */
+void test_format_locale_cache(void);
+
+/** @brief Check every catalogue locale against the SQL Lingua view, restoring fixture settings before returning. */
+void test_format_locale_catalogue(void);
+
+/** @brief Run the multilingual README programme, checking its byte count and releasing its date after printing. */
+void example_format_locales(void);
+
+/** @brief Run the datetime guide's first-day multilingual example; check its byte count and release its date. */
+void example_datetime_lingua_new_year(void);
+
 /**
  * @brief Check core-only capture, adapter payload lifetime, validation and compiled type identity.
  * @note Takes no parameters or ownership. Reports failures through the ordinary test harness and releases all
@@ -64,7 +87,7 @@ void test_format_expression_header(void);
 void example_format_named(void);
 
 /**
- * @brief Run the format guide's positions README example and check its result.
+ * @brief Run the format guide's named-calculation README example and check its result.
  * @note Takes no parameters or ownership. Produces the documented output and reports failures through the test
  * harness; releases local resources before returning. Run after ordinary checks with the other README examples.
  */
@@ -148,11 +171,17 @@ void example_format_symbolic(void);
 void example_format_excel(void);
 
 /**
- * @brief Verify typed datetime interpolation with only the owning public header.
+ * @brief Verify datetime-only header isolation and typed interpolation after explicitly including format-t.h.
  * @note Takes no parameters or ownership. Reports assertions through the ordinary harness and releases local
  * fixture values before returning; run sequentially with the other ordinary format checks.
  */
 void test_format_datetime_header(void);
+
+/**
+ * @brief Verify datetime interpolation when format-t.h precedes datetime-t.h.
+ * @note Takes no arguments or ownership. Releases local dates and strings and reports failures to the harness.
+ */
+void test_format_datetime_format_first(void);
 
 /**
  * @brief Verify typed equation interpolation with only the owning public header.

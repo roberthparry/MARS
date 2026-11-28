@@ -93,6 +93,7 @@ This example is also exercised as the last README case in `test_image`.
 #include <stdlib.h>
 #include <string.h>
 
+#include "format-t.h"
 #include "image-t.h"
 
 int main(void)
@@ -105,7 +106,11 @@ int main(void)
     bool ok = copy && image_size(copy) == 4 && !memcmp(image_data(small), image_data(copy), 4);
     if (ok) {
         const unsigned char *p = image_data(copy);
-        printf("RGBA: %u %u %u %u\nPNG round-trip: identical\n", p[0],p[1],p[2],p[3]);
+        fmt_print("RGBA: {red} {green} {blue} {alpha}\nPNG round-trip: identical\n",
+            FMT(red, p[0]),
+            FMT(green, p[1]),
+            FMT(blue, p[2]),
+            FMT(alpha, p[3]));
     }
     image_free(copy);
     array_destroy(png);

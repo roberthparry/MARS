@@ -18,6 +18,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#include "format-t.h"
 #include "file-t.h"
 #include "string-t.h"
 #include "array-t.h"
@@ -145,7 +146,7 @@ static void example_file_sha256(void)
     ASSERT_TRUE(file_write_all_bytes(source, "abc", 3));
     string_t *digest = file_sha256(source);
     ASSERT_NOT_NULL(digest);
-    string_printf("%S\n", digest);
+    fmt_print("{digest}\n", FMT(digest));
     TEST_ASSERT_STR_EQ(string_c_str(digest), "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
     string_free(digest);
     ASSERT_TRUE(file_delete(source));
@@ -698,7 +699,7 @@ static void example_file_utf8_lines(void)
     while (file_read_line(file, &line) && line) {
         ASSERT_TRUE(count < 3);
         TEST_ASSERT_STR_EQ(string_c_str(line), expected[count++]);
-        printf("%s\n", string_c_str(line));
+        fmt_print("{line}\n", FMT(line));
         string_free(line);
     }
     ASSERT_EQ_INT(file_last_error(file), 0);
@@ -727,7 +728,7 @@ static void example_file_replace_backup(void)
     ASSERT_NOT_NULL(backup_text);
     TEST_ASSERT_STR_EQ(string_c_str(current_text), "new");
     TEST_ASSERT_STR_EQ(string_c_str(backup_text), "old");
-    printf("current: %s\nbackup: %s\n", string_c_str(current_text), string_c_str(backup_text));
+    fmt_print("current: {current_text}\nbackup: {backup_text}\n", FMT(current_text), FMT(backup_text));
     ASSERT_TRUE(file_delete(current));
     ASSERT_TRUE(file_delete(backup));
     string_free(current_text);

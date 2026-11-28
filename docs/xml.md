@@ -91,6 +91,7 @@ README tests check the output. Production callers should check allocation and
 operation failures before inspecting results.
 
 ```c
+#include "format-t.h"
 #include "xml-t.h"
 #include "string-t.h"
 
@@ -103,7 +104,7 @@ int main(void)
     dictionary_entry_t *entry = NULL;
     bool found = dictionary_get_entry(xml_attributes(book), &key, &entry);
     const string_t *language = found ? *(string_t *const *)dictionary_entry_value(entry) : NULL;
-    string_printf("%S: %S\n", xml_name(book), language);
+    fmt_print("{name}: {language}\n", FMT(name, xml_name(book)), FMT(language));
     xml_free(document);
     string_free(key);
     string_free(source);
@@ -120,6 +121,7 @@ book: cy
 ## Example: build and escape XML
 
 ```c
+#include "format-t.h"
 #include "xml-t.h"
 #include "string-t.h"
 
@@ -131,7 +133,7 @@ int main(void)
     xml_t *text = xml_new_text(value);
     xml_append_child(message, text);
     string_t *output = xml_to_string(message);
-    string_printf("%S\n", output);
+    fmt_print("{output}\n", FMT(output));
     string_free(output);
     xml_free(text);
     xml_free(message);
@@ -152,6 +154,7 @@ Output:
 This example counts elements without constructing a tree.
 
 ```c
+#include "format-t.h"
 #include "xml-t.h"
 #include "string-t.h"
 
@@ -176,7 +179,7 @@ int main(void)
     xml_reader_t *reader = xml_reader_new(NULL, count_events, &counts);
     bool ok = xml_reader_feed(reader, "<items><item", 12) &&
               xml_reader_feed(reader, "/><item/></items>", 17) && xml_reader_finish(reader);
-    string_printf("elements=%zu complete=%d\n", counts.starts, (int)ok);
+    fmt_print("elements={elements} complete={ok:d}\n", FMT(elements, counts.starts), FMT(ok));
     xml_reader_free(reader);
     return 0;
 }

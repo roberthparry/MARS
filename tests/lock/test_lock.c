@@ -11,6 +11,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 
+#include "format-t.h"
 #include "lock-t.h"
 #include "thread-t.h"
 #include "test_harness.h"
@@ -255,7 +256,7 @@ static void example_lock_scope(void)
     int value = 41;
     bool ok = mutex && lock_example_increment(mutex, &value) && lock_try(mutex);
     if (ok)
-        printf("Value: %d; lock available again\n", value);
+        fmt_print("Value: {value}; lock available again\n", FMT(value));
     ok = lock_free(mutex) && ok;
     TEST_ASSERT_TRUE(ok && value == 42, "README scoped unlock output");
 }
@@ -266,10 +267,10 @@ static void example_lock_event(void)
     lock_t *event = lock_new(LOCK_EVENT, 0);
     bool ok = event && !lock_check(event) && errno == EBUSY;
     if (ok)
-        puts("Pending");
+        fmt_print("Pending\n");
     ok = ok && lock_signal(event) && lock_wait_for(event, 1000);
     if (ok)
-        puts("Complete");
+        fmt_print("Complete\n");
     ok = lock_free(event) && ok;
     TEST_ASSERT_TRUE(ok, "README completion output");
 }

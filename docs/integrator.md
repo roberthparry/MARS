@@ -67,6 +67,7 @@ evaluations. The result is explicitly unavailable when quadrature needs more wor
 #include <inttypes.h>
 #include <stdio.h>
 
+#include "format-t.h"
 #include "computation-t.h"
 #include "integrator-t.h"
 
@@ -88,8 +89,10 @@ int main(void)
     number_t value = NUM_NAN;
     int result = intg_integral(ig, formula, x, NUM_ZERO, NUM_ONE, &value, NULL);
     bool stopped = result == -2 && computation_status(control) == COMPUTATION_BUDGET_EXHAUSTED;
-    printf("Budget exhausted: %d; work: %" PRIu64 "; value unavailable: %d\n",
-           stopped, computation_work_used(control), num_is_nan(value));
+    fmt_print("Budget exhausted: {stopped:d}; work: {work}; value unavailable: {value_unavailable:d}\n",
+        FMT(stopped),
+        FMT(work, computation_work_used(control)),
+        FMT(value_unavailable, num_is_nan(value)));
     num_destroy(&value);
     expr_free(formula);
     expr_bindings_free(bindings);
@@ -150,6 +153,7 @@ at the requested precision without quadrature. The exact expression returned by
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "format-t.h"
 #include "expression-t.h"
 #include "integrator-t.h"
 
@@ -165,7 +169,7 @@ int main(void)
     string_t *text = exact ? expr_to_text(exact, style_UNBOUND) : NULL;
     bool ok = status == 0 && text;
     if (ok)
-        printf("Exact result: %s\n", string_c_str(text));
+        fmt_print("Exact result: {text}\n", FMT(text));
     string_free(text);
     num_destroy(&value);
     intg_free(ig);
@@ -229,6 +233,8 @@ reusing their slots. Destroy returned numbers when they are no longer needed.
 
 ```c
 #include <stdio.h>
+
+#include "format-t.h"
 #include "expression-t.h"
 #include "integrator-t.h"
 #include "number-t.h"
@@ -247,9 +253,9 @@ int main(void) {
 
     intg_integral(ig, expr, x, lo, hi, &result, &err);
 
-    num_printf("∫₋₃³ exp(-x²) dx ≈ %.64N\n", result);
-    num_printf("  error estimate   ≈ %.6N\n", err);
-    printf("  subintervals used: %zu\n", intg_get_interval_count_used(ig));
+    fmt_print("∫₋₃³ exp(-x²) dx ≈ {result:.64N}\n", FMT(result));
+    fmt_print("  error estimate   ≈ {err:.6N}\n", FMT(err));
+    fmt_print("  subintervals used: {subintervals_used}\n", FMT(subintervals_used, intg_get_interval_count_used(ig)));
 
     num_destroy(&err);
     num_destroy(&result);
@@ -278,6 +284,8 @@ over `number_t` bounds and tolerances.
 
 ```c
 #include <stdio.h>
+
+#include "format-t.h"
 #include "expression-t.h"
 #include "integrator-t.h"
 #include "number-t.h"
@@ -295,9 +303,9 @@ int main(void) {
 
     intg_integral(ig, expr, x, lo, hi, &result, &err);
 
-    num_printf("∫₀¹ exp(x) dx ≈ %.64N\n", result);
-    num_printf("  error estimate   ≈ %.6N\n", err);
-    printf("  subintervals used: %zu\n", intg_get_interval_count_used(ig));
+    fmt_print("∫₀¹ exp(x) dx ≈ {result:.64N}\n", FMT(result));
+    fmt_print("  error estimate   ≈ {err:.6N}\n", FMT(err));
+    fmt_print("  subintervals used: {subintervals_used}\n", FMT(subintervals_used, intg_get_interval_count_used(ig)));
 
     num_destroy(&err);
     num_destroy(&result);
@@ -324,6 +332,8 @@ multiple dimensions:
 
 ```c
 #include <stdio.h>
+
+#include "format-t.h"
 #include "expression-t.h"
 #include "integrator-t.h"
 #include "number-t.h"
@@ -349,8 +359,8 @@ int main(void) {
 
     intg_integral_multi(ig, expr, 2, vars, lo, hi, &result, &err);
 
-    num_printf("result = %.64N\n", result);
-    printf("intervals = %zu\n", intg_get_interval_count_used(ig));
+    fmt_print("result = {result:.64N}\n", FMT(result));
+    fmt_print("intervals = {intervals}\n", FMT(intervals, intg_get_interval_count_used(ig)));
 
     num_destroy(&err);
     num_destroy(&result);
@@ -385,6 +395,8 @@ intervals = 1
 
 ```c
 #include <stdio.h>
+
+#include "format-t.h"
 #include "expression-t.h"
 #include "integrator-t.h"
 #include "number-t.h"
@@ -403,8 +415,8 @@ int main(void) {
 
     intg_integral(ig, expr, x, lo, hi, &result, &err);
 
-    num_printf("∫₀¹ x^2.5 dx ≈ %.64N\n", result);
-    num_printf("  error estimate   ≈ %.6N\n", err);
+    fmt_print("∫₀¹ x^2.5 dx ≈ {result:.64N}\n", FMT(result));
+    fmt_print("  error estimate   ≈ {err:.6N}\n", FMT(err));
 
     num_destroy(&err);
     num_destroy(&result);

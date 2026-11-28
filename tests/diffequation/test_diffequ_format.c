@@ -14,6 +14,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "format-t.h"
 #include "string-t.h"
 #include "diffequation-t.h"
 #include "test_harness.h"
@@ -55,9 +56,9 @@ static void check_power_display(const char *source, const char *expected)
     bool stable = text && round_trip && strcmp(text, round_trip) == 0;
     bool equivalent = base && round_trip_base && strcmp(base, round_trip_base) == 0;
 
-    printf("  %s\n  %s\n", source, text ? text : "NULL");
+    fmt_print("  {source}\n  {value_2}\n", FMT(source), FMT(value_2, text ? text : "NULL"));
     if (!stable)
-        printf("  round trip: %s\n", round_trip ? round_trip : "NULL");
+        fmt_print("  round trip: {round_trip}\n", FMT(round_trip, round_trip ? round_trip : "NULL"));
     free(round_trip_base);
     free(base);
     free(round_trip);

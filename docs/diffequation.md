@@ -80,6 +80,7 @@ remain in force.
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "format-t.h"
 #include "diffequation-t.h"
 
 int main(void)
@@ -92,9 +93,9 @@ int main(void)
     string_t *b = upper ? expr_to_text(upper, style_UNBOUND) : NULL;
     bool ok = a && b && result && de_solve_result_status(result) == DE_SOLVE_STATUS_SOLVED;
     if (ok) {
-        printf("Interval: %s < x < %s\n", string_c_str(a), string_c_str(b));
-        printf("Point conditions: %zu\n", de_condition_count(problem));
-        printf("Solution families: %zu\n", de_solve_result_count(result));
+        fmt_print("Interval: {a} < x < {b}\n", FMT(a), FMT(b));
+        fmt_print("Point conditions: {point_conditions}\n", FMT(point_conditions, de_condition_count(problem)));
+        fmt_print("Solution families: {solution_families}\n", FMT(solution_families, de_solve_result_count(result)));
     }
     string_free(b);
     string_free(a);
@@ -186,6 +187,7 @@ This runnable README example solves $y'-y^2=x^2$ with $y(0)=0$:
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "format-t.h"
 #include "diffequation-t.h"
 
 int main(void)
@@ -193,12 +195,12 @@ int main(void)
     diffequ_t *problem = de_from_string("y' - y^2 = x^2; y(0)=0");
     diffequ_solve_result_t *result = problem ? de_solve_with_options(problem, DE_SOLVE_OPTION_STEPS) : NULL;
     bool solved = result && de_solve_result_status(result) == DE_SOLVE_STATUS_SOLVED;
-    printf("Solved: %s\n", solved ? "yes" : "no");
-    printf("Solutions: %zu\n", de_solve_result_count(result));
-    printf("Lie system: %s\n", result ? de_solve_result_symmetry(result) : "unavailable");
+    fmt_print("Solved: {solved}\n", FMT(solved, solved ? "yes" : "no"));
+    fmt_print("Solutions: {solutions}\n", FMT(solutions, de_solve_result_count(result)));
+    fmt_print("Lie system: {lie_system}\n", FMT(lie_system, result ? de_solve_result_symmetry(result) : "unavailable"));
     const equation_t *solution = de_solve_result_at(result, 0u);
     string_t *text = solution ? equ_to_text(solution, style_UNBOUND) : NULL;
-    printf("Solution: %s\n", text ? string_c_str(text) : "unavailable");
+    fmt_print("Solution: {solution}\n", FMT(solution, text ? string_c_str(text) : "unavailable"));
     int status = solved && text ? EXIT_SUCCESS : EXIT_FAILURE;
     string_free(text);
     de_solve_result_free(result);
@@ -255,6 +257,7 @@ This runnable example prints the native formulae, including their restrictions:
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "format-t.h"
 #include "diffequation-t.h"
 
 int main(void)
@@ -265,7 +268,7 @@ int main(void)
               de_solve_result_count(result) == 3u;
     for (size_t i = 0; ok && i < de_solve_result_count(result); ++i) {
         string_t *text = equ_to_text(de_solve_result_at(result, i), style_UNBOUND);
-        ok = text && puts(string_c_str(text)) != EOF;
+        ok = text && fmt_print("{text}\n", FMT(text)) != EOF;
         string_free(text);
     }
     de_solve_result_free(result);
@@ -308,6 +311,7 @@ substituting a numerical value into the solution:
 #include <stdlib.h>
 #include <string.h>
 
+#include "format-t.h"
 #include "diffequation-t.h"
 
 int main(void)
@@ -321,8 +325,8 @@ int main(void)
     if (!result || de_solve_result_count(result) != 1)
         return 1;
     char *text = expr_to_string(equ_rhs(de_solve_result_at(result, 0)), style_UNBOUND);
-    printf("Symbolic parameter: %d\n", text && strstr(text, "a") != NULL);
-    printf("Root removed: %d\n", text && strstr(text, "√") == NULL);
+    fmt_print("Symbolic parameter: {symbolic_parameter}\n", FMT(symbolic_parameter, text && strstr(text, "a") != NULL));
+    fmt_print("Root removed: {root_removed}\n", FMT(root_removed, text && strstr(text, "√") == NULL));
     free(text);
     de_solve_result_free(result);
     expr_context_free(context);
@@ -436,6 +440,7 @@ This runnable example keeps the oscillator coefficients symbolic:
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "format-t.h"
 #include "diffequation-t.h"
 #include "equation-t.h"
 
@@ -447,7 +452,7 @@ int main(void)
     string_t *text = solution ? equ_to_text(solution, style_UNBOUND) : NULL;
     bool ok = text && de_solve_result_status(result) == DE_SOLVE_STATUS_SOLVED;
     if (ok)
-        puts(string_c_str(text));
+        fmt_print("{text}\n", FMT(text));
     string_free(text);
     de_solve_result_free(result);
     de_free(problem);
@@ -480,6 +485,7 @@ solver to select the repeated-root form.
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "format-t.h"
 #include "diffequation-t.h"
 
 int main(void)
@@ -489,9 +495,9 @@ int main(void)
     string_t *text = problem ? de_to_text(problem, style_EXPRESSION) : NULL;
     bool ok = text && result && de_solve_result_status(result) == DE_SOLVE_STATUS_SOLVED;
     if (ok) {
-        puts(string_c_str(text));
-        printf("Point conditions: %zu\n", de_condition_count(problem));
-        puts("Symbolic solution: solved");
+        fmt_print("{text}\n", FMT(text));
+        fmt_print("Point conditions: {point_conditions}\n", FMT(point_conditions, de_condition_count(problem)));
+        fmt_print("Symbolic solution: solved\n");
     }
     string_free(text);
     de_solve_result_free(result);
@@ -797,6 +803,7 @@ and its exceptional branches:
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "format-t.h"
 #include "diffequation-t.h"
 
 int main(void)
@@ -807,9 +814,12 @@ int main(void)
     const expr_t *reference = de_solve_result_quadrature_reference(result);
     int status = EXIT_FAILURE;
     if (result && de_solve_result_status(result) == DE_SOLVE_STATUS_QUADRATURE && parameter && reference) {
-        printf("Parameter: %s\nFixed reference: %s\n", expr_symbol_name(parameter), expr_symbol_name(reference));
-        puts("Parametric coordinate equations: 2");
-        printf("Exceptional families: %zu\n", de_solve_result_count(result) - 2u);
+        fmt_print("Parameter: {parameter}\nFixed reference: {fixed_reference}\n",
+            FMT(parameter, expr_symbol_name(parameter)),
+            FMT(fixed_reference, expr_symbol_name(reference)));
+        fmt_print("Parametric coordinate equations: 2\n");
+        fmt_print("Exceptional families: {exceptional_families}\n",
+            FMT(exceptional_families, de_solve_result_count(result) - 2u));
         status = EXIT_SUCCESS;
     }
     de_solve_result_free(result);
@@ -1993,6 +2003,7 @@ This programme supplies only the oscillator's initial position:
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "format-t.h"
 #include "diffequation-t.h"
 
 int main(void)
@@ -2002,7 +2013,7 @@ int main(void)
     const equation_t *solution = result ? de_solve_result_at(result, 0u) : NULL;
     string_t *text = solution ? equ_to_text(solution, style_UNBOUND) : NULL;
     int status = text && de_solve_result_status(result) == DE_SOLVE_STATUS_SOLVED &&
-                 puts(string_c_str(text)) != EOF ? EXIT_SUCCESS : EXIT_FAILURE;
+                 fmt_print("{text}\n", FMT(text)) != EOF ? EXIT_SUCCESS : EXIT_FAILURE;
     string_free(text);
     de_solve_result_free(result);
     de_free(problem);
@@ -2212,6 +2223,7 @@ sine/cosine functions, retaining exact rational coefficients. For example:
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "format-t.h"
 #include "diffequation-t.h"
 
 int main(void)
@@ -2220,7 +2232,7 @@ int main(void)
     diffequ_solve_result_t *result = problem ? de_solve(problem) : NULL;
     string_t *text = result ? equ_to_text(de_solve_result_at(result, 0u), style_UNBOUND) : NULL;
     int status = EXIT_FAILURE;
-    if (text && puts(string_c_str(text)) != EOF)
+    if (text && fmt_print("{text}\n", FMT(text)) != EOF)
         status = EXIT_SUCCESS;
     string_free(text);
     de_solve_result_free(result);
@@ -2561,6 +2573,7 @@ $\quad\begin{array}{l}\displaystyle \displaystyle\quad \begin{aligned} & \frac{d
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "format-t.h"
 #include "diffequation-t.h"
 
 int main(void)
@@ -2573,9 +2586,9 @@ int main(void)
     char *problem_text = de_to_string(ode, style_EXPRESSION);
     string_t *solution_text = equ_to_text(solution, style_UNBOUND);
 
-    printf("input = %s\n", source);
-    printf("problem = %s\n", problem_text);
-    printf("solution = %s\n", string_c_str(solution_text));
+    fmt_print("input = {source}\n", FMT(source));
+    fmt_print("problem = {problem_text}\n", FMT(problem_text));
+    fmt_print("solution = {solution_text}\n", FMT(solution_text));
 
     string_free(solution_text);
     free(problem_text);
@@ -2632,6 +2645,7 @@ and `de_solve_result_steps()` or `de_solve_result_steps_TeX()`.
 ```c
 #include <stdio.h>
 
+#include "format-t.h"
 #include "diffequation-t.h"
 
 int main(void)
@@ -2643,9 +2657,9 @@ int main(void)
     const char *symmetry = de_solve_result_symmetry(result);
     string_t *solution_text = equ_to_text(solution, style_UNBOUND);
 
-    printf("input = %s\n", source);
-    printf("symmetry = %s\n", symmetry);
-    printf("solution = %s\n", string_c_str(solution_text));
+    fmt_print("input = {source}\n", FMT(source));
+    fmt_print("symmetry = {symmetry}\n", FMT(symmetry));
+    fmt_print("solution = {solution_text}\n", FMT(solution_text));
 
     string_free(solution_text);
     de_solve_result_free(result);
@@ -2667,6 +2681,8 @@ retrieve the existing solver's group-name metadata.
 
 ```c
 #include <stdio.h>
+
+#include "format-t.h"
 #include "diffequation-t.h"
 
 int main(void)
@@ -2678,9 +2694,11 @@ int main(void)
     int status = 1;
 
     if (generators && constants) {
-        printf("polynomial generators = %zu\n", mat_get_col_count(generators));
-        printf("structure constants = %zu x %zu\n",
-               mat_get_row_count(constants), mat_get_col_count(constants));
+        fmt_print("polynomial generators = {polynomial_generators}\n",
+            FMT(polynomial_generators, mat_get_col_count(generators)));
+        fmt_print("structure constants = {structure_constants} x {x}\n",
+            FMT(structure_constants, mat_get_row_count(constants)),
+            FMT(x, mat_get_col_count(constants)));
         status = 0;
     }
 
@@ -3229,6 +3247,7 @@ timeout, or cancel the control from another thread for normal application use.
 ```c
 #include <stdio.h>
 
+#include "format-t.h"
 #include "computation-t.h"
 #include "diffequation-t.h"
 
@@ -3253,7 +3272,7 @@ int main(void)
     computation_t *control = computation_new(&options);
     bool ok = control && computation_run(control, calculate, &job);
     bool stopped = !ok && computation_status(control) == COMPUTATION_BUDGET_EXHAUSTED;
-    printf("Stopped: %d\n", stopped);
+    fmt_print("Stopped: {stopped:d}\n", FMT(stopped));
     de_solve_result_free(job.result);
     de_free(job.input);
     computation_free(control);
@@ -3310,6 +3329,7 @@ For x(0) = 0 and x′(0) = 1, the following README example samples the rational 
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "format-t.h"
 #include "diffequation-t.h"
 
 int main(void)
@@ -3324,7 +3344,9 @@ int main(void)
     const sampler_point_t *last = samples ? sampler_point(samples, sampler_count(samples) - 1) : NULL;
     int status = EXIT_FAILURE;
     if (last && last->valid) {
-        printf("Samples: %zu\nx(1): %.6f\n", sampler_count(samples), num_to_double(last->y));
+        fmt_print("Samples: {samples}\nx(1): {value:.6f}\n",
+            FMT(samples, sampler_count(samples)),
+            FMT(value, num_to_double(last->y)));
         status = EXIT_SUCCESS;
     }
     sampler_free(samples);

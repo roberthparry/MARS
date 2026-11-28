@@ -31,6 +31,8 @@
 #include "test_format_internal.h"
 
 TEST_SUITE_CONFIG(TEST_CONFIG_GLOBAL);
+TEST_SUITE_SETUP(test_format_locale_setup);
+TEST_POST_SUMMARY(test_format_locale_cleanup);
 
 static const json_t *test_property(const json_t *object, const char *name)
 {
@@ -264,7 +266,7 @@ static const test_argument_factory_t *test_factory(const char *name)
     return NULL;
 }
 
-static void test_format_case(const void *data)
+static void test_format_check(const void *data, bool stream_case)
 {
     static const char *const codes[] = {
         [FMT_OK]              = "success",
@@ -294,15 +296,34 @@ static void test_format_case(const void *data)
         arguments[i] = fmt_named(name ? string_c_str(name) : NULL, fixtures[i].value);
     }
     fmt_error_t error = {FMT_OK, SIZE_MAX, SIZE_MAX, "fixture not loaded"};
-    string_t *out = ok ? fmt_string_args(string_c_str(pattern), arguments, count, &error) : NULL;
+    string_t *out = ok && !stream_case ? fmt_string_args(string_c_str(pattern), arguments, count, &error) : NULL;
     bool failure_case = string_view_equals_literal(string_view_all(row->operation), "error");
-    if (failure_case) {
+    if (!stream_case && failure_case) {
         ok = ok && !out && error.code > FMT_OK && error.code <= FMT_ERROR_IO &&
              !strcmp(codes[error.code], string_c_str(row->expected));
-    } else {
+    } else if (!stream_case) {
         ok = ok && out && error.code == FMT_OK && string_byte_length(out) == string_byte_length(row->expected) &&
              !memcmp(string_c_str(out), string_c_str(row->expected), string_byte_length(out));
     }
+    char *written = NULL;
+    size_t written_length = 0u;
+    FILE *stream = ok && stream_case ? open_memstream(&written, &written_length) : NULL;
+    if (ok && stream_case)
+        ok = stream != NULL;
+    for (unsigned pass = 0; ok && stream_case && pass < 2u; ++pass) {
+        int bytes = fmt_fprint_args(stream, string_c_str(pattern), arguments, count, &error);
+        ok = failure_case ? bytes == -1 && error.code > FMT_OK && error.code <= FMT_ERROR_IO &&
+                            !strcmp(codes[error.code], string_c_str(row->expected)) :
+                            bytes >= 0 && (size_t)bytes == string_byte_length(row->expected) && error.code == FMT_OK;
+    }
+    if (stream) {
+        ok = fclose(stream) == 0 && ok;
+        size_t expected = failure_case ? 0u : string_byte_length(row->expected);
+        ok = ok && written_length == expected * 2u &&
+             (!expected || (!memcmp(written, string_c_str(row->expected), expected) &&
+                            !memcmp(written + expected, string_c_str(row->expected), expected)));
+    }
+    free(written);
     if (!ok) {
         test_set_failure_detailf("%s: result=%s; error=%s at byte %zu argument %zu; expected=%s",
             string_c_str(row->name), out ? string_c_str(out) : "<NULL>", error.message,
@@ -327,6 +348,16 @@ static void test_format_case(const void *data)
     TEST_ASSERT_TRUE(ok, "typed formatting agrees with its database-backed text or error reference");
 }
 
+static void test_format_case(const void *data)
+{
+    test_format_check(data, false);
+}
+
+static void test_stream_case(const void *data)
+{
+    test_format_check(data, true);
+}
+
 static void test_format_render(void)
 {
     test_run_database_cases(__FILE__, __LINE__, "format.render", "tests.test_format_render", test_format_case);
@@ -335,6 +366,16 @@ static void test_format_render(void)
 static void test_format_errors(void)
 {
     test_run_database_cases(__FILE__, __LINE__, "format.errors", "tests.test_format_errors", test_format_case);
+}
+
+static void test_format_streams(void)
+{
+    test_run_database_cases(__FILE__, __LINE__, "format.stream", "tests.test_format_streams", test_stream_case);
+}
+
+static void test_format_stream_errors(void)
+{
+    test_run_database_cases(__FILE__, __LINE__, "format.stream_errors", "tests.test_format_stream_errors", test_stream_case);
 }
 
 static void test_macro_evaluation(void)
@@ -348,6 +389,14 @@ static void test_macro_evaluation(void)
     string_free(text);
     text = fmt_string("{result}", fmt_named("result", FMT(counter + 2)));
     TEST_ASSERT_TRUE(text && !strcmp(string_c_str(text), "7"), "explicit naming supports C expressions");
+    string_free(text);
+    const char *unit = "items";
+    text = fmt_string("{answer}/{unit}", FMT(unit), FMT(answer, counter++));
+    TEST_ASSERT_TRUE(text && counter == 6 && !strcmp(string_c_str(text), "5/items"),
+                     "explicit FMT labels evaluate once and remove dependence on binding order");
+    string_free(text);
+    text = fmt_string("{NUM_ONE}", FMT(NUM_ONE));
+    TEST_ASSERT_TRUE(text && !strcmp(string_c_str(text), "1"), "FMT preserves a macro argument's original name");
     string_free(text);
     text = fmt_string("plain UTF-8: Ω");
     TEST_ASSERT_TRUE(text && !strcmp(string_c_str(text), "plain UTF-8: Ω"), "zero-argument calls need no dummy binding");
@@ -447,6 +496,18 @@ static void test_native_objects(void)
     out = fmt_string("{matrix:latex}", FMT(matrix));
     TEST_ASSERT_TRUE(out && expected && !strcmp(string_c_str(out), string_c_str(expected)),
                      "matrix formatting delegates to its native TeX renderer");
+    string_free(out);
+    string_free(expected);
+    expected = mat_to_text(matrix, MAT_STRING_LAYOUT_PRETTY);
+    out = fmt_string("{matrix:pretty_layout}", FMT(matrix));
+    TEST_ASSERT_TRUE(out && expected && !strcmp(string_c_str(out), string_c_str(expected)),
+                     "matrix layout retains the legacy pretty presentation");
+    string_free(out);
+    string_free(expected);
+    expected = mat_to_text(matrix, MAT_STRING_LAYOUT_SCIENTIFIC);
+    out = fmt_string("{matrix:scientific_layout}", FMT(matrix));
+    TEST_ASSERT_TRUE(out && expected && !strcmp(string_c_str(out), string_c_str(expected)),
+                     "matrix layout retains the legacy scientific presentation");
     string_free(out);
     string_free(expected);
     expected = expr_to_text(expression, style_FUNCTION);
@@ -555,6 +616,16 @@ static void *test_format_worker(void *data)
     string_t *out = fmt_render(worker->format, arguments, 1u, NULL);
     worker->passed = out && !strcmp(string_c_str(out), "0023") && fmt_last_error()->code == FMT_OK;
     string_free(out);
+    FILE *stream = tmpfile();
+    bool printed = stream && fmt_fprint(stream, "{n:04d}", FMT(n)) == 4 &&
+                   fmt_fprint(stream, "{n:04d}", FMT(n)) == 4;
+    if (stream) {
+        rewind(stream);
+        char bytes[9] = {0};
+        printed = printed && fread(bytes, 1u, 8u, stream) == 8u && !strcmp(bytes, "00230023");
+        fclose(stream);
+    }
+    worker->passed = worker->passed && printed;
     out = fmt_string("{missing}");
     worker->passed = worker->passed && !out && fmt_last_error()->code == FMT_ERROR_MISSING;
     return NULL;
@@ -572,6 +643,120 @@ static void test_thread_local_diagnostics(void)
     TEST_ASSERT_TRUE(pthread_join(thread, NULL) == 0 && worker.passed, "render across threads with independent errors");
     TEST_ASSERT_TRUE(fmt_last_error()->code == FMT_OK, "worker failures do not replace this thread's diagnostic");
     fmt_free(format);
+}
+
+static void test_stream_plan_reuse(void)
+{
+    char pattern[48] = "{value:d}";
+    char name[16] = "value";
+    char *written = NULL;
+    size_t length = 0u;
+    FILE *stream = open_memstream(&written, &length);
+    TEST_ASSERT_TRUE(stream != NULL, "create a stream for mutable template and layout checks");
+    if (!stream)
+        return;
+    bool ok = fmt_fprint(stream, pattern, fmt_named(name, FMT(12))) == 2;
+    strcpy(pattern, "{value:#x}");
+    ok = ok && fmt_fprint(stream, pattern, fmt_named(name, FMT(31))) == 4;
+    strcpy(pattern, "{label}");
+    strcpy(name, "label");
+    ok = ok && fmt_fprint(stream, pattern, fmt_named(name, FMT("Ada"))) == 3;
+    ok = ok && fmt_fprint(stream, pattern, fmt_named(name, FMT(42))) == 2;
+    strcpy(name, "other");
+    ok = ok && fmt_fprint(stream, pattern, fmt_named(name, FMT(99))) == -1 &&
+         fmt_last_error()->code == FMT_ERROR_MISSING;
+    ok = fclose(stream) == 0 && ok && length == 11u && !strcmp(written, "120x1fAda42");
+    free(written);
+    TEST_ASSERT_TRUE(ok, "stream plan reuse compares current template text, binding names and value categories");
+}
+
+static string_t *test_recursive_stream(const void *data, const fmt_options_t *options, fmt_error_t *error)
+{
+    (void)options;
+    (void)error;
+    FILE *stream = *(FILE *const *)data;
+    for (unsigned i = 0; i < 32u; ++i) {
+        char pattern[48];
+        snprintf(pattern, sizeof(pattern), "inner %u: {}", i);
+        if (fmt_fprint(stream, pattern, FMT(i)) < 0)
+            return NULL;
+    }
+    return string_new_with("payload");
+}
+
+static void test_stream_recursive_callbacks(void)
+{
+    char *written = NULL;
+    size_t length = 0u;
+    FILE *stream = open_memstream(&written, &length);
+    FILE *inner = tmpfile();
+    bool ok = stream && inner;
+    if (ok)
+        ok = fmt_fprint(stream, "before {value} after", fmt_arg_custom("value", &inner, test_recursive_stream)) == 20;
+    if (stream)
+        ok = fclose(stream) == 0 && ok;
+    if (inner)
+        ok = fclose(inner) == 0 && ok;
+    ok = ok && length == 20u && !strcmp(written, "before payload after");
+    free(written);
+    TEST_ASSERT_TRUE(ok, "recursive stream callbacks cannot evict an active outer template");
+}
+
+static void test_stream_storage_boundaries(void)
+{
+    char text[4097], pattern[600];
+    memset(text, 'x', sizeof(text) - 1u);
+    text[sizeof(text) - 1u] = '\0';
+    memset(pattern, 'p', sizeof(pattern) - 4u);
+    memcpy(pattern + sizeof(pattern) - 4u, "{}", 3u);
+    char *written = NULL;
+    size_t length = 0u;
+    FILE *stream = open_memstream(&written, &length);
+    bool ok = stream && fmt_fprint(stream, "{}", FMT(text)) == 4096;
+    if (ok)
+        ok = fmt_fprint(stream, pattern, FMT(7)) == 597;
+    if (stream)
+        ok = fclose(stream) == 0 && ok;
+    ok = ok && length == 4693u && !memcmp(written, text, 4096u) && written[length - 1u] == '7';
+    for (size_t i = 4096u; ok && i + 1u < length; ++i)
+        ok = written[i] == 'p';
+    free(written);
+    TEST_ASSERT_TRUE(ok, "large outputs grow safely and large templates use temporary plans");
+}
+
+static string_t *test_stream_adapter_render(const void *value, const fmt_options_t *options, fmt_error_t *error)
+{
+    (void)value;
+    (void)options;
+    (void)error;
+    return string_new_with("payload");
+}
+
+static bool test_stream_adapter_reject(const fmt_options_t *options, fmt_error_t *error)
+{
+    (void)options;
+    *error = (fmt_error_t){FMT_ERROR_TYPE, SIZE_MAX, SIZE_MAX, "replacement adapter rejects this presentation"};
+    return false;
+}
+
+static void test_stream_adapter_lifetimes(void)
+{
+    fmt_adapter_t adapter = {.render = test_stream_adapter_render};
+    int value = 0;
+    char *written = NULL;
+    size_t length = 0u;
+    FILE *stream = open_memstream(&written, &length);
+    bool ok = stream && fmt_fprint(stream, "{:tag}", fmt_arg_adapter(&adapter, &value, sizeof(value))) == 7;
+    /* The first one-shot call's borrowed adapter lifetime has ended; the same storage may hold another adapter. */
+    adapter.validate = test_stream_adapter_reject;
+    if (ok)
+        ok = fmt_fprint(stream, "{:tag}", fmt_arg_adapter(&adapter, &value, sizeof(value))) == -1 &&
+             fmt_last_error()->code == FMT_ERROR_TYPE;
+    if (stream)
+        ok = fclose(stream) == 0 && ok;
+    ok = ok && length == 7u && !strcmp(written, "payload");
+    free(written);
+    TEST_ASSERT_TRUE(ok, "one-shot stream calls do not extend borrowed adapter lifetimes across calls");
 }
 
 static void test_excel_compiled(void)
@@ -611,10 +796,14 @@ static void test_excel_compiled(void)
 
 int tests_main(void)
 {
+    TEST_RUN_IN_GROUP(test_format_locale_snapshot, tests, "format,locale,ownership");
+    TEST_RUN_IN_GROUP(test_format_locale_catalogue, tests, "format,locale,catalogue");
+    TEST_RUN_IN_GROUP(test_format_locale_cache, tests, "format,locale,cache");
     TEST_RUN_IN_GROUP(test_format_core, tests, "format,core,adapter");
     TEST_RUN_IN_GROUP(test_format_TeX_header, tests, "format,headers,TeX");
     TEST_RUN_IN_GROUP(test_format_equation_header, tests, "format,headers,equation");
     TEST_RUN_IN_GROUP(test_format_datetime_header, tests, "format,headers,datetime");
+    TEST_RUN_IN_GROUP(test_format_datetime_format_first, tests, "format,headers,datetime");
     TEST_RUN_IN_GROUP(test_format_qfloat_header, tests, "format,headers,qfloat");
     TEST_RUN_IN_GROUP(test_format_qcomplex_header, tests, "format,headers,qcomplex");
     TEST_RUN_IN_GROUP(test_format_number_header, tests, "format,headers,number");
@@ -630,6 +819,12 @@ int tests_main(void)
     TEST_RUN_IN_GROUP(test_stream_and_invalid_text, tests, "format,streams,utf8");
     TEST_RUN_IN_GROUP(test_stream_failure, tests, "format,streams,errors");
     TEST_RUN_IN_GROUP(test_thread_local_diagnostics, tests, "format,threads");
+    TEST_RUN_IN_GROUP(test_stream_plan_reuse, tests, "format,streams,cache");
+    TEST_RUN_IN_GROUP(test_stream_recursive_callbacks, tests, "format,streams,callbacks");
+    TEST_RUN_IN_GROUP(test_stream_storage_boundaries, tests, "format,streams,boundaries");
+    TEST_RUN_IN_GROUP(test_stream_adapter_lifetimes, tests, "format,streams,adapters");
+    TEST_RUN_IN_GROUP(test_format_streams, tests, "format,streams,database");
+    TEST_RUN_IN_GROUP(test_format_stream_errors, tests, "format,streams,database,errors");
     TEST_RUN_IN_GROUP(test_excel_compiled, tests, "format,excel,compiled,lifetime");
     TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_format_named, readme_examples, "format,readme,output");
     TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_format_compiled, readme_examples, "format,readme,output");
@@ -642,6 +837,8 @@ int tests_main(void)
     TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_format_emoji, readme_examples, "format,readme,output");
     TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_format_owned_string, readme_examples, "format,readme,output");
     TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_format_datetime, readme_examples, "format,readme,output");
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_format_locales, readme_examples, "format,readme,locale,output");
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_datetime_lingua_new_year, readme_examples, "datetime,readme,locale,output");
     TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_format_symbolic, readme_examples, "format,readme,output");
     TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_format_excel, readme_examples, "format,readme,output");
     TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_format_date_literals, readme_examples, "format,readme,output");

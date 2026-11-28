@@ -14,6 +14,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "format-t.h"
 #include "string-t.h"
 #include "computation-t.h"
 #include "xml-t.h"
@@ -1603,7 +1604,7 @@ static void example_plot_svg(void)
     bool ok = plot && plot_add_points(plot, points, 3, "Measurements", PLOT_LINES, 0x55aacc);
     string_t *svg = ok ? plot_to_svg(plot) : NULL;
     if (svg)
-        printf("SVG ready; series: %zu\n", plot_series_count(plot));
+        fmt_print("SVG ready; series: {series}\n", FMT(series, plot_series_count(plot)));
     ok = svg != NULL;
     string_free(svg);
     plot_free(plot);
@@ -1626,7 +1627,7 @@ static void example_plot_surface(void)
         num_destroy(&heights[i]);
     string_t *svg = added ? plot_to_svg(plot) : NULL;
     if (svg)
-        printf("Surface SVG ready; series: %zu; height: 0 to 1\n", plot_series_count(plot));
+        fmt_print("Surface SVG ready; series: {series}; height: 0 to 1\n", FMT(series, plot_series_count(plot)));
     TEST_ASSERT_TRUE(svg != NULL, "README native height-surface SVG");
     string_free(svg);
     plot_free(plot);

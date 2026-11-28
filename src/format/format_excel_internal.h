@@ -39,14 +39,32 @@ typedef enum {
     FX_ELAPSED_MINUTE, /**< Total elapsed minutes without wrapping. */
     FX_ELAPSED_SECOND, /**< Total elapsed seconds without wrapping. */
     FX_LONG_DATE,      /**< MARS long Gregorian date convention. */
-    FX_LONG_TIME      /**< MARS long 24-hour time convention. */
+    FX_LONG_TIME,      /**< MARS long 24-hour time convention. */
+    FX_SUBSECOND,      /**< Resolved decimal separator and following fractional-second placeholders. */
+    FX_INTEGER_DIGIT,  /**< Resolved decimal/scientific integer placeholder. */
+    FX_FRACTION_DIGIT, /**< Resolved decimal/scientific fractional placeholder. */
+    FX_KIND_COUNT      /**< Token-table size; never emitted by the compiler. */
 } fmt_excel_kind_t;
+
+/** @brief Presentation properties resolved by the lexer rather than re-read from source during rendering. */
+typedef enum {
+    FX_REQUIRED = 1u,         /**< A zero placeholder must display a digit. */
+    FX_RESERVED = 2u,         /**< A question-mark placeholder reserves a space when omitted. */
+    FX_UPPER_PERIOD = 4u,     /**< Emit upper-case AM/PM text. */
+    FX_SUPERSCRIPT = 8u,      /**< Raise the ordinal suffix. */
+    FX_POSITIVE_EXPONENT = 16u, /**< Include an explicit positive exponent sign. */
+    FX_DATE_CONTEXT = 32u,    /**< Participates in Excel's neighbouring date-field lookup. */
+    FX_HOUR_CONTEXT = 64u,    /**< An hour field makes a following short month field denote minutes. */
+    FX_SECOND_CONTEXT = 128u  /**< A second field makes a preceding short month field denote minutes. */
+} fmt_excel_flags_t;
 
 /** @brief One source span with a resolved presentation role. */
 typedef struct {
     fmt_excel_kind_t kind; /**< Direct rendering category. */
     size_t start; /**< Byte offset into the owned code. */
     size_t length; /**< Byte count, or the count of repeated date letters. */
+    size_t next; /**< Next token index after any compile-time fusion of placeholder runs. */
+    unsigned flags; /**< Resolved fmt_excel_flags_t properties. */
 } fmt_excel_token_t;
 
 /** @brief One of at most four independently selected Excel format sections. */
@@ -61,6 +79,8 @@ typedef struct {
     bool date; /**< Contains calendar or elapsed-time fields. */
     bool ampm; /**< Uses twelve-hour time. */
     bool general; /**< Contains the General keyword. */
+    bool text; /**< Contains a text insertion placeholder. */
+    bool grouping; /**< Contains a grouping comma before the last integer placeholder. */
     int shift; /**< Decimal scaling from percent and trailing commas. */
     size_t decimal; /**< Decimal token index, or SIZE_MAX. */
     size_t exponent; /**< Scientific exponent token index, or SIZE_MAX. */
@@ -69,11 +89,15 @@ typedef struct {
     size_t last_digit; /**< Last numeric placeholder index, or SIZE_MAX. */
     unsigned whole; /**< Count of integer placeholders. */
     unsigned fractional; /**< Count of decimal places. */
+    unsigned minimum_fraction; /**< Position after the last mandatory fractional placeholder. */
+    unsigned exponent_digits; /**< Mandatory exponent digit count, resolved once during compilation. */
+    unsigned second_precision; /**< Maximum fractional-second precision, resolved once during compilation. */
 } fmt_excel_section_t;
 
 /** @brief Immutable Excel custom code; template ownership includes all tokens and comparison values. */
 struct _fmt_excel_t {
     char *code; /**< Owned exact UTF-8 code. */
+    size_t length; /**< Owned code's byte length, captured once. */
     fmt_excel_token_t *tokens; /**< Owned contiguous token array. */
     size_t count; /**< Initialised token count. */
     unsigned sections; /**< Section count from one through four. */
@@ -89,10 +113,83 @@ typedef struct {
 
 /**
  * @brief Distinguish Excel codes from ordinary native presentation names.
- * @param code Borrowed NUL-terminated presentation.
+ * @param code Borrowed UTF-8 presentation span; need not be NUL-terminated.
+ * @param length Exact byte count of the presentation span.
  * @return True for a custom-code spelling; false for ordinary presentation. Retains nothing and cannot fail.
  */
-bool fmt_excel_detect(const char *code);
+bool fmt_excel_detect(const char *code, size_t length);
+
+/**
+ * @brief Fold one ASCII byte without consulting the process locale.
+ * @param byte Input byte; non-ASCII bytes are unchanged.
+ * @return Lower-case ASCII byte or the original byte. Allocates nothing and cannot fail.
+ */
+static inline unsigned char fmt_excel_lower(unsigned char byte) {
+    return byte >= 'A' && byte <= 'Z' ? (unsigned char)(byte + ('a' - 'A')) : byte;
+}
+
+/**
+ * @brief Compare ASCII text case-insensitively within a bounded prefix.
+ * @param a Borrowed text with length readable bytes or an earlier NUL terminator.
+ * @param b Borrowed text with the same readable-byte contract.
+ * @param length Maximum byte count to compare.
+ * @return Zero for an equal prefix, otherwise a signed byte difference. Retains nothing and is reentrant.
+ */
+int fmt_excel_ascii_compare(const char *a, const char *b, size_t length);
+
+/**
+ * @brief Tokenise the next section through directly indexed byte handlers.
+ * @param[in,out] plan Owned-in-progress plan with enough token capacity for its source bytes.
+ * @param[in,out] section Current section receiving tokens and presentation properties.
+ * @param[in,out] position Required byte cursor, left at a semicolon or the terminating NUL on success.
+ * @param[out] error Optional diagnostic destination.
+ * @return True on success; false on syntax or allocation failure. Retains no extra resources beyond plan ownership.
+ */
+bool fmt_excel_lex_section(fmt_excel_t *plan, fmt_excel_section_t *section, size_t *position, fmt_error_t *error);
+
+/**
+ * @brief Read a coefficient digit with implicit zero extension.
+ * @param digits Borrowed ASCII coefficient containing length readable digits.
+ * @param length Coefficient digit count.
+ * @param index Signed position relative to the coefficient's first digit.
+ * @return The indexed digit, or ASCII zero outside the coefficient. No ownership transfers or failures occur.
+ */
+static inline char fmt_excel_digit_at(const char *digits, size_t length, int index) {
+    return index >= 0 && (size_t)index < length ? digits[index] : '0';
+}
+
+/**
+ * @brief Round a mutable coefficient to nearest with halves away from zero.
+ * @param[in,out] digits Caller-owned NUL-terminated coefficient, modified in place.
+ * @param[in,out] length Required coefficient length, updated after rounding.
+ * @param[in,out] point Required decimal point position, adjusted for a carry.
+ * @param keep Number of significant coefficient digits to retain; may be negative for a small fixed-point value.
+ * @note Allocates nothing, retains no storage and cannot fail for a valid coefficient buffer.
+ */
+void fmt_excel_round(char *digits, size_t *length, int *point, int keep);
+
+/**
+ * @brief Append an unsigned decimal integer with a minimum digit width.
+ * @param[in,out] out Borrowed output string.
+ * @param value Integer to append.
+ * @param minimum Minimum digit count, bounded by the internal 32-digit scratch capacity.
+ * @return True on success, false on allocation failure. Retains no inputs and transfers no ownership.
+ */
+bool fmt_excel_append_unsigned(string_t *out, uint64_t value, size_t minimum);
+
+/**
+ * @brief Render fixed or scientific fields through the compiled token dispatch table.
+ * @param[in,out] out Borrowed destination.
+ * @param plan Borrowed immutable source and tokens.
+ * @param section Borrowed resolved numeric section.
+ * @param[in,out] digits Mutable coefficient scratch, rounded in place and never retained.
+ * @param length Coefficient digit count.
+ * @param point Decimal point position before section scaling.
+ * @param[in,out] fill Required call-local repeat-fill position.
+ * @return True on success, false on output allocation failure. Transfers no ownership and is reentrant.
+ */
+bool fmt_excel_fixed(string_t *out, const fmt_excel_t *plan, const fmt_excel_section_t *section,
+                     char *digits, size_t length, int point, fmt_excel_fill_t *fill);
 
 /**
  * @brief Compile a complete custom code and validate its bounded section grammar.

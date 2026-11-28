@@ -3,7 +3,8 @@
  * @brief Typed brace formatting, named interpolation and reusable output templates.
  *
  * Use this module to format C values and text with automatic, indexed or named fields.
- * FMT(value) captures a value's type and source name once; fmt_named() supplies an explicit binding name.
+ * FMT(value) captures a value's type and source name once; FMT(name, value) supplies an explicit label.
+ * fmt_named() accepts a binding name supplied as a C string at runtime.
  * Formatting creates string_t output, appends to strings or builders, or writes to FILE streams.
  * Compiled templates own their text and binding layout and use direct argument indices during rendering.
  *
@@ -241,8 +242,11 @@ fmt_arg_t fmt_named(const char *name, fmt_arg_t value);
 /** @brief Internal expression constructor selection; the expression header enables its own association. */
 #define MARS_FMT_SELECT_EXPR_(value, next) next
 
-/** @brief Internal datetime constructor selection, enabled by datetime-t.h. */
+/* Preserve an owning-header association registered before this formatting interface was included. */
+#ifndef MARS_FMT_SELECT_DATETIME_
+/** @brief Internal datetime constructor selection, registered by datetime-t.h in either include order. */
 #define MARS_FMT_SELECT_DATETIME_(value, next) next
+#endif
 
 /** @brief Internal equation constructor selection, enabled by equation-t.h. */
 #define MARS_FMT_SELECT_EQU_(value, next) next
@@ -257,20 +261,55 @@ fmt_arg_t fmt_named(const char *name, fmt_arg_t value);
     MARS_FMT_SELECT_EQU_(value, MARS_FMT_SELECT_TeX_(value, fmt_arg_pointer))))))))
 
 /**
- * @brief Capture the type, source name and value of one supported C expression, evaluating it exactly once.
- * @param value Supported C value or a native value enabled by including its owning type header.
- * @return Non-owning fmt_arg_t; unsupported C types produce a compiler diagnostic.
- * @note Stringified expression names are primarily useful for identifiers; use positional fields or fmt_named()
- * for other expressions. This macro performs type selection and name capture that ordinary C functions cannot.
+ * @brief Select a descriptor constructor for a supported C expression.
+ * @param value Supported expression, evaluated once by its selected constructor.
+ * @return Non-owning descriptor; unsupported C types produce a compiler diagnostic.
  */
-#define FMT(value) fmt_named(#value, _Generic((value), \
+#define MARS_FMT_VALUE_(value) _Generic((value), \
     char: fmt_arg_signed, signed char: fmt_arg_signed, short: fmt_arg_signed, int: fmt_arg_signed, \
     long: fmt_arg_signed, long long: fmt_arg_signed, unsigned char: fmt_arg_unsigned, \
     unsigned short: fmt_arg_unsigned, unsigned int: fmt_arg_unsigned, unsigned long: fmt_arg_unsigned, \
     unsigned long long: fmt_arg_unsigned, bool: fmt_arg_bool, float: fmt_arg_float, double: fmt_arg_double, \
     long double: fmt_arg_long_double, char *: fmt_arg_cstring, const char *: fmt_arg_cstring, \
     string_t *: fmt_arg_string, const string_t *: fmt_arg_string, string_view_t: fmt_arg_view, rune_t: fmt_arg_rune, \
-    void *: fmt_arg_pointer, const void *: fmt_arg_pointer, default: MARS_FMT_EXTENDED_(value))((value)))
+    void *: fmt_arg_pointer, const void *: fmt_arg_pointer, default: MARS_FMT_EXTENDED_(value))((value))
+
+/**
+ * @brief Capture an expression using its original source spelling as the binding name.
+ * @param name Stringified source spelling supplied by FMT(), borrowed for the descriptor lifetime.
+ * @param value Supported expression, evaluated once.
+ * @return Non-owning named descriptor with the original expression's type.
+ */
+#define MARS_FMT_CAPTURE_(name, value) fmt_named((name), MARS_FMT_VALUE_(value))
+
+/**
+ * @brief Capture an explicitly labelled expression without evaluating the label.
+ * @param name Stringified label supplied by FMT(), borrowed for the descriptor lifetime.
+ * @param label Original label tokens, discarded without evaluation or requiring a declared C variable.
+ * @param value Supported expression, evaluated once.
+ * @return Non-owning named descriptor with the supplied expression's type.
+ */
+#define MARS_FMT_BIND_(name, label, value) fmt_named((name), MARS_FMT_VALUE_(value))
+
+/**
+ * @brief Select the one-expression or explicit-label capture form without inspecting the value's tokens.
+ * @param form Selected internal capture macro.
+ * @param ... Remaining form candidates, discarded.
+ * @return The selected capture macro; no C expression is evaluated.
+ */
+#define MARS_FMT_FORM_(form, ...) form
+
+/**
+ * @brief Capture a supported value once, using either its source name or an explicit label.
+ * @param name_or_value A value expression for FMT(value), or an unevaluated label token for FMT(name, value).
+ * @param ... Optional supported C value or native value enabled by including its owning type header.
+ * @return Non-owning fmt_arg_t; unsupported C types produce a compiler diagnostic.
+ * @note Use FMT(name, expression) for calculated values and fmt_named() for runtime C-string names. Original
+ * label spelling is preserved without macro expansion. These macros provide C type selection and name capture.
+ */
+#define FMT(name_or_value, ...) \
+    MARS_FMT_FORM_(__VA_OPT__(MARS_FMT_BIND_,) MARS_FMT_CAPTURE_)( \
+        #name_or_value, name_or_value __VA_OPT__(,) __VA_ARGS__)
 
 /**
  * @brief Compile a template and resolve its fields against a typed argument layout.

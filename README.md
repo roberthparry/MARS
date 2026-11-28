@@ -234,13 +234,15 @@ sample output.
 
 ```c
 #include <stdio.h>
+
+#include "format-t.h"
 #include "qfloat-t.h"
 
 int main(void) {
     qfloat_t x = qf_from_string("1");
     qfloat_t w = qf_lambert_W0(x);
 
-    qf_printf("W0(1) = %.34q\n", w);
+    fmt_print("W0(1) = {w:.34q}\n", FMT(w));
     return 0;
 }
 ```
@@ -253,24 +255,21 @@ W0(1) = 0.5671432904097838729999686622103575
 
 ```c
 #include <stdio.h>
+
+#include "format-t.h"
 #include "number-t.h"
 
 int main(void) {
     number_t x;
     number_t gamma_x;
     number_t lgamma_x;
-    char buf[256];
 
     num_set_default_prec_bits(256);
     x = num_create_from_string("2.345");
     gamma_x = num_gamma(x);
     lgamma_x = num_lgamma(x);
 
-    num_sprintf(buf, sizeof(buf), "%.77n", gamma_x);
-    printf("gamma(2.345)  = %s\n", buf);
-
-    num_sprintf(buf, sizeof(buf), "%.77n", lgamma_x);
-    printf("lgamma(2.345) = %s\n", buf);
+    fmt_print("gamma(2.345)  = {gamma_x:.77n}\nlgamma(2.345) = {lgamma_x:.77n}\n", FMT(gamma_x), FMT(lgamma_x));
 
     num_destroy(&lgamma_x);
     num_destroy(&gamma_x);
@@ -288,6 +287,8 @@ lgamma(2.345) = 0.18173624337757203797862933229995978550118791690492470651875093
 
 ```c
 #include <stdio.h>
+
+#include "format-t.h"
 #include "number-t.h"
 #include "string-t.h"
 
@@ -295,18 +296,11 @@ int main(void) {
     number_t a = num_create_from_string("2");
     number_t b = num_create_from_string("5/6");
     number_t c = num_add(a, b);
-    string_t *text = num_to_string(c);
-
-    if (!text)
-        return 1;
-
-    printf("2 + 5/6 = %s\n", string_c_str(text));
-
-    string_free(text);
+    int bytes = fmt_print("2 + 5/6 = {c}\n", FMT(c));
     num_destroy(&a);
     num_destroy(&b);
     num_destroy(&c);
-    return 0;
+    return bytes < 0;
 }
 ```
 
@@ -324,6 +318,8 @@ semantics and the `bench_number_scope` benchmark notes.
 
 ```c
 #include <stdio.h>
+
+#include "format-t.h"
 #include "expression-t.h"
 #include "number-t.h"
 
@@ -352,6 +348,8 @@ static expr_t *make_f(expr_t *x) {
 }
 
 int main(void) {
+    NUM_SCOPE(readme_numbers);
+
     num_set_default_prec_bits(384);
     number_t x0 = num_create_from_string("1.25");
     expr_t *x;
@@ -368,19 +366,18 @@ int main(void) {
     df_dx = expr_create_deriv(f, x);
     d2f_dx = expr_get_deriv(df_dx, x);
 
-    printf("f(x)    = "); expr_print(f);
-    printf("f'(x)   = "); expr_print(df_dx);
-    printf("f''(x)  = "); expr_print(d2f_dx);
+    fmt_print("f(x)    = {f}\n", FMT(f));
+    fmt_print("f'(x)   = {df_dx}\n", FMT(df_dx));
+    fmt_print("f''(x)  = {d2f_dx}\n", FMT(d2f_dx));
 
     f_val = expr_eval(f);
     d1_val = expr_eval(df_dx);
     d2_val = expr_eval(d2f_dx);
 
-    printf("\nAt x = 1.25 (384 bits, %zu significant digits):\n",
-           num_get_prec_digits(f_val));
-    num_printf("f(x)     = %.114N\n", f_val);
-    num_printf("f'(x)    = %.114N\n", d1_val);
-    num_printf("f''(x)   = %.114N\n", d2_val);
+    fmt_print("\nAt x = 1.25 (384 bits, {digits} significant digits):\n", FMT(digits, num_get_prec_digits(f_val)));
+    fmt_print("f(x)     = {f_val:.114N}\n", FMT(f_val));
+    fmt_print("f'(x)    = {d1_val:.114N}\n", FMT(d1_val));
+    fmt_print("f''(x)   = {d2_val:.114N}\n", FMT(d2_val));
 
     num_destroy(&d2_val);
     num_destroy(&d1_val);
@@ -408,6 +405,8 @@ f''(x)   = 3.8055231012396292258221776404244325549429604624756689463326935689439
 ```c
 #include <stdio.h>
 #include <stdlib.h>
+
+#include "format-t.h"
 #include "matrix-t.h"
 
 int main(void) {
@@ -416,7 +415,7 @@ int main(void) {
         "{ (Δ, Ω; Ω, -Δ) | Δ = 1.5; Ω = 0.25 }",
         &bindings);
 
-    mat_printf("%ml\n", H);
+    fmt_print("{H:pretty_layout}\n", FMT(H));
     mat_bindings_free(bindings);
     mat_free(H);
     return 0;

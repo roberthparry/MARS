@@ -12,11 +12,11 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "format-t.h"
 #include "string-t.h"
 #include "diffequation-t.h"
 #define MARS_SHARED_EXPR_INTERNAL_ACCESS
 #include "internal/expr_internal.h"
-
 #include "test_harness.h"
 #include "test_database.h"
 #include "test_diffequ_bessel.h"
@@ -148,7 +148,7 @@ void example_diffequation_bessel(void)
     diffequ_solve_result_t *result = problem ? de_solve(problem) : NULL;
     string_t *text = result ? equ_to_text(de_solve_result_at(result, 0u), style_UNBOUND) : NULL;
     int status = EXIT_FAILURE;
-    if (text && puts(string_c_str(text)) != EOF)
+    if (text && fmt_print("{text}\n", FMT(text)) != EOF)
         status = EXIT_SUCCESS;
     bool ok = status == EXIT_SUCCESS && !strcmp(string_c_str(text),
         "y = (C₁·cos(x) + C₂·sin(x))·1/√(|x|) where (x ∈ ℝ; x ≠ 0)");

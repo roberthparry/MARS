@@ -133,6 +133,7 @@ With an installed texture layer:
 ```c
 #include <stdio.h>
 
+#include "format-t.h"
 #include "array-t.h"
 #include "globe-t.h"
 
@@ -149,7 +150,7 @@ int main(void)
         globe_close(globe);
         return 1;
     }
-    printf("%u x %u; %zu bytes\n", info.width, info.height, array_size(png));
+    fmt_print("{width} x {x}; {size} bytes\n", FMT(width, info.width), FMT(x, info.height), FMT(size, array_size(png)));
     array_destroy(png);
     globe_close(globe);
     return 0;
@@ -433,6 +434,7 @@ With a configured globe database whose shoreline includes the Caspian Sea:
 ```c
 #include <stdio.h>
 
+#include "format-t.h"
 #include "globe-t.h"
 #include "string-t.h"
 
@@ -440,7 +442,7 @@ int main(void)
 {
     globe_t *globe = globe_open_configured(NULL);
     string_t *name = globe_water_name_at(globe, 41, 51);
-    printf("%s\n", name ? string_c_str(name) : "Unnamed water");
+    fmt_print("{c_str}\n", FMT(c_str, name ? string_c_str(name) : "Unnamed water"));
     int status = name ? 0 : 1;
     string_free(name);
     globe_close(globe);
@@ -505,6 +507,7 @@ With a configured, readable globe database:
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "format-t.h"
 #include "globe-t.h"
 #include "string-t.h"
 
@@ -512,7 +515,8 @@ int main(void)
 {
     globe_reader_t *reader = globe_reader_new();
     string_t *identity = globe_reader_identity(reader);
-    printf("Cache identity available: %s\n", identity ? "yes" : "no");
+    fmt_print("Cache identity available: {cache_identity_available}\n",
+        FMT(cache_identity_available, identity ? "yes" : "no"));
     int status = identity ? EXIT_SUCCESS : EXIT_FAILURE;
     string_free(identity);
     globe_reader_free(reader);
@@ -604,6 +608,7 @@ This README example rotates the positive x axis onto the positive y axis:
 #include <math.h>
 #include <stdio.h>
 
+#include "format-t.h"
 #include "quaternion-t.h"
 
 int main(void)
@@ -611,7 +616,7 @@ int main(void)
     quaternion_t rotation;
     double axis[] = {0, 0, 1}, vector[] = {1, 0, 0}, result[3];
     bool ok = quaternion_axis_angle(rotation, axis, acos(-1) / 2) && quaternion_rotate(result, rotation, vector);
-    if (ok) printf("Rotated: %.0f %.0f %.0f\n", result[0], result[1], result[2]);
+    if (ok) fmt_print("Rotated: {x:.0f} {y:.0f} {z:.0f}\n", FMT(x, result[0]), FMT(y, result[1]), FMT(z, result[2]));
     return ok ? 0 : 1;
 }
 ```

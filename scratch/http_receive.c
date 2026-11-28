@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "format-t.h"
 #include "http-t.h"
 
 int main(void)
@@ -20,7 +21,9 @@ int main(void)
     if (!http_receive_commit(receiver, 3) || !http_receive_finish(receiver, 200)) {
         http_receive_free(receiver); return EXIT_FAILURE;
     }
-    printf("%u: %zu bytes\n", http_receive_status(receiver), http_receive_size(receiver));
+    fmt_print("{receive_status}: {receive_size} bytes\n",
+        FMT(receive_status, http_receive_status(receiver)),
+        FMT(receive_size, http_receive_size(receiver)));
     http_receive_free(receiver);
     return EXIT_SUCCESS;
 }

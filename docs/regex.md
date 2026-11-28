@@ -74,6 +74,7 @@ advancing would loop forever.
 ## Capture UTF-8 text
 
 ```c
+#include "format-t.h"
 #include "regex-t.h"
 
 int main(void)
@@ -87,7 +88,7 @@ int main(void)
     string_t *value = ok ? regex_capture(subject, &spans[2]) : NULL;
     ok = name && value;
     if (ok)
-        string_printf("%S: %S\n", name, value);
+        fmt_print("{name}: {value}\n", FMT(name), FMT(value));
     string_free(value);
     string_free(name);
     regex_free(regex);
@@ -108,6 +109,7 @@ Zoë: 42
 This pattern cannot match empty text, so advancing to each match's end is safe.
 
 ```c
+#include "format-t.h"
 #include "regex-t.h"
 
 int main(void)
@@ -125,7 +127,7 @@ int main(void)
                 status = REGEX_ERROR;
                 break;
             }
-            string_printf("%S\n", value);
+            fmt_print("{value}\n", FMT(value));
             string_free(value);
             start = span.end;
         }

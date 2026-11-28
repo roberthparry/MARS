@@ -12,6 +12,7 @@
 #include <math.h>
 #include <string.h>
 
+#include "format-t.h"
 #include "string-t.h"
 #include "computation-t.h"
 #define MARS_SHARED_EXPR_INTERNAL_ACCESS
@@ -213,9 +214,9 @@ static void print_num_line(const char *label, const number_t value)
     if (!text)
         text = num_to_string(value);
     if (text)
-        string_printf("%-8s = %S\n", label, text);
+        fmt_print("{label:<8s} = {text}\n", FMT(label), FMT(text));
     else
-        string_printf("%-8s = (unavailable)\n", label);
+        fmt_print("{label:<8s} = (unavailable)\n", FMT(label));
     string_free(text);
 }
 
@@ -293,14 +294,11 @@ static int run_readme_example(void)
     d1_val = expr_eval(df_dx);
     d2_val = expr_eval(d2f_dx);
 
-    printf("f(x)    = ");
-    expr_print(f);
-    printf("f'(x)   = ");
-    expr_print(df_dx);
-    printf("f''(x)  = ");
-    expr_print(d2f_dx);
+    fmt_print("f(x)    = {f}\n", FMT(f));
+    fmt_print("f'(x)   = {df_dx}\n", FMT(df_dx));
+    fmt_print("f''(x)  = {d2f_dx}\n", FMT(d2f_dx));
 
-    printf("\nAt x = 1.25 (384 bits, %zu significant digits):\n", num_get_prec_digits(f_val));
+    fmt_print("\nAt x = 1.25 (384 bits, {digits} significant digits):\n", FMT(digits, num_get_prec_digits(f_val)));
     print_num_line("f(x)", f_val);
     print_num_line("f'(x)", d1_val);
     print_num_line("f''(x)", d2_val);
@@ -363,14 +361,11 @@ static int run_readme_from_string_example(void)
     d1_val = expr_eval(df_dx);
     d2_val = expr_eval(d2f_dx);
 
-    printf("f(x)    = ");
-    expr_print(f);
-    printf("f'(x)   = ");
-    expr_print(df_dx);
-    printf("f''(x)  = ");
-    expr_print(d2f_dx);
+    fmt_print("f(x)    = {f}\n", FMT(f));
+    fmt_print("f'(x)   = {df_dx}\n", FMT(df_dx));
+    fmt_print("f''(x)  = {d2f_dx}\n", FMT(d2f_dx));
 
-    printf("\nAt x = 1.25 (384 bits, %zu significant digits):\n", num_get_prec_digits(f_val));
+    fmt_print("\nAt x = 1.25 (384 bits, {digits} significant digits):\n", FMT(digits, num_get_prec_digits(f_val)));
     print_num_line("f(x)", f_val);
     print_num_line("f'(x)", d1_val);
     print_num_line("f''(x)", d2_val);
@@ -448,7 +443,7 @@ static int run_readme_partial_example(void)
     }
 
     value = expr_eval(f);
-    printf("At x=1, y=2 (384 bits, %zu significant digits):\n", num_get_prec_digits(value));
+    fmt_print("At x=1, y=2 (384 bits, {digits} significant digits):\n", FMT(digits, num_get_prec_digits(value)));
     print_num_line("f", value);
     num_destroy(&value);
     value = expr_eval(df_dx);
@@ -480,7 +475,7 @@ static int run_readme_partial_example(void)
     x0 = num_create_from_string("3");
     expr_set_val(x, x0);
     num_destroy(&x0);
-    printf("\nAfter x=3:\n");
+    fmt_print("\nAfter x=3:\n");
     value = expr_eval(df_dx);
     print_num_line("∂f/∂x", value);
     num_destroy(&value);
@@ -563,7 +558,8 @@ static int run_readme_eval_derivatives_example(void)
         return 1;
     }
 
-    printf("Evaluating derivatives at x=1, y=2 (384 bits, %zu significant digits):\n", num_get_prec_digits(value));
+    fmt_print("Evaluating derivatives at x=1, y=2 (384 bits, {digits} significant digits):\n",
+        FMT(digits, num_get_prec_digits(value)));
     print_num_line("f", value);
     print_num_line("∂f/∂x", grads[0]);
     print_num_line("∂f/∂y", grads[1]);
@@ -612,7 +608,7 @@ static void example_exact_factorisation(void)
     TEST_ASSERT_TRUE(text != NULL, "README exact factorisation succeeds");
     if (text) {
         TEST_ASSERT_STR_EQ(string_c_str(text), "{ a₀⁵¹²·a₁²⁵⁶·a₂¹²⁸ | ; a₀ = 2, a₁ = 3, a₂ = 5 }");
-        TEST_ASSERT_TRUE(puts(string_c_str(text)) != EOF, "README exact factorisation output");
+        TEST_ASSERT_TRUE(fmt_print("{text}\n", FMT(text)) != EOF, "README exact factorisation output");
     }
     string_free(text);
     expr_free(expression);
@@ -628,7 +624,7 @@ static void example_round(void)
         expr_t *expression = expr_from_string(inputs[i], NULL);
         ASSERT_NOT_NULL(expression);
         double value = qf_to_double(expr_eval_qf(expression));
-        printf("%.10g\n", value);
+        fmt_print("{value:.10g}\n", FMT(value));
         TEST_ASSERT_TRUE(value == expected[i], "README round output");
         expr_free(expression);
     }
@@ -646,7 +642,7 @@ static void example_indexed_roots(void)
         expr_free(simplified);
         bool ok = text && strcmp(text, expected[i]) == 0;
         if (text)
-            puts(text);
+            fmt_print("{text}\n", FMT(text));
         free(text);
         expr_free(expr);
         TEST_ASSERT_TRUE(ok, "README indexed root output");
@@ -658,7 +654,7 @@ static void example_lambert_sum(void)
 {
     expr_t *expression = expr_from_string("lambert_S(-1,1,1,1,-1,4)", NULL);
     number_t value = expr_eval(expression);
-    printf("%.1f\n", num_to_double(value));
+    fmt_print("{value:.1f}\n", FMT(value, num_to_double(value)));
     TEST_ASSERT_TRUE(num_to_double(value) == -2.5, "README Lambert sum output");
     num_destroy(&value);
     expr_free(expression);

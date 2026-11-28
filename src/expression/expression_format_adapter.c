@@ -3,7 +3,7 @@
  * @brief Module-owned symbolic expression presentations for typed brace formatting.
  *
  * Borrows expression pointers and delegates to the expression module's native renderers without evaluation,
- * substitution or mathematical rewriting. A sorted style table provides binary lookup during validation and rendering.
+ * substitution or mathematical rewriting. Style-name lengths form a minimal perfect hash with no empty slots.
  */
 #include <string.h>
 
@@ -16,25 +16,16 @@ static int expr_fmt_style(const char *name)
         const char *name;
         style_t style;
     } styles[] = {
-        {"expression", style_EXPRESSION},
         {"function",   style_FUNCTION},
         {"latex",      style_LATEX},
+        {"expression", style_EXPRESSION},
         {"unbound",    style_UNBOUND},
     };
     if (!*name)
         return style_EXPRESSION;
-    size_t first = 0, last = sizeof(styles) / sizeof(*styles);
-    while (first < last) {
-        size_t middle = first + (last - first) / 2u;
-        int order = strcmp(name, styles[middle].name);
-        if (!order)
-            return styles[middle].style;
-        if (order < 0)
-            last = middle;
-        else
-            first = middle + 1u;
-    }
-    return -1;
+    _Static_assert(sizeof(styles) / sizeof(*styles) == 4u, "Regenerate the minimal perfect hash when adding styles.");
+    size_t slot = strlen(name) & 3u;
+    return strcmp(name, styles[slot].name) ? -1 : (int)styles[slot].style;
 }
 
 static bool expr_fmt_validate(const fmt_options_t *options, fmt_error_t *error)

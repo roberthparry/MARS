@@ -13,11 +13,11 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "format-t.h"
 #include "string-t.h"
 #include "diffequation-t.h"
 #define MARS_EXPR_INTERNAL_ACCESS
 #include "expression/expr_internal.h"
-
 #include "test_harness.h"
 #include "test_diffequ_autonomous.h"
 
@@ -137,7 +137,10 @@ void example_diffequation_autonomous_transport(void)
     const equation_t *solution = de_solve_result_at(result, 0u);
     string_t *text = solution ? equ_to_text(solution, style_UNBOUND) : NULL;
     char *TeX = solution ? equ_to_TeX_body_wrapped(solution, SIZE_MAX) : NULL;
-    printf("  %s\n  %s\n  %s\n", source, text ? string_c_str(text) : "NULL", TeX ? TeX : "NULL");
+    fmt_print("  {source}\n  {c_str}\n  {value_3}\n",
+        FMT(source),
+        FMT(c_str, text ? string_c_str(text) : "NULL"),
+        FMT(value_3, TeX ? TeX : "NULL"));
     bool matched = text && strcmp(string_c_str(text), "u = F(x - uy)") == 0;
     bool verified = solution && implicit_transport_residual(de, solution);
     free(TeX);

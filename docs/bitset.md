@@ -10,6 +10,8 @@
 
 ```c
 #include <stdio.h>
+
+#include "format-t.h"
 #include "bitset-t.h"
 
 int main(void) {
@@ -20,12 +22,13 @@ int main(void) {
     bitset_set(bs, 63);
     bitset_set(bs, 200);
 
-    printf("popcount: %zu\n", bitset_popcount(bs));
+    size_t count = bitset_popcount(bs);
+    fmt_print("popcount: {count}\n", FMT(count));
 
     for (size_t i = bitset_next_set(bs, 0);
          i != BITSET_NPOS;
          i = bitset_next_set(bs, i + 1))
-        printf("  bit %zu is set\n", i);
+        fmt_print("  bit {i} is set\n", FMT(i));
 
     bitset_destroy(bs);
     return 0;
@@ -44,6 +47,8 @@ popcount: 4
 
 ```c
 #include <stdio.h>
+
+#include "format-t.h"
 #include "bitset-t.h"
 
 int main(void) {
@@ -55,10 +60,10 @@ int main(void) {
 
     bitset_and(a, b);
 
-    printf("AND result:");
+    fmt_print("AND result:");
     for (size_t i = bitset_next_set(a, 0); i != BITSET_NPOS; i = bitset_next_set(a, i + 1))
-        printf(" %zu", i);
-    printf("\n");
+        fmt_print(" {i}", FMT(i));
+    fmt_print("\n");
 
     bitset_destroy(a);
     bitset_destroy(b);

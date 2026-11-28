@@ -10,6 +10,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+#include "format-t.h"
 #include "webserver-t.h"
 #include "http-t.h"
 
@@ -44,13 +45,13 @@ int main(void)
     }
     websrv_free(server);
     if (child < 0) return EXIT_FAILURE;
-    string_t *url = string_sprintf("http://127.0.0.1:%u/hello", port);
+    string_t *url = fmt_string("http://127.0.0.1:{port}/hello", FMT(port));
     http_client_t *client = http_client_new();
     http_request_t *request = http_request_new(HTTP_GET, url);
     http_response_t *response = client && request ? http_client_send(client, request) : NULL;
     string_t *text = http_response_ok(response) ? http_response_text(response) : NULL;
     bool ok = text != NULL;
-    if (ok) string_printf("status=%ld\n%S\n", http_response_status(response), text);
+    if (ok) fmt_print("status={status}\n{text}\n", FMT(status, http_response_status(response)), FMT(text));
     string_free(text);
     http_response_free(response);
     http_request_free(request);

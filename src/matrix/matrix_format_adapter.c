@@ -3,7 +3,7 @@
  * @brief Module-owned matrix presentations for typed brace formatting.
  *
  * Borrows matrix pointers, validates native style names and delegates to the matrix module's public renderer.
- * The style table is sorted for binary lookup; entries are shared by validation and rendering so they cannot drift.
+ * A minimal perfect hash shares eight style entries between validation and rendering without empty slots.
  * No entry values, bindings or symbolic algebra are evaluated or rewritten here.
  */
 #include <string.h>
@@ -17,27 +17,23 @@ static int mat_fmt_style(const char *name)
         const char *name;
         mat_string_style_t style;
     } styles[] = {
-        {"expression", MAT_STRING_EXPRESSION},
-        {"function",   MAT_STRING_FUNCTION},
-        {"latex",      MAT_STRING_LATEX},
-        {"layout",     MAT_STRING_EXPRESSION_LAYOUT},
-        {"pretty",     MAT_STRING_INLINE_PRETTY},
-        {"scientific", MAT_STRING_INLINE_SCIENTIFIC},
+        {"pretty_layout",     MAT_STRING_LAYOUT_PRETTY},
+        {"scientific_layout", MAT_STRING_LAYOUT_SCIENTIFIC},
+        {"pretty",            MAT_STRING_INLINE_PRETTY},
+        {"layout",            MAT_STRING_EXPRESSION_LAYOUT},
+        {"expression",        MAT_STRING_EXPRESSION},
+        {"function",          MAT_STRING_FUNCTION},
+        {"scientific",        MAT_STRING_INLINE_SCIENTIFIC},
+        {"latex",             MAT_STRING_LATEX},
     };
+    _Static_assert(sizeof(styles) / sizeof(*styles) == 8u, "Regenerate the minimal perfect hash when adding styles.");
     if (!*name)
         return MAT_STRING_EXPRESSION;
-    size_t first = 0, last = sizeof(styles) / sizeof(*styles);
-    while (first < last) {
-        size_t middle = first + (last - first) / 2u;
-        int order = strcmp(name, styles[middle].name);
-        if (!order)
-            return styles[middle].style;
-        if (order < 0)
-            last = middle;
-        else
-            first = middle + 1u;
-    }
-    return -1;
+    uint32_t hash = 95u;
+    for (const unsigned char *at = (const unsigned char *)name; *at; ++at)
+        hash = (hash ^ *at) * UINT32_C(16777619);
+    size_t slot = (hash ^ (hash >> 16u)) & 7u;
+    return strcmp(name, styles[slot].name) ? -1 : (int)styles[slot].style;
 }
 
 static bool mat_fmt_validate(const fmt_options_t *options, fmt_error_t *error)

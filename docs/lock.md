@@ -123,6 +123,7 @@ handles alone do not monitor PIDs or operate across address spaces.
 ```c
 #include <stdio.h>
 
+#include "format-t.h"
 #include "lock-t.h"
 
 static bool lock_example_increment(lock_t *mutex, int *value)
@@ -140,7 +141,7 @@ int main(void)
     int value = 41;
     bool ok = mutex && lock_example_increment(mutex, &value) && lock_try(mutex);
     if (ok)
-        printf("Value: %d; lock available again\n", value);
+        fmt_print("Value: {value}; lock available again\n", FMT(value));
     ok = lock_free(mutex) && ok;
     return ok ? 0 : 1;
 }
@@ -161,6 +162,7 @@ For completion signalled from a real worker, see the [thread examples](thread.md
 #include <errno.h>
 #include <stdio.h>
 
+#include "format-t.h"
 #include "lock-t.h"
 
 int main(void)
@@ -168,10 +170,10 @@ int main(void)
     lock_t *event = lock_new(LOCK_EVENT, 0);
     bool ok = event && !lock_check(event) && errno == EBUSY;
     if (ok)
-        puts("Pending");
+        fmt_print("Pending\n");
     ok = ok && lock_signal(event) && lock_wait_for(event, 1000);
     if (ok)
-        puts("Complete");
+        fmt_print("Complete\n");
     ok = lock_free(event) && ok;
     return ok ? 0 : 1;
 }

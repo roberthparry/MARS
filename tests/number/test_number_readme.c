@@ -14,6 +14,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "format-t.h"
 #include "string-t.h"
 #include "test_number.h"
 
@@ -23,16 +24,8 @@ static void number_readme_rational_basic(void)
     number_t b = num_create_from_string("5/4");
     number_t product = num_mul(a, b);
     number_t want = num_create_from_frac(5, 6);
-    string_t *text = num_to_string(product);
-
-    if (!text) {
-        test_mark_failure(__FILE__, __LINE__, "failed to format rational README example");
-    } else {
-        printf("(2/3) * (5/4) = %s\n", string_c_str(text));
-        ASSERT_TRUE(num_eq(product, want));
-    }
-
-    string_free(text);
+    ASSERT_TRUE(fmt_print("(2/3) * (5/4) = {product}\n", FMT(product)) >= 0);
+    ASSERT_TRUE(num_eq(product, want));
     num_destroy(&a);
     num_destroy(&b);
     num_destroy(&product);
@@ -45,16 +38,8 @@ static void number_readme_binomial_cardinality(void)
     number_t k = num_create_from_long(5);
     number_t c = num_binomial(n, k);
     number_t want = num_create_from_long(2598960);
-    string_t *text = num_to_string(c);
-
-    if (!text) {
-        test_mark_failure(__FILE__, __LINE__, "failed to format binomial README example");
-    } else {
-        printf("C(52, 5) = %s\n", string_c_str(text));
-        ASSERT_TRUE(num_eq(c, want));
-    }
-
-    string_free(text);
+    ASSERT_TRUE(fmt_print("C(52, 5) = {c}\n", FMT(c)) >= 0);
+    ASSERT_TRUE(num_eq(c, want));
     num_destroy(&n);
     num_destroy(&k);
     num_destroy(&c);
@@ -80,9 +65,9 @@ void run_number_readme_mersenne_prime_search(void)
                 ASSERT_TRUE(found < (sizeof(want_exponents) / sizeof(want_exponents[0])));
                 ASSERT_EQ_INT((int)p, (int)want_exponents[found]);
                 if ((found % 4u) == 3u)
-                    printf("M_%-4u is prime\n", p);
+                    fmt_print("M_{p:<4d} is prime\n", FMT(p));
                 else
-                    printf("M_%-4u is prime    ", p);
+                    fmt_print("M_{p:<4d} is prime    ", FMT(p));
                 found++;
             }
 
@@ -108,7 +93,6 @@ static void number_readme_multiprecision_example(void)
     number_t y;
     number_t gamma_x;
     number_t lgamma_y;
-    char buf[256];
 
     ASSERT_EQ_INT(num_set_default_prec_bits(256u), 0);
     x = num_create_from_string("2.345");
@@ -116,13 +100,15 @@ static void number_readme_multiprecision_example(void)
     gamma_x = num_gamma(x);
     lgamma_y = num_lgamma(y);
 
-    ASSERT_TRUE(num_sprintf(buf, sizeof(buf), "%.77n", gamma_x) > 0);
-    printf("gamma(2.345)  = %s\n", buf);
-    ASSERT_TRUE(strncmp(buf, gamma_prefix, strlen(gamma_prefix)) == 0);
-
-    ASSERT_TRUE(num_sprintf(buf, sizeof(buf), "%.77n", lgamma_y) > 0);
-    printf("lgamma(2.345) = %s\n", buf);
-    ASSERT_TRUE(strncmp(buf, lgamma_prefix, strlen(lgamma_prefix)) == 0);
+    string_t *gamma_text = fmt_string("{gamma_x:.77n}", FMT(gamma_x));
+    string_t *lgamma_text = fmt_string("{lgamma_y:.77n}", FMT(lgamma_y));
+    ASSERT_TRUE(gamma_text && strncmp(string_c_str(gamma_text), gamma_prefix, strlen(gamma_prefix)) == 0);
+    ASSERT_TRUE(lgamma_text && strncmp(string_c_str(lgamma_text), lgamma_prefix, strlen(lgamma_prefix)) == 0);
+    ASSERT_TRUE(fmt_print("gamma(2.345)  = {gamma_x:.77n}\nlgamma(2.345) = {lgamma_y:.77n}\n",
+        FMT(gamma_x),
+        FMT(lgamma_y)) > 0);
+    string_free(gamma_text);
+    string_free(lgamma_text);
 
     num_destroy(&x);
     num_destroy(&y);
@@ -136,15 +122,13 @@ static void number_readme_complex_example(void)
     size_t saved_digits = num_get_default_prec_digits();
     number_t z;
     number_t exp_z;
-    char buf[256];
 
     ASSERT_EQ_INT(num_set_default_prec_digits(50u), 0);
     z = num_create_from_string("1 + 1i");
     exp_z = num_exp(z);
 
     ASSERT_TRUE(!num_is_real(exp_z));
-    ASSERT_TRUE(num_sprintf(buf, sizeof(buf), "%n", exp_z) > 0);
-    printf("exp(1 + i) = %s\n", buf);
+    ASSERT_TRUE(fmt_print("exp(1 + i) = {exp_z}\n", FMT(exp_z)) > 0);
 
     num_destroy(&z);
     num_destroy(&exp_z);
@@ -156,7 +140,7 @@ static void number_readme_struve_L_example(void)
     /* README example: modified Struve L (docs/number.md). */
     NUM_SCOPE(scope);
     number_t value = num_struve_L(NUM_ZERO, NUM_ONE);
-    num_printf("L_0(1) = %.16n\n", value);
+    fmt_print("L_0(1) = {value:.16n}\n", FMT(value));
     char output[80];
     num_sprintf(output, sizeof(output), "L_0(1) = %.16n", value);
     ASSERT_TRUE(strcmp(output, "L_0(1) = 0.7102431859378909") == 0);
@@ -167,7 +151,7 @@ static void number_readme_bessel_I_example(void)
     /* README example: modified Bessel I (docs/number.md). */
     NUM_SCOPE(scope);
     number_t bessel = num_bessel_I(NUM_ZERO, NUM_ONE);
-    num_printf("I_0(1) = %.16n\n", bessel);
+    fmt_print("I_0(1) = {bessel:.16n}\n", FMT(bessel));
     char output[80];
     num_sprintf(output, sizeof(output), "I_0(1) = %.16n", bessel);
     ASSERT_TRUE(strcmp(output, "I_0(1) = 1.266065877752008") == 0);
@@ -178,7 +162,7 @@ static void number_readme_struve_H_example(void)
     /* README example: ordinary Struve H (docs/number.md). */
     NUM_SCOPE(scope);
     number_t ordinary = num_struve_H(NUM_ZERO, NUM_ONE);
-    num_printf("H_0(1) = %.15n\n", ordinary);
+    fmt_print("H_0(1) = {ordinary:.15n}\n", FMT(ordinary));
     char output[80];
     num_sprintf(output, sizeof(output), "H_0(1) = %.15n", ordinary);
     ASSERT_TRUE(strcmp(output, "H_0(1) = 0.568656627048288") == 0);
@@ -189,7 +173,7 @@ static void number_readme_sgn_example(void)
     /* README example: real signum (docs/number.md). */
     NUM_SCOPE(scope);
     number_t sign = num_sgn(num_create_from_frac(-2, 3));
-    printf("sgn(-2/3) = %.0f\n", num_to_double(sign));
+    fmt_print("sgn(-2/3) = {value:.0f}\n", FMT(value, num_to_double(sign)));
     char output[80];
     snprintf(output, sizeof(output), "sgn(-2/3) = %.0f\n", num_to_double(sign));
     ASSERT_TRUE(strcmp(output, "sgn(-2/3) = -1\n") == 0);
@@ -204,7 +188,7 @@ static void number_readme_physical_example(void)
     bool ok = num_get_fraction_parts(NUM_ELEMENTARY_CHARGE, &numerator, &denominator);
     ASSERT_TRUE(ok);
     string_t *top = num_to_string(numerator), *bottom = num_to_string(denominator);
-    string_printf("elementary charge: %S/%S C\n", top, bottom);
+    fmt_print("elementary charge: {top}/{bottom} C\n", FMT(top), FMT(bottom));
     ASSERT_TRUE(strcmp(string_c_str(top), "801088317") == 0);
     ASSERT_TRUE(strcmp(string_c_str(bottom), "5000000000000000000000000000") == 0);
     string_free(top);
@@ -221,8 +205,9 @@ static void number_readme_zeta_pair(void)
     num_set_default_prec_bits(256);
     number_t s = num_create_from_string("2.25"), derivative;
     number_t value = num_zeta_pair(s, &derivative);
-    printf("zeta(2.25) = %.6f; derivative = %.6f\n",
-           num_to_double(value), num_to_double(derivative));
+    fmt_print("zeta(2.25) = {value:.6f}; derivative = {derivative:.6f}\n",
+        FMT(value, num_to_double(value)),
+        FMT(derivative, num_to_double(derivative)));
     char output[128];
     snprintf(output, sizeof output, "zeta(2.25) = %.6f; derivative = %.6f",
              num_to_double(value), num_to_double(derivative));

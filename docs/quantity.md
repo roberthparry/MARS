@@ -189,6 +189,7 @@ input format.
 ```c
 #include <string.h>
 
+#include "format-t.h"
 #include "quantity-t.h"
 
 int main(void)
@@ -198,7 +199,7 @@ int main(void)
     quantity_t *speed = quantity_from_string(text);
     quantity_t *converted = quantity_convert(speed, unit);
     string_t *output = quantity_to_string(converted, style_FUNCTION);
-    string_printf("%S\n", output);
+    fmt_print("{output}\n", FMT(output));
     if (!output || strcmp(string_c_str(output), "10 [m/s]"))
         return 1;
     string_free(output);
@@ -221,6 +222,7 @@ Output:
 ```c
 #include <string.h>
 
+#include "format-t.h"
 #include "quantity-t.h"
 
 int main(void)
@@ -233,7 +235,7 @@ int main(void)
     quantity_t *warmer = quantity_add(point, step);
     quantity_t *celsius = quantity_convert(warmer, unit);
     string_t *output = quantity_to_string(celsius, style_FUNCTION);
-    string_printf("%S\n", output);
+    fmt_print("{output}\n", FMT(output));
     if (!output || strcmp(string_c_str(output), "10 [degC]"))
         return 1;
     string_free(output);
@@ -259,6 +261,7 @@ Output:
 ```c
 #include <string.h>
 
+#include "format-t.h"
 #include "quantity-t.h"
 
 int main(void)
@@ -268,7 +271,7 @@ int main(void)
     quantity_t *angle = quantity_from_string(text);
     quantity_t *converted = quantity_convert(angle, unit);
     string_t *output = quantity_to_string(converted, style_FUNCTION);
-    string_printf("%S\n", output);
+    fmt_print("{output}\n", FMT(output));
     if (!output || strcmp(string_c_str(output), "3600 [arcsec]"))
         return 1;
     string_free(output);
@@ -291,6 +294,7 @@ Output:
 ```c
 #include <string.h>
 
+#include "format-t.h"
 #include "quantity-t.h"
 
 int main(void)
@@ -300,7 +304,7 @@ int main(void)
     quantity_t *energy = quantity_from_string(text);
     quantity_t *converted = quantity_convert(energy, unit);
     string_t *output = quantity_to_string(converted, style_FUNCTION);
-    string_printf("%S\n", output);
+    fmt_print("{output}\n", FMT(output));
     if (!output || strcmp(string_c_str(output), "2000000000 [eV]"))
         return 1;
     string_free(output);
@@ -339,6 +343,7 @@ precision settings. No units or constants need to be recreated when precision ch
 #include <stdio.h>
 #include <string.h>
 
+#include "format-t.h"
 #include "quantity-t.h"
 
 int main(void)
@@ -352,7 +357,7 @@ int main(void)
     quantity_t *distance = quantity_mul(speed, time);
     quantity_t *years = quantity_convert(distance, length_unit);
     string_t *output = quantity_to_string(years, style_FUNCTION);
-    string_printf("%S\n", output);
+    fmt_print("{output}\n", FMT(output));
     if (!output || strcmp(string_c_str(output), "1 [ly]"))
         return 1;
     string_t *angle_text = string_new_with("1 [deg]");
@@ -363,7 +368,7 @@ int main(void)
         num_set_default_prec_bits(precisions[i]);
         quantity_t *radians = quantity_convert(angle, angle_unit);
         number_t value = quantity_value(radians);
-        printf("radians: %zu bits\n", num_get_prec_bits(value));
+        fmt_print("radians: {radians} bits\n", FMT(radians, num_get_prec_bits(value)));
         if (num_get_prec_bits(value) != precisions[i])
             return 1;
         num_destroy(&value);
@@ -400,6 +405,7 @@ This example keeps the three mass definitions distinct.
 ```c
 #include <string.h>
 
+#include "format-t.h"
 #include "quantity-t.h"
 
 int main(void)
@@ -419,7 +425,7 @@ int main(void)
         quantity_t *mass = quantity_from_string(input);
         quantity_t *converted = quantity_convert(mass, unit);
         string_t *output = quantity_to_string(converted, style_FUNCTION);
-        string_printf("%S\n", output);
+        fmt_print("{output}\n", FMT(output));
         if (!output || strcmp(string_c_str(output), cases[i].expected))
             return 1;
         string_free(output);
@@ -459,6 +465,7 @@ This example retrieves the exact rational result rather than rounding its displa
 ```c
 #include <string.h>
 
+#include "format-t.h"
 #include "quantity-t.h"
 
 int main(void)
@@ -472,14 +479,14 @@ int main(void)
     bool exact = num_get_fraction_parts(value, &numerator, &denominator);
     if (!exact)
         return 1;
-    string_t *top = num_to_string(numerator), *bottom = num_to_string(denominator);
-    string_t *output = string_sprintf("%S/%S [%S]", top, bottom, quantity_unit(converted));
-    string_printf("%S\n", output);
+    string_t *output = fmt_string("{numerator}/{denominator} [{unit}]",
+        FMT(numerator),
+        FMT(denominator),
+        FMT(unit, quantity_unit(converted)));
+    fmt_print("{output}\n", FMT(output));
     if (!output || strcmp(string_c_str(output), "1397/11250000 [m/s^2]"))
         return 1;
     string_free(output);
-    string_free(bottom);
-    string_free(top);
     num_destroy(&denominator);
     num_destroy(&numerator);
     num_destroy(&value);

@@ -16,12 +16,6 @@
 #define MARS_FORMAT_INTERNAL_ACCESS
 #include "format_excel_internal.h"
 
-static const char *const fx_months[12] = {
-    "January", "February", "March", "April", "May", "June",
-    "July", "August", "September", "October", "November", "December",
-};
-static const char *const fx_weekdays[7] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
-
 static const char *fx_day_suffix(unsigned day, bool superscript)
 {
     static const char *const ordinary[4] = {"th", "st", "nd", "rd"};
@@ -55,48 +49,165 @@ static void fx_days_civil(int64_t days, int *year, unsigned *month, unsigned *da
     *year = y + (*month <= 2u);
 }
 
-static bool fx_calendar_integer(string_t *out, uint64_t value, size_t minimum)
+typedef struct {
+    const char *text;
+    size_t length;
+} fx_calendar_name_t;
+
+static const fx_calendar_name_t fx_months[12] = {
+    {"January", 7u}, {"February", 8u}, {"March", 5u}, {"April", 5u}, {"May", 3u}, {"June", 4u},
+    {"July", 4u}, {"August", 6u}, {"September", 9u}, {"October", 7u}, {"November", 8u}, {"December", 8u},
+};
+static const fx_calendar_name_t fx_weekdays[7] = {
+    {"Sunday", 6u}, {"Monday", 6u}, {"Tuesday", 7u}, {"Wednesday", 9u},
+    {"Thursday", 8u}, {"Friday", 6u}, {"Saturday", 8u},
+};
+
+typedef struct {
+    const fmt_excel_t *plan;
+    const fmt_excel_section_t *section;
+    string_t *out;
+    fmt_excel_fill_t fill;
+    fmt_error_t *error;
+    int year;
+    unsigned month, day, weekday, hour, minute;
+    uint64_t second, fractional;
+    long double elapsed;
+    bool range_error;
+} fx_calendar_state_t;
+
+typedef bool (*fx_calendar_fn)(fx_calendar_state_t *, const fmt_excel_token_t *);
+
+static bool fx_calendar_literal(fx_calendar_state_t *state, const fmt_excel_token_t *token)
 {
-    char digits[32];
-    size_t count = 0u;
-    do {
-        digits[count++] = (char)('0' + value % 10u);
-        value /= 10u;
-    } while (value);
-    while (count < minimum && count < sizeof(digits))
-        digits[count++] = '0';
-    while (count) {
-        if (string_append_char(out, digits[--count]) != 0)
-            return false;
-    }
-    return true;
+    return fmt_excel_literal(state->out, state->plan, token, &state->fill);
 }
 
-static unsigned fx_second_precision(const fmt_excel_t *plan, const fmt_excel_section_t *section)
+static bool fx_calendar_name(string_t *out, const fx_calendar_name_t *name, size_t width)
 {
-    unsigned precision = 0u;
-    size_t end = section->first + section->count;
-    for (size_t i = section->first; i < end; ++i) {
-        if (plan->tokens[i].kind != FX_DOT)
-            continue;
-        unsigned count = 0u;
-        while (i + 1u < end && plan->tokens[i + 1u].kind == FX_DIGIT) {
-            ++count;
-            ++i;
-        }
-        if (count > precision)
-            precision = count;
-    }
-    return precision;
+    static const size_t lengths[6] = {0u, 0u, 0u, 3u, SIZE_MAX, 1u};
+    size_t length = lengths[width];
+    return string_append_bytes(out, name->text, length == SIZE_MAX ? name->length : length) == 0;
 }
+
+static bool fx_calendar_year(fx_calendar_state_t *state, const fmt_excel_token_t *token)
+{
+    bool short_year = token->length <= 2u;
+    unsigned value = short_year ? (unsigned)state->year % 100u : (unsigned)state->year;
+    return fmt_excel_append_unsigned(state->out, value, short_year ? 2u : 4u);
+}
+
+static bool fx_calendar_month(fx_calendar_state_t *state, const fmt_excel_token_t *token)
+{
+    if (token->length <= 2u)
+        return fmt_excel_append_unsigned(state->out, state->month, token->length);
+    return fx_calendar_name(state->out, &fx_months[state->month - 1u], token->length);
+}
+
+static bool fx_calendar_day(fx_calendar_state_t *state, const fmt_excel_token_t *token)
+{
+    if (token->length <= 2u)
+        return fmt_excel_append_unsigned(state->out, state->day, token->length);
+    return fx_calendar_name(state->out, &fx_weekdays[state->weekday], token->length);
+}
+
+static bool fx_calendar_ordinal(fx_calendar_state_t *state, const fmt_excel_token_t *token)
+{
+    return fmt_excel_append_unsigned(state->out, state->day, token->length) &&
+           string_append_cstr(state->out, fx_day_suffix(state->day, (token->flags & FX_SUPERSCRIPT) != 0u)) == 0;
+}
+
+static bool fx_calendar_hour(fx_calendar_state_t *state, const fmt_excel_token_t *token)
+{
+    unsigned hour = state->section->ampm ? state->hour % 12u : state->hour;
+    if (state->section->ampm && !hour)
+        hour = 12u;
+    return fmt_excel_append_unsigned(state->out, hour, token->length);
+}
+
+static bool fx_calendar_minute(fx_calendar_state_t *state, const fmt_excel_token_t *token)
+{
+    return fmt_excel_append_unsigned(state->out, state->minute, token->length);
+}
+
+static bool fx_calendar_second(fx_calendar_state_t *state, const fmt_excel_token_t *token)
+{
+    return fmt_excel_append_unsigned(state->out, state->second, token->length);
+}
+
+static bool fx_calendar_period(fx_calendar_state_t *state, const fmt_excel_token_t *token)
+{
+    static const char *const periods[2][2] = {{"am", "pm"}, {"AM", "PM"}};
+    const char *text = periods[(token->flags & FX_UPPER_PERIOD) != 0u][state->hour >= 12u];
+    return string_append_bytes(state->out, text, token->length == 3u ? 1u : 2u) == 0;
+}
+
+static bool fx_calendar_elapsed(fx_calendar_state_t *state, const fmt_excel_token_t *token)
+{
+    static const unsigned divisors[FX_KIND_COUNT] = {
+        [FX_ELAPSED_HOUR]   = 3600u,
+        [FX_ELAPSED_MINUTE] = 60u,
+        [FX_ELAPSED_SECOND] = 1u,
+    };
+    long double value = floorl(state->elapsed / divisors[token->kind]);
+    if (value < 0.0L || value > (long double)UINT64_MAX) {
+        state->range_error = true;
+        return fmt_error_set(state->error,
+            FMT_ERROR_RANGE,
+            SIZE_MAX,
+            SIZE_MAX,
+            "elapsed time exceeds the supported range");
+    }
+    return fmt_excel_append_unsigned(state->out, (uint64_t)value, token->length);
+}
+
+static bool fx_calendar_subsecond(fx_calendar_state_t *state, const fmt_excel_token_t *token)
+{
+    return string_append_char(state->out, '.') == 0 &&
+           (!token->length || fmt_excel_append_unsigned(state->out, state->fractional, token->length));
+}
+
+static bool fx_calendar_long_date(fx_calendar_state_t *state, const fmt_excel_token_t *token)
+{
+    (void)token;
+    const fx_calendar_name_t *weekday = &fx_weekdays[state->weekday], *month = &fx_months[state->month - 1u];
+    return string_append_bytes(state->out, weekday->text, weekday->length) == 0 &&
+           string_append_cstr(state->out, ", ") == 0 && string_append_bytes(state->out, month->text, month->length) == 0 &&
+           string_append_char(state->out, ' ') == 0 && fmt_excel_append_unsigned(state->out, state->day, 1u) &&
+           string_append_cstr(state->out, ", ") == 0 && fmt_excel_append_unsigned(state->out, (unsigned)state->year, 4u);
+}
+
+static bool fx_calendar_long_time(fx_calendar_state_t *state, const fmt_excel_token_t *token)
+{
+    (void)token;
+    return fmt_excel_append_unsigned(state->out, state->hour, 2u) && string_append_char(state->out, ':') == 0 &&
+           fmt_excel_append_unsigned(state->out, state->minute, 2u) && string_append_char(state->out, ':') == 0 &&
+           fmt_excel_append_unsigned(state->out, state->second, 2u);
+}
+
+static const fx_calendar_fn fx_calendar_dispatch[FX_KIND_COUNT] = {
+    [FX_YEAR]           = fx_calendar_year,
+    [FX_MONTH]          = fx_calendar_month,
+    [FX_DAY]            = fx_calendar_day,
+    [FX_DAY_ORDINAL]    = fx_calendar_ordinal,
+    [FX_HOUR]           = fx_calendar_hour,
+    [FX_MINUTE]         = fx_calendar_minute,
+    [FX_SECOND]         = fx_calendar_second,
+    [FX_AMPM]           = fx_calendar_period,
+    [FX_ELAPSED_HOUR]   = fx_calendar_elapsed,
+    [FX_ELAPSED_MINUTE] = fx_calendar_elapsed,
+    [FX_ELAPSED_SECOND] = fx_calendar_elapsed,
+    [FX_LONG_DATE]      = fx_calendar_long_date,
+    [FX_LONG_TIME]      = fx_calendar_long_time,
+    [FX_SUBSECOND]      = fx_calendar_subsecond,
+};
 
 static string_t *fx_calendar_render(const fmt_options_t *options, const fmt_excel_section_t *section, int year,
                                     unsigned month, unsigned day, long double serial, unsigned weekday,
                                     unsigned hour, unsigned minute, long double second, fmt_error_t *error)
 {
     const fmt_excel_t *plan = options->excel;
-    fmt_excel_fill_t fill = {0};
-    unsigned precision = fx_second_precision(plan, section);
+    unsigned precision = section->second_precision;
     if (precision > 9u) {
         fmt_error_set(error, FMT_ERROR_RANGE, SIZE_MAX, SIZE_MAX, "date fractional seconds support at most nine places");
         return NULL;
@@ -121,106 +232,35 @@ static string_t *fx_calendar_render(const fmt_options_t *options, const fmt_exce
         return string_new_with("########");
     uint64_t fractional = (uint64_t)floorl((rounded - floorl(rounded)) * (long double)scale + 0.5L);
     long double total = floorl(serial * 86400.0L * (long double)scale + 0.5L) / (long double)scale;
-    string_t *out = string_new();
+    fx_calendar_state_t state = {.plan = plan, .section = section, .out = string_new(), .error = error,
+        .year = year, .month = month, .day = day, .weekday = weekday, .hour = hour, .minute = minute,
+        .second = (uint64_t)rounded, .fractional = fractional, .elapsed = total};
     size_t end = section->first + section->count;
-    bool ok = out != NULL;
-    for (size_t i = section->first; ok && i < end; ++i) {
+    bool ok = state.out != NULL;
+    for (size_t i = section->first; ok && i < end;) {
         const fmt_excel_token_t *token = &plan->tokens[i];
-        size_t count = token->length;
-        switch (token->kind) {
-            case FX_YEAR:
-                ok = fx_calendar_integer(out, count <= 2u ? (unsigned)year % 100u : (unsigned)year,
-                                          count <= 2u ? 2u : 4u);
-                break;
-            case FX_MONTH:
-                if (count <= 2u)
-                    ok = fx_calendar_integer(out, month, count);
-                else
-                    ok = string_append_bytes(out, fx_months[month - 1u], count == 3u ? 3u : count == 5u ? 1u :
-                                              strlen(fx_months[month - 1u])) == 0;
-                break;
-            case FX_DAY:
-                if (count <= 2u)
-                    ok = fx_calendar_integer(out, day, count);
-                else
-                    ok = string_append_bytes(out, fx_weekdays[weekday], count == 3u ? 3u : strlen(fx_weekdays[weekday])) == 0;
-                break;
-            case FX_DAY_ORDINAL:
-                ok = fx_calendar_integer(out, day, count) &&
-                     string_append_cstr(out, fx_day_suffix(day, plan->code[token->start + count + 1u] == '^')) == 0;
-                break;
-            case FX_HOUR: {
-                unsigned shown = section->ampm ? hour % 12u : hour;
-                ok = fx_calendar_integer(out, section->ampm && !shown ? 12u : shown, count);
-                break;
-            }
-            case FX_MINUTE:
-                ok = fx_calendar_integer(out, minute, count);
-                break;
-            case FX_SECOND:
-                ok = fx_calendar_integer(out, (uint64_t)rounded, count);
-                break;
-            case FX_AMPM: {
-                bool lower = plan->code[token->start] == 'a';
-                const char *period = hour < 12u ? (lower ? "am" : "AM") : (lower ? "pm" : "PM");
-                ok = string_append_bytes(out, period, count == 3u ? 1u : 2u) == 0;
-                break;
-            }
-            case FX_ELAPSED_HOUR:
-            case FX_ELAPSED_MINUTE:
-            case FX_ELAPSED_SECOND: {
-                long double divisor = token->kind == FX_ELAPSED_HOUR ? 3600.0L :
-                                      token->kind == FX_ELAPSED_MINUTE ? 60.0L : 1.0L;
-                long double value = floorl(total / divisor);
-                if (value < 0.0L || value > (long double)UINT64_MAX) {
-                    string_free(out);
-                    fmt_error_set(error, FMT_ERROR_RANGE, SIZE_MAX, SIZE_MAX, "elapsed time exceeds the supported range");
-                    return NULL;
-                }
-                ok = fx_calendar_integer(out, (uint64_t)value, count);
-                break;
-            }
-            case FX_DOT: {
-                unsigned places = 0u;
-                while (i + 1u < end && plan->tokens[i + 1u].kind == FX_DIGIT) {
-                    ++i;
-                    ++places;
-                }
-                ok = string_append_char(out, '.') == 0;
-                if (places)
-                    ok = ok && fx_calendar_integer(out, fractional, places);
-                break;
-            }
-            case FX_LONG_DATE:
-                ok = string_append_cstr(out, fx_weekdays[weekday]) == 0 && string_append_cstr(out, ", ") == 0 &&
-                     string_append_cstr(out, fx_months[month - 1u]) == 0 && string_append_char(out, ' ') == 0 &&
-                     fx_calendar_integer(out, day, 1u) && string_append_cstr(out, ", ") == 0 &&
-                     fx_calendar_integer(out, (unsigned)year, 4u);
-                break;
-            case FX_LONG_TIME:
-                ok = fx_calendar_integer(out, hour, 2u) && string_append_char(out, ':') == 0 &&
-                     fx_calendar_integer(out, minute, 2u) && string_append_char(out, ':') == 0 &&
-                     fx_calendar_integer(out, (uint64_t)rounded, 2u);
-                break;
-            default:
-                ok = fmt_excel_literal(out, plan, token, &fill);
-                break;
-        }
+        fx_calendar_fn render = fx_calendar_dispatch[token->kind];
+        ok = (render ? render : fx_calendar_literal)(&state, token);
+        i = token->next;
     }
     if (!ok) {
-        string_free(out);
-        fmt_error_set(error, FMT_ERROR_MEMORY, SIZE_MAX, SIZE_MAX, "cannot allocate Excel date output");
+        string_free(state.out);
+        if (!state.range_error)
+            fmt_error_set(error, FMT_ERROR_MEMORY, SIZE_MAX, SIZE_MAX, "cannot allocate Excel date output");
         return NULL;
     }
-    return fmt_excel_finish(out, plan, section, options, fill);
+    return fmt_excel_finish(state.out, plan, section, options, state.fill);
+
 }
 
-string_t *fmt_excel_calendar(const fmt_options_t *options, const fmt_excel_section_t *section,
-                            long double serial, fmt_error_t *error)
+string_t *fmt_excel_calendar(const fmt_options_t *options,
+    const fmt_excel_section_t *section,
+    long double serial,
+    fmt_error_t *error)
 {
     if (!isfinite(serial) || serial < 0.0L || serial >= 2958466.0L)
         return string_new_with("########");
-    unsigned precision = fx_second_precision(options->excel, section);
+    unsigned precision = section->second_precision;
     long double scale = powl(10.0L, (long double)(precision > 9u ? 9u : precision));
     long double ticks = floorl(serial * 86400.0L * scale + 0.5L);
     long double day_ticks = 86400.0L * scale;
@@ -248,8 +288,14 @@ string_t *fmt_excel_calendar(const fmt_options_t *options, const fmt_excel_secti
 }
 
 /* Render a real Gregorian datetime without converting its fractional seconds through a serial-day double. */
-string_t *fmt_excel_datetime(const fmt_options_t *options, int year, unsigned month, unsigned day,
-                             unsigned hour, unsigned minute, double second, fmt_error_t *error)
+string_t *fmt_excel_datetime(const fmt_options_t *options,
+    int year,
+    unsigned month,
+    unsigned day,
+    unsigned hour,
+    unsigned minute,
+    double second,
+    fmt_error_t *error)
 {
     static const unsigned month_days[12] = {31u, 28u, 31u, 30u, 31u, 30u, 31u, 31u, 30u, 31u, 30u, 31u};
     bool leap = year % 4 == 0 && (year % 100 != 0 || year % 400 == 0);

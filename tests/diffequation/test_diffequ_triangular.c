@@ -13,11 +13,11 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "format-t.h"
 #include "string-t.h"
 #include "diffequation-t.h"
 #define MARS_EXPR_INTERNAL_ACCESS
 #include "expression/expr_internal.h"
-
 #include "test_harness.h"
 #include "test_diffequ_triangular.h"
 
@@ -118,7 +118,7 @@ static bool triangular_verify(const diffequ_t *de, const equation_t *solution)
                      (expr_is_exact_zero(zero) || triangular_zero_at_samples(zero, de, mask));
         if (!valid) {
             char *text = zero ? expr_to_string(zero, style_UNBOUND) : NULL;
-            printf("  residual: %s\n", text ? text : "NULL");
+            fmt_print("  residual: {residual}\n", FMT(residual, text ? text : "NULL"));
             free(text);
         }
         expr_free(zero);
@@ -236,7 +236,7 @@ void example_diffequation_triangular_transport(void)
     diffequ_solve_result_t *result = de ? de_solve(de) : NULL;
     const equation_t *solution = de_solve_result_at(result, 0u);
     string_t *text = solution ? equ_to_text(solution, style_UNBOUND) : NULL;
-    printf("  %s\n  %s\n", source, text ? string_c_str(text) : "NULL");
+    fmt_print("  {source}\n  {c_str}\n", FMT(source), FMT(c_str, text ? string_c_str(text) : "NULL"));
     bool verified = solution && triangular_verify(de, solution);
     bool matched = text && strcmp(string_c_str(text), "u = F(y/x - ln(|x|)) + ln(|x|)") == 0;
     string_free(text);

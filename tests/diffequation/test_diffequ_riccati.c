@@ -11,6 +11,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "format-t.h"
 #include "string-t.h"
 #include "diffequation-t.h"
 #include "expression-t.h"
@@ -245,12 +246,12 @@ void example_diffequation_riccati(void)
     diffequ_t *problem = de_from_string("y' - y^2 = x^2; y(0)=0");
     diffequ_solve_result_t *result = problem ? de_solve_with_options(problem, DE_SOLVE_OPTION_STEPS) : NULL;
     bool solved = result && de_solve_result_status(result) == DE_SOLVE_STATUS_SOLVED;
-    printf("Solved: %s\n", solved ? "yes" : "no");
-    printf("Solutions: %zu\n", de_solve_result_count(result));
-    printf("Lie system: %s\n", result ? de_solve_result_symmetry(result) : "unavailable");
+    fmt_print("Solved: {solved}\n", FMT(solved, solved ? "yes" : "no"));
+    fmt_print("Solutions: {solutions}\n", FMT(solutions, de_solve_result_count(result)));
+    fmt_print("Lie system: {lie_system}\n", FMT(lie_system, result ? de_solve_result_symmetry(result) : "unavailable"));
     const equation_t *solution = de_solve_result_at(result, 0u);
     string_t *text = solution ? equ_to_text(solution, style_UNBOUND) : NULL;
-    printf("Solution: %s\n", text ? string_c_str(text) : "unavailable");
+    fmt_print("Solution: {solution}\n", FMT(solution, text ? string_c_str(text) : "unavailable"));
     const char *expected = "y = x·J_{¾}(½·x²)/J_{-¼}(½·x²); x ≠ 0; y(0) = 0";
     bool valid = solved && de_solve_result_count(result) == 1u && text && !strcmp(string_c_str(text), expected);
     string_free(text); de_solve_result_free(result); de_free(problem);

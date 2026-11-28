@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "format-t.h"
 #include "http-t.h"
 #include "array-t.h"
 
@@ -26,12 +27,14 @@ int main(int argc, char **argv)
     string_t *output = string_new();
     bool ok = reply && text && output && !string_append_utf8_exact(output, array_get(reply, 0), array_size(reply));
     if (ok)
-        string_printf("WebSocket echo: %S\n", output);
+        fmt_print("WebSocket echo: {output}\n", FMT(output));
     if (http_websocket_is_open(socket))
         ok = http_websocket_close(socket, 1000, NULL) && ok;
     if (!ok) {
         const string_t *error = http_client_error_text(client);
-        fprintf(stderr, "WebSocket echo failed: %s\n", error ? string_c_str(error) : "no text reply or clean close");
+        fmt_fprint(stderr,
+            "WebSocket echo failed: {websocket_echo_failed}\n",
+            FMT(websocket_echo_failed, error ? string_c_str(error) : "no text reply or clean close"));
     }
     string_free(output);
     array_destroy(reply);

@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "format-t.h"
 #include "computation-t.h"
 #include "integrator-t.h"
 #include "thread-t.h"
@@ -247,7 +248,7 @@ static void example_computation_scope(void)
     bool stopped = !computation_run(control, scoped_eval, &test);
     number_t value = expr_eval(test.formula), expected = num_create_from_long(26);
     bool reusable = num_eq(value, expected);
-    printf("Stopped: %d; graph reusable: %d\n", stopped, reusable);
+    fmt_print("Stopped: {stopped:d}; graph reusable: {reusable:d}\n", FMT(stopped), FMT(reusable));
     num_destroy(&expected);
     num_destroy(&value);
     expr_free(test.formula);

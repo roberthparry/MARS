@@ -16,6 +16,7 @@
 #include <string.h>
 #include <sys/stat.h>
 
+#include "format-t.h"
 #include "string-t.h"
 #include "file-t.h"
 #include "array-t.h"
@@ -528,7 +529,7 @@ void example_file_sqlite_round_trip(void)
     string_t *restored = file_read_all_text(destination);
     ASSERT_NOT_NULL(restored);
     TEST_ASSERT_STR_EQ(string_c_str(restored), "sky\n");
-    printf("restored: %s", string_c_str(restored));
+    fmt_print("restored: {restored}", FMT(restored));
     string_free(restored);
     sqlite_close(db);
     file_free(destination);

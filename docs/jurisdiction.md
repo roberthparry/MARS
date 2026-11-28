@@ -165,6 +165,7 @@ The following complete example requires the installed jurisdiction database:
 #include <stdlib.h>
 #include <string.h>
 
+#include "format-t.h"
 #include "jurisdiction-t.h"
 
 static bool readme_location(const jurisdict_place_t *place, void *context)
@@ -172,8 +173,12 @@ static bool readme_location(const jurisdict_place_t *place, void *context)
     bool *found = context;
     if (strcmp(place->jurisdiction_code, "AD"))
         return true;
-    printf("%s: %s (%s, %s), %s\n", place->jurisdiction_code, place->name,
-           place->latitude, place->longitude, place->timezone);
+    fmt_print("{jurisdiction_code}: {name} ({latitude}, {longitude}), {timezone}\n",
+        FMT(jurisdiction_code, place->jurisdiction_code),
+        FMT(name, place->name),
+        FMT(latitude, place->latitude),
+        FMT(longitude, place->longitude),
+        FMT(timezone, place->timezone));
     *found = true;
     return false;
 }
@@ -243,13 +248,15 @@ Open a jurisdiction engine for a jurisdiction:
 
 ```c
 #include <stdio.h>
+
+#include "format-t.h"
 #include "jurisdiction-t.h"
 
 int main(void)
 {
     jurisdiction_t *jurisdiction = jurisdict_open("GB-ENG");
     if (!jurisdiction) return 1;
-    printf("opened GB-ENG\n");
+    fmt_print("opened GB-ENG\n");
     jurisdict_close(jurisdiction);
     return 0;
 }
@@ -868,6 +875,33 @@ standalone month sets share the same stored rows wherever their names agree.
 standalone full month name can differ grammatically from the name inside a date.
 `ME Dates Text` and `WE Dates Text` retain their abbreviated month names.
 
+Datetime interpolation uses these same catalogue conventions. Plain `{dt}` or
+`{dt:lingua}` selects the installed Lingua date, while `{dt:fr_FR}`, `{dt:el_GR}`
+and other exact catalogue locale codes override the language and date order for
+one field. See the [multilingual formatting example](format.md#datetimes).
+Locale selection changes presentation rather than the jurisdiction's holiday
+policy. `{dt:iso}` remains independent of locale setup.
+
+For applications that manage presentation lifetime explicitly,
+`jurisdict_date_locale_load(engine, locale)` returns an owned immutable snapshot;
+pass `NULL` as the locale to select the configured Lingua presentation.
+`jurisdict_date_locale_text(snapshot, date)` returns an owned `string_t` to
+release with `string_free()`. Release the snapshot with
+`jurisdict_date_locale_free()`. Snapshots survive closing the engine and may be
+shared across threads, provided access to a shared datetime's lazy caches is
+synchronised. Missing catalogue data or allocation failure returns `NULL`;
+inspect `jurisdict_last_error()` after a failed load.
+
+Rendering uses copied names and compiled date parts without SQL or ICU.
+Interpolation keeps a bounded per-thread cache of eight snapshots, cleared by
+`jurisdict_date_locale_cache_clear()` when that thread must pick up changed
+configuration. It creates no database. A missing default catalogue falls back
+to ISO datetime; an unavailable explicit locale is a formatting error.
+`calendar_native_month` supplies the shared Islamic and Hebrew spellings for
+both native rendering and the SQL view. Older installations need their
+jurisdiction catalogue refreshed to use these native alternate-calendar
+presentations; Gregorian locale presentations use the existing locale tables.
+
 Except for Arabic, Hebrew and the hand-maintained language supplements, `Date Lingua` uses the selected locale's CLDR **long** Gregorian date pattern,
 including its field order, punctuation, connecting words and era label where
 required. French adds a superscript first-day ordinal in both date columns;
@@ -1069,6 +1103,8 @@ require the existing libunistring-enabled build. See the
 
 ```c
 #include <stdio.h>
+
+#include "format-t.h"
 #include "jurisdiction-t.h"
 
 int main(void)
@@ -1079,7 +1115,7 @@ int main(void)
     if (!jurisdiction || !start || !end) return 1;
     array_t *events = jurisdict_holidays_between(jurisdiction, start, end);
     if (!events) return 1;
-    printf("holiday count: %zu\n", array_size(events));
+    fmt_print("holiday count: {holiday_count}\n", FMT(holiday_count, array_size(events)));
     array_destroy(events);
     datetime_dealloc(end);
     datetime_dealloc(start);
@@ -1220,6 +1256,8 @@ bool jurisdict_serialize(const jurisdiction_t *jurisdiction, string_t **out_type
 ```c
 #include <stdio.h>
 #include <stdlib.h>
+
+#include "format-t.h"
 #include "array-t.h"
 #include "datetime-t.h"
 #include "jurisdiction-t.h"
@@ -1234,34 +1272,29 @@ int main(void) {
     size_t i;
 
     if (!jurisdiction || !bank_holiday || !range_start || !range_end) {
-        fprintf(stderr, "Jurisdiction data is unavailable.\n");
+        fmt_fprint(stderr, "Jurisdiction data is unavailable.\n");
         return 1;
     }
 
     events = jurisdict_holidays_between(jurisdiction, range_start, range_end);
     if (!events) {
-        fprintf(stderr, "Jurisdiction query failed.\n");
+        fmt_fprint(stderr, "Jurisdiction query failed.\n");
         return 1;
     }
 
-    printf("Holidays between 2021-12-24 and 2021-12-31:\n");
+    fmt_print("Holidays between 2021-12-24 and 2021-12-31:\n");
     for (i = 0; i < array_size(events); ++i) {
         holiday_event_t *event = array_get(events, i);
-        char *date_text = datetime_format(event->holiday_date, "%yyyy-%MM-%dd");
-
-        printf("- %s: %s\n",
-               event->holiday_name,
-               date_text ? date_text : "(unavailable)");
-        free(date_text);
+        fmt_print("- {name}: {date:yyyy-MM-dd}\n", FMT(name, event->holiday_name), FMT(date, event->holiday_date));
     }
 
-    printf("2021-12-25 weekend: %s\n",
-           jurisdict_is_weekend(jurisdiction, bank_holiday) ? "yes" : "no");
-    printf("2021-12-25 national holiday: %s\n",
-           jurisdict_is_national_holiday(jurisdiction, bank_holiday) ? "yes" : "no");
+    fmt_print("2021-12-25 weekend: {is_weekend}\n",
+        FMT(is_weekend, jurisdict_is_weekend(jurisdiction, bank_holiday) ? "yes" : "no"));
+    fmt_print("2021-12-25 national holiday: {is_national_holiday}\n",
+        FMT(is_national_holiday, jurisdict_is_national_holiday(jurisdiction, bank_holiday) ? "yes" : "no"));
 
     working_days = jurisdict_working_days_between(jurisdiction, range_start, range_end);
-    printf("Working days between 2021-12-24 and 2021-12-31: %ld\n", working_days);
+    fmt_print("Working days between 2021-12-24 and 2021-12-31: {working_days}\n", FMT(working_days));
 
     array_destroy(events);
     datetime_dealloc(range_end);

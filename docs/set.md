@@ -27,6 +27,8 @@ duplicate or free the pointed-to strings.
 ```c
 #include <stdio.h>
 #include <string.h>
+
+#include "format-t.h"
 #include "set-t.h"
 
 static size_t str_hash(const void *p) {
@@ -53,15 +55,15 @@ int main(void) {
     set_add(s, &b);
 
     if (set_contains(s, &a))
-        printf("'hello' is in the set\n");
+        fmt_print("'hello' is in the set\n");
 
     if (!set_add(s, &c))
-        printf("Duplicate 'hello' was not added\n");
+        fmt_print("Duplicate 'hello' was not added\n");
 
     set_remove(s, &a);
 
     if (!set_contains(s, &a))
-        printf("'hello' was removed\n");
+        fmt_print("'hello' was removed\n");
 
     set_destroy(s);
     return 0;
@@ -85,6 +87,8 @@ copies on destruction.
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+
+#include "format-t.h"
 #include "set-t.h"
 
 static size_t str_hash(const void *p) {
@@ -121,7 +125,7 @@ int main(void) {
     /* Iterate in sorted order */
     for (size_t i = 0; i < set_get_size(s); i++) {
         const char *elem = *(const char **)set_get_sorted(s, i);
-        printf("[%zu] %s\n", i, elem);
+        fmt_print("[{i}] {elem}\n", FMT(i), FMT(elem));
     }
 
     set_destroy(s);

@@ -28,6 +28,8 @@ copies on removal or destruction. A supplied clone callback is still called once
 
 ```c
 #include <stdio.h>
+
+#include "format-t.h"
 #include "array-t.h"
 
 int main(void) {
@@ -38,8 +40,8 @@ int main(void) {
         array_add(arr, &vals[i]);
 
     for (size_t i = 0; i < array_size(arr); ++i)
-        printf("%d ", *(int*)array_get(arr, i));
-    printf("\n");
+        fmt_print("{value} ", FMT(value, *(int*)array_get(arr, i)));
+    fmt_print("\n");
 
     array_destroy(arr);
     return 0;
@@ -56,6 +58,8 @@ int main(void) {
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#include "format-t.h"
 #include "array-t.h"
 
 struct deep {
@@ -89,7 +93,7 @@ int main(void) {
 
     for (size_t i = 0; i < array_size(arr); ++i) {
         struct deep *p = array_get(arr, i);
-        printf("%s: %d\n", p->name, p->value);
+        fmt_print("{name}: {value}\n", FMT(name, p->name), FMT(value, p->value));
     }
 
     free(a.name);
@@ -189,6 +193,8 @@ A lightweight view into a subrange of an `array_t`. Slices do not copy elements 
 
 ```c
 #include <stdio.h>
+
+#include "format-t.h"
 #include "array-t.h"
 
 int main(void) {
@@ -201,8 +207,8 @@ int main(void) {
     array_slice_t *slice = array_slice(arr, 2, 4);
 
     for (size_t i = 0; i < array_slice_size(slice); ++i)
-        printf("%d ", *(int*)array_slice_get(slice, i));
-    printf("\n");
+        fmt_print("{value} ", FMT(value, *(int*)array_slice_get(slice, i)));
+    fmt_print("\n");
 
     array_slice_destroy(slice);
     array_destroy(arr);
@@ -218,6 +224,8 @@ int main(void) {
 
 ```c
 #include <stdio.h>
+
+#include "format-t.h"
 #include "array-t.h"
 
 static int cmp_int(const void *a, const void *b) {
@@ -234,15 +242,15 @@ int main(void) {
     array_slice_t *slice = array_slice(arr, 0, 5);
     array_slice_sort(slice, cmp_int);
 
-    printf("slice (sorted): ");
+    fmt_print("slice (sorted): ");
     for (size_t i = 0; i < array_slice_size(slice); ++i)
-        printf("%d ", *(int*)array_slice_get(slice, i));
-    printf("\n");
+        fmt_print("{value} ", FMT(value, *(int*)array_slice_get(slice, i)));
+    fmt_print("\n");
 
-    printf("array (unchanged): ");
+    fmt_print("array (unchanged): ");
     for (size_t i = 0; i < array_size(arr); ++i)
-        printf("%d ", *(int*)array_get(arr, i));
-    printf("\n");
+        fmt_print("{value} ", FMT(value, *(int*)array_get(arr, i)));
+    fmt_print("\n");
 
     array_slice_destroy(slice);
     array_destroy(arr);
@@ -259,6 +267,8 @@ array (unchanged): 7 3 9 1 5
 
 ```c
 #include <stdio.h>
+
+#include "format-t.h"
 #include "array-t.h"
 
 int main(void) {
@@ -274,8 +284,8 @@ int main(void) {
     array_destroy(arr);
 
     for (size_t i = 0; i < array_size(copy); ++i)
-        printf("%d ", *(int*)array_get(copy, i));
-    printf("\n");
+        fmt_print("{value} ", FMT(value, *(int*)array_get(copy, i)));
+    fmt_print("\n");
 
     array_destroy(copy);
     return 0;
@@ -313,6 +323,8 @@ A LIFO stack backed by an `array_t`. Supports the same ownership model as `array
 ```c
 #include <stdio.h>
 #include <stdlib.h>
+
+#include "format-t.h"
 #include "array-t.h"
 
 int main(void) {
@@ -324,7 +336,7 @@ int main(void) {
 
     int *v;
     while ((v = stack_pop(s)) != NULL) {
-        printf("%d\n", *v);
+        fmt_print("{value}\n", FMT(value, *v));
         free(v);
     }
 
@@ -345,6 +357,8 @@ int main(void) {
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#include "format-t.h"
 #include "array-t.h"
 
 static void str_clone(void *dst, const void *src) {
@@ -366,7 +380,7 @@ int main(void) {
 
     char **top;
     while ((top = stack_pop(s)) != NULL) {
-        printf("%s\n", *top);
+        fmt_print("{value}\n", FMT(value, *top));
         free(*top);
         free(top);
     }

@@ -9,6 +9,7 @@
  * run suites sequentially; this source is not part of the installed library.
  */
 
+#include "format-t.h"
 #include "matrix-t.h"
 #include "qcomplex-t.h"
 #include "test_expr.h"
@@ -570,15 +571,17 @@ void example_signal_readme_examples(void)
     NUM_SCOPE(scope);
     double half = qf_to_double(qf_step(QF_ZERO));
     ASSERT_TRUE(half == 0.5);
-    printf("step(0) = %.1f\n", half);
+    fmt_print("step(0) = {half:.1f}\n", FMT(half));
 
     qcomplex_t value = qc_sinc(qc_make(QF_ZERO, QF_ZERO));
     ASSERT_TRUE(qc_eq(value, qc_make(QF_ONE, QF_ZERO)));
-    printf("sinc(0) = %.0f + %.0fi\n", qf_to_double(qc_real(value)), qf_to_double(qc_imag(value)));
+    fmt_print("sinc(0) = {real:.0f} + {imaginary:.0f}i\n",
+        FMT(real, qf_to_double(qc_real(value))),
+        FMT(imaginary, qf_to_double(qc_imag(value))));
 
     number_t edge = num_rect(NUM_HALF);
     ASSERT_TRUE(num_eq(edge, NUM_HALF));
-    printf("rect(1/2) = %.1f\n", num_to_double(edge));
+    fmt_print("rect(1/2) = {value:.1f}\n", FMT(value, num_to_double(edge)));
 
     number_t diagonal[] = {NUM_NEG_ONE, NUM_ZERO, NUM_ONE};
     matrix_t *a = mat_create_diagonal(3u, diagonal);
@@ -588,9 +591,10 @@ void example_signal_readme_examples(void)
         ASSERT_TRUE(num_eq(mat_get_num(b, 0, 0), NUM_ZERO));
         ASSERT_TRUE(num_eq(mat_get_num(b, 1, 1), NUM_HALF));
         ASSERT_TRUE(num_eq(mat_get_num(b, 2, 2), NUM_ONE));
-        printf("step(diag(-1, 0, 1)) = diag(%.1f, %.1f, %.1f)\n",
-               num_to_double(mat_get_num(b, 0, 0)), num_to_double(mat_get_num(b, 1, 1)),
-               num_to_double(mat_get_num(b, 2, 2)));
+        fmt_print("step(diag(-1, 0, 1)) = diag({negative:.1f}, {zero:.1f}, {positive:.1f})\n",
+            FMT(negative, num_to_double(mat_get_num(b, 0, 0))),
+            FMT(zero, num_to_double(mat_get_num(b, 1, 1))),
+            FMT(positive, num_to_double(mat_get_num(b, 2, 2))));
     }
     mat_free(b);
     mat_free(a);

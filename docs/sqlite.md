@@ -85,6 +85,7 @@ reuse pages; this cache does not hold decoded images or GPU textures.
 ```c
 #include <stdio.h>
 
+#include "format-t.h"
 #include "sqlite-t.h"
 
 int main(void) {
@@ -94,7 +95,7 @@ int main(void) {
     sqlite_stmt_t *stmt = ready ? sqlite_stmt_prepare(db, "SELECT 42") : NULL;
     int result = 1;
     if (stmt && sqlite_stmt_step(stmt) == SQLITE_STEP_ROW) {
-        printf("%d\n", sqlite_stmt_column_int(stmt, 0));
+        fmt_print("{value}\n", FMT(value, sqlite_stmt_column_int(stmt, 0)));
         result = 0;
     }
     sqlite_stmt_finalize(stmt);
@@ -115,6 +116,7 @@ Output:
 ```c
 #include <stdio.h>
 
+#include "format-t.h"
 #include "sqlite-t.h"
 #include "string-t.h"
 
@@ -132,7 +134,7 @@ int main(void) {
     sqlite_init_object_store(db);
     sqlite_store_string(db, name, value);
     sqlite_load_string(db, name, &loaded);
-    string_printf("%S\n", loaded);
+    fmt_print("{loaded}\n", FMT(loaded));
 
     string_free(loaded);
     sqlite_close(db);
@@ -155,6 +157,7 @@ Output:
 ```c
 #include <stdio.h>
 
+#include "format-t.h"
 #include "sqlite-t.h"
 #include "string-t.h"
 
@@ -192,9 +195,9 @@ int main(void) {
     }
 
     while (sqlite_stmt_step(stmt) == SQLITE_STEP_ROW) {
-        printf("%s: %d\n",
-               sqlite_stmt_column_text(stmt, 0),
-               sqlite_stmt_column_int(stmt, 1));
+        fmt_print("{name}: {value}\n",
+            FMT(name, sqlite_stmt_column_text(stmt, 0)),
+            FMT(value, sqlite_stmt_column_int(stmt, 1)));
     }
 
     sqlite_stmt_finalize(stmt);
@@ -268,6 +271,7 @@ elements, `array_serialize()` and `array_deserialise()` provide that route.
 #include <stdint.h>
 #include <stdlib.h>
 
+#include "format-t.h"
 #include "array-t.h"
 #include "sqlite-t.h"
 #include "string-t.h"
@@ -306,8 +310,8 @@ int main(void) {
     loaded_values = array_deserialise(loaded_payload, loaded_payload_len,
                                       loaded_type, loaded_encoding);
     for (i = 0; i < array_size(loaded_values); ++i)
-        printf("%d ", *(int32_t *)array_get(loaded_values, i));
-    printf("\n");
+        fmt_print("{value} ", FMT(value, *(int32_t *)array_get(loaded_values, i)));
+    fmt_print("\n");
 
     array_destroy(loaded_values);
     sqlite_free_object_data(loaded_payload);
@@ -340,6 +344,7 @@ so callers can keep the storage round-trip in one obvious public path.
 ```c
 #include <stdlib.h>
 
+#include "format-t.h"
 #include "datetime-t.h"
 #include "sqlite-t.h"
 #include "timeseries-t.h"
@@ -380,7 +385,7 @@ int main(void) {
     loaded_series = ts_deserialise(loaded_payload, loaded_payload_len,
                                    loaded_type, loaded_encoding);
     loaded_text = ts_to_text(loaded_series, TS_STRING_CSV);
-    string_printf("%S", loaded_text);
+    fmt_print("{loaded_text}", FMT(loaded_text));
 
     string_free(loaded_text);
     ts_free(loaded_series);
@@ -418,11 +423,14 @@ payload-shaping logic at each call site.
 ```c
 #include <stdlib.h>
 
+#include "format-t.h"
 #include "expression-t.h"
 #include "sqlite-t.h"
 #include "string-t.h"
 
 int main(void) {
+    NUM_SCOPE(readme_numbers);
+
     string_t *path = string_new_with("secure.db");
     string_t *key = string_new_with("correct horse battery staple");
     string_t *name = string_new_with("trajectory");
@@ -458,8 +466,8 @@ int main(void) {
     loaded_roundtrip = expr_to_text(loaded_expr, style_EXPRESSION);
     value = expr_eval(loaded_expr);
     value_text = num_to_string(value);
-    string_printf("%S\n", loaded_roundtrip);
-    string_printf("%S\n", value_text);
+    fmt_print("{loaded_roundtrip}\n", FMT(loaded_roundtrip));
+    fmt_print("{value_text}\n", FMT(value_text));
 
     string_free(value_text);
     num_destroy(&value);
@@ -736,6 +744,7 @@ storage types and removes the input.
 ```c
 #include <stdlib.h>
 
+#include "format-t.h"
 #include "sqlite-t.h"
 
 int main(void)
@@ -743,7 +752,7 @@ int main(void)
     char directory[] = "/tmp/mars-csv-import-XXXXXX";
     if (!mkdtemp(directory))
         return 1;
-    string_t *source_path = string_sprintf("%s/input.csv", directory);
+    string_t *source_path = fmt_string("{directory}/input.csv", FMT(directory));
     file_t *input = file_new(source_path), *dir = file_new_cstr(directory);
     string_t *text = string_new_with("code,count\n00123,7\n00456,12\n");
     string_t *path = string_new_with(":memory:"), *key = string_new_with("example key");
@@ -755,8 +764,10 @@ int main(void)
     sqlite_stmt_t *stmt = ok ? sqlite_stmt_prepare(db, "SELECT typeof(code), typeof(count) FROM measurements LIMIT 1") : NULL;
     ok = ok && stmt && sqlite_stmt_step(stmt) == SQLITE_STEP_ROW;
     if (ok)
-        string_printf("Imported %zu rows (code: %s, count: %s)\n", report.rows,
-                  sqlite_stmt_column_text(stmt, 0), sqlite_stmt_column_text(stmt, 1));
+        fmt_print("Imported {imported} rows (code: {code}, count: {count})\n",
+            FMT(imported, report.rows),
+            FMT(code, sqlite_stmt_column_text(stmt, 0)),
+            FMT(count, sqlite_stmt_column_text(stmt, 1)));
     sqlite_stmt_finalize(stmt);
     file_close(input);
     file_delete(input);
@@ -785,6 +796,7 @@ This example uses a single final chunk. The file-to-file streaming example below
 shows the refill callback and a file-backed output writer together.
 
 ```c
+#include "format-t.h"
 #include "sqlite-t.h"
 
 int main(void)
@@ -802,7 +814,7 @@ int main(void)
     bool ok = db && reader && csv_feed(reader, text, true) &&
               sqlite_import_csv_reader(db, reader, table, &options, NULL, NULL, &report);
     if (ok)
-        string_printf("Imported %zu rows\n", report.rows);
+        fmt_print("Imported {imported} rows\n", FMT(imported, report.rows));
     csv_free(reader);
     sqlite_close(db);
     string_free(text);
@@ -822,6 +834,7 @@ Imported 2 rows
 ### Example: export query results
 
 ```c
+#include "format-t.h"
 #include "sqlite-t.h"
 
 int main(void)
@@ -834,7 +847,7 @@ int main(void)
     csv_t *writer = csv_writer_new(NULL, &options);
     bool ok = db && writer && sqlite_export_csv(db, query, writer, true, NULL);
     if (ok)
-        string_printf("%S", csv_output(writer));
+        fmt_print("{output}", FMT(output, csv_output(writer)));
     csv_free(writer);
     string_free(query);
     sqlite_close(db);
@@ -882,6 +895,7 @@ may leave a partial file; use staging before publishing production output.
 ```c
 #include <stdlib.h>
 
+#include "format-t.h"
 #include "sqlite-t.h"
 
 /* Caller-owned state passed unchanged to every refill invocation. */
@@ -912,8 +926,8 @@ int main(void)
     char directory[] = "/tmp/mars-csv-stream-XXXXXX";
     if (!mkdtemp(directory))
         return 1;
-    string_t *source_path = string_sprintf("%s/input.csv", directory);
-    string_t *output_path = string_sprintf("%s/output.csv", directory);
+    string_t *source_path = fmt_string("{directory}/input.csv", FMT(directory));
+    string_t *output_path = fmt_string("{directory}/output.csv", FMT(directory));
     file_t *input = file_new(source_path), *output = file_new(output_path), *dir = file_new_cstr(directory);
     string_t *text = string_new_with("name,count\nZoë,7\n\"Ada, A.\",12\n");
     string_t *path = string_new_with(":memory:"), *key = string_new_with("example key");
@@ -953,8 +967,10 @@ int main(void)
     if (!file_close(output))
         ok = false;
     if (ok) {
-        string_printf("Refill callback: %zu calls (including EOF)\n", source.calls);
-        string_printf("Imported %zu rows; exported %zu rows\n", imported.rows, exported.rows);
+        fmt_print("Refill callback: {refill_callback} calls (including EOF)\n", FMT(refill_callback, source.calls));
+        fmt_print("Imported {imported} rows; exported {exported} rows\n",
+            FMT(imported, imported.rows),
+            FMT(exported, exported.rows));
     }
 
     /* The demonstration removes its temporary files; keep output.csv in a real application. */
@@ -1022,6 +1038,7 @@ timeout, or cancel the control from another thread for normal application use.
 ```c
 #include <stdio.h>
 
+#include "format-t.h"
 #include "computation-t.h"
 #include "sqlite-t.h"
 
@@ -1064,7 +1081,7 @@ int main(void)
     computation_t *control = computation_new(&options);
     bool ok = control && computation_run(control, calculate, &job);
     bool stopped = !ok && computation_status(control) == COMPUTATION_BUDGET_EXHAUSTED;
-    printf("Stopped: %d\n", stopped);
+    fmt_print("Stopped: {stopped:d}\n", FMT(stopped));
     csv_free(job.reader);
     string_free(job.table);
     sqlite_close(job.input);
@@ -1109,6 +1126,7 @@ Applications decide which details to expose to their clients.
 ```c
 #include <stdio.h>
 
+#include "format-t.h"
 #include "sqlite-t.h"
 
 int main(void)
@@ -1121,7 +1139,9 @@ int main(void)
     string_free(path);
     string_free(key);
     if (error)
-        printf("%s: %s\n", diagnostic_domain(error), diagnostic_message(error));
+        fmt_print("{domain}: {message}\n",
+            FMT(domain, diagnostic_domain(error)),
+            FMT(message, diagnostic_message(error)));
     bool ok = error != NULL;
     diagnostic_free(error);
     return ok ? 0 : 1;

@@ -137,4 +137,29 @@ bool fmt_validate(const fmt_layout_t *layout, const fmt_options_t *options, size
  */
 string_t *fmt_render_field(const fmt_arg_impl_t *argument, const fmt_part_t *part, fmt_error_t *error);
 
+/**
+ * @brief Render a common scalar without allocation, or request the general field renderer.
+ * @param argument Borrowed decoded value, kept alive by the caller throughout output staging.
+ * @param part Borrowed validated compiled field.
+ * @param[out] scratch Caller-owned storage of at least 128 bytes, retained until the span is copied.
+ * @param capacity Scratch capacity in bytes.
+ * @param[out] bytes Receives borrowed value bytes or a span within scratch on success.
+ * @param[out] length Receives the encoded byte count on success.
+ * @return True for a complete field; false requires fmt_render_field(). Does not publish diagnostics or retain inputs.
+ */
+bool fmt_render_fast(const fmt_arg_impl_t *argument, const fmt_part_t *part,
+                     char *scratch, size_t capacity, const char **bytes, size_t *length);
+
+/**
+ * @brief Stage and write a stream result using bounded per-thread plans and stack storage for common fields.
+ * @param stream Required borrowed stream, already checked by the public output entry point.
+ * @param pattern Borrowed NUL-terminated template, copied if a plan is cached; mutable templates are compared by value.
+ * @param arguments Borrowed descriptors and resources, used only during this call.
+ * @param count Descriptor count.
+ * @param[out] error Optional diagnostic destination.
+ * @return Encoded byte count, or -1 with a published diagnostic. Formatting failures write no bytes; I/O may be partial.
+ * @note Cached plans contain no argument values. At most eight small plans survive per thread; worker exit frees them.
+ */
+int fmt_stream_write(FILE *stream, const char *pattern, const fmt_arg_t *arguments, size_t count, fmt_error_t *error);
+
 #endif

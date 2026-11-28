@@ -9,6 +9,7 @@
  * run suites sequentially; this source is not part of the installed library.
  */
 
+#include "format-t.h"
 #include "matrix-t.h"
 #include "qcomplex-t.h"
 #include "test_expr.h"
@@ -60,16 +61,16 @@ void example_orthopoly_readme_examples(void)
 {
     NUM_SCOPE(scope);
     ASSERT_TRUE(qf_to_double(qf_chebyshev_Tn(3, qf_from_double(2))) == 26);
-    printf("T3(2) = 26\n");
+    fmt_print("T3(2) = 26\n");
     qcomplex_t h = qc_hermite_Hn(3, qc_make(QF_ZERO, QF_ONE));
     ASSERT_TRUE(qf_to_double(qc_imag(h)) == -20 && qf_eq(qc_real(h), QF_ZERO));
-    printf("Hermite H3(i) = -20i\n");
+    fmt_print("Hermite H3(i) = -20i\n");
     ASSERT_TRUE(num_to_double(num_hermite_Hn(num_create_from_long(3), NUM_TWO)) == 40);
-    printf("Hermite H3(2) = 40\n");
+    fmt_print("Hermite H3(2) = 40\n");
     number_t values[] = {NUM_ZERO, NUM_ONE, NUM_ZERO, NUM_ZERO};
     matrix_t *a = mat_create(2, 2, values), *t = mat_chebyshev_Tn(a, 3);
     ASSERT_TRUE(t && num_to_double(mat_get_num(t, 0, 1)) == -3);
-    printf("T3((0, 1; 0, 0)) = (0, -3; 0, 0)\n");
+    fmt_print("T3((0, 1; 0, 0)) = (0, -3; 0, 0)\n");
     mat_free(t);
     mat_free(a);
 }

@@ -13,6 +13,7 @@
 #include <sys/stat.h>
 #include <wchar.h>
 
+#include "format-t.h"
 #include "array-t.h"
 #include "file-t.h"
 #include "string-t.h"
@@ -23,6 +24,7 @@
 #include "internal/test_database_internal.h"
 #define MARS_TEST_TEST_HARNESS_INTERNAL_ACCESS
 #include "test_test_harness.h"
+
 /* Keep the test-management implementation independent of its own reporting hooks. */
 bool test_suite_database_selection_enabled(void)
 {
@@ -1220,7 +1222,7 @@ static void test_readme_statistics_formats(void)
     file_t *file = path ? file_new(path) : NULL;
     string_t *guide = file ? file_read_all_text(file) : NULL;
     ok = ok && output && status == 0 && string_find(output, example) >= 0 && guide && string_find(guide, example) >= 0;
-    if (ok) fputs(example, stdout);
+    if (ok) fmt_fprint(stdout, "{example}", FMT(example));
     string_free(guide); file_free(file); string_free(path);
     string_free(output); fixture_close(&fixture);
     TEST_ASSERT_TRUE(ok, "README Markdown table is emitted by the real statistics command");
@@ -1255,7 +1257,7 @@ static void test_readme_case_table(void)
          !strcmp((const char *)sqlite3_column_text(statement, 0), "another_sum") &&
          !strcmp((const char *)sqlite3_column_text(statement, 1), "5/6");
     if (ok)
-        puts("another_sum|5/6");
+        fmt_print("another_sum|5/6\n");
     sqlite3_finalize(statement);
     fixture_close(&fixture);
     TEST_ASSERT_TRUE(ok, "README case-table output agrees with the testing guide");

@@ -76,6 +76,7 @@ and square root. Only the completed result and the builder require cleanup.
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "format-t.h"
 #include "TeX-t.h"
 
 int main(void)
@@ -88,10 +89,10 @@ int main(void)
     TeX_sqrt(builder);
     TeX_t *formula = TeX_builder_finish(builder);
     TeX_builder_free(builder);
-    int status = formula && puts(TeX_source(formula)) != EOF ? EXIT_SUCCESS : EXIT_FAILURE;
+    int status = formula && fmt_print("{source}\n", FMT(source, TeX_source(formula))) != EOF ? EXIT_SUCCESS : EXIT_FAILURE;
     TeX_free(formula);
     if (status != EXIT_SUCCESS)
-        fputs("Could not construct or print TeX.\n", stderr);
+        fmt_fprint(stderr, "Could not construct or print TeX.\n");
     return status;
 }
 ```
@@ -250,6 +251,7 @@ the stack from bottom to top; inspecting it does not transfer ownership.
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "format-t.h"
 #include "TeX-t.h"
 
 static int show(const TeX_builder_t *builder)
@@ -258,7 +260,9 @@ static int show(const TeX_builder_t *builder)
         return -1;
     for (size_t level = TeX_builder_count(builder); level; --level) {
         const TeX_t *value = TeX_builder_peek(builder, level);
-        if (!value || printf("%s%s", TeX_source(value), level == 1 ? "\n" : " ") < 0)
+        if (!value || fmt_print("{source}{separator}",
+            FMT(source, TeX_source(value)),
+            FMT(separator, level == 1 ? "\n" : " ")) < 0)
             return -1;
     }
     return 0;
@@ -336,6 +340,7 @@ by name rather than by writing a TeX spacing command.
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "format-t.h"
 #include "TeX-t.h"
 
 int main(void)
@@ -376,10 +381,10 @@ int main(void)
     TeX_sequence(builder);
     TeX_t *formula = TeX_builder_finish(builder);
     TeX_builder_free(builder);
-    int status = formula && puts(TeX_source(formula)) != EOF ? EXIT_SUCCESS : EXIT_FAILURE;
+    int status = formula && fmt_print("{source}\n", FMT(source, TeX_source(formula))) != EOF ? EXIT_SUCCESS : EXIT_FAILURE;
     TeX_free(formula);
     if (status != EXIT_SUCCESS)
-        fputs("Could not construct or print TeX.\n", stderr);
+        fmt_fprint(stderr, "Could not construct or print TeX.\n");
     return status;
 }
 ```
@@ -416,6 +421,7 @@ between rows; the spacing is an operand, separate from the matrix's entries.
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "format-t.h"
 #include "TeX-t.h"
 
 int main(void)
@@ -454,10 +460,10 @@ int main(void)
 
     TeX_t *formula = TeX_builder_finish(builder);
     TeX_builder_free(builder);
-    int status = formula && puts(TeX_source(formula)) != EOF ? EXIT_SUCCESS : EXIT_FAILURE;
+    int status = formula && fmt_print("{source}\n", FMT(source, TeX_source(formula))) != EOF ? EXIT_SUCCESS : EXIT_FAILURE;
     TeX_free(formula);
     if (status != EXIT_SUCCESS)
-        fputs("Could not construct or print TeX.\n", stderr);
+        fmt_fprint(stderr, "Could not construct or print TeX.\n");
     return status;
 }
 ```
@@ -525,6 +531,7 @@ is needed; matrices use the standard `amsmath` environments.
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "format-t.h"
 #include "TeX-t.h"
 
 static void wavefunction(TeX_builder_t *builder)
@@ -540,7 +547,7 @@ static void wavefunction(TeX_builder_t *builder)
 static bool print_formula(TeX_builder_t *builder)
 {
     TeX_t *formula = TeX_builder_finish(builder);
-    bool ok = formula && puts(TeX_source(formula)) != EOF;
+    bool ok = formula && fmt_print("{source}\n", FMT(source, TeX_source(formula))) != EOF;
     TeX_free(formula);
     return ok;
 }
@@ -703,7 +710,7 @@ int main(void)
 done:
     TeX_builder_free(b);
     if (status != EXIT_SUCCESS)
-        fputs("Could not construct or print TeX.\n", stderr);
+        fmt_fprint(stderr, "Could not construct or print TeX.\n");
     return status;
 }
 ```
@@ -796,12 +803,13 @@ The same builder can be reused immediately after each completed value is transfe
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "format-t.h"
 #include "TeX-t.h"
 
 static bool print_layout(TeX_builder_t *builder)
 {
     TeX_t *layout = TeX_builder_finish(builder);
-    bool ok = layout && puts(TeX_source(layout)) != EOF;
+    bool ok = layout && fmt_print("{source}\n", FMT(source, TeX_source(layout))) != EOF;
     TeX_free(layout);
     return ok;
 }
@@ -845,7 +853,7 @@ int main(void)
 done:
     TeX_builder_free(b);
     if (status != EXIT_SUCCESS)
-        fputs("Could not compose native mathematical layouts.\n", stderr);
+        fmt_fprint(stderr, "Could not compose native mathematical layouts.\n");
     return status;
 }
 ```
@@ -908,12 +916,13 @@ spacing supplied by the builder. These operations construct notation without eva
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "format-t.h"
 #include "TeX-t.h"
 
 static bool print_formula(TeX_builder_t *builder)
 {
     TeX_t *notation = TeX_builder_finish(builder);
-    bool ok = notation && puts(TeX_source(notation)) != EOF;
+    bool ok = notation && fmt_print("{source}\n", FMT(source, TeX_source(notation))) != EOF;
     TeX_free(notation);
     return ok;
 }
@@ -1171,7 +1180,7 @@ int main(void)
 done:
     TeX_builder_free(b);
     if (status != EXIT_SUCCESS)
-        fputs("Could not construct or print calculus notation.\n", stderr);
+        fmt_fprint(stderr, "Could not construct or print calculus notation.\n");
     return status;
 }
 ```
@@ -1353,6 +1362,7 @@ mixed strict/inclusive chain.
 #include <stdlib.h>
 #include <string.h>
 
+#include "format-t.h"
 #include "TeX-t.h"
 
 static int print_match(TeX_builder_t *builder, const char *source)
@@ -1361,7 +1371,7 @@ static int print_match(TeX_builder_t *builder, const char *source)
     string_t *input = string_new_with(source);
     TeX_t *text = input ? TeX_from_expression(input) : NULL;
     int status = rpn && text && !strcmp(TeX_source(rpn), TeX_source(text)) &&
-                 printf("%s -> %s\n", source, TeX_source(rpn)) >= 0 ? EXIT_SUCCESS : EXIT_FAILURE;
+                 fmt_print("{source} -> {rendered}\n", FMT(source), FMT(rendered, TeX_source(rpn))) >= 0 ? EXIT_SUCCESS : EXIT_FAILURE;
     TeX_free(text);
     string_free(input);
     TeX_free(rpn);
@@ -1405,7 +1415,7 @@ int main(void)
     }
     TeX_builder_free(b);
     if (status != EXIT_SUCCESS)
-        fputs("Could not construct matching relation notation.\n", stderr);
+        fmt_fprint(stderr, "Could not construct matching relation notation.\n");
     return status;
 }
 ```
@@ -1486,12 +1496,13 @@ lower bound and upper bound before applying `TeX_integral`.
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "format-t.h"
 #include "TeX-t.h"
 
 static bool print_formula(TeX_builder_t *builder)
 {
     TeX_t *notation = TeX_builder_finish(builder);
-    bool ok = notation && puts(TeX_source(notation)) != EOF;
+    bool ok = notation && fmt_print("{source}\n", FMT(source, TeX_source(notation))) != EOF;
     TeX_free(notation);
     return ok;
 }
@@ -1560,7 +1571,7 @@ int main(void)
 done:
     TeX_builder_free(b);
     if (status != EXIT_SUCCESS)
-        fputs("Could not construct constant notation.\n", stderr);
+        fmt_fprint(stderr, "Could not construct constant notation.\n");
     return status;
 }
 ```
@@ -1655,6 +1666,7 @@ same equation and initial conditions as the
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "format-t.h"
 #include "TeX-t.h"
 
 int main(void)
@@ -1708,11 +1720,11 @@ int main(void)
 
     TeX_sequence(b);
     TeX_t *notation = TeX_builder_finish(b);
-    int printed = notation ? puts(TeX_source(notation)) : EOF;
+    int printed = notation ? fmt_print("{source}\n", FMT(source, TeX_source(notation))) : EOF;
     TeX_free(notation);
     TeX_builder_free(b);
     if (printed == EOF) {
-        fputs("Could not construct primed derivative notation.\n", stderr);
+        fmt_fprint(stderr, "Could not construct primed derivative notation.\n");
         return EXIT_FAILURE;
     }
     return EXIT_SUCCESS;
@@ -1784,12 +1796,13 @@ Raw TeX remains available for further specialised notation.
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "format-t.h"
 #include "TeX-t.h"
 
 static bool print_formula(TeX_builder_t *builder)
 {
     TeX_t *notation = TeX_builder_finish(builder);
-    bool ok = notation && puts(TeX_source(notation)) != EOF;
+    bool ok = notation && fmt_print("{source}\n", FMT(source, TeX_source(notation))) != EOF;
     TeX_free(notation);
     return ok;
 }
@@ -1931,7 +1944,7 @@ int main(void)
 done:
     TeX_builder_free(b);
     if (status != EXIT_SUCCESS)
-        fputs("Could not construct geometric notation.\n", stderr);
+        fmt_fprint(stderr, "Could not construct geometric notation.\n");
     return status;
 }
 ```
@@ -2003,12 +2016,13 @@ parsing generated TeX.
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "format-t.h"
 #include "TeX-t.h"
 
 static bool print_formula(TeX_builder_t *b)
 {
     TeX_t *formula = TeX_builder_finish(b);
-    bool ok = formula && puts(TeX_source(formula)) != EOF;
+    bool ok = formula && fmt_print("{source}\n", FMT(source, TeX_source(formula))) != EOF;
     TeX_free(formula);
     return ok;
 }
@@ -2051,7 +2065,7 @@ int main(void)
 done:
     TeX_builder_free(b);
     if (status != EXIT_SUCCESS)
-        fputs("Could not construct list-based notation.\n", stderr);
+        fmt_fprint(stderr, "Could not construct list-based notation.\n");
     return status;
 }
 ```
@@ -2105,12 +2119,13 @@ The previews below use native display mathematics, following the viewer's theme.
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "format-t.h"
 #include "TeX-t.h"
 
 static bool print_formula(TeX_builder_t *b)
 {
     TeX_t *formula = TeX_builder_finish(b);
-    bool ok = formula && puts(TeX_source(formula)) != EOF;
+    bool ok = formula && fmt_print("{source}\n", FMT(source, TeX_source(formula))) != EOF;
     TeX_free(formula);
     return ok;
 }
@@ -2167,7 +2182,7 @@ int main(void)
 done:
     TeX_builder_free(b);
     if (status != EXIT_SUCCESS)
-        fputs("Could not construct multiline notation.\n", stderr);
+        fmt_fprint(stderr, "Could not construct multiline notation.\n");
     return status;
 }
 ```
@@ -2222,12 +2237,13 @@ grammar and tensor algebra remain deferred.
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "format-t.h"
 #include "TeX-t.h"
 
 static bool print_formula(TeX_builder_t *b)
 {
     TeX_t *formula = TeX_builder_finish(b);
-    bool ok = formula && puts(TeX_source(formula)) != EOF;
+    bool ok = formula && fmt_print("{source}\n", FMT(source, TeX_source(formula))) != EOF;
     TeX_free(formula);
     return ok;
 }
@@ -2314,7 +2330,7 @@ int main(void)
 done:
     TeX_builder_free(b);
     if (status != EXIT_SUCCESS)
-        fputs("Could not construct indexed derivatives.\n", stderr);
+        fmt_fprint(stderr, "Could not construct indexed derivatives.\n");
     return status;
 }
 ```
@@ -2394,6 +2410,7 @@ the caller; it does not compute the Jacobians or transform component values.
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "format-t.h"
 #include "TeX-t.h"
 
 int main(void)
@@ -2465,13 +2482,13 @@ int main(void)
     TeX_eq(b);
 
     TeX_t *notation = TeX_builder_finish(b);
-    if (notation && puts(TeX_source(notation)) != EOF)
+    if (notation && fmt_print("{source}\n", FMT(source, TeX_source(notation))) != EOF)
         status = EXIT_SUCCESS;
     TeX_free(notation);
 done:
     TeX_builder_free(b);
     if (status != EXIT_SUCCESS)
-        fputs("Could not construct the coordinate-transformation law.\n", stderr);
+        fmt_fprint(stderr, "Could not construct the coordinate-transformation law.\n");
     return status;
 }
 ```
@@ -2518,6 +2535,7 @@ notation; the coordinate convention gives the bar its meaning here.
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "format-t.h"
 #include "TeX-t.h"
 
 int main(void)
@@ -2583,13 +2601,13 @@ int main(void)
     TeX_eq(b);
 
     TeX_t *notation = TeX_builder_finish(b);
-    if (notation && puts(TeX_source(notation)) != EOF)
+    if (notation && fmt_print("{source}\n", FMT(source, TeX_source(notation))) != EOF)
         status = EXIT_SUCCESS;
     TeX_free(notation);
 done:
     TeX_builder_free(b);
     if (status != EXIT_SUCCESS)
-        fputs("Could not construct the barred-coordinate transformation law.\n", stderr);
+        fmt_fprint(stderr, "Could not construct the barred-coordinate transformation law.\n");
     return status;
 }
 ```
@@ -2635,6 +2653,7 @@ acts on each index label before `TeX_upper`, `TeX_lower` and `TeX_tensor`.
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "format-t.h"
 #include "TeX-t.h"
 
 int main(void)
@@ -2706,13 +2725,13 @@ int main(void)
     TeX_eq(b);
 
     TeX_t *notation = TeX_builder_finish(b);
-    if (notation && puts(TeX_source(notation)) != EOF)
+    if (notation && fmt_print("{source}\n", FMT(source, TeX_source(notation))) != EOF)
         status = EXIT_SUCCESS;
     TeX_free(notation);
 done:
     TeX_builder_free(b);
     if (status != EXIT_SUCCESS)
-        fputs("Could not construct the Latin-index coordinate-transformation law.\n", stderr);
+        fmt_fprint(stderr, "Could not construct the Latin-index coordinate-transformation law.\n");
     return status;
 }
 ```
@@ -2766,6 +2785,7 @@ statement occupies its own line; the comments identify the formula being built.
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "format-t.h"
 #include "TeX-t.h"
 
 int main(void)
@@ -2830,13 +2850,13 @@ int main(void)
     TeX_newline(b);
     TeX_align(b);
     TeX_t *notation = TeX_builder_finish(b);
-    if (notation && puts(TeX_source(notation)) != EOF)
+    if (notation && fmt_print("{source}\n", FMT(source, TeX_source(notation))) != EOF)
         status = EXIT_SUCCESS;
     TeX_free(notation);
 done:
     TeX_builder_free(b);
     if (status != EXIT_SUCCESS)
-        fputs("Could not construct Maxwell's equations.\n", stderr);
+        fmt_fprint(stderr, "Could not construct Maxwell's equations.\n");
     return status;
 }
 ```
@@ -2884,12 +2904,13 @@ presentation operations: they do not evaluate, normalise or rearrange operators.
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "format-t.h"
 #include "TeX-t.h"
 
 static bool print_formula(TeX_builder_t *b)
 {
     TeX_t *formula = TeX_builder_finish(b);
-    bool ok = formula && puts(TeX_source(formula)) != EOF;
+    bool ok = formula && fmt_print("{source}\n", FMT(source, TeX_source(formula))) != EOF;
     TeX_free(formula);
     return ok;
 }
@@ -2961,7 +2982,7 @@ int main(void)
 done:
     TeX_builder_free(b);
     if (status != EXIT_SUCCESS)
-        fputs("Could not construct quantum notation.\n", stderr);
+        fmt_fprint(stderr, "Could not construct quantum notation.\n");
     return status;
 }
 ```
@@ -3028,6 +3049,7 @@ inequalities and binding separators. This adds notation support to
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "format-t.h"
 #include "TeX-t.h"
 
 int main(void)
@@ -3044,10 +3066,10 @@ int main(void)
         string_t *input = string_new_with(sources[i]);
         TeX_t *notation = input ? TeX_from_expression(input) : NULL;
         string_free(input);
-        int printed = notation ? puts(TeX_source(notation)) : EOF;
+        int printed = notation ? fmt_print("{source}\n", FMT(source, TeX_source(notation))) : EOF;
         TeX_free(notation);
         if (printed == EOF) {
-            fputs("Could not convert quantum notation.\n", stderr);
+            fmt_fprint(stderr, "Could not convert quantum notation.\n");
             return EXIT_FAILURE;
         }
     }
@@ -3140,6 +3162,7 @@ for base ten (rendered as `lg`); use `ln` for the natural logarithm.
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "format-t.h"
 #include "TeX-t.h"
 
 int main(void)
@@ -3149,10 +3172,10 @@ int main(void)
     string_free(input);
     int status = EXIT_FAILURE;
     if (notation)
-        status = puts(TeX_source(notation)) == EOF ? EXIT_FAILURE : EXIT_SUCCESS;
+        status = fmt_print("{source}\n", FMT(source, TeX_source(notation))) == EOF ? EXIT_FAILURE : EXIT_SUCCESS;
     TeX_free(notation);
     if (status != EXIT_SUCCESS)
-        fputs("Could not parse or print the expression.\n", stderr);
+        fmt_fprint(stderr, "Could not parse or print the expression.\n");
     return status;
 }
 ```
@@ -3209,6 +3232,7 @@ congruence and a chained inequality. These are typeset without testing their tru
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "format-t.h"
 #include "TeX-t.h"
 
 int main(void)
@@ -3244,10 +3268,10 @@ int main(void)
         string_t *input = string_new_with(sources[i]);
         TeX_t *notation = TeX_from_expression(input);
         string_free(input);
-        int printed = notation ? puts(TeX_source(notation)) : EOF;
+        int printed = notation ? fmt_print("{source}\n", FMT(source, TeX_source(notation))) : EOF;
         TeX_free(notation);
         if (printed == EOF) {
-            fputs("Could not render calculus notation.\n", stderr);
+            fmt_fprint(stderr, "Could not render calculus notation.\n");
             return EXIT_FAILURE;
         }
     }
@@ -3433,6 +3457,7 @@ operator notation, as in the runnable calculus example above.
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "format-t.h"
 #include "expression-t.h"
 #include "TeX-t.h"
 
@@ -3442,14 +3467,15 @@ int main(void)
     string_t *source = expression ? expr_to_text(expression, style_EXPRESSION) : NULL;
     TeX_t *notation = source ? TeX_from_expression(source) : NULL;
     int status = EXIT_FAILURE;
-    if (source && notation && printf("Native text: %s\nTeX source: %s\n",
-                                    string_c_str(source), TeX_source(notation)) >= 0)
+    if (source && notation && fmt_print("Native text: {source}\nTeX source: {tex_source}\n",
+        FMT(source),
+        FMT(tex_source, TeX_source(notation))) >= 0)
         status = EXIT_SUCCESS;
     TeX_free(notation);
     string_free(source);
     expr_free(expression);
     if (status != EXIT_SUCCESS)
-        fputs("Could not convert native expression output.\n", stderr);
+        fmt_fprint(stderr, "Could not convert native expression output.\n");
     return status;
 }
 ```
@@ -3499,6 +3525,7 @@ Tensor syntax remains deferred.
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "format-t.h"
 #include "TeX-t.h"
 
 int main(void)
@@ -3514,12 +3541,12 @@ int main(void)
         string_t *input = string_new_with(formulae[i]);
         TeX_t *notation = input ? TeX_from_expression(input) : NULL;
         string_free(input);
-        bool ok = notation && puts(TeX_source(notation)) != EOF;
+        bool ok = notation && fmt_print("{source}\n", FMT(source, TeX_source(notation))) != EOF;
         TeX_free(notation);
         if (ok && captions[i])
-            ok = puts(captions[i]) != EOF;
+            ok = fmt_print("{value}\n", FMT(value, captions[i])) != EOF;
         if (!ok) {
-            fputs("Could not render mathematical text.\n", stderr);
+            fmt_fprint(stderr, "Could not render mathematical text.\n");
             return EXIT_FAILURE;
         }
     }
@@ -3577,6 +3604,7 @@ unit use the existing spellings `e` and `i`, not `@e` or `@i`.
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "format-t.h"
 #include "TeX-t.h"
 
 int main(void)
@@ -3589,10 +3617,10 @@ int main(void)
         string_t *input = string_new_with(sources[i]);
         TeX_t *notation = input ? TeX_from_expression(input) : NULL;
         string_free(input);
-        int printed = notation ? puts(TeX_source(notation)) : EOF;
+        int printed = notation ? fmt_print("{source}\n", FMT(source, TeX_source(notation))) : EOF;
         TeX_free(notation);
         if (printed == EOF) {
-            fputs("Could not render a constant alias.\n", stderr);
+            fmt_fprint(stderr, "Could not render a constant alias.\n");
             return EXIT_FAILURE;
         }
     }
@@ -3692,6 +3720,7 @@ existing meaning.
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "format-t.h"
 #include "TeX-t.h"
 
 int main(void)
@@ -3699,10 +3728,10 @@ int main(void)
     string_t *input = string_new_with("(1, 2; 3, 4)^x");
     TeX_t *notation = input ? TeX_from_expression(input) : NULL;
     string_free(input);
-    int printed = notation ? puts(TeX_source(notation)) : EOF;
+    int printed = notation ? fmt_print("{source}\n", FMT(source, TeX_source(notation))) : EOF;
     TeX_free(notation);
     if (printed == EOF) {
-        fputs("Could not render the matrix power.\n", stderr);
+        fmt_fprint(stderr, "Could not render the matrix power.\n");
         return EXIT_FAILURE;
     }
     return EXIT_SUCCESS;
@@ -3749,6 +3778,7 @@ retain their coordinate labels. No solver is invoked. The
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "format-t.h"
 #include "TeX-t.h"
 
 int main(void)
@@ -3761,10 +3791,10 @@ int main(void)
         string_t *input = string_new_with(sources[i]);
         TeX_t *notation = input ? TeX_from_expression(input) : NULL;
         string_free(input);
-        int printed = notation ? puts(TeX_source(notation)) : EOF;
+        int printed = notation ? fmt_print("{source}\n", FMT(source, TeX_source(notation))) : EOF;
         TeX_free(notation);
         if (printed == EOF) {
-            fputs("Could not render the bound problem.\n", stderr);
+            fmt_fprint(stderr, "Could not render the bound problem.\n");
             return EXIT_FAILURE;
         }
     }
@@ -3816,12 +3846,13 @@ validation; the TeX engine that typesets it reports invalid commands or grouping
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "format-t.h"
 #include "TeX-t.h"
 
 static int print_formula(TeX_builder_t *builder)
 {
     TeX_t *notation = TeX_builder_finish(builder);
-    int printed = notation ? puts(TeX_source(notation)) : EOF;
+    int printed = notation ? fmt_print("{source}\n", FMT(source, TeX_source(notation))) : EOF;
     TeX_free(notation);
     return printed == EOF ? EXIT_FAILURE : EXIT_SUCCESS;
 }
@@ -3843,7 +3874,7 @@ int main(void)
 
     TeX_builder_free(b);
     if (status != EXIT_SUCCESS)
-        fputs("Could not construct raw TeX notation.\n", stderr);
+        fmt_fprint(stderr, "Could not construct raw TeX notation.\n");
     return status;
 }
 ```

@@ -14,6 +14,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "format-t.h"
 #include "string-t.h"
 #include "diffequation-t.h"
 #include "test_harness.h"
@@ -158,7 +159,7 @@ void example_diffequation_fourier_evolution(void)
     const char *expected = "u = 1/π·∫^∞_-∞ f(ξ)·∫^∞_0 exp(-t·(k⁴ - k²))·cos(k·(x - ξ) - Ukt)·dk·dξ";
     bool valid = de_solve_result_solver(result) == DE_SOLVER_FOURIER_EVOLUTION && text &&
                  strcmp(string_c_str(text), expected) == 0 && fourier_mode(equ_rhs(solution));
-    printf("  %s\n  %s\n", source, text ? string_c_str(text) : "NULL");
+    fmt_print("  {source}\n  {c_str}\n", FMT(source), FMT(c_str, text ? string_c_str(text) : "NULL"));
     string_free(text); de_solve_result_free(result); de_free(de);
     ASSERT_TRUE(valid);
 }

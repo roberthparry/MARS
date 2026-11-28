@@ -8,6 +8,7 @@
 #include <errno.h>
 #include <stdio.h>
 
+#include "format-t.h"
 #include "computation-t.h"
 #include "sampler-t.h"
 #include "test_harness.h"
@@ -288,8 +289,10 @@ static void example_sampler_expression(void)
     sampler_t *samples = sampler_expression(expression, expr_bindings_get(bindings, "x"), NULL,
                                              NUM_ZERO, NUM_ONE, &options);
     if (samples) {
-        printf("Points: %zu\n", sampler_count(samples));
-        num_printf("Last point: (%n, %n)\n", sampler_point(samples, 2)->x, sampler_point(samples, 2)->y);
+        fmt_print("Points: {points}\n", FMT(points, sampler_count(samples)));
+        fmt_print("Last point: ({x}, {y})\n",
+            FMT(x, sampler_point(samples, 2)->x),
+            FMT(y, sampler_point(samples, 2)->y));
     }
     bool ok = samples != NULL;
     sampler_free(samples);
@@ -317,7 +320,11 @@ static void example_sampler_callback(void)
     if (samples) {
         const sampler_point_t *first = sampler_point(samples, 0);
         const sampler_point_t *last = sampler_point(samples, 2);
-        num_printf("Curve endpoints: (%n, %n) to (%n, %n)\n", first->x, first->y, last->x, last->y);
+        fmt_print("Curve endpoints: ({first_x}, {first_y}) to ({last_x}, {last_y})\n",
+            FMT(first_x, first->x),
+            FMT(first_y, first->y),
+            FMT(last_x, last->x),
+            FMT(last_y, last->y));
     }
     bool ok = samples != NULL;
     sampler_free(samples);
@@ -344,7 +351,9 @@ static void example_sampler_derivatives(void)
     sampler_t *samples = sampler_new_with_derivatives(square_derivatives, NULL, NUM_ZERO, NUM_ONE, NULL);
     if (samples) {
         const sampler_point_t *last = sampler_point(samples, sampler_count(samples) - 1);
-        num_printf("Last slope: %n; curvature: %n\n", last->dy, last->ddy);
+        fmt_print("Last slope: {last_slope}; curvature: {curvature}\n",
+            FMT(last_slope, last->dy),
+            FMT(curvature, last->ddy));
     }
     bool ok = samples != NULL;
     sampler_free(samples);

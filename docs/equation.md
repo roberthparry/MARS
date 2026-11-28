@@ -70,6 +70,7 @@ binding to simplify the principal root:
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "format-t.h"
 #include "equation-t.h"
 
 int main(void)
@@ -78,9 +79,7 @@ int main(void)
     equation_t *display = equ_simplify_with_context(source, NULL);
     if (!display)
         return 1;
-    char *text = expr_to_string(equ_rhs(display), style_UNBOUND);
-    puts(text);
-    free(text);
+    fmt_print("{rhs:unbound}\n", FMT(rhs, equ_rhs(display)));
     equ_free(display);
     equ_free(source);
     return 0;
@@ -204,6 +203,7 @@ For example, this complete programme needs no starting value for `x`:
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "format-t.h"
 #include "equation-t.h"
 
 int main(void)
@@ -211,9 +211,7 @@ int main(void)
     equation_t *equation = equ_from_string("sqrt(7^x) = 49");
     equation_solutions_t *solutions = equ_derive_solutions(equation);
     const equation_t *solution = equ_solutions_at(solutions, 0);
-    string_t *text = solution ? equ_to_text(solution, style_UNBOUND) : NULL;
-    int status = text && puts(string_c_str(text)) != EOF ? EXIT_SUCCESS : EXIT_FAILURE;
-    string_free(text);
+    int status = solution && fmt_print("{solution:unbound}\n", FMT(solution)) >= 0 ? EXIT_SUCCESS : EXIT_FAILURE;
     equ_solutions_free(solutions);
     equ_free(equation);
     return status;
@@ -232,6 +230,7 @@ The same API returns a whole complex exponential family symbolically:
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "format-t.h"
 #include "equation-t.h"
 
 int main(void)
@@ -239,10 +238,8 @@ int main(void)
     equation_t *equation = equ_from_string("i^x = 2");
     equation_solutions_t *solutions = equ_derive_solutions(equation);
     const equation_t *solution = equ_solutions_at(solutions, 0);
-    string_t *text = solution ? equ_to_text(solution, style_UNBOUND) : NULL;
-    int status = text && puts(string_c_str(text)) != EOF && puts("n is any integer.") != EOF
+    int status = solution && fmt_print("{solution:unbound}\nn is any integer.\n", FMT(solution)) >= 0
                      ? EXIT_SUCCESS : EXIT_FAILURE;
-    string_free(text);
     equ_solutions_free(solutions);
     equ_free(equation);
     return status;
@@ -494,6 +491,8 @@ seed-driven numeric cases.
 
 ```c
 #include <stdio.h>
+
+#include "format-t.h"
 #include "equation-t.h"
 #include "number-t.h"
 
@@ -508,11 +507,8 @@ int main(void)
 
     for (size_t i = 0; i < equ_solutions_count(solutions); ++i) {
         const equation_t *solution = equ_solutions_at(solutions, i);
-        string_t *text = equ_to_text(solution, style_UNBOUND);
-
-        if (text)
-            string_printf("solution[%zu] = %S\n", i, text);
-        string_free(text);
+        if (solution)
+            fmt_print("solution[{i}] = {solution:unbound}\n", FMT(i), FMT(solution));
     }
 
     equ_solutions_free(solutions);
@@ -534,6 +530,8 @@ polynomial:
 
 ```c
 #include <stdio.h>
+
+#include "format-t.h"
 #include "equation-t.h"
 #include "number-t.h"
 
@@ -549,11 +547,8 @@ int main(void)
 
     for (size_t i = 0; i < equ_solutions_count(solutions); ++i) {
         const equation_t *solution = equ_solutions_at(solutions, i);
-        string_t *text = equ_to_text(solution, style_UNBOUND);
-
-        if (text)
-            string_printf("solution[%zu] = %S\n", i, text);
-        string_free(text);
+        if (solution)
+            fmt_print("solution[{i}] = {solution:unbound}\n", FMT(i), FMT(solution));
     }
 
     equ_solutions_free(solutions);
@@ -579,6 +574,8 @@ text:
 
 ```c
 #include <stdio.h>
+
+#include "format-t.h"
 #include "equation-t.h"
 #include "number-t.h"
 
@@ -592,7 +589,7 @@ int main(void)
     const equation_t *first = equ_solutions_at(solutions, 0u);
 
     if (first)
-        equ_print(first);
+        fmt_print("{first}\n", FMT(first));
 
     equ_solutions_free(solutions);
     equ_free(kepler);
@@ -650,17 +647,14 @@ For display code, it is often useful to show the original input on one side and
 derived solutions or residuals on the other.
 
 ```c
+#include "format-t.h"
 #include "equation-t.h"
 
 int main(void)
 {
     equation_t *equation = equ_from_string("2*x + 3 = 7");
-    string_t *text = equ_to_text(equation, style_UNBOUND);
-
-    if (text)
-        string_printf("%S\n", text);
-
-    string_free(text);
+    if (equation)
+        fmt_print("{equation:unbound}\n", FMT(equation));
     equ_free(equation);
     return 0;
 }
@@ -750,6 +744,7 @@ timeout, or cancel the control from another thread for normal application use.
 ```c
 #include <stdio.h>
 
+#include "format-t.h"
 #include "computation-t.h"
 #include "equation-t.h"
 
@@ -774,7 +769,7 @@ int main(void)
     computation_t *control = computation_new(&options);
     bool ok = control && computation_run(control, calculate, &job);
     bool stopped = !ok && computation_status(control) == COMPUTATION_BUDGET_EXHAUSTED;
-    printf("Stopped: %d\n", stopped);
+    fmt_print("Stopped: {stopped:d}\n", FMT(stopped));
     equ_solutions_free(job.result);
     equ_free(job.input);
     computation_free(control);
@@ -798,6 +793,7 @@ not a certificate of completeness. It then enumerates the exact trivial zeros be
 ```c
 #include <stdio.h>
 
+#include "format-t.h"
 #include "equation-t.h"
 
 int main(void)
@@ -808,7 +804,9 @@ int main(void)
     bool limited = false;
     equation_solutions_t *roots = equ_search_zeta_zeros(equation, lower, upper, 64, &limited);
     if (roots)
-        printf("Roots in [80, 100]: %zu; limited: %d\n", equ_solutions_count(roots), limited);
+        fmt_print("Roots in [80, 100]: {solutions_count}; limited: {limited:d}\n",
+            FMT(solutions_count, equ_solutions_count(roots)),
+            FMT(limited));
     bool ok = roots && equ_solutions_count(roots) == 8 && !limited;
     equ_solutions_free(roots);
     num_destroy(&lower);
@@ -817,7 +815,9 @@ int main(void)
     upper = num_create_from_long(0);
     roots = equ_search_zeta_trivial_zeros(equation, lower, upper, 64, &limited);
     if (roots)
-        printf("Trivial zeros in [-10, 0]: %zu; limited: %d\n", equ_solutions_count(roots), limited);
+        fmt_print("Trivial zeros in [-10, 0]: {solutions_count}; limited: {limited:d}\n",
+            FMT(solutions_count, equ_solutions_count(roots)),
+            FMT(limited));
     ok = ok && roots && equ_solutions_count(roots) == 5 && !limited;
     equ_solutions_free(roots);
     num_destroy(&lower);

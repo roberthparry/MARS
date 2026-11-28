@@ -104,12 +104,16 @@ callbacks. For a GUI, enqueue notifications for the UI thread.
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "format-t.h"
 #include "computation-t.h"
 
 static void progress(const computation_progress_t *update, void *argument)
 {
     (void)argument;
-    printf("%s: %" PRIu64 "/%" PRIu64 "\n", update->stage, update->completed, update->total);
+    fmt_print("{stage}: {completed}/{total}\n",
+        FMT(stage, update->stage),
+        FMT(completed, update->completed),
+        FMT(total, update->total));
 }
 
 int main(void)
@@ -125,7 +129,7 @@ int main(void)
         }
     }
     bool completed = computation_complete(control);
-    printf("Completed: %d; work: %" PRIu64 "\n", completed, computation_work_used(control));
+    fmt_print("Completed: {completed:d}; work: {work}\n", FMT(completed), FMT(work, computation_work_used(control)));
     computation_free(control);
     return completed ? 0 : 1;
 }
@@ -198,6 +202,7 @@ process deadlines as hard-stop safeguards; see [MARS Lab](mars-lab.md#native-cal
 ```c
 #include <stdio.h>
 
+#include "format-t.h"
 #include "computation-t.h"
 #include "expression-t.h"
 
@@ -210,6 +215,8 @@ static bool evaluate(void *argument)
 
 int main(void)
 {
+    NUM_SCOPE(readme_numbers);
+
     expr_bindings_t *bindings = NULL;
     expr_t *formula = expr_from_string("x*x*x + 2*x*x + 3*x + 4", &bindings);
     expr_t *x = expr_bindings_get(bindings, "x");
@@ -225,7 +232,7 @@ int main(void)
     bool stopped = !computation_run(control, evaluate, formula);
     number_t value = expr_eval(formula), expected = num_create_from_long(26);
     bool reusable = num_eq(value, expected);
-    printf("Stopped: %d; graph reusable: %d\n", stopped, reusable);
+    fmt_print("Stopped: {stopped:d}; graph reusable: {reusable:d}\n", FMT(stopped), FMT(reusable));
     num_destroy(&expected);
     num_destroy(&value);
     expr_free(formula);

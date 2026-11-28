@@ -64,13 +64,15 @@ README signum example:
 
 ```c
 #include <stdio.h>
+
+#include "format-t.h"
 #include "number-t.h"
 
 int main(void)
 {
     NUM_SCOPE(scope);
     number_t sign = num_sgn(num_create_from_frac(-2, 3));
-    printf("sgn(-2/3) = %.0f\n", num_to_double(sign));
+    fmt_print("sgn(-2/3) = {value:.0f}\n", FMT(value, num_to_double(sign)));
     return 0;
 }
 ```
@@ -85,13 +87,15 @@ README example (the scope owns temporary numbers):
 
 ```c
 #include <stdio.h>
+
+#include "format-t.h"
 #include "number-t.h"
 
 int main(void)
 {
     NUM_SCOPE(scope);
     number_t edge = num_rect(NUM_HALF);
-    printf("rect(1/2) = %.1f\n", num_to_double(edge));
+    fmt_print("rect(1/2) = {value:.1f}\n", FMT(value, num_to_double(edge)));
     return 0;
 }
 ```
@@ -279,6 +283,8 @@ Example:
 
 ```c
 #include <stdio.h>
+
+#include "format-t.h"
 #include "number-t.h"
 
 int main(void)
@@ -288,7 +294,7 @@ int main(void)
     number_t b = num_create_from_string("5/6");
     number_t c = num_add(a, b);
 
-    num_printf("sum = %n\n", c);
+    fmt_print("sum = {c}\n", FMT(c));
     num_destroy(&a);
     num_destroy(&b);
     num_destroy(&c);
@@ -306,6 +312,8 @@ Example with explicit precision:
 
 ```c
 #include <stdio.h>
+
+#include "format-t.h"
 #include "number-t.h"
 
 int main(void)
@@ -316,9 +324,9 @@ int main(void)
     number_t x = num_create_from_string("1.25");
     number_t y = num_const_prec(NUM_PI, 512);
 
-    printf("default bits: %zu\n", num_get_default_prec_bits());
-    printf("x bits: %zu\n", num_get_prec_bits(x));
-    printf("y bits: %zu\n", num_get_prec_bits(y));
+    fmt_print("default bits: {default_bits}\n", FMT(default_bits, num_get_default_prec_bits()));
+    fmt_print("x bits: {x_bits}\n", FMT(x_bits, num_get_prec_bits(x)));
+    fmt_print("y bits: {y_bits}\n", FMT(y_bits, num_get_prec_bits(y)));
 
     num_destroy(&x);
     num_destroy(&y);
@@ -339,6 +347,8 @@ Named constants such as `NUM_PI`, `NUM_E`, `NUM_LN10`, `NUM_PHI`, and
 
 ```c
 #include <stdio.h>
+
+#include "format-t.h"
 #include "number-t.h"
 
 int main(void)
@@ -346,7 +356,7 @@ int main(void)
     NUM_SCOPE(scope);
     number_t pi = NUM_PI;
     num_destroy(&pi);
-    printf("constant cleared safely\n");
+    fmt_print("constant cleared safely\n");
     return 0;
 }
 ```
@@ -396,6 +406,7 @@ Detaching behaves differently depending on how the scoped value is stored:
 Example with the public cleanup macro:
 
 ```c
+#include "format-t.h"
 #include "number-t.h"
 
 number_t make_sum(void) {
@@ -409,7 +420,7 @@ number_t make_sum(void) {
 
 int main(void) {
     number_t kept = make_sum();
-    num_printf("kept = %n\n", kept);
+    fmt_print("kept = {kept}\n", FMT(kept));
     num_destroy(&kept);
     return 0;
 }
@@ -426,13 +437,15 @@ sequence is:
 
 ```c
 #include <stdio.h>
+
+#include "format-t.h"
 #include "number-t.h"
 
 int main(void)
 {
     num_scope_t *scope = num_scope_enter();
     number_t sum = num_add(NUM_ONE, NUM_HALF);
-    num_printf("sum = %n\n", sum);
+    fmt_print("sum = {sum}\n", FMT(sum));
     num_scope_leave(&scope);
     return 0;
 }
@@ -454,6 +467,11 @@ That avoids repeated detach/copy work and lets the scope reclaim the cheap
 temporary churn.
 
 ## Formatting
+
+The README examples use `fmt_print()` with `FMT(number)`. The `{}` or `{:n}`
+presentation keeps the native human-readable form; `{:N}` selects scientific
+output for inexact values. See the [format guide](format.md) for named fields,
+Excel custom codes and appending with `fmt_append()`.
 
 `number_t` provides its own formatting helpers:
 
@@ -716,6 +734,8 @@ The following runnable example covers the corresponding [qfloat](qfloat.md), [qc
 
 ```c
 #include <stdio.h>
+
+#include "format-t.h"
 #include "expression-t.h"
 #include "matrix-t.h"
 #include "number-t.h"
@@ -741,11 +761,11 @@ int main(void)
         mat_free(matrix); mat_free(y); mat_free(x); expr_free(expression);
         return 1;
     }
-    printf("qfloat F2 = %.6f\n", qf_to_double(fixed));
-    printf("qcomplex F3 = %.6f\n", qf_to_double(qc_real(complex_value)));
-    printf("number F4 = %.6f\n", num_to_double(polynomial));
-    printf("expression F2 = %.6f\n", num_to_double(expr_eval(expression)));
-    printf("matrix F2[0,1] = %.6f\n", num_to_double(mat_get_num(matrix, 0, 1)));
+    fmt_print("qfloat F2 = {qfloat_f2:.6f}\n", FMT(qfloat_f2, qf_to_double(fixed)));
+    fmt_print("qcomplex F3 = {qcomplex_f3:.6f}\n", FMT(qcomplex_f3, qf_to_double(qc_real(complex_value))));
+    fmt_print("number F4 = {number_f4:.6f}\n", FMT(number_f4, num_to_double(polynomial)));
+    fmt_print("expression F2 = {expression_f2:.6f}\n", FMT(expression_f2, num_to_double(expr_eval(expression))));
+    fmt_print("matrix F2[0,1] = {value:.6f}\n", FMT(value, num_to_double(mat_get_num(matrix, 0, 1))));
     mat_free(matrix); mat_free(y); mat_free(x); expr_free(expression);
     return 0;
 }
@@ -1026,13 +1046,15 @@ wrappers additionally have the exponent range of their component type.
 
 ```c
 #include <stdio.h>
+
+#include "format-t.h"
 #include "number-t.h"
 
 int main(void)
 {
     NUM_SCOPE(scope);
     number_t value = num_bessel_Y(NUM_ZERO, NUM_ONE);
-    printf("Y_0(1) = %.15f\n", num_to_double(value));
+    fmt_print("Y_0(1) = {value:.15f}\n", FMT(value, num_to_double(value)));
     num_destroy(&value);
     return 0;
 }
@@ -1120,13 +1142,15 @@ division by an approximate reciprocal.
 
 ```c
 #include <stdio.h>
+
+#include "format-t.h"
 #include "number-t.h"
 
 int main(void)
 {
     NUM_SCOPE(scope);
     number_t bessel = num_bessel_I(NUM_ZERO, NUM_ONE);
-    num_printf("I_0(1) = %.16n\n", bessel);
+    fmt_print("I_0(1) = {bessel:.16n}\n", FMT(bessel));
     return 0;
 }
 ```
@@ -1181,13 +1205,15 @@ do not guarantee success at every point.
 
 ```c
 #include <stdio.h>
+
+#include "format-t.h"
 #include "number-t.h"
 
 int main(void)
 {
     NUM_SCOPE(scope);
     number_t ordinary = num_struve_H(NUM_ZERO, NUM_ONE);
-    num_printf("H_0(1) = %.15n\n", ordinary);
+    fmt_print("H_0(1) = {ordinary:.15n}\n", FMT(ordinary));
     return 0;
 }
 ```
@@ -1244,13 +1270,15 @@ every point passes the numerical guards.
 
 ```c
 #include <stdio.h>
+
+#include "format-t.h"
 #include "number-t.h"
 
 int main(void)
 {
     NUM_SCOPE(scope);
     number_t value = num_struve_L(NUM_ZERO, NUM_ONE);
-    num_printf("L_0(1) = %.16n\n", value);
+    fmt_print("L_0(1) = {value:.16n}\n", FMT(value));
     return 0;
 }
 ```
@@ -1434,6 +1462,8 @@ Return conventions in this area:
 
 ```c
 #include <stdio.h>
+
+#include "format-t.h"
 #include "number-t.h"
 #include "string-t.h"
 
@@ -1443,17 +1473,7 @@ int main(void) {
     number_t c = num_create_from_string("5/6");
     number_t sum = num_add(a, c);
     number_t beta = num_beta(a, b);
-    string_t *sum_text = num_to_string(sum);
-    string_t *beta_text = num_to_string(beta);
-
-    if (!sum_text || !beta_text)
-        return 1;
-
-    printf("2 + 5/6 = %s\n", string_c_str(sum_text));
-    num_printf("beta(2, 3) = %.32n\n", beta);
-
-    string_free(sum_text);
-    string_free(beta_text);
+    fmt_print("2 + 5/6 = {sum}\nbeta(2, 3) = {beta:.32n}\n", FMT(sum), FMT(beta));
     num_destroy(&a);
     num_destroy(&b);
     num_destroy(&c);
@@ -1476,8 +1496,10 @@ documented output stays tied to the public `number_t` API.
 ### Exact Rational Arithmetic
 
 ```c
-#include "string-t.h"
 #include <stdio.h>
+
+#include "format-t.h"
+#include "string-t.h"
 #include "number-t.h"
 
 int main(void)
@@ -1486,10 +1508,7 @@ int main(void)
     number_t a = num_create_from_frac(2, 3);
     number_t b = num_create_from_string("5/4");
     number_t product = num_mul(a, b);
-    string_t *text = num_to_string(product);
-
-    printf("(2/3) * (5/4) = %s\n", string_c_str(text));
-    string_free(text);
+    fmt_print("(2/3) * (5/4) = {product}\n", FMT(product));
     return 0;
 }
 ```
@@ -1501,8 +1520,10 @@ int main(void)
 ### Exact Combinatorics
 
 ```c
-#include "string-t.h"
 #include <stdio.h>
+
+#include "format-t.h"
+#include "string-t.h"
 #include "number-t.h"
 
 int main(void)
@@ -1511,10 +1532,7 @@ int main(void)
     number_t n = num_create_from_long(52);
     number_t k = num_create_from_long(5);
     number_t c = num_binomial(n, k);
-    string_t *text = num_to_string(c);
-
-    printf("C(52, 5) = %s\n", string_c_str(text));
-    string_free(text);
+    fmt_print("C(52, 5) = {c}\n", FMT(c));
     return 0;
 }
 ```
@@ -1611,6 +1629,7 @@ The following README example requests both values at 256 bits:
 ```c
 #include <stdio.h>
 
+#include "format-t.h"
 #include "number-t.h"
 
 int main(void)
@@ -1619,8 +1638,9 @@ int main(void)
     num_set_default_prec_bits(256);
     number_t s = num_create_from_string("2.25"), derivative;
     number_t value = num_zeta_pair(s, &derivative);
-    printf("zeta(2.25) = %.6f; derivative = %.6f\n",
-           num_to_double(value), num_to_double(derivative));
+    fmt_print("zeta(2.25) = {value:.6f}; derivative = {derivative:.6f}\n",
+        FMT(value, num_to_double(value)),
+        FMT(derivative, num_to_double(derivative)));
     num_destroy(&value);
     num_destroy(&derivative);
     num_destroy(&s);
@@ -1695,6 +1715,8 @@ retain their own precision.
 
 ```c
 #include <stdio.h>
+
+#include "format-t.h"
 #include "number-t.h"
 
 int main(void)
@@ -1706,14 +1728,7 @@ int main(void)
     number_t gamma_x = num_gamma(x);
     number_t lgamma_x = num_lgamma(x);
 
-    char gamma_text[256];
-    char lgamma_text[256];
-
-    num_sprintf(gamma_text, sizeof(gamma_text), "%.77n", gamma_x);
-    num_sprintf(lgamma_text, sizeof(lgamma_text), "%.77n", lgamma_x);
-
-    printf("gamma(2.345)  = %s\n", gamma_text);
-    printf("lgamma(2.345) = %s\n", lgamma_text);
+    fmt_print("gamma(2.345)  = {gamma_x:.77n}\nlgamma(2.345) = {lgamma_x:.77n}\n", FMT(gamma_x), FMT(lgamma_x));
     return 0;
 }
 ```
@@ -1727,6 +1742,8 @@ lgamma(2.345) = 0.18173624337757203797862933229995978550118791690492470651875093
 
 ```c
 #include <stdio.h>
+
+#include "format-t.h"
 #include "number-t.h"
 
 int main(void)
@@ -1737,10 +1754,7 @@ int main(void)
     number_t z = num_create_from_string("1 + i");
     number_t exp_z = num_exp(z);
 
-    char text[256];
-    num_sprintf(text, sizeof(text), "%n", exp_z);
-
-    printf("exp(1 + i) = %s\n", text);
+    fmt_print("exp(1 + i) = {exp_z}\n", FMT(exp_z));
     return 0;
 }
 ```
@@ -2887,13 +2901,15 @@ README example:
 
 ```c
 #include <stdio.h>
+
+#include "format-t.h"
 #include "number-t.h"
 
 int main(void)
 {
     NUM_SCOPE(scope);
     number_t value = num_hermite_Hn(num_create_from_long(3), NUM_TWO);
-    num_printf("Hermite H3(2) = %n\n", value);
+    fmt_print("Hermite H3(2) = {value}\n", FMT(value));
     return 0;
 }
 ```
@@ -2949,6 +2965,7 @@ README example: retrieve the elementary charge's exact ratio even at 53 bits.
 ```c
 #include <string.h>
 
+#include "format-t.h"
 #include "string-t.h"
 #include "number-t.h"
 
@@ -2961,7 +2978,7 @@ int main(void)
     if (!ok)
         return 1;
     string_t *top = num_to_string(numerator), *bottom = num_to_string(denominator);
-    string_printf("elementary charge: %S/%S C\n", top, bottom);
+    fmt_print("elementary charge: {top}/{bottom} C\n", FMT(top), FMT(bottom));
     if (!top || !bottom || strcmp(string_c_str(top), "801088317") ||
         strcmp(string_c_str(bottom), "5000000000000000000000000000"))
         return 1;
@@ -2989,6 +3006,7 @@ manageable; it is not a limit of the number API.
 ```c
 #include <stdio.h>
 
+#include "format-t.h"
 #include "number-t.h"
 
 int main(void)
@@ -3004,9 +3022,9 @@ int main(void)
             number_t mersenne = num_sub(mersenne_base, one);
             if (num_is_prime(mersenne)) {
                 if ((found % 4u) == 3u)
-                    printf("M_%-4u is prime\n", p);
+                    fmt_print("M_{p:<4d} is prime\n", FMT(p));
                 else
-                    printf("M_%-4u is prime    ", p);
+                    fmt_print("M_{p:<4d} is prime    ", FMT(p));
                 found++;
             }
             num_destroy(&mersenne);

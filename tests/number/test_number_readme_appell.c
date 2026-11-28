@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "format-t.h"
 #include "expression-t.h"
 #include "matrix-t.h"
 #include "number-t.h"
@@ -56,6 +57,6 @@ void run_number_readme_appell(void)
         "matrix F2[0,1] = 0.093750\n";
     char output[256];
     bool ok = run_appell_example(output, sizeof output) == 0;
-    if (ok) fputs(output, stdout);
+    if (ok) fmt_fprint(stdout, "{output}", FMT(output));
     TEST_ASSERT_TRUE(ok && !strcmp(output, expected), "README Appell output agrees across all public modules");
 }

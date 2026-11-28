@@ -9,6 +9,7 @@
  * run suites sequentially; this source is not part of the installed library.
  */
 
+#include "format-t.h"
 #include "string-t.h"
 #include "test_matrix.h"
 #include "test_database.h"
@@ -54,8 +55,8 @@ static int run_readme_example(void)
         return 1;
     }
 
-    num_printf("eigenvalue[0] = %.0n\n", eigenvalues[0]);
-    num_printf("eigenvalue[1] = %.0n\n", eigenvalues[1]);
+    fmt_print("eigenvalue[0] = {value:.0n}\n", FMT(value, eigenvalues[0]));
+    fmt_print("eigenvalue[1] = {value:.0n}\n", FMT(value, eigenvalues[1]));
 
     num_destroy(&eigenvalues[0]);
     num_destroy(&eigenvalues[1]);
@@ -77,10 +78,6 @@ static int run_readme_string_quantum_example(void)
     expr_t *evals[2] = {NULL, NULL};
     expr_t *trace = NULL;
     expr_t *c2 = NULL;
-    char *trace_s = NULL;
-    char *c2_s = NULL;
-    char *eval0_s = NULL;
-    char *eval1_s = NULL;
 
     if (!H)
         return 1;
@@ -136,37 +133,14 @@ static int run_readme_string_quantum_example(void)
         return 1;
     }
 
-    trace_s = expr_to_string(trace, style_EXPRESSION);
-    c2_s = expr_to_string(c2, style_EXPRESSION);
-    eval0_s = expr_to_string(evals[0], style_EXPRESSION);
-    eval1_s = expr_to_string(evals[1], style_EXPRESSION);
-    if (!trace_s || !c2_s || !eval0_s || !eval1_s) {
-        free(trace_s);
-        free(c2_s);
-        free(eval0_s);
-        free(eval1_s);
-        expr_free(trace);
-        for (size_t i = 0; i < 2; ++i)
-            expr_free(evals[i]);
-        num_destroy(&omega);
-        num_destroy(&delta);
-        mat_bindings_free(bindings);
-        mat_free(P);
-        mat_free(H2);
-        mat_free(H);
-        return 1;
-    }
-
-    mat_printf("H = %ml\n", H);
-    mat_printf("H² = %m\n", H2);
-    printf("tr(H) = %s\n", trace_s);
-    printf("charpoly constant term = %s\n", c2_s);
-    printf("eigenvalues = %s, %s\n", eval0_s, eval1_s);
-
-    free(trace_s);
-    free(c2_s);
-    free(eval0_s);
-    free(eval1_s);
+    int bytes = fmt_print("H = {H:pretty_layout}\nH² = {H2:pretty}\ntr(H) = {trace}\ncharpoly constant term = "
+                          "{c2}\neigenvalues = {first}, {second}\n",
+        FMT(H),
+        FMT(H2),
+        FMT(trace),
+        FMT(c2),
+        FMT(first, evals[0]),
+        FMT(second, evals[1]));
     expr_free(trace);
     for (size_t i = 0; i < 2; ++i)
         expr_free(evals[i]);
@@ -176,7 +150,7 @@ static int run_readme_string_quantum_example(void)
     mat_free(P);
     mat_free(H2);
     mat_free(H);
-    return 0;
+    return bytes < 0;
 }
 
 static void test_readme_example_hermitian_eigendecomposition(void)
@@ -204,7 +178,7 @@ static void test_readme_example_struve_l(void)
 
         snprintf(output, sizeof(output), "L_0(A)[0,1] = %.6f\n", num_to_double(entry));
         check_bool("README Struve L output matches the guide", strcmp(output, "L_0(A)[0,1] = 0.636620\n") == 0);
-        printf("L_0(A)[0,1] = %.6f\n", num_to_double(entry));
+        fmt_print("L_0(A)[0,1] = {value:.6f}\n", FMT(value, num_to_double(entry)));
         num_destroy(&entry);
     }
     mat_free(L);
@@ -227,7 +201,7 @@ static void test_readme_example_bessel_i(void)
 
         snprintf(output, sizeof(output), "I_0(A)[0,2] = %.6f\n", num_to_double(entry));
         check_bool("README Bessel I0 output matches the guide", strcmp(output, "I_0(A)[0,2] = 0.250000\n") == 0);
-        printf("I_0(A)[0,2] = %.6f\n", num_to_double(entry));
+        fmt_print("I_0(A)[0,2] = {value:.6f}\n", FMT(value, num_to_double(entry)));
         num_destroy(&entry);
     }
     mat_free(I0);
@@ -251,7 +225,7 @@ static void test_readme_example_struve_h(void)
 
         snprintf(output, sizeof(output), "H_0(A)[0,3] = %.6f\n", num_to_double(entry));
         check_bool("README Struve H0 output matches the guide", strcmp(output, "H_0(A)[0,3] = -0.070736\n") == 0);
-        printf("H_0(A)[0,3] = %.6f\n", num_to_double(entry));
+        fmt_print("H_0(A)[0,3] = {value:.6f}\n", FMT(value, num_to_double(entry)));
         num_destroy(&entry);
     }
     mat_free(h0);
@@ -272,7 +246,7 @@ static void test_readme_example_bessel_y(void)
 
         snprintf(output, sizeof(output), "Y_0(A)[0,1] = %.6f\n", num_to_double(entry));
         check_bool("README Bessel Y0 output matches the guide", strcmp(output, "Y_0(A)[0,1] = 0.781213\n") == 0);
-        printf("Y_0(A)[0,1] = %.6f\n", num_to_double(entry));
+        fmt_print("Y_0(A)[0,1] = {value:.6f}\n", FMT(value, num_to_double(entry)));
         num_destroy(&entry);
     }
     mat_free(y0);
@@ -288,9 +262,10 @@ static void test_readme_example_sgn(void)
     matrix_t *b = mat_sgn(a);
     check_bool("README signum example produces a matrix", b != NULL);
     if (b) {
-        printf("sgn(diag(-1, 0, 1)) = diag(%.0f, %.0f, %.0f)\n",
-               num_to_double(mat_get_num(b, 0, 0)), num_to_double(mat_get_num(b, 1, 1)),
-               num_to_double(mat_get_num(b, 2, 2)));
+        fmt_print("sgn(diag(-1, 0, 1)) = diag({negative:.0f}, {zero:.0f}, {positive:.0f})\n",
+            FMT(negative, num_to_double(mat_get_num(b, 0, 0))),
+            FMT(zero, num_to_double(mat_get_num(b, 1, 1))),
+            FMT(positive, num_to_double(mat_get_num(b, 2, 2))));
         char output[80];
         snprintf(output, sizeof(output), "sgn(diag(-1, 0, 1)) = diag(%.0f, %.0f, %.0f)\n",
                  num_to_double(mat_get_num(b, 0, 0)), num_to_double(mat_get_num(b, 1, 1)),

@@ -11,7 +11,9 @@ CREATE INDEX IF NOT EXISTS format_cases_operation ON format_cases(operation,name
 
 INSERT INTO test_case_runner(module,source,parent,table_name,operation) VALUES
     ('format.render','tests/format/test_format.c','tests.test_format_render','format_cases','render'),
-    ('format.errors','tests/format/test_format.c','tests.test_format_errors','format_cases','error')
+    ('format.errors','tests/format/test_format.c','tests.test_format_errors','format_cases','error'),
+    ('format.stream','tests/format/test_format.c','tests.test_format_streams','format_cases','render'),
+    ('format.stream_errors','tests/format/test_format.c','tests.test_format_stream_errors','format_cases','error')
 ON CONFLICT(module) DO UPDATE SET table_name=excluded.table_name,operation=excluded.operation;
 
 INSERT INTO format_cases(name,operation,input,expected) VALUES
@@ -621,4 +623,71 @@ INSERT INTO format_cases(name,operation,input,expected) VALUES
     ('native_adjacent_midnight','render','{"pattern":"{:h:mm:ssam/pm}","args":[{"type":"datetime","value":"2026-02-10T00:05:06"}]}','12:05:06am')
 ON CONFLICT(name) DO UPDATE SET operation=excluded.operation,input=excluded.input,expected=excluded.expected;
 INSERT INTO format_cases(name,operation,input,expected) VALUES ('native_coloured_string_width','render','{"pattern":"{:>10s}","args":[{"type":"text","value":"\u001b[31m1.25\u001b[0m"}]}','      [31m1.25[0m')
+ON CONFLICT(name) DO UPDATE SET operation=excluded.operation,input=excluded.input,expected=excluded.expected;
+
+-- Every slot in the minimal perfect colour dictionary is exercised, including mixed case and non-members.
+INSERT INTO format_cases(name,operation,input,expected) VALUES
+    ('excel_colour_hash_black','render','{"pattern":"{:excel:[Black]0}","args":[{"type":"int","value":"2"}]}',char(27)||'[30m2'||char(27)||'[0m'),
+    ('excel_colour_hash_blue','render','{"pattern":"{:excel:[Blue]0}","args":[{"type":"int","value":"2"}]}',char(27)||'[34m2'||char(27)||'[0m'),
+    ('excel_colour_hash_cyan','render','{"pattern":"{:excel:[Cyan]0}","args":[{"type":"int","value":"2"}]}',char(27)||'[36m2'||char(27)||'[0m'),
+    ('excel_colour_hash_green','render','{"pattern":"{:excel:[Green]0}","args":[{"type":"int","value":"2"}]}',char(27)||'[32m2'||char(27)||'[0m'),
+    ('excel_colour_hash_magenta','render','{"pattern":"{:excel:[Magenta]0}","args":[{"type":"int","value":"2"}]}',char(27)||'[35m2'||char(27)||'[0m'),
+    ('excel_colour_hash_red','render','{"pattern":"{:excel:[Red]0}","args":[{"type":"int","value":"2"}]}',char(27)||'[31m2'||char(27)||'[0m'),
+    ('excel_colour_hash_white','render','{"pattern":"{:excel:[White]0}","args":[{"type":"int","value":"2"}]}',char(27)||'[37m2'||char(27)||'[0m'),
+    ('excel_colour_hash_yellow','render','{"pattern":"{:excel:[Yellow]0}","args":[{"type":"int","value":"2"}]}',char(27)||'[33m2'||char(27)||'[0m'),
+    ('excel_colour_hash_mixed','render','{"pattern":"{:excel:[mAgEnTa]0}","args":[{"type":"int","value":"2"}]}',char(27)||'[35m2'||char(27)||'[0m'),
+    ('excel_colour_hash_nonmember','error','{"pattern":"{:excel:[Redd]0}","args":[{"type":"int","value":"2"}]}','syntax')
+ON CONFLICT(name) DO UPDATE SET operation=excluded.operation,input=excluded.input,expected=excluded.expected;
+
+-- Native datetime presentation names occupy every slot in the module-owned minimal perfect hash.
+INSERT INTO format_cases(name,operation,input,expected) VALUES
+    ('lingua_default','render','{"pattern":"{dt}","args":[{"name":"dt","type":"datetime","value":"2026-06-10T13:05:06"}]}','10 juin 2026'),
+    ('lingua_explicit_default','render','{"pattern":"{dt:lingua}","args":[{"name":"dt","type":"datetime","value":"2026-06-10T13:05:06"}]}','10 juin 2026'),
+    ('lingua_french','render','{"pattern":"{dt:fr_FR}","args":[{"name":"dt","type":"datetime","value":"2026-06-10T13:05:06"}]}','10 juin 2026'),
+    ('lingua_french_first','render','{"pattern":"{dt:fr_FR}","args":[{"name":"dt","type":"datetime","value":"2026-06-01T00:00:00"}]}','1ᵉʳ juin 2026'),
+    ('lingua_spanish','render','{"pattern":"{dt:es_ES}","args":[{"name":"dt","type":"datetime","value":"2026-06-10T13:05:06"}]}','10 de junio de 2026'),
+    ('lingua_welsh','render','{"pattern":"{dt:cy_GB}","args":[{"name":"dt","type":"datetime","value":"2026-06-10T13:05:06"}]}','10 Mehefin 2026'),
+    ('lingua_greek','render','{"pattern":"{dt:el_GR}","args":[{"name":"dt","type":"datetime","value":"2026-06-10T13:05:06"}]}','10 Ιουνίου 2026'),
+    ('lingua_russian','render','{"pattern":"{dt:ru_RU}","args":[{"name":"dt","type":"datetime","value":"2026-06-10T13:05:06"}]}','10 июня 2026 г.'),
+    ('lingua_japanese','render','{"pattern":"{dt:ja_JP}","args":[{"name":"dt","type":"datetime","value":"2026-06-10T13:05:06"}]}','2026年6月10日'),
+    ('lingua_hebrew_new_year','render','{"pattern":"{dt:he_IL}","args":[{"name":"dt","type":"datetime","value":"2024-10-03T00:00:00"}]}','1 בתשרי 5785'),
+    ('lingua_hebrew_adar_first','render','{"pattern":"{dt:he_IL}","args":[{"name":"dt","type":"datetime","value":"2024-02-10T00:00:00"}]}','1 באדר א׳ 5784'),
+    ('lingua_hebrew_adar_second','render','{"pattern":"{dt:he_IL}","args":[{"name":"dt","type":"datetime","value":"2024-03-11T00:00:00"}]}','1 באדר ב׳ 5784'),
+    ('lingua_hebrew_adar_common','render','{"pattern":"{dt:he_IL}","args":[{"name":"dt","type":"datetime","value":"2023-02-22T00:00:00"}]}','1 באדר 5783'),
+    ('lingua_arabic_new_year','render','{"pattern":"{dt:ar_SA}","args":[{"name":"dt","type":"datetime","value":"2025-06-27T00:00:00"}]}','١ محرم ١٤٤٧'),
+    ('lingua_uk_ordinal','render','{"pattern":"{dt:en_GB}","args":[{"name":"dt","type":"datetime","value":"2026-06-10T00:00:00"}]}','10ᵗʰ June 2026'),
+    ('lingua_uk_eleventh','render','{"pattern":"{dt:en_GB}","args":[{"name":"dt","type":"datetime","value":"2026-06-11T00:00:00"}]}','11ᵗʰ June 2026'),
+    ('lingua_uk_twenty_first','render','{"pattern":"{dt:en_GB}","args":[{"name":"dt","type":"datetime","value":"2026-06-21T00:00:00"}]}','21ˢᵗ June 2026'),
+    ('lingua_unknown_locale','error','{"pattern":"{dt:zz_ZZ}","args":[{"name":"dt","type":"datetime","value":"2026-06-10T13:05:06"}]}','type')
+ON CONFLICT(name) DO UPDATE SET operation=excluded.operation,input=excluded.input,expected=excluded.expected;
+
+INSERT INTO format_cases(name,operation,input,expected) VALUES
+    ('native_datetime_hash_month','render','{"pattern":"{:M}","args":[{"type":"datetime","value":"2026-02-10T13:05:06.125"}]}','2'),
+    ('native_datetime_hash_date','render','{"pattern":"{:date}","args":[{"type":"datetime","value":"2026-02-10T13:05:06.125"}]}','2026-02-10'),
+    ('native_datetime_hash_minute','render','{"pattern":"{:m}","args":[{"type":"datetime","value":"2026-02-10T13:05:06.125"}]}','5'),
+    ('native_datetime_hash_hour','render','{"pattern":"{:h}","args":[{"type":"datetime","value":"2026-02-10T13:05:06.125"}]}','13'),
+    ('native_datetime_hash_second','render','{"pattern":"{:s}","args":[{"type":"datetime","value":"2026-02-10T13:05:06.125"}]}','6'),
+    ('native_datetime_hash_day','render','{"pattern":"{:d}","args":[{"type":"datetime","value":"2026-02-10T13:05:06.125"}]}','10'),
+    ('native_datetime_hash_datetime','render','{"pattern":"{:datetime}","args":[{"type":"datetime","value":"2026-02-10T13:05:06.125"}]}','2026-02-10T13:05:06'),
+    ('native_datetime_hash_iso','render','{"pattern":"{:iso}","args":[{"type":"datetime","value":"2026-02-10T13:05:06.125"}]}','2026-02-10T13:05:06'),
+    ('native_datetime_hash_year','render','{"pattern":"{:y}","args":[{"type":"datetime","value":"2026-02-10T13:05:06.125"}]}','26'),
+    ('native_datetime_hash_time','render','{"pattern":"{:time}","args":[{"type":"datetime","value":"2026-02-10T13:05:06.125"}]}','13:05:06')
+ON CONFLICT(name) DO UPDATE SET operation=excluded.operation,input=excluded.input,expected=excluded.expected;
+
+INSERT INTO format_cases(name,operation,input,expected) VALUES
+    ('native_repeated_year_one_field','render','{"pattern":"Chinese New Year {dt:yyyy: yyyy-MM-dd}","args":[{"name":"dt","type":"datetime","value":"2020-01-25T00:00:00"}]}','Chinese New Year 2020: 2020-01-25')
+ON CONFLICT(name) DO UPDATE SET operation=excluded.operation,input=excluded.input,expected=excluded.expected;
+
+INSERT INTO format_cases(name,operation,input,expected) VALUES
+    ('calendar_christian','render','{"pattern":"{dt:christian}","args":[{"name":"dt","type":"datetime","value":"2026-06-21T00:00:00"}]}','Gregorian 2026-06-21; Julian 2026-06-08'),
+    ('calendar_chinese','render','{"pattern":"{dt:chinese}","args":[{"name":"dt","type":"datetime","value":"2026-02-17T00:00:00"}]}','Year 4724 (Horse), month 1, day 1'),
+    ('calendar_hindu','render','{"pattern":"{dt:hindu}","args":[{"name":"dt","type":"datetime","value":"2026-06-21T00:00:00"}]}','Vikram Samvat 2083, Ashadha Shukla 7, lunar day 7'),
+    ('calendar_buddhist','render','{"pattern":"{dt:buddhist}","args":[{"name":"dt","type":"datetime","value":"2026-06-21T00:00:00"}]}','B.E. 2569-06-21 (Thai solar)'),
+    ('calendar_muslim','render','{"pattern":"{dt:muslim}","args":[{"name":"dt","type":"datetime","value":"2026-02-17T00:00:00"}]}','29 Sha''ban 1447 AH'),
+    ('calendar_jewish','render','{"pattern":"{dt:jewish}","args":[{"name":"dt","type":"datetime","value":"2024-10-03T00:00:00"}]}','1 Tishrei 5785 AM'),
+    ('calendar_cherokee','render','{"pattern":"{dt:cherokee}","args":[{"name":"dt","type":"datetime","value":"2026-06-21T00:00:00"}]}','Cherokee civil Green Corn Moon, day 21, year 2026'),
+    ('calendar_mayan','render','{"pattern":"{dt:mayan}","args":[{"name":"dt","type":"datetime","value":"2026-06-21T00:00:00"}]}','Long Count 13.0.13.12.10; Tzolk''in 7 Ok; Haab 3 Sek'),
+    ('calendar_aztec','render','{"pattern":"{dt:aztec}","args":[{"name":"dt","type":"datetime","value":"2026-06-21T00:00:00"}]}','Tonalpohualli 5 Mazatl; Xiuhpohualli day 19 of Etzalcualiztli; year 1 Tochtli'),
+    ('calendar_ethiopian','render','{"pattern":"{dt:ethiopian}","args":[{"name":"dt","type":"datetime","value":"2023-09-11T00:00:00"}]}','1 Meskerem 2016 EC'),
+    ('calendar_unknown_name','error','{"pattern":"{:mayan_extra}","args":[{"type":"datetime","value":"2026-06-21T00:00:00"}]}','type')
 ON CONFLICT(name) DO UPDATE SET operation=excluded.operation,input=excluded.input,expected=excluded.expected;

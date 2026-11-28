@@ -16,6 +16,7 @@
 #include <string.h>
 #include <time.h>
 
+#include "format-t.h"
 #include "string-t.h"
 #include "computation-t.h"
 #include "equation-t.h"
@@ -268,11 +269,8 @@ static void example_equation_quadratic_solve(void)
 
     for (size_t i = 0; i < equ_solutions_count(solutions); ++i) {
         const equation_t *solution = equ_solutions_at(solutions, i);
-        string_t *text = equ_to_text(solution, style_UNBOUND);
-
-        if (text)
-            string_printf("solution[%zu] = %S\n", i, text);
-        string_free(text);
+        if (solution)
+            fmt_print("solution[{i}] = {solution:unbound}\n", FMT(i), FMT(solution));
     }
 
     equ_solutions_free(solutions);
@@ -291,11 +289,8 @@ static void example_equation_sextic_solve(void)
 
     for (size_t i = 0; i < equ_solutions_count(solutions); ++i) {
         const equation_t *solution = equ_solutions_at(solutions, i);
-        string_t *text = equ_to_text(solution, style_UNBOUND);
-
-        if (text)
-            string_printf("solution[%zu] = %S\n", i, text);
-        string_free(text);
+        if (solution)
+            fmt_print("solution[{i}] = {solution:unbound}\n", FMT(i), FMT(solution));
     }
 
     equ_solutions_free(solutions);
@@ -317,7 +312,7 @@ static void example_equation_kepler(void)
     first = equ_solutions_at(solutions, 0u);
 
     if (first)
-        equ_print(first);
+        fmt_print("{first}\n", FMT(first));
 
     equ_solutions_free(solutions);
     equ_free(kepler);
@@ -330,7 +325,7 @@ static void example_equation_output_form(void)
     string_t *text = equ_to_text(equation, style_UNBOUND);
 
     if (text)
-        string_printf("%S\n", text);
+        fmt_print("{text}\n", FMT(text));
 
     string_free(text);
     equ_free(equation);
@@ -3128,9 +3123,7 @@ static void example_equation_root_inverse(void)
     equation_t *equation = equ_from_string("sqrt(7^x) = 49");
     equation_solutions_t *solutions = equ_derive_solutions(equation);
     const equation_t *solution = equ_solutions_at(solutions, 0);
-    string_t *text = solution ? equ_to_text(solution, style_UNBOUND) : NULL;
-    int status = text && puts(string_c_str(text)) != EOF ? EXIT_SUCCESS : EXIT_FAILURE;
-    string_free(text);
+    int status = solution && fmt_print("{solution:unbound}\n", FMT(solution)) >= 0 ? EXIT_SUCCESS : EXIT_FAILURE;
     equ_solutions_free(solutions);
     equ_free(equation);
     ASSERT_EQ_INT(status, EXIT_SUCCESS);
@@ -3143,7 +3136,7 @@ static void example_equation_complex_power_family(void)
     equation_solutions_t *solutions = equ_derive_solutions(equation);
     const equation_t *solution = equ_solutions_at(solutions, 0);
     string_t *text = solution ? equ_to_text(solution, style_UNBOUND) : NULL;
-    int status = text && puts(string_c_str(text)) != EOF && puts("n is any integer.") != EOF
+    int status = solution && fmt_print("{solution:unbound}\nn is any integer.\n", FMT(solution)) >= 0
                      ? EXIT_SUCCESS : EXIT_FAILURE;
     bool correct = text && !strcmp(string_c_str(text), "x = 4n - 2i·ln(2)/π");
     string_free(text);

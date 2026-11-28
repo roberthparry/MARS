@@ -63,12 +63,16 @@ README signum example:
 
 ```c
 #include <stdio.h>
+
+#include "format-t.h"
 #include "qcomplex-t.h"
 
 int main(void)
 {
     qcomplex_t sign = qc_sgn(qc_make(QF_NEG_ONE, QF_ZERO));
-    printf("sgn(-1 + 0i) = %.0f + %.0fi\n", qf_to_double(qc_real(sign)), qf_to_double(qc_imag(sign)));
+    fmt_print("sgn(-1 + 0i) = {real:.0f} + {imaginary:.0f}i\n",
+        FMT(real, qf_to_double(qc_real(sign))),
+        FMT(imaginary, qf_to_double(qc_imag(sign))));
     return 0;
 }
 ```
@@ -83,12 +87,16 @@ README example:
 
 ```c
 #include <stdio.h>
+
+#include "format-t.h"
 #include "qcomplex-t.h"
 
 int main(void)
 {
     qcomplex_t value = qc_sinc(qc_make(QF_ZERO, QF_ZERO));
-    printf("sinc(0) = %.0f + %.0fi\n", qf_to_double(qc_real(value)), qf_to_double(qc_imag(value)));
+    fmt_print("sinc(0) = {real:.0f} + {imaginary:.0f}i\n",
+        FMT(real, qf_to_double(qc_real(value))),
+        FMT(imaginary, qf_to_double(qc_imag(value))));
     return 0;
 }
 ```
@@ -140,6 +148,8 @@ Common real constants are also available on the real axis, including
 
 ```c
 #include <stdio.h>
+
+#include "format-t.h"
 #include "qcomplex-t.h"
 #include "qfloat-t.h"
 
@@ -150,9 +160,9 @@ int main(void) {
     qfloat_t real  = qc_real(r);
     qfloat_t imag  = qc_imag(r);
 
-    qc_printf("exp(iπ) + 1 = %.34z\n", r);
-    qf_printf("real part    = %.34q\n", real);
-    qf_printf("imag part    = %.34q\n", imag);
+    fmt_print("exp(iπ) + 1 = {r:.34q}\n", FMT(r));
+    fmt_print("real part    = {real:.34q}\n", FMT(real));
+    fmt_print("imag part    = {imag:.34q}\n", FMT(imag));
     return 0;
 }
 ```
@@ -395,12 +405,16 @@ The shared evaluator limits work precision to 65536 bits and series to
 
 ```c
 #include <stdio.h>
+
+#include "format-t.h"
 #include "qcomplex-t.h"
 
 int main(void)
 {
     qcomplex_t value = qc_bessel_Y(QC_ZERO, QC_ONE);
-    printf("Y_0(1) = %.15f + %.0fi\n", qf_to_double(qc_real(value)), qf_to_double(qc_imag(value)));
+    fmt_print("Y_0(1) = {real:.15f} + {imaginary:.0f}i\n",
+        FMT(real, qf_to_double(qc_real(value))),
+        FMT(imaginary, qf_to_double(qc_imag(value))));
     return 0;
 }
 ```
@@ -447,12 +461,14 @@ there is no asymptotic large-argument implementation.
 
 ```c
 #include <stdio.h>
+
+#include "format-t.h"
 #include "qcomplex-t.h"
 
 int main(void)
 {
     qcomplex_t bessel = qc_bessel_I(QC_ZERO, QC_ONE);
-    qc_printf("I_0(1) = %.16z\n", bessel);
+    fmt_print("I_0(1) = {bessel:.16q}\n", FMT(bessel));
     return 0;
 }
 ```
@@ -486,12 +502,14 @@ inside the input bounds is guaranteed to pass the numerical guards.
 
 ```c
 #include <stdio.h>
+
+#include "format-t.h"
 #include "qcomplex-t.h"
 
 int main(void)
 {
     qcomplex_t ordinary = qc_struve_H(QC_ZERO, QC_ONE);
-    qc_printf("H_0(1) = %.15z\n", ordinary);
+    fmt_print("H_0(1) = {ordinary:.15q}\n", FMT(ordinary));
     return 0;
 }
 ```
@@ -525,12 +543,14 @@ provided. See the number guide for the work-precision and iteration limits.
 
 ```c
 #include <stdio.h>
+
+#include "format-t.h"
 #include "qcomplex-t.h"
 
 int main(void)
 {
     qcomplex_t value = qc_struve_L(QC_ZERO, QC_ONE);
-    qc_printf("L_0(1) = %.16z\n", value);
+    fmt_print("L_0(1) = {value:.16q}\n", FMT(value));
     return 0;
 }
 ```
@@ -847,12 +867,14 @@ README example:
 
 ```c
 #include <stdio.h>
+
+#include "format-t.h"
 #include "qcomplex-t.h"
 
 int main(void)
 {
     qcomplex_t value = qc_hermite_Hn(3, qc_make(QF_ZERO, QF_ONE));
-    qc_printf("Hermite H3(i) = %.0z\n", value);
+    fmt_print("Hermite H3(i) = {value:.0q}\n", FMT(value));
     return 0;
 }
 ```

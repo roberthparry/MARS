@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "format-t.h"
 #include "http-t.h"
 
 static bool show_event(const string_t *event, const string_t *data, const string_t *id, bool has_retry,
@@ -19,7 +20,7 @@ static bool show_event(const string_t *event, const string_t *data, const string
     (void)retry_ms;
     unsigned *count = context;
     ++*count;
-    string_printf("%S: %S\n", event, data);
+    fmt_print("{event}: {data}\n", FMT(event), FMT(data));
     return true;
 }
 
@@ -30,7 +31,7 @@ int main(void)
     bool ok = form && name && value && http_form_add_text(form, name, value);
     string_t *encoded = ok ? http_form_encode(form) : NULL;
     if (encoded)
-        string_printf("%S\n", encoded);
+        fmt_print("{encoded}\n", FMT(encoded));
     else
         ok = false;
 
@@ -39,7 +40,8 @@ int main(void)
     xml_t *envelope = document ? http_soap_envelope(HTTP_SOAP_12, xml_child_at(document, 0), NULL) : NULL;
     http_soap_t *soap = envelope ? http_soap_parse(envelope) : NULL;
     if (soap)
-        printf("SOAP body children: %zu\n", xml_child_count(http_soap_body(soap)));
+        fmt_print("SOAP body children: {soap_body_children}\n",
+            FMT(soap_body_children, xml_child_count(http_soap_body(soap))));
     else
         ok = false;
 

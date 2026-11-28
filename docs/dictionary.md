@@ -36,6 +36,8 @@ it does not duplicate or free the pointed-to strings.
 ```c
 #include <stdio.h>
 #include <string.h>
+
+#include "format-t.h"
 #include "dictionary-t.h"
 
 static size_t str_hash(const void *p) {
@@ -65,7 +67,7 @@ int main(void) {
     dictionary_set(dict, &k1, &v1);
 
     if (dictionary_get(dict, &k1, &out))
-        printf("Value for '%s': %s\n", k1, out);
+        fmt_print("Value for '{k1}': {out}\n", FMT(k1), FMT(out));
 
     dictionary_destroy(dict);
     return 0;
@@ -87,6 +89,8 @@ stored copies on destruction or removal.
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+
+#include "format-t.h"
 #include "dictionary-t.h"
 
 struct item { char *name; int value; };
@@ -130,7 +134,10 @@ int main(void) {
 
     struct item out;
     if (dictionary_get(dict, &k1, &out)) {
-        printf("Value for key '%s': %s (%d)\n", k1.name, out.name, out.value);
+        fmt_print("Value for key '{name}': {name_2} ({value})\n",
+            FMT(name, k1.name),
+            FMT(name_2, out.name),
+            FMT(value, out.value));
         free(out.name);   /* get() cloned the value */
     }
 

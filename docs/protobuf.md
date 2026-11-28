@@ -154,6 +154,7 @@ It is exercised as a README example in the Protobuf tests.
 ```c
 #include <stdio.h>
 
+#include "format-t.h"
 #include "protobuf_wire-t.h"
 
 int main(void)
@@ -166,7 +167,10 @@ int main(void)
     protobuf_wire_field_t field;
     ok = ok && protobuf_wire_read_field(bytes, written, &offset, &field);
     if (ok)
-        printf("Field %u: %llu (%zu bytes)\n", (unsigned)field.field, (unsigned long long)field.integer, written);
+        fmt_print("Field {field}: {integer} ({written} bytes)\n",
+            FMT(field, (unsigned)field.field),
+            FMT(integer, (unsigned long long)field.integer),
+            FMT(written));
     return ok ? 0 : 1;
 }
 ```
@@ -183,10 +187,12 @@ This is also `scratch/protobuf_roundtrip.c`. The field numbers correspond to
 an application schema with an unsigned integer field 1 and string field 2.
 
 ```c
-#include "protobuf-t.h"
 #include <inttypes.h>
 #include <stdio.h>
 #include <stdlib.h>
+
+#include "format-t.h"
+#include "protobuf-t.h"
 
 int main(void)
 {
@@ -199,11 +205,14 @@ int main(void)
     size_t size = 0;
     const char *name = decoded ? protobuf_bytes(decoded, 1, &size) : NULL;
     ok = decoded && protobuf_integer(decoded, 0, &value) && name && size == 4;
+    string_t *name_text = ok ? string_new() : NULL;
+    ok = ok && name_text && string_append_bytes(name_text, name, size) == 0;
     if (ok) {
-        printf("Field %" PRIu32 ": %" PRIu64 "\n", protobuf_field(decoded, 0), value);
-        printf("Field %" PRIu32 ": %.*s\n", protobuf_field(decoded, 1), (int)size, name);
-        printf("Encoded bytes: %zu\n", array_size(encoded));
+        fmt_print("Field {field}: {value}\n", FMT(field, protobuf_field(decoded, 0)), FMT(value));
+        fmt_print("Field {field}: {name_text}\n", FMT(field, protobuf_field(decoded, 1)), FMT(name_text));
+        fmt_print("Encoded bytes: {encoded_bytes}\n", FMT(encoded_bytes, array_size(encoded)));
     }
+    string_free(name_text);
     protobuf_free(decoded);
     array_destroy(encoded);
     protobuf_free(message);

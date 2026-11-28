@@ -127,6 +127,7 @@ facilities. Do not treat a failed CSV object as reusable; inspect and free it.
 ## Example: reading named columns
 
 ```c
+#include "format-t.h"
 #include "csv-t.h"
 
 int main(void)
@@ -140,7 +141,7 @@ int main(void)
     bool ok = csv && text && name && csv_feed(csv, text, true) && csv_next(csv) == CSV_ROW &&
               csv_column(csv, name, &column);
     if (ok)
-        string_printf("%S: %S\n", csv_field(csv, 0), csv_field(csv, column));
+        fmt_print("{first}: {selected}\n", FMT(first, csv_field(csv, 0)), FMT(selected, csv_field(csv, column)));
     string_free(name);
     string_free(text);
     csv_free(csv);
@@ -157,6 +158,7 @@ Zoë: hello, world
 ## Example: writing headers and escaped text
 
 ```c
+#include "format-t.h"
 #include "csv-t.h"
 
 int main(void)
@@ -170,7 +172,7 @@ int main(void)
     bool ok = csv && name && note && person && message && csv_set_header(csv, headers, 2) &&
               csv_write(csv, fields, 2) && csv_finish(csv);
     if (ok)
-        string_printf("%S", csv_output(csv));
+        fmt_print("{output}", FMT(output, csv_output(csv)));
     string_free(message);
     string_free(person);
     string_free(note);
@@ -213,6 +215,7 @@ timeout, or cancel the control from another thread for normal application use.
 ```c
 #include <stdio.h>
 
+#include "format-t.h"
 #include "computation-t.h"
 #include "csv-t.h"
 
@@ -244,7 +247,7 @@ int main(void)
     computation_t *control = computation_new(&options);
     bool ok = control && computation_run(control, calculate, &job);
     bool stopped = !ok && computation_status(control) == COMPUTATION_BUDGET_EXHAUSTED;
-    printf("Stopped: %d\n", stopped);
+    fmt_print("Stopped: {stopped:d}\n", FMT(stopped));
     csv_free(job.input);
     computation_free(control);
     return stopped ? 0 : 1;
@@ -277,6 +280,7 @@ ingestion uses these snapshots as causes in its own structured error.
 ```c
 #include <stdio.h>
 
+#include "format-t.h"
 #include "csv-t.h"
 
 int main(void)
@@ -289,7 +293,10 @@ int main(void)
     string_free(input);
     bool ok = error && diagnostic_location(error);
     if (ok)
-        printf("%s: %s; line %zu\n", diagnostic_domain(error), diagnostic_message(error), diagnostic_location(error)->line);
+        fmt_print("{domain}: {message}; line {line}\n",
+            FMT(domain, diagnostic_domain(error)),
+            FMT(message, diagnostic_message(error)),
+            FMT(line, diagnostic_location(error)->line));
     diagnostic_free(error);
     return ok ? 0 : 1;
 }

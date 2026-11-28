@@ -90,44 +90,72 @@ static string_t *fmt_character(uintmax_t scalar)
     return text;
 }
 
-static string_t *fmt_integer_value(const fmt_arg_impl_t *argument, const fmt_options_t *options)
+static uintmax_t fmt_magnitude(const fmt_arg_impl_t *argument, bool negative)
 {
-    char conversion = options->presentation[0];
-    bool negative = argument->kind == FMT_KIND_SIGNED && argument->value.signed_value < 0;
-    uintmax_t magnitude = argument->kind == FMT_KIND_SIGNED ?
+    return argument->kind == FMT_KIND_SIGNED ?
         (negative ? (uintmax_t)0 - (uintmax_t)argument->value.signed_value : (uintmax_t)argument->value.signed_value) :
         argument->kind == FMT_KIND_BOOL ? (uintmax_t)argument->value.boolean :
         argument->kind == FMT_KIND_POINTER ? (uintmax_t)(uintptr_t)argument->value.pointer : argument->value.unsigned_value;
-    if (conversion == 'c')
-        return negative ? NULL : fmt_character(magnitude);
+}
+
+static size_t fmt_integer_bytes(const fmt_arg_impl_t *argument, const fmt_options_t *options, char *bytes)
+{
+    static const char pairs[] =
+        "0001020304050607080910111213141516171819"
+        "2021222324252627282930313233343536373839"
+        "4041424344454647484950515253545556575859"
+        "6061626364656667686970717273747576777879"
+        "8081828384858687888990919293949596979899";
+    char conversion = options->presentation[0];
+    bool negative = argument->kind == FMT_KIND_SIGNED && argument->value.signed_value < 0;
+    uintmax_t magnitude = fmt_magnitude(argument, negative);
     unsigned base = conversion == 'b' ? 2u : conversion == 'o' ? 8u :
                     conversion == 'x' || conversion == 'X' || argument->kind == FMT_KIND_POINTER ? 16u : 10u;
     const char *alphabet = conversion == 'X' ? "0123456789ABCDEF" : "0123456789abcdef";
     char digits[sizeof(uintmax_t) * CHAR_BIT];
-    size_t count = 0;
-    do {
-        digits[count++] = alphabet[magnitude % base];
-        magnitude /= base;
-    } while (magnitude);
-    string_t *text = string_new();
-    if (!text)
-        return NULL;
-    if (negative && string_append_char(text, '-') != 0)
-        goto fail;
+    size_t first = sizeof(digits), length = 0u;
+    if (base == 10u) {
+        while (magnitude >= 100u) {
+            unsigned pair = (unsigned)(magnitude % 100u) * 2u;
+            magnitude /= 100u;
+            digits[--first] = pairs[pair + 1u];
+            digits[--first] = pairs[pair];
+        }
+        if (magnitude >= 10u)
+            digits[--first] = pairs[(unsigned)magnitude * 2u + 1u];
+        digits[--first] = magnitude >= 10u ? pairs[(unsigned)magnitude * 2u] : (char)('0' + magnitude);
+    } else {
+        unsigned shift = base == 2u ? 1u : base == 8u ? 3u : 4u;
+        do {
+            digits[--first] = alphabet[magnitude & (base - 1u)];
+            magnitude >>= shift;
+        } while (magnitude);
+    }
+    if (negative)
+        bytes[length++] = '-';
     if ((options->alternate || argument->kind == FMT_KIND_POINTER) && base != 10u) {
         const char *prefix = base == 2u ? "0b" : base == 8u ? "0o" : conversion == 'X' ? "0X" : "0x";
-        if (string_append_cstr(text, prefix) != 0)
-            goto fail;
+        memcpy(bytes + length, prefix, 2u);
+        length += 2u;
     }
-    while (count) {
-        if (string_append_char(text, digits[--count]) != 0)
-            goto fail;
+    memcpy(bytes + length, digits + first, sizeof(digits) - first);
+    return length + sizeof(digits) - first;
+}
+
+static string_t *fmt_integer_value(const fmt_arg_impl_t *argument, const fmt_options_t *options)
+{
+    if (options->presentation[0] == 'c') {
+        bool negative = argument->kind == FMT_KIND_SIGNED && argument->value.signed_value < 0;
+        return negative ? NULL : fmt_character(fmt_magnitude(argument, negative));
+    }
+    char bytes[sizeof(uintmax_t) * CHAR_BIT + 3u];
+    size_t length = fmt_integer_bytes(argument, options, bytes);
+    string_t *text = string_new();
+    if (text && string_append_bytes(text, bytes, length) != 0) {
+        string_free(text);
+        text = NULL;
     }
     return text;
-
-fail:
-    string_free(text);
-    return NULL;
 }
 
 static string_t *fmt_boolean_value(const fmt_arg_impl_t *argument, const fmt_options_t *options)
@@ -136,24 +164,8 @@ static string_t *fmt_boolean_value(const fmt_arg_impl_t *argument, const fmt_opt
         fmt_integer_value(argument, options) : fmt_text_value(argument, options);
 }
 
-static string_t *fmt_real_value(const fmt_arg_impl_t *argument, const fmt_options_t *options)
+static int fmt_real_bytes(const fmt_arg_impl_t *argument, const fmt_options_t *options, char *bytes, size_t capacity)
 {
-    static const char *const ordinary[128] = {
-        ['e'] = "%.*Le",
-        ['E'] = "%.*LE",
-        ['f'] = "%.*Lf",
-        ['F'] = "%.*LF",
-        ['g'] = "%.*Lg",
-        ['G'] = "%.*LG",
-    };
-    static const char *const alternate[128] = {
-        ['e'] = "%#.*Le",
-        ['E'] = "%#.*LE",
-        ['f'] = "%#.*Lf",
-        ['F'] = "%#.*LF",
-        ['g'] = "%#.*Lg",
-        ['G'] = "%#.*LG",
-    };
     unsigned conversion = options->presentation[0] ? (unsigned char)options->presentation[0] : 'g';
     int precision = options->precision;
     if (precision < 0) {
@@ -163,17 +175,117 @@ static string_t *fmt_real_value(const fmt_arg_impl_t *argument, const fmt_option
             precision = argument->kind == FMT_KIND_FLOAT ? FLT_DECIMAL_DIG :
                         argument->kind == FMT_KIND_DOUBLE ? DBL_DECIMAL_DIG : LDBL_DECIMAL_DIG;
     }
-    const char *format = options->alternate ? alternate[conversion] : ordinary[conversion];
-    int needed = snprintf(NULL, 0u, format, precision, argument->value.real);
+    char format[8];
+    size_t length = options->alternate ? 5u : 4u;
+    memcpy(format, options->alternate ? "%#.*L" : "%.*L", length);
+    if (argument->kind != FMT_KIND_LONG_DOUBLE)
+        --length;
+    format[length++] = (char)conversion;
+    format[length] = '\0';
+    return argument->kind == FMT_KIND_LONG_DOUBLE ? snprintf(bytes, capacity, format, precision, argument->value.real) :
+                                                  snprintf(bytes, capacity, format, precision, (double)argument->value.real);
+}
+
+static string_t *fmt_real_value(const fmt_arg_impl_t *argument, const fmt_options_t *options)
+{
+    char local[256];
+    int needed = fmt_real_bytes(argument, options, local, sizeof(local));
     if (needed < 0)
         return NULL;
+    if ((size_t)needed < sizeof(local))
+        return fmt_copy_text(local);
     char *bytes = malloc((size_t)needed + 1u);
     if (!bytes)
         return NULL;
-    snprintf(bytes, (size_t)needed + 1u, format, precision, argument->value.real);
+    fmt_real_bytes(argument, options, bytes, (size_t)needed + 1u);
     string_t *text = fmt_copy_text(bytes);
     free(bytes);
     return text;
+}
+
+/* Borrow or stage common scalar bytes, leaving complex Unicode and adapter fields to the full renderer. */
+bool fmt_render_fast(const fmt_arg_impl_t *argument, const fmt_part_t *part,
+                     char *scratch, size_t capacity, const char **bytes, size_t *length)
+{
+    const fmt_options_t *options = &part->options;
+    fmt_kind_t kind = argument->kind;
+    if (options->excel || options->width >= capacity)
+        return false;
+    bool numeric = fmt_is_numeric(kind, options);
+    bool integer = kind == FMT_KIND_SIGNED || kind == FMT_KIND_UNSIGNED || kind == FMT_KIND_POINTER ||
+                   (kind == FMT_KIND_BOOL && numeric);
+    if (integer && options->presentation[0] != 'c') {
+        *length = fmt_integer_bytes(argument, options, scratch);
+    } else if (kind >= FMT_KIND_FLOAT && kind <= FMT_KIND_LONG_DOUBLE) {
+        if (options->precision > 64)
+            return false;
+        int needed = fmt_real_bytes(argument, options, scratch, capacity);
+        if (needed < 0 || (size_t)needed >= capacity)
+            return false;
+        *length = (size_t)needed;
+        /* A locale decimal separator may occupy several UTF-8 bytes; retain normal grapheme padding there. */
+        for (size_t i = 0; i < *length; ++i)
+            if ((unsigned char)scratch[i] >= 0x80u)
+                return false;
+    } else if (!options->width && options->precision < 0) {
+        const char *text = NULL;
+        if (kind == FMT_KIND_BOOL)
+            text = argument->value.boolean ? "true" : "false";
+        else if (kind == FMT_KIND_CSTRING)
+            text = argument->value.cstring ? argument->value.cstring : "(null)";
+        else if (kind == FMT_KIND_STRING) {
+            if (argument->value.string) {
+                if (!string_is_valid_utf8(argument->value.string))
+                    return false;
+                *bytes = string_c_str(argument->value.string);
+                *length = string_byte_length(argument->value.string);
+                return true;
+            }
+            text = "(null)";
+        }
+        if (!text)
+            return false;
+        size_t count = 0;
+        while (text[count]) {
+            if ((unsigned char)text[count] >= 0x80u)
+                return false;
+            ++count;
+        }
+        *bytes = text;
+        *length = count;
+        return true;
+    } else {
+        return false;
+    }
+    if (!integer && !numeric)
+        return false;
+    if (numeric && options->sign != '-' && scratch[0] != '-' && scratch[0] != '+' && scratch[0] != ' ') {
+        memmove(scratch + 1u, scratch, (*length)++);
+        scratch[0] = options->sign;
+    }
+    if (options->width > *length) {
+        size_t pad = options->width - *length;
+        char alignment = options->alignment ? options->alignment : '>';
+        char fill = options->fill;
+        if (options->zero && fill == ' ') {
+            fill = '0';
+            if (!options->alignment)
+                alignment = '=';
+        }
+        size_t prefix = 0u;
+        if (alignment == '=') {
+            prefix = scratch[0] == '-' || scratch[0] == '+' || scratch[0] == ' ';
+            if (*length >= prefix + 2u && scratch[prefix] == '0' && strchr("xXbo", scratch[prefix + 1u]))
+                prefix += 2u;
+        }
+        size_t left = alignment == '<' ? 0u : alignment == '^' ? pad / 2u : pad;
+        memmove(scratch + prefix + left, scratch + prefix, *length - prefix);
+        memset(scratch + prefix, fill, left);
+        memset(scratch + *length + left, fill, pad - left);
+        *length += pad;
+    }
+    *bytes = scratch;
+    return true;
 }
 
 typedef struct {

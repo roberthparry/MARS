@@ -10,6 +10,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "format-t.h"
 #include "string-t.h"
 #include "quantity-t.h"
 #include "test_harness.h"
@@ -722,7 +723,7 @@ static void example_quantity_speed(void)
     quantity_t *speed = quantity_from_string(text);
     quantity_t *converted = quantity_convert(speed, unit);
     string_t *output = quantity_to_string(converted, style_FUNCTION);
-    string_printf("%S\n", output);
+    fmt_print("{output}\n", FMT(output));
     TEST_ASSERT_STR_EQ(string_c_str(output), "10 [m/s]");
     string_free(output);
     quantity_free(converted);
@@ -742,7 +743,7 @@ static void example_quantity_temperature(void)
     quantity_t *warmer = quantity_add(point, step);
     quantity_t *celsius = quantity_convert(warmer, unit);
     string_t *output = quantity_to_string(celsius, style_FUNCTION);
-    string_printf("%S\n", output);
+    fmt_print("{output}\n", FMT(output));
     TEST_ASSERT_STR_EQ(string_c_str(output), "10 [degC]");
     string_free(output);
     quantity_free(celsius);
@@ -762,7 +763,7 @@ static void example_quantity_angles(void)
     quantity_t *angle = quantity_from_string(text);
     quantity_t *converted = quantity_convert(angle, unit);
     string_t *output = quantity_to_string(converted, style_FUNCTION);
-    string_printf("%S\n", output);
+    fmt_print("{output}\n", FMT(output));
     TEST_ASSERT_STR_EQ(string_c_str(output), "3600 [arcsec]");
     string_free(output);
     quantity_free(converted);
@@ -779,7 +780,7 @@ static void example_quantity_energy(void)
     quantity_t *energy = quantity_from_string(text);
     quantity_t *converted = quantity_convert(energy, unit);
     string_t *output = quantity_to_string(converted, style_FUNCTION);
-    string_printf("%S\n", output);
+    fmt_print("{output}\n", FMT(output));
     TEST_ASSERT_STR_EQ(string_c_str(output), "2000000000 [eV]");
     string_free(output);
     quantity_free(converted);
@@ -800,7 +801,7 @@ static void example_quantity_constants_precision(void)
     quantity_t *distance = quantity_mul(speed, time);
     quantity_t *years = quantity_convert(distance, length_unit);
     string_t *output = quantity_to_string(years, style_FUNCTION);
-    string_printf("%S\n", output);
+    fmt_print("{output}\n", FMT(output));
     TEST_ASSERT_STR_EQ(string_c_str(output), "1 [ly]");
     string_t *angle_text = string_new_with("1 [deg]");
     string_t *angle_unit = string_new_with("rad");
@@ -810,7 +811,7 @@ static void example_quantity_constants_precision(void)
         num_set_default_prec_bits(precisions[i]);
         quantity_t *radians = quantity_convert(angle, angle_unit);
         number_t value = quantity_value(radians);
-        printf("radians: %zu bits\n", num_get_prec_bits(value));
+        fmt_print("radians: {radians} bits\n", FMT(radians, num_get_prec_bits(value)));
         TEST_ASSERT_TRUE(num_get_prec_bits(value) == precisions[i], "selected precision");
         num_destroy(&value);
         quantity_free(radians);
@@ -847,7 +848,7 @@ static void example_quantity_tons(void)
         quantity_t *mass = quantity_from_string(input);
         quantity_t *converted = quantity_convert(mass, unit);
         string_t *output = quantity_to_string(converted, style_FUNCTION);
-        string_printf("%S\n", output);
+        fmt_print("{output}\n", FMT(output));
         TEST_ASSERT_STR_EQ(string_c_str(output), cases[i].expected);
         string_free(output);
         quantity_free(converted);
@@ -868,13 +869,13 @@ static void example_quantity_acceleration(void)
     number_t numerator = {0}, denominator = {0};
     bool exact = num_get_fraction_parts(value, &numerator, &denominator);
     TEST_ASSERT_TRUE(exact, "exact acceleration conversion");
-    string_t *top = num_to_string(numerator), *bottom = num_to_string(denominator);
-    string_t *output = string_sprintf("%S/%S [%S]", top, bottom, quantity_unit(converted));
-    string_printf("%S\n", output);
+    string_t *output = fmt_string("{numerator}/{denominator} [{unit}]",
+        FMT(numerator),
+        FMT(denominator),
+        FMT(unit, quantity_unit(converted)));
+    fmt_print("{output}\n", FMT(output));
     TEST_ASSERT_STR_EQ(string_c_str(output), "1397/11250000 [m/s^2]");
     string_free(output);
-    string_free(bottom);
-    string_free(top);
     num_destroy(&denominator);
     num_destroy(&numerator);
     num_destroy(&value);

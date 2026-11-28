@@ -15,6 +15,7 @@
 #include <string.h>
 #include <unistd.h>
 
+#include "format-t.h"
 #include "computation-t.h"
 #include "thread-t.h"
 #include "integrator-t.h"
@@ -464,7 +465,10 @@ static void test_computation_integrator_deadline(void)
 static void computation_example_progress(const computation_progress_t *progress, void *argument)
 {
     (void)argument;
-    printf("%s: %" PRIu64 "/%" PRIu64 "\n", progress->stage, progress->completed, progress->total);
+    fmt_print("{stage}: {completed}/{total}\n",
+        FMT(stage, progress->stage),
+        FMT(completed, progress->completed),
+        FMT(total, progress->total));
 }
 
 static void example_computation_progress(void)
@@ -477,7 +481,7 @@ static void example_computation_progress(void)
         computation_require(computation_report(control, "items", i + 1, 3));
     }
     bool completed = computation_complete(control);
-    printf("Completed: %d; work: %" PRIu64 "\n", completed, computation_work_used(control));
+    fmt_print("Completed: {completed:d}; work: {work}\n", FMT(completed), FMT(work, computation_work_used(control)));
     TEST_ASSERT_TRUE(completed && computation_work_used(control) == 3, "README progress and completion");
     computation_free(control);
 }
@@ -495,8 +499,10 @@ static void example_computation_integrator(void)
     number_t value = NUM_NAN;
     int result = intg_integral(ig, formula, x, NUM_ZERO, NUM_ONE, &value, NULL);
     bool stopped = result == -2 && computation_status(control) == COMPUTATION_BUDGET_EXHAUSTED;
-    printf("Budget exhausted: %d; work: %" PRIu64 "; value unavailable: %d\n",
-           stopped, computation_work_used(control), num_is_nan(value));
+    fmt_print("Budget exhausted: {stopped:d}; work: {work}; value unavailable: {value_unavailable:d}\n",
+        FMT(stopped),
+        FMT(work, computation_work_used(control)),
+        FMT(value_unavailable, num_is_nan(value)));
     TEST_ASSERT_TRUE(stopped && computation_work_used(control) == 1 && num_is_nan(value), "README guarded integration");
     num_destroy(&value);
     expr_free(formula);

@@ -8,13 +8,14 @@
 
 #include <stdlib.h>
 
+#include "format-t.h"
 #include "http-t.h"
 
 /* Run the documented example; an optional URL allows deterministic offline tests. */
 int main(int argc, char **argv)
 {
     if (argc > 2) {
-        string_printf("Usage: %s [URL]\n", argv[0]);
+        fmt_print("Usage: {usage} [URL]\n", FMT(usage, argv[0]));
         return EXIT_FAILURE;
     }
     string_t *url = string_new_with(argc == 2 ? argv[1] : "https://httpbin.org/post");
@@ -31,10 +32,11 @@ int main(int argc, char **argv)
     bool valid = http_response_status(response) == 200 && answer &&
                  string_view_equals_literal(string_view_all(answer), "42");
     if (valid)
-        string_printf("status=%ld\nanswer=%S\n", http_response_status(response), answer);
+        fmt_print("status={status}\nanswer={answer}\n", FMT(status, http_response_status(response)), FMT(answer));
     else
-        string_printf("request failed: status=%ld error=%d\n",
-                      http_response_status(response), (int)http_client_error(client));
+        fmt_print("request failed: status={status} error={error}\n",
+            FMT(status, http_response_status(response)),
+            FMT(error, (int)http_client_error(client)));
     json_free(reply); json_free(payload);
     string_free(text); string_free(json_key); string_free(answer_key);
     http_response_free(response); http_request_free(request); http_client_free(client); string_free(url);

@@ -15,6 +15,7 @@
 #include <string.h>
 #include <unistd.h>
 
+#include "format-t.h"
 #include "file-t.h"
 #include "array-t.h"
 #include "test_harness.h"
@@ -144,8 +145,10 @@ void example_file_symlink_target(void)
         ASSERT_NOT_NULL(target);
         ASSERT_EQ_INT(file_info_target_error(entry), 0);
         ASSERT_EQ_INT(file_info_type(target), FILE_TYPE_DIRECTORY);
-        printf("%s -> %s: %s\n", file_info_name(entry), file_info_link_target(entry),
-               file_info_type(target) == FILE_TYPE_DIRECTORY ? "directory" : "not a directory");
+        fmt_print("{name} -> {target}: {type}\n",
+            FMT(name, file_info_name(entry)),
+            FMT(target, file_info_link_target(entry)),
+            FMT(type, file_info_type(target) == FILE_TYPE_DIRECTORY ? "directory" : "not a directory"));
     }
     array_destroy(entries);
     ASSERT_TRUE(file_delete(link));

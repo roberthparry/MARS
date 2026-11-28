@@ -10,6 +10,7 @@
 #include <locale.h>
 #include <string.h>
 
+#include "format-t.h"
 #include "string-t.h"
 #include "regex-t.h"
 #include "test_harness.h"
@@ -197,7 +198,7 @@ static void example_regex_capture(void)
     string_t *value = ok ? regex_capture(subject, &spans[2]) : NULL;
     ok = name && value;
     if (ok)
-        string_printf("%S: %S\n", name, value);
+        fmt_print("{name}: {value}\n", FMT(name), FMT(value));
     bool output = ok && !strcmp(string_c_str(name), "Zoë") && !strcmp(string_c_str(value), "42");
     string_free(value);
     string_free(name);
@@ -224,7 +225,7 @@ static void example_regex_iteration(void)
                 status = REGEX_ERROR;
                 break;
             }
-            string_printf("%S\n", value);
+            fmt_print("{value}\n", FMT(value));
             output = output && count < 2 && !strcmp(string_c_str(value), count == 0 ? "12" : "34");
             ++count;
             string_free(value);

@@ -16,6 +16,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "format-t.h"
 #include "string-t.h"
 #include "qfloat-t.h"
 #include "qcomplex-t.h"
@@ -153,7 +154,7 @@ static bool test_assert_qcomplex_close_tol(const char *label, qcomplex_t got, qc
         return true;
 
     if (label)
-        printf("    check    = %s\n", label);
+        fmt_print("    check    = {label}\n", FMT(label));
     return false;
 }
 
@@ -335,12 +336,12 @@ static void test_exp(void)
 
 static void example_euler_identity(void)
 {
-    printf(C_CYAN "TEST: README example — Euler's identity\n" C_RESET);
+    fmt_print(C_CYAN "TEST: README example — Euler's identity\n" C_RESET);
 
     qcomplex_t z = qc_make(qf_from_double(0.0), QF_PI);
     qcomplex_t r = qc_add(qc_exp(z), qc_make(qf_from_double(1.0), qf_from_double(0.0)));
 
-    qc_printf("    exp(iπ) + 1 = %.34z\n", r);
+    fmt_print("    exp(iπ) + 1 = {r:.34q}\n", FMT(r));
 
     check_qc("exp(iπ)+1 ≈ 0 (QF_PI residual < 2e-19)", r, qcr(0.0), 2e-19);
 }
@@ -1474,7 +1475,7 @@ static void example_struve_h(void)
 {
     /* README example: ordinary Struve H (docs/qcomplex.md). */
     qcomplex_t ordinary = qc_struve_H(QC_ZERO, QC_ONE);
-    qc_printf("H_0(1) = %.15z\n", ordinary);
+    fmt_print("H_0(1) = {ordinary:.15q}\n", FMT(ordinary));
     char output[80];
     qc_sprintf(output, sizeof(output), "H_0(1) = %.15z", ordinary);
     TEST_ASSERT_TRUE(strcmp(output, "H_0(1) = 0.568656627048288") == 0, "Struve H README output");
@@ -1484,7 +1485,7 @@ static void example_struve_l(void)
 {
     /* README example: modified Struve L (docs/qcomplex.md). */
     qcomplex_t value = qc_struve_L(QC_ZERO, QC_ONE);
-    qc_printf("L_0(1) = %.16z\n", value);
+    fmt_print("L_0(1) = {value:.16q}\n", FMT(value));
     char output[80];
     qc_sprintf(output, sizeof(output), "L_0(1) = %.16z", value);
     TEST_ASSERT_TRUE(strcmp(output, "L_0(1) = 0.7102431859378909") == 0, "Struve L README output");
@@ -1494,7 +1495,7 @@ static void example_bessel_i(void)
 {
     /* README example: modified Bessel I (docs/qcomplex.md). */
     qcomplex_t bessel = qc_bessel_I(QC_ZERO, QC_ONE);
-    qc_printf("I_0(1) = %.16z\n", bessel);
+    fmt_print("I_0(1) = {bessel:.16q}\n", FMT(bessel));
     char output[80];
     qc_sprintf(output, sizeof(output), "I_0(1) = %.16z", bessel);
     TEST_ASSERT_TRUE(strcmp(output, "I_0(1) = 1.2660658777520083") == 0, "Bessel I README output");
@@ -1524,7 +1525,9 @@ static void example_sgn(void)
 {
     /* README example: real signum (docs/qcomplex.md). */
     qcomplex_t sign = qc_sgn(qc_make(QF_NEG_ONE, QF_ZERO));
-    printf("sgn(-1 + 0i) = %.0f + %.0fi\n", qf_to_double(qc_real(sign)), qf_to_double(qc_imag(sign)));
+    fmt_print("sgn(-1 + 0i) = {real:.0f} + {imaginary:.0f}i\n",
+        FMT(real, qf_to_double(qc_real(sign))),
+        FMT(imaginary, qf_to_double(qc_imag(sign))));
     char output[80];
     snprintf(output, sizeof(output), "sgn(-1 + 0i) = %.0f + %.0fi\n",
              qf_to_double(qc_real(sign)), qf_to_double(qc_imag(sign)));

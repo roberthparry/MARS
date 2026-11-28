@@ -1,7 +1,7 @@
 # `matrix_t`
 
 With `matrix-t.h` included, the [format module](format.md) accepts `FMT(matrix_pointer)` with native
-`expression`, `function`, `latex`, `pretty`, `scientific` and `layout` styles.
+`expression`, `function`, `latex`, `pretty`, `scientific`, `layout`, `pretty_layout` and `scientific_layout` styles.
 It borrows the matrix and delegates presentation without changing its entries
 or bindings.
 Use `fmt_arg_matrix()` for an explicit binding. No additional formatting
@@ -45,10 +45,13 @@ value. The principal-root ratio then simplifies to one:
 ```c
 #include <stdio.h>
 
+#include "format-t.h"
 #include "matrix-t.h"
 
 int main(void)
 {
+    NUM_SCOPE(readme_numbers);
+
     expr_bindings_t *bindings = NULL;
     expr_t *entry = expr_from_string("sqrt(s^2)/s", &bindings);
     matrix_t *source = mat_create_expr(1, 1, &entry);
@@ -62,7 +65,7 @@ int main(void)
     expr_t *result = NULL;
     mat_get(display, 0, 0, &result);
     number_t value = expr_eval(result);
-    printf("Unit entry: %d\n", num_eq(value, NUM_ONE));
+    fmt_print("Unit entry: {unit_entry:d}\n", FMT(unit_entry, num_eq(value, NUM_ONE)));
     num_destroy(&value);
     mat_free(display);
     mat_free(source);
@@ -117,6 +120,7 @@ the precise assumption required:
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "format-t.h"
 #include "matrix-t.h"
 
 int main(void)
@@ -126,7 +130,7 @@ int main(void)
     matrix_t *b = mat_create_identity(1);
     expr_context_t *context = expr_context_new();
     matrix_t *result = mat_solve_with_context(a, b, context);
-    printf("Needs non-zero assumption: %d\n", result == NULL && errno == EAGAIN);
+    fmt_print("Needs non-zero assumption: {zero_assumption}\n", FMT(zero_assumption, result == NULL && errno == EAGAIN));
     mat_free(result);
     if (!expr_context_set(context, x, EXPR_CONTEXT_FREE, EXPR_CONTEXT_NONZERO, NUM_NAN))
         return 1;
@@ -135,9 +139,7 @@ int main(void)
         return 1;
     expr_t *entry = NULL;
     mat_get(result, 0, 0, &entry);
-    char *text = expr_to_string(entry, style_UNBOUND);
-    printf("Solution: %s\n", text);
-    free(text);
+    fmt_print("Solution: {entry:unbound}\n", FMT(entry));
     mat_free(result);
     expr_context_free(context);
     mat_free(b);
@@ -208,6 +210,8 @@ README signum example:
 
 ```c
 #include <stdio.h>
+
+#include "format-t.h"
 #include "matrix-t.h"
 
 int main(void)
@@ -217,9 +221,10 @@ int main(void)
     matrix_t *a = mat_create_diagonal(3u, diagonal);
     matrix_t *b = mat_sgn(a);
     if (b) {
-        printf("sgn(diag(-1, 0, 1)) = diag(%.0f, %.0f, %.0f)\n",
-               num_to_double(mat_get_num(b, 0, 0)), num_to_double(mat_get_num(b, 1, 1)),
-               num_to_double(mat_get_num(b, 2, 2)));
+        fmt_print("sgn(diag(-1, 0, 1)) = diag({negative:.0f}, {zero:.0f}, {positive:.0f})\n",
+            FMT(negative, num_to_double(mat_get_num(b, 0, 0))),
+            FMT(zero, num_to_double(mat_get_num(b, 1, 1))),
+            FMT(positive, num_to_double(mat_get_num(b, 2, 2))));
     }
     mat_free(b);
     mat_free(a);
@@ -237,6 +242,8 @@ README example:
 
 ```c
 #include <stdio.h>
+
+#include "format-t.h"
 #include "matrix-t.h"
 
 int main(void)
@@ -246,9 +253,10 @@ int main(void)
     matrix_t *a = mat_create_diagonal(3u, diagonal);
     matrix_t *b = mat_step(a);
     if (b) {
-        printf("step(diag(-1, 0, 1)) = diag(%.1f, %.1f, %.1f)\n",
-               num_to_double(mat_get_num(b, 0, 0)), num_to_double(mat_get_num(b, 1, 1)),
-               num_to_double(mat_get_num(b, 2, 2)));
+        fmt_print("step(diag(-1, 0, 1)) = diag({negative:.1f}, {zero:.1f}, {positive:.1f})\n",
+            FMT(negative, num_to_double(mat_get_num(b, 0, 0))),
+            FMT(zero, num_to_double(mat_get_num(b, 1, 1))),
+            FMT(positive, num_to_double(mat_get_num(b, 2, 2))));
     }
     mat_free(b);
     mat_free(a);
@@ -414,6 +422,8 @@ Output: (2x, 2y; 0, 3x²)
 
 ```c
 #include <stdio.h>
+
+#include "format-t.h"
 #include "matrix-t.h"
 #include "number-t.h"
 
@@ -428,8 +438,8 @@ int main(void) {
 
     mat_eigendecompose(A, eigenvalues, &evecs);
 
-    num_printf("eigenvalue[0] = %.0n\n", eigenvalues[0]);
-    num_printf("eigenvalue[1] = %.0n\n", eigenvalues[1]);
+    fmt_print("eigenvalue[0] = {value:.0n}\n", FMT(value, eigenvalues[0]));
+    fmt_print("eigenvalue[1] = {value:.0n}\n", FMT(value, eigenvalues[1]));
 
     mat_free(A);
     mat_free(evecs);
@@ -455,6 +465,7 @@ forms `@DELTA` and `@OMEGA`, so you do not need to type Greek letters at the
 keyboard:
 
 ```c
+#include "format-t.h"
 #include "expression-t.h"
 #include "matrix-t.h"
 
@@ -468,27 +479,13 @@ int main(void)
     matrix_t *charpoly = mat_charpoly(H);
     expr_t *detH = NULL;
     expr_t *ddet_dDelta = mat_deriv_det(H, delta);
-    string_t *H_text;
-    string_t *p_text;
-    string_t *det_text;
-    string_t *ddet_text;
-
     mat_get(charpoly, 2, 0, &detH);
-
-    H_text = mat_to_text(H, MAT_STRING_LAYOUT_PRETTY);
-    p_text = mat_to_text(charpoly, MAT_STRING_INLINE_PRETTY);
-    det_text = expr_to_text(detH, style_EXPRESSION);
-    ddet_text = expr_to_text(ddet_dDelta, style_EXPRESSION);
-
-    string_printf("%S\n", H_text);
-    string_printf("characteristic polynomial coefficients = %S\n", p_text);
-    string_printf("det(H) = %S\n", det_text);
-    string_printf("d/dΔ det(H) = %S\n", ddet_text);
-
-    string_free(H_text);
-    string_free(p_text);
-    string_free(det_text);
-    string_free(ddet_text);
+    fmt_print("{H:pretty_layout}\ncharacteristic polynomial coefficients = {charpoly:pretty}\ndet(H) = "
+              "{detH}\nd/dΔ det(H) = {ddet_dDelta}\n",
+        FMT(H),
+        FMT(charpoly),
+        FMT(detH),
+        FMT(ddet_dDelta));
     mat_bindings_free(bindings);
     expr_free(ddet_dDelta);
     mat_free(charpoly);
@@ -534,6 +531,8 @@ This is a pleasing example because the algebra stays exact:
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#include "format-t.h"
 #include "expression-t.h"
 #include "matrix-t.h"
 
@@ -550,10 +549,6 @@ int main(void)
     expr_t *evals[2] = {NULL, NULL};
     expr_t *trace = NULL;
     expr_t *c2 = NULL;
-    string_t *trace_text = NULL;
-    string_t *c2_text = NULL;
-    string_t *eval0_text = NULL;
-    string_t *eval1_text = NULL;
 
     expr_set_val(mat_bindings_get(bindings, "@DELTA"), delta);
     expr_set_val(mat_bindings_get(bindings, "@OMEGA"), omega);
@@ -561,23 +556,14 @@ int main(void)
     mat_eigenvalues_expr(H, evals);
     mat_trace_expr(H, &trace);
     mat_get(P, 2, 0, &c2);
-    trace_text = expr_to_text(trace, style_EXPRESSION);
-    c2_text = expr_to_text(c2, style_EXPRESSION);
-    eval0_text = expr_to_text(evals[0], style_EXPRESSION);
-    eval1_text = expr_to_text(evals[1], style_EXPRESSION);
-
-    mat_printf("H = %ml\n", H);
-    mat_printf("H² = %m\n", H2);
-    printf("tr(H) = %s\n", string_c_str(trace_text));
-    printf("charpoly constant term = %s\n", string_c_str(c2_text));
-    printf("eigenvalues = %s, %s\n",
-           string_c_str(eval0_text),
-           string_c_str(eval1_text));
-
-    string_free(eval1_text);
-    string_free(eval0_text);
-    string_free(c2_text);
-    string_free(trace_text);
+    fmt_print("H = {H:pretty_layout}\nH² = {H2:pretty}\ntr(H) = {trace}\ncharpoly constant term = "
+              "{c2}\neigenvalues = {first}, {second}\n",
+        FMT(H),
+        FMT(H2),
+        FMT(trace),
+        FMT(c2),
+        FMT(first, evals[0]),
+        FMT(second, evals[1]));
     num_destroy(&omega);
     num_destroy(&delta);
     mat_bindings_free(bindings);
@@ -1041,6 +1027,8 @@ Example:
 
 ```c
 #include <stdio.h>
+
+#include "format-t.h"
 #include "matrix-t.h"
 
 int main(void)
@@ -1060,7 +1048,7 @@ int main(void)
     matrix_t *B = mat_create(3, 1, B_data);
     matrix_t *X = mat_least_squares(A, B);
 
-    mat_print(X);
+    fmt_print("{X:pretty_layout}\n", FMT(X));
 
     for (size_t i = 0; i < 6; ++i)
         num_destroy(&A_data[i]);
@@ -1417,6 +1405,8 @@ For `A = I + N`, where `N² = 0`, `Y₀(A) = Y₀(1)I − Y₁(1)N`:
 
 ```c
 #include <stdio.h>
+
+#include "format-t.h"
 #include "matrix-t.h"
 
 int main(void)
@@ -1427,7 +1417,7 @@ int main(void)
 
     if (y0) {
         number_t entry = mat_get_num(y0, 0, 1);
-        printf("Y_0(A)[0,1] = %.6f\n", num_to_double(entry));
+        fmt_print("Y_0(A)[0,1] = {value:.6f}\n", FMT(value, num_to_double(entry)));
         num_destroy(&entry);
     }
     mat_free(y0);
@@ -1466,6 +1456,8 @@ For a nilpotent matrix with `A⁴ = 0`, `H₀(A) = (2/π)(A − A³/9)`:
 
 ```c
 #include <stdio.h>
+
+#include "format-t.h"
 #include "matrix-t.h"
 
 int main(void)
@@ -1479,7 +1471,7 @@ int main(void)
 
     if (h0) {
         number_t entry = mat_get_num(h0, 0, 3);
-        printf("H_0(A)[0,3] = %.6f\n", num_to_double(entry));
+        fmt_print("H_0(A)[0,3] = {value:.6f}\n", FMT(value, num_to_double(entry)));
         num_destroy(&entry);
     }
     mat_free(h0);
@@ -1534,6 +1526,8 @@ For a nilpotent matrix with `A³ = 0`, `I₀(A) = I + A²/4`:
 
 ```c
 #include <stdio.h>
+
+#include "format-t.h"
 #include "matrix-t.h"
 
 int main(void)
@@ -1546,7 +1540,7 @@ int main(void)
 
     if (I0) {
         number_t entry = mat_get_num(I0, 0, 2);
-        printf("I_0(A)[0,2] = %.6f\n", num_to_double(entry));
+        fmt_print("I_0(A)[0,2] = {value:.6f}\n", FMT(value, num_to_double(entry)));
         num_destroy(&entry);
     }
     mat_free(I0);
@@ -1588,6 +1582,8 @@ For a nilpotent matrix with `A² = 0`, the order-zero result is `L₀(A) = 2A/π
 
 ```c
 #include <stdio.h>
+
+#include "format-t.h"
 #include "matrix-t.h"
 
 int main(void)
@@ -1598,7 +1594,7 @@ int main(void)
 
     if (L) {
         number_t entry = mat_get_num(L, 0, 1);
-        printf("L_0(A)[0,1] = %.6f\n", num_to_double(entry));
+        fmt_print("L_0(A)[0,1] = {value:.6f}\n", FMT(value, num_to_double(entry)));
         num_destroy(&entry);
     }
     mat_free(L);
@@ -1873,17 +1869,21 @@ through the ordinary `expr` API:
 
 ```c
 #include <stdio.h>
+
+#include "format-t.h"
 #include "matrix-t.h"
 
 int main(void)
 {
+    NUM_SCOPE(readme_numbers);
+
     mat_bindings_t *bindings = NULL;
     number_t x = num_create_from_double(2.0);
     matrix_t *A = mat_from_string_expr("(x, c1; x*y, [radius])", &bindings);
 
     expr_set_val(mat_bindings_get(bindings, "x"), x);
 
-    printf("bound x: %.0f\n", num_to_double(expr_eval(mat_bindings_get(bindings, "x"))));
+    fmt_print("bound x: {bound_x:.0f}\n", FMT(bound_x, num_to_double(expr_eval(mat_bindings_get(bindings, "x")))));
     num_destroy(&x);
     mat_bindings_free(bindings);
     mat_free(A);
@@ -1923,6 +1923,10 @@ matrix-specific format specifiers:
 - `%m`  — inline pretty matrix
 - `%ML` — layout scientific matrix
 - `%ml` — layout pretty matrix
+
+Typed `fmt_print()` uses `{:scientific}`, `{:pretty}`, `{:scientific_layout}`
+and `{:pretty_layout}` for these same four presentations. The README examples
+use these typed fields with `FMT(matrix)`; the output layout is unchanged.
 
 ---
 
@@ -2257,6 +2261,8 @@ README example:
 
 ```c
 #include <stdio.h>
+
+#include "format-t.h"
 #include "matrix-t.h"
 
 int main(void)
@@ -2264,7 +2270,7 @@ int main(void)
     number_t values[] = {NUM_ZERO, NUM_ONE, NUM_ZERO, NUM_ZERO};
     matrix_t *a = mat_create(2, 2, values);
     matrix_t *t = mat_chebyshev_Tn(a, 3);
-    mat_printf("T3((0, 1; 0, 0)) = %m\n", t);
+    fmt_print("T3((0, 1; 0, 0)) = {t:pretty}\n", FMT(t));
     mat_free(t);
     mat_free(a);
     return 0;
@@ -2301,6 +2307,7 @@ timeout, or cancel the control from another thread for normal application use.
 ```c
 #include <stdio.h>
 
+#include "format-t.h"
 #include "computation-t.h"
 #include "matrix-t.h"
 
@@ -2326,7 +2333,7 @@ int main(void)
     computation_t *control = computation_new(&options);
     bool ok = control && computation_run(control, calculate, &job);
     bool stopped = !ok && computation_status(control) == COMPUTATION_BUDGET_EXHAUSTED;
-    printf("Stopped: %d\n", stopped);
+    fmt_print("Stopped: {stopped:d}\n", FMT(stopped));
     mat_qr_factor_free(&job.result);
     mat_free(job.input);
     computation_free(control);

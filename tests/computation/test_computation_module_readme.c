@@ -7,6 +7,7 @@
  */
 #include <stdio.h>
 
+#include "format-t.h"
 #include "string-t.h"
 #include "computation-t.h"
 #include "csv-t.h"
@@ -41,7 +42,7 @@ static int equation_example_main(void)
     computation_t *control = computation_new(&options);
     bool ok = control && computation_run(control, equation_example_calculate, &job);
     bool stopped = !ok && computation_status(control) == COMPUTATION_BUDGET_EXHAUSTED;
-    printf("Stopped: %d\n", stopped);
+    fmt_print("Stopped: {stopped:d}\n", FMT(stopped));
     equ_solutions_free(job.result);
     equ_free(job.input);
     computation_free(control);
@@ -76,7 +77,7 @@ static int matrix_example_main(void)
     computation_t *control = computation_new(&options);
     bool ok = control && computation_run(control, matrix_example_calculate, &job);
     bool stopped = !ok && computation_status(control) == COMPUTATION_BUDGET_EXHAUSTED;
-    printf("Stopped: %d\n", stopped);
+    fmt_print("Stopped: {stopped:d}\n", FMT(stopped));
     mat_qr_factor_free(&job.result);
     mat_free(job.input);
     computation_free(control);
@@ -110,7 +111,7 @@ static int diffequation_example_main(void)
     computation_t *control = computation_new(&options);
     bool ok = control && computation_run(control, diffequation_example_calculate, &job);
     bool stopped = !ok && computation_status(control) == COMPUTATION_BUDGET_EXHAUSTED;
-    printf("Stopped: %d\n", stopped);
+    fmt_print("Stopped: {stopped:d}\n", FMT(stopped));
     de_solve_result_free(job.result);
     de_free(job.input);
     computation_free(control);
@@ -146,7 +147,7 @@ static int timeseries_example_main(void)
     computation_t *control = computation_new(&options);
     bool ok = control && computation_run(control, timeseries_example_calculate, &job);
     bool stopped = !ok && computation_status(control) == COMPUTATION_BUDGET_EXHAUSTED;
-    printf("Stopped: %d\n", stopped);
+    fmt_print("Stopped: {stopped:d}\n", FMT(stopped));
     ts_arima_result_clear(&job.result);
     ts_free(job.input);
     computation_free(control);
@@ -187,7 +188,7 @@ static int csv_example_main(void)
     computation_t *control = computation_new(&options);
     bool ok = control && computation_run(control, csv_example_calculate, &job);
     bool stopped = !ok && computation_status(control) == COMPUTATION_BUDGET_EXHAUSTED;
-    printf("Stopped: %d\n", stopped);
+    fmt_print("Stopped: {stopped:d}\n", FMT(stopped));
     csv_free(job.input);
     computation_free(control);
     return stopped ? 0 : 1;
@@ -224,7 +225,7 @@ static int almanac_example_main(void)
     computation_t *control = computation_new(&options);
     bool ok = control && computation_run(control, almanac_example_calculate, &job);
     bool stopped = !ok && computation_status(control) == COMPUTATION_BUDGET_EXHAUSTED;
-    printf("Stopped: %d\n", stopped);
+    fmt_print("Stopped: {stopped:d}\n", FMT(stopped));
     datetime_dealloc(job.after);
     almanac_close(job.input);
     computation_free(control);
@@ -276,7 +277,7 @@ static int sqlite_example_main(void)
     computation_t *control = computation_new(&options);
     bool ok = control && computation_run(control, sqlite_example_calculate, &job);
     bool stopped = !ok && computation_status(control) == COMPUTATION_BUDGET_EXHAUSTED;
-    printf("Stopped: %d\n", stopped);
+    fmt_print("Stopped: {stopped:d}\n", FMT(stopped));
     csv_free(job.reader);
     string_free(job.table);
     sqlite_close(job.input);

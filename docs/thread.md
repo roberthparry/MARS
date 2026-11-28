@@ -58,6 +58,7 @@ object lifetimes.
 ```c
 #include <stdio.h>
 
+#include "format-t.h"
 #include "thread-t.h"
 
 static void *thread_example_double(void *argument)
@@ -76,7 +77,7 @@ int main(void)
     bool joined = thread && thread_join(thread, &result);
     bool ok = completed && joined;
     if (ok)
-        printf("Result: %d\n", *(int *)result);
+        fmt_print("Result: {result}\n", FMT(result, *(int *)result));
     ok = thread_free(thread) && ok;
     return ok ? 0 : 1;
 }
@@ -101,6 +102,7 @@ callers should apply their own resource-failure policy.
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "format-t.h"
 #include "thread-t.h"
 
 typedef struct {
@@ -155,7 +157,7 @@ int main(void)
     }
     ok = lock_free(mutex) && ok;
     if (ok)
-        printf("Counter: %d\n", value);
+        fmt_print("Counter: {value}\n", FMT(value));
     return ok ? 0 : 1;
 }
 ```
@@ -182,6 +184,7 @@ allowing that borrowed context to disappear while the worker may still use it.
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "format-t.h"
 #include "thread-t.h"
 
 typedef struct {
@@ -216,7 +219,7 @@ int main(void)
     ok = thread_free(thread) && ok;
     ok = lock_free(ready) && ok;
     if (ok)
-        printf("Completion signalled; result: %d\n", work.value);
+        fmt_print("Completion signalled; result: {result}\n", FMT(result, work.value));
     return ok ? 0 : 1;
 }
 ```

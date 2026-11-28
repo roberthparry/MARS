@@ -101,16 +101,5 @@ int fmt_fprint_args(FILE *stream, const char *pattern, const fmt_arg_t *argument
         fmt_error_set(error, FMT_ERROR_ARGUMENT, SIZE_MAX, SIZE_MAX, "output stream is required");
         return -1;
     }
-    string_t *text = fmt_string_args(pattern, arguments, count, error);
-    if (!text)
-        return -1;
-    size_t length = string_byte_length(text);
-    size_t written = fwrite(string_c_str(text), 1u, length, stream);
-    bool failed = ferror(stream) != 0;
-    string_free(text);
-    if (written != length || failed) {
-        fmt_error_set(error, FMT_ERROR_IO, SIZE_MAX, SIZE_MAX, "cannot write complete formatted output");
-        return -1;
-    }
-    return (int)length;
+    return fmt_stream_write(stream, pattern, arguments, count, error);
 }

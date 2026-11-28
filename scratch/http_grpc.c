@@ -10,6 +10,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "format-t.h"
 #include "http-t.h"
 #include "protobuf-t.h"
 
@@ -28,7 +29,9 @@ int main(int argc, char **argv)
     uint64_t value = 0;
     bool ok = http_grpc_status(result) == 0 && protobuf_integer(http_grpc_payload(result), 0, &value);
     if (ok)
-        printf("gRPC status: %d\nReply: %" PRIu64 "\n", http_grpc_status(result), value);
+        fmt_print("gRPC status: {grpc_status}\nReply: {value}\n",
+            FMT(grpc_status, http_grpc_status(result)),
+            FMT(value));
     http_grpc_free(result);
     http_response_free(response);
     protobuf_free(message);

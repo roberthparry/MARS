@@ -11,6 +11,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "format-t.h"
 #include "string-t.h"
 #include "expr_context-t.h"
 #include "equation-t.h"
@@ -276,7 +277,7 @@ static void example_expr_context_binding(void)
     context_require(context != NULL);
     expr_t *display = expr_context_simplify(context, source);
     char *text = expr_to_string(display, style_UNBOUND);
-    printf("Positive binding: %s\n", text);
+    fmt_print("Positive binding: {text}\n", FMT(text));
     TEST_ASSERT_STR_EQ(text, "x + 1");
     free(text);
     expr_free(display);
@@ -286,7 +287,7 @@ static void example_expr_context_binding(void)
     num_destroy(&negative);
     display = expr_context_simplify(context, source);
     text = expr_to_string(display, style_UNBOUND);
-    printf("Negative binding: %s\n", text);
+    fmt_print("Negative binding: {text}\n", FMT(text));
     TEST_ASSERT_STR_EQ(text, "x - 1");
     free(text);
     expr_free(display);

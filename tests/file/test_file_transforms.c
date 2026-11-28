@@ -15,6 +15,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "format-t.h"
 #include "string-t.h"
 #include "file-t.h"
 #include "array-t.h"
@@ -714,7 +715,7 @@ void example_file_compression_round_trip(void)
     string_t *text = file_read_all_text(restored);
     ASSERT_TRUE(text);
     TEST_ASSERT_STR_EQ(string_c_str(text), "sky sky sky\n");
-    printf("decompressed: %s", string_c_str(text));
+    fmt_print("decompressed: {text}", FMT(text));
     ASSERT_TRUE(file_delete(restored));
     ASSERT_TRUE(file_delete(compressed));
     ASSERT_TRUE(file_delete(source));
@@ -740,7 +741,7 @@ void example_file_encryption_only(void)
     string_t *text = file_read_all_text(restored);
     ASSERT_TRUE(text);
     TEST_ASSERT_STR_EQ(string_c_str(text), "Private notes.\n");
-    printf("decrypted: %s", string_c_str(text));
+    fmt_print("decrypted: {text}", FMT(text));
     ASSERT_TRUE(file_delete(restored));
     ASSERT_TRUE(file_delete(encrypted));
     ASSERT_TRUE(file_delete(source));
@@ -771,7 +772,7 @@ void example_file_encrypted_round_trip(void)
     string_t *text = file_read_all_text(restored);
     ASSERT_NOT_NULL(text);
     TEST_ASSERT_STR_EQ(string_c_str(text), "Meet at noon.");
-    printf("restored: %s\n", string_c_str(text));
+    fmt_print("restored: {text}\n", FMT(text));
     ASSERT_TRUE(file_delete(restored));
     ASSERT_TRUE(file_delete(encrypted));
     ASSERT_TRUE(file_delete(source));

@@ -14,6 +14,7 @@
 #include <string.h>
 #include <zstd.h>
 
+#include "format-t.h"
 #include "globe-t.h"
 #include "almanac-t.h"
 #include "string-t.h"
@@ -829,7 +830,7 @@ static void example_globe_named_water(void)
         file_open_read(source) && globe_import_shoreline(db, source) && file_close(source), "README shoreline fixture");
     globe_t *globe = globe_open(db, NULL);
     string_t *name = globe_water_name_at(globe, 41, 51);
-    printf("%s\n", name ? string_c_str(name) : "Unnamed water");
+    fmt_print("{c_str}\n", FMT(c_str, name ? string_c_str(name) : "Unnamed water"));
     int status = name ? 0 : 1;
     TEST_ASSERT_TRUE(name && !strcmp(string_c_str(name), "Caspian Sea"), "README output: Caspian Sea");
     string_free(name);

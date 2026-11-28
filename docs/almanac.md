@@ -340,6 +340,7 @@ For example, retrieve the geometry and local tilt for a London solar-eclipse pre
 #include <math.h>
 #include <stdio.h>
 
+#include "format-t.h"
 #include "almanac-t.h"
 
 int main(void)
@@ -355,8 +356,9 @@ int main(void)
     double separation = almanac_solar_eclipse_separation_degrees(event);
     double orientation = almanac_solar_eclipse_orientation_degrees(event);
     bool geometry = disc > 0 && cover > 0 && isfinite(separation);
-    printf("Solar preview geometry: %s\nLocal orientation: %s\n",
-           geometry ? "available" : "unavailable", isfinite(orientation) ? "available" : "unavailable");
+    fmt_print("Solar preview geometry: {solar_preview_geometry}\nLocal orientation: {local_orientation}\n",
+        FMT(solar_preview_geometry, geometry ? "available" : "unavailable"),
+        FMT(local_orientation, isfinite(orientation) ? "available" : "unavailable"));
     array_destroy(events);
     datetime_dealloc(end);
     datetime_dealloc(start);
@@ -380,6 +382,7 @@ single body entry. For solar eclipses, prefer the dedicated local event search:
 ```c
 #include <stdio.h>
 
+#include "format-t.h"
 #include "almanac-t.h"
 #include "array-t.h"
 #include "datetime-t.h"
@@ -431,9 +434,9 @@ int main(void)
     if (!events)
         goto done;
 
-    printf("Shrewsbury eclipse watch\n");
+    fmt_print("Shrewsbury eclipse watch\n");
     if (array_size(events) == 0u) {
-        printf("No local solar eclipse found in August 2026.\n");
+        fmt_print("No local solar eclipse found in August 2026.\n");
         status = 0;
         goto done;
     }
@@ -456,31 +459,13 @@ int main(void)
     kind = event_kind == ALMANAC_SOLAR_ECLIPSE_TOTAL ? "total" :
            event_kind == ALMANAC_SOLAR_ECLIPSE_ANNULAR ? "annular" :
            "partial";
-    printf("Local solar eclipse found in August 2026.\n");
-    printf("Greatest local circumstance: %04d-%02d-%02d %02u:%02u:%04.1f local time\n",
-           datetime_year(greatest_time),
-           (int)datetime_month(greatest_time),
-           datetime_day(greatest_time),
-           datetime_hour(greatest_time),
-           datetime_minute(greatest_time),
-           datetime_second(greatest_time));
-    printf("Kind: %s\n", kind);
-    printf("Magnitude: %.3f\n", almanac_solar_eclipse_magnitude(event));
-    printf("Obscuration: %.1f%%\n", almanac_solar_eclipse_totality_percent(event));
-    printf("First contact: %04d-%02d-%02d %02u:%02u:%04.1f local time\n",
-           datetime_year(first_time),
-           (int)datetime_month(first_time),
-           datetime_day(first_time),
-           datetime_hour(first_time),
-           datetime_minute(first_time),
-           datetime_second(first_time));
-    printf("Fourth contact: %04d-%02d-%02d %02u:%02u:%04.1f local time\n",
-           datetime_year(fourth_time),
-           (int)datetime_month(fourth_time),
-           datetime_day(fourth_time),
-           datetime_hour(fourth_time),
-           datetime_minute(fourth_time),
-           datetime_second(fourth_time));
+    fmt_print("Local solar eclipse found in August 2026.\n");
+    fmt_print("Greatest local circumstance: {greatest_time:yyyy-MM-dd hh:mm:ss.0} local time\n", FMT(greatest_time));
+    fmt_print("Kind: {kind}\n", FMT(kind));
+    fmt_print("Magnitude: {magnitude:.3f}\n", FMT(magnitude, almanac_solar_eclipse_magnitude(event)));
+    fmt_print("Obscuration: {obscuration:.1f}%\n", FMT(obscuration, almanac_solar_eclipse_totality_percent(event)));
+    fmt_print("First contact: {first_time:yyyy-MM-dd hh:mm:ss.0} local time\n", FMT(first_time));
+    fmt_print("Fourth contact: {fourth_time:yyyy-MM-dd hh:mm:ss.0} local time\n", FMT(fourth_time));
 
     status = 0;
 
@@ -984,6 +969,7 @@ timeout, or cancel the control from another thread for normal application use.
 ```c
 #include <stdio.h>
 
+#include "format-t.h"
 #include "computation-t.h"
 #include "almanac-t.h"
 
@@ -1012,7 +998,7 @@ int main(void)
     computation_t *control = computation_new(&options);
     bool ok = control && computation_run(control, calculate, &job);
     bool stopped = !ok && computation_status(control) == COMPUTATION_BUDGET_EXHAUSTED;
-    printf("Stopped: %d\n", stopped);
+    fmt_print("Stopped: {stopped:d}\n", FMT(stopped));
     datetime_dealloc(job.after);
     almanac_close(job.input);
     computation_free(control);

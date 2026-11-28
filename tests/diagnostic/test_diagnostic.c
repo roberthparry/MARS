@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "format-t.h"
 #include "string-t.h"
 #include "thread-t.h"
 #include "diagnostic-t.h"
@@ -138,7 +139,7 @@ static void example_diagnostic_chain(void)
     diagnostic_free(cause);
     string_t *text = error ? diagnostic_to_string(error) : NULL;
     if (text)
-        printf("%s\n", string_c_str(text));
+        fmt_print("{text}\n", FMT(text));
     bool ok = text != NULL;
     string_free(text);
     diagnostic_free(error);

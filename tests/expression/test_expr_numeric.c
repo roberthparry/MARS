@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "format-t.h"
 #include "string-t.h"
 #include "expression-t.h"
 #include "matrix-t.h"
@@ -189,7 +190,7 @@ void example_expression_integer_callables(void)
         number_t value = expression ? expr_eval(expression) : NUM_NAN;
         string_t *text = num_to_string(value);
         if (text)
-            printf("%s = %s\n", sources[i], string_c_str(text));
+            fmt_print("{value} = {text}\n", FMT(value, sources[i]), FMT(text));
         number_t want = num_create_from_long(expected[i]);
         TEST_ASSERT_TRUE(expression && text && num_eq(value, want), "README numerical call produces documented output");
         num_destroy(&want);

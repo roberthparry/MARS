@@ -115,11 +115,7 @@ static bool fmt_options(fmt_t *format, fmt_part_t *part, size_t start, size_t en
     const char *text = string_c_str(format->text);
     size_t at = start;
     part->options = (fmt_options_t){.fill = ' ', .sign = '-', .precision = -1};
-    string_t *code = string_substr(format->text, start, end - start);
-    if (!code)
-        return fmt_error_set(error, FMT_ERROR_MEMORY, at, part->argument, "cannot copy field specification");
-    bool excel = fmt_excel_detect(string_c_str(code));
-    string_free(code);
+    bool excel = fmt_excel_detect(text + start, end - start);
     if (excel) {
         if (at < end && (fmt_alignment(text[at]) ||
             (text[at] != '[' && at + 1u < end && fmt_alignment(text[at + 1u])))) {

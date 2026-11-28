@@ -13,11 +13,11 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "format-t.h"
 #include "string-t.h"
 #include "diffequation-t.h"
 #define MARS_EXPR_INTERNAL_ACCESS
 #include "expression/expr_internal.h"
-
 #include "test_harness.h"
 #include "test_diffequ_gradient.h"
 
@@ -201,10 +201,10 @@ void example_diffequation_gradient_envelope(void)
     bool valid = de_solve_result_count(result) == 2u && de_solve_result_parameter_constraint(result);
     bool readable = TeX && strstr(TeX, "\\frac{\\partial u}{\\partial x}\\,\\frac{\\partial u}{\\partial y}") &&
                     !strstr(TeX, "NAN");
-    printf("  u_x + u_x u_y = 1\n");
+    fmt_print("  u_x + u_x u_y = 1\n");
     for (size_t i = 0u; i < de_solve_result_count(result); ++i) {
         string_t *text = equ_to_text(de_solve_result_at(result, i), style_UNBOUND);
-        printf("  %s\n", text ? string_c_str(text) : "NULL");
+        fmt_print("  {c_str}\n", FMT(c_str, text ? string_c_str(text) : "NULL"));
         valid = valid && text && strstr(string_c_str(text), "a ≠ 0");
         if (i == 0u)
             valid = valid && text && strstr(string_c_str(text), "ax + y·(1/a - 1) + F(a)") &&

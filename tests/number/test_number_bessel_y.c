@@ -11,6 +11,7 @@
 
 #include <string.h>
 
+#include "format-t.h"
 #include "test_number.h"
 
 static void assert_bessel_Y_close(number_t actual, number_t expected, const char *tolerance_text)
@@ -316,13 +317,13 @@ void run_number_bessel_y_readme_tests(void)
     char output[96];
     snprintf(output, sizeof(output), "Y_0(1) = %.15f", num_to_double(number_value));
     ASSERT_TRUE(strcmp(output, "Y_0(1) = 0.088256964215677") == 0);
-    printf("README number Bessel Y\n%s\n", output);
+    fmt_print("README number Bessel Y\n{output}\n", FMT(output));
     num_destroy(&number_value);
     snprintf(output, sizeof(output), "Y_0(1) = %.15f", qf_to_double(real_value));
     ASSERT_TRUE(strcmp(output, "Y_0(1) = 0.088256964215677") == 0);
-    printf("README qfloat Bessel Y\n%s\n", output);
+    fmt_print("README qfloat Bessel Y\n{output}\n", FMT(output));
     snprintf(output, sizeof(output), "Y_0(1) = %.15f + %.0fi",
              qf_to_double(qc_real(complex_value)), qf_to_double(qc_imag(complex_value)));
     ASSERT_TRUE(strcmp(output, "Y_0(1) = 0.088256964215677 + 0i") == 0);
-    printf("README qcomplex Bessel Y\n%s\n", output);
+    fmt_print("README qcomplex Bessel Y\n{output}\n", FMT(output));
 }

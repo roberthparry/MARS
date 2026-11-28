@@ -17,6 +17,7 @@
 #include <string.h>
 #include <time.h>
 
+#include "format-t.h"
 #include "dictionary-t.h"
 #include "test_harness.h"
 #include "test_dict_layout.h"
@@ -591,12 +592,18 @@ void test_readme_example_deep(void)
     struct deep out;
 
     if (dictionary_get(dict, &k1, &out)) {
-        printf("Value for key '%s': %s (%d)\n", k1.name, out.name, out.value);
+        fmt_print("Value for key '{name}': {name_2} ({value})\n",
+            FMT(name, k1.name),
+            FMT(name_2, out.name),
+            FMT(value, out.value));
         free(out.name);
     }
 
     if (dictionary_get(dict, &k2, &out)) {
-        printf("Value for key '%s': %s (%d)\n", k2.name, out.name, out.value);
+        fmt_print("Value for key '{name}': {name_2} ({value})\n",
+            FMT(name, k2.name),
+            FMT(name_2, out.name),
+            FMT(value, out.value));
         free(out.name);
     }
 
@@ -618,12 +625,12 @@ void test_readme_example_shallow(void)
     char *out;
 
     if (dictionary_get(dict, &k1, &out)) {
-        printf("Value for key %d: %s\n", k1, out);
+        fmt_print("Value for key {k1}: {out}\n", FMT(k1), FMT(out));
         free(out);
     }
 
     if (dictionary_get(dict, &k2, &out)) {
-        printf("Value for key %d: %s\n", k2, out);
+        fmt_print("Value for key {k2}: {out}\n", FMT(k2), FMT(out));
         free(out);
     }
 
@@ -696,7 +703,7 @@ static void test_sort_by_value(void)
 
 static void example_dictionary_readme_examples(void)
 {
-    printf(C_YELLOW "\ntesting README examples...\n" RESET);
+    fmt_print(C_YELLOW "\ntesting README examples...\n" RESET);
 
     test_readme_example_deep();
     test_readme_example_shallow();

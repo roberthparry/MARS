@@ -126,6 +126,7 @@ claims it can safely kill one.
 ```c
 #include <stdio.h>
 
+#include "format-t.h"
 #include "executor-t.h"
 
 static bool executor_identity(void *argument, void **result, diagnostic_t **diagnostic)
@@ -144,7 +145,7 @@ int main(void)
     ok = executor_free(pool) && ok;
     void *result = NULL;
     if (ok && executor_task_result(task, &result))
-        printf("Result: %d\n", *(int *)result);
+        fmt_print("Result: {result}\n", FMT(result, *(int *)result));
     else
         ok = false;
     executor_task_free(task);
@@ -165,6 +166,7 @@ Result: 42
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "format-t.h"
 #include "executor-t.h"
 
 static bool executor_failure(void *argument, void **result, diagnostic_t **diagnostic)
@@ -185,7 +187,7 @@ int main(void)
     diagnostic_t *error = ok ? executor_task_diagnostic(task) : NULL;
     string_t *text = error ? diagnostic_to_string(error) : NULL;
     if (text)
-        printf("%s\n", string_c_str(text));
+        fmt_print("{text}\n", FMT(text));
     ok = ok && text && executor_task_error(task) == EDOM;
     string_free(text);
     diagnostic_free(error);

@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "format-t.h"
 #include "string-t.h"
 #include "diffequation-t.h"
 #include "equation-t.h"
@@ -230,9 +231,9 @@ void example_diffequation_interval(void)
     string_t *b = upper ? expr_to_text(upper, style_UNBOUND) : NULL;
     bool ok = a && b && result && de_solve_result_status(result) == DE_SOLVE_STATUS_SOLVED;
     if (ok) {
-        printf("Interval: %s < x < %s\n", string_c_str(a), string_c_str(b));
-        printf("Point conditions: %zu\n", de_condition_count(problem));
-        printf("Solution families: %zu\n", de_solve_result_count(result));
+        fmt_print("Interval: {a} < x < {b}\n", FMT(a), FMT(b));
+        fmt_print("Point conditions: {point_conditions}\n", FMT(point_conditions, de_condition_count(problem)));
+        fmt_print("Solution families: {solution_families}\n", FMT(solution_families, de_solve_result_count(result)));
     }
     string_free(b); string_free(a); de_solve_result_free(result); de_free(problem);
     TEST_ASSERT_TRUE(ok, "README interval example solves without consuming integration constants");
@@ -246,9 +247,9 @@ void example_diffequation_parameter_restrictions(void)
     string_t *text = problem ? de_to_text(problem, style_EXPRESSION) : NULL;
     bool ok = text && result && de_solve_result_status(result) == DE_SOLVE_STATUS_SOLVED;
     if (ok) {
-        puts(string_c_str(text));
-        printf("Point conditions: %zu\n", de_condition_count(problem));
-        puts("Symbolic solution: solved");
+        fmt_print("{text}\n", FMT(text));
+        fmt_print("Point conditions: {point_conditions}\n", FMT(point_conditions, de_condition_count(problem)));
+        fmt_print("Symbolic solution: solved\n");
         TEST_ASSERT_TRUE(de_condition_count(problem) == 0u, "README parameter assumptions are not initial data");
     }
     string_free(text); de_solve_result_free(result); de_free(problem);

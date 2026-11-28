@@ -17,6 +17,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "format-t.h"
 #include "array-t.h"
 #include "datetime-t.h"
 #include "expression-t.h"
@@ -297,7 +298,7 @@ static void example_sqlite_readme_plain(void)
     TEST_ASSERT_TRUE(sqlite_set_cache_budget(db, "temp", 512), "README temporary cache budget");
     sqlite_stmt_t *stmt = sqlite_stmt_prepare(db, "SELECT 42");
     TEST_ASSERT_TRUE(stmt && sqlite_stmt_step(stmt) == SQLITE_STEP_ROW, "README plain query");
-    printf("%d\n", sqlite_stmt_column_int(stmt, 0));
+    fmt_print("{value}\n", FMT(value, sqlite_stmt_column_int(stmt, 0)));
     sqlite_stmt_finalize(stmt);
     sqlite_close(db);
     string_free(path);
@@ -334,7 +335,9 @@ static void example_sqlite_readme_prepared_statement_query(void)
     TEST_ASSERT_TRUE(sqlite_stmt_bind_int(stmt, 1, 350000), "population threshold binds");
 
     while (sqlite_stmt_step(stmt) == SQLITE_STEP_ROW) {
-        printf("%s: %d\n", sqlite_stmt_column_text(stmt, 0), sqlite_stmt_column_int(stmt, 1));
+        fmt_print("{name}: {value}\n",
+            FMT(name, sqlite_stmt_column_text(stmt, 0)),
+            FMT(value, sqlite_stmt_column_int(stmt, 1)));
     }
 
     sqlite_stmt_finalize(stmt);
@@ -363,7 +366,7 @@ static void example_sqlite_readme_encrypted_string_storage(void)
     TEST_ASSERT_TRUE(sqlite_load_string(db, name, &loaded), "string loads");
     ASSERT_NOT_NULL(loaded);
 
-    string_printf("%S\n", loaded);
+    fmt_print("{loaded}\n", FMT(loaded));
 
     string_free(loaded);
     sqlite_close(db);
@@ -411,7 +414,9 @@ static void example_sqlite_readme_array_object_storage(void)
     ASSERT_NOT_NULL(loaded_values);
 
     for (i = 0u; i < array_size(loaded_values); ++i)
-        printf("%d%s", *(int32_t *)array_get(loaded_values, i), (i + 1u < array_size(loaded_values)) ? " " : "\n");
+        fmt_print("{value}{value_2}",
+            FMT(value, *(int32_t *)array_get(loaded_values, i)),
+            FMT(value_2, (i + 1u < array_size(loaded_values)) ? " " : "\n"));
 
     array_destroy(loaded_values);
     sqlite_free_object_data(loaded_payload);
@@ -469,7 +474,7 @@ static void example_sqlite_readme_timeseries_object_storage(void)
     loaded_text = ts_to_text(loaded_series, TS_STRING_CSV);
     ASSERT_NOT_NULL(loaded_text);
 
-    string_printf("%S", loaded_text);
+    fmt_print("{loaded_text}", FMT(loaded_text));
 
     string_free(loaded_text);
     ts_free(loaded_series);
@@ -531,8 +536,8 @@ static void example_sqlite_readme_expression_object_storage(void)
     value_text = num_to_string(value);
     ASSERT_NOT_NULL(value_text);
 
-    string_printf("%S\n", loaded_roundtrip);
-    string_printf("%S\n", value_text);
+    fmt_print("{loaded_roundtrip}\n", FMT(loaded_roundtrip));
+    fmt_print("{value_text}\n", FMT(value_text));
 
     string_free(value_text);
     num_destroy(&value);

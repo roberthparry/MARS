@@ -13,6 +13,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "format-t.h"
 #include "string-t.h"
 #include "diffequation-t.h"
 #include "test_harness.h"
@@ -73,7 +74,7 @@ void example_diffequation_caret_pde(void)
     const char *expected = "Dt(u) = ½·(n·(n + 3) + 2)·u^n·Dx(u) - Dxxx(u)";
     bool valid = text && TeX && strcmp(string_c_str(text), expected) == 0 &&
                  strstr(TeX, "\\partial^{3} u") && strstr(TeX, "\\partial x^{3}");
-    printf("  %s\n  %s\n", source, text ? string_c_str(text) : "NULL");
+    fmt_print("  {source}\n  {c_str}\n", FMT(source), FMT(c_str, text ? string_c_str(text) : "NULL"));
     free(TeX); string_free(text); de_free(de);
     ASSERT_TRUE(valid);
 }

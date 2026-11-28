@@ -11,6 +11,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "format-t.h"
 #include "string-t.h"
 #include "sqlite-t.h"
 #include "test_harness.h"
@@ -386,7 +387,7 @@ static void example_sqlite_csv_file(void)
 {
     char directory[] = "/tmp/mars-csv-import-XXXXXX";
     TEST_ASSERT_NOT_NULL(mkdtemp(directory));
-    string_t *source_path = string_sprintf("%s/input.csv", directory);
+    string_t *source_path = fmt_string("{directory}/input.csv", FMT(directory));
     file_t *input = file_new(source_path), *dir = file_new_cstr(directory);
     string_t *text = string_new_with("code,count\n00123,7\n00456,12\n");
     string_t *path = string_new_with(":memory:"), *key = string_new_with("example key");
@@ -398,8 +399,10 @@ static void example_sqlite_csv_file(void)
     sqlite_stmt_t *stmt = ok ? sqlite_stmt_prepare(db, "SELECT typeof(code), typeof(count) FROM measurements LIMIT 1") : NULL;
     ok = ok && stmt && sqlite_stmt_step(stmt) == SQLITE_STEP_ROW;
     TEST_ASSERT_TRUE(ok, "README file import");
-    string_printf("Imported %zu rows (code: %s, count: %s)\n", report.rows,
-                  sqlite_stmt_column_text(stmt, 0), sqlite_stmt_column_text(stmt, 1));
+    fmt_print("Imported {imported} rows (code: {code}, count: {count})\n",
+        FMT(imported, report.rows),
+        FMT(code, sqlite_stmt_column_text(stmt, 0)),
+        FMT(count, sqlite_stmt_column_text(stmt, 1)));
     TEST_ASSERT_INT_EQ(report.rows, 2);
     TEST_ASSERT_STR_EQ(sqlite_stmt_column_text(stmt, 0), "text");
     TEST_ASSERT_STR_EQ(sqlite_stmt_column_text(stmt, 1), "integer");
@@ -433,7 +436,7 @@ static void example_sqlite_csv_stream(void)
     bool ok = db && reader && csv_feed(reader, text, true) &&
               sqlite_import_csv_reader(db, reader, table, &options, NULL, NULL, &report);
     TEST_ASSERT_TRUE(ok, "README import");
-    string_printf("Imported %zu rows\n", report.rows);
+    fmt_print("Imported {imported} rows\n", FMT(imported, report.rows));
     TEST_ASSERT_INT_EQ(report.rows, 2);
     csv_free(reader);
     sqlite_close(db);
@@ -454,7 +457,7 @@ static void example_sqlite_csv_export(void)
     csv_t *writer = csv_writer_new(NULL, &options);
     bool ok = db && writer && sqlite_export_csv(db, query, writer, true, NULL);
     TEST_ASSERT_TRUE(ok, "README export");
-    string_printf("%S", csv_output(writer));
+    fmt_print("{output}", FMT(output, csv_output(writer)));
     TEST_ASSERT_STR_EQ(string_c_str(csv_output(writer)), "name,note\nZoë,\"hello, world\"\n");
     csv_free(writer);
     string_free(query);
@@ -491,8 +494,8 @@ static void example_sqlite_csv_file_stream(void)
 {
     char directory[] = "/tmp/mars-csv-stream-XXXXXX";
     TEST_ASSERT_NOT_NULL(mkdtemp(directory));
-    string_t *source_path = string_sprintf("%s/input.csv", directory);
-    string_t *output_path = string_sprintf("%s/output.csv", directory);
+    string_t *source_path = fmt_string("{directory}/input.csv", FMT(directory));
+    string_t *output_path = fmt_string("{directory}/output.csv", FMT(directory));
     file_t *input = file_new(source_path), *output = file_new(output_path), *dir = file_new_cstr(directory);
     string_t *text = string_new_with("name,count\nZoë,7\n\"Ada, A.\",12\n");
     string_t *path = string_new_with(":memory:"), *key = string_new_with("example key");
@@ -534,8 +537,10 @@ static void example_sqlite_csv_file_stream(void)
     if (!file_close(output))
         ok = false;
     if (ok) {
-        string_printf("Refill callback: %zu calls (including EOF)\n", source.calls);
-        string_printf("Imported %zu rows; exported %zu rows\n", imported.rows, exported.rows);
+        fmt_print("Refill callback: {refill_callback} calls (including EOF)\n", FMT(refill_callback, source.calls));
+        fmt_print("Imported {imported} rows; exported {exported} rows\n",
+            FMT(imported, imported.rows),
+            FMT(exported, exported.rows));
     }
 
     /* Only this tiny fixture is read back in full, to verify the streamed output. */
@@ -630,7 +635,9 @@ static void example_sqlite_diagnostic(void)
     string_free(path);
     string_free(key);
     if (error)
-        printf("%s: %s\n", diagnostic_domain(error), diagnostic_message(error));
+        fmt_print("{domain}: {message}\n",
+            FMT(domain, diagnostic_domain(error)),
+            FMT(message, diagnostic_message(error)));
     bool ok = error != NULL;
     diagnostic_free(error);
     TEST_ASSERT_TRUE(ok, "README retained database error");

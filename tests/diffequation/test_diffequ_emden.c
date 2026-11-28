@@ -12,6 +12,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "format-t.h"
 #include "string-t.h"
 #include "diffequation-t.h"
 #define MARS_SHARED_EXPR_INTERNAL_ACCESS
@@ -231,9 +232,12 @@ void example_diffequation_emden_quadrature(void)
     bool ok = result && de_solve_result_status(result) == DE_SOLVE_STATUS_QUADRATURE && parameter && reference &&
               de_solve_result_count(result) == 6u;
     if (ok) {
-        printf("Parameter: %s\nFixed reference: %s\n", expr_symbol_name(parameter), expr_symbol_name(reference));
-        puts("Parametric coordinate equations: 2");
-        printf("Exceptional families: %zu\n", de_solve_result_count(result) - 2u);
+        fmt_print("Parameter: {parameter}\nFixed reference: {fixed_reference}\n",
+            FMT(parameter, expr_symbol_name(parameter)),
+            FMT(fixed_reference, expr_symbol_name(reference)));
+        fmt_print("Parametric coordinate equations: 2\n");
+        fmt_print("Exceptional families: {exceptional_families}\n",
+            FMT(exceptional_families, de_solve_result_count(result) - 2u));
     }
     de_solve_result_free(result); de_free(problem);
     TEST_ASSERT_TRUE(ok, "README independent-coefficient example distinguishes the parameter, reference "
@@ -252,8 +256,8 @@ void example_diffequation_symbolic_emden(void)
         de_solve_result_solver(result) == DE_SOLVER_LINEAR_TRANSFORMATION &&
         !strcmp(string_c_str(text), "x = (2t + C₁)/(⅓α·(t² + C₁t + C₂))");
     if (ok) {
-        printf("input = %s\nsolver = linear transformation\n", source);
-        printf("solution = %s\n", string_c_str(text));
+        fmt_print("input = {source}\nsolver = linear transformation\n", FMT(source));
+        fmt_print("solution = {text}\n", FMT(text));
     }
     string_free(text); de_solve_result_free(result); de_free(problem);
     TEST_ASSERT_TRUE(ok, "README symbolic modified-Emden equation selects the rational solution directly");
@@ -271,7 +275,9 @@ void example_diffequation_trajectory(void)
     sampler_t *samples = de_sample_trajectory(problem, NUM_ZERO, NUM_ZERO, NUM_ONE, lower, NUM_ONE, &options);
     const sampler_point_t *last = samples ? sampler_point(samples, sampler_count(samples) - 1) : NULL;
     if (last && last->valid) {
-        printf("Samples: %zu\nx(1): %.6f\n", sampler_count(samples), num_to_double(last->y));
+        fmt_print("Samples: {samples}\nx(1): {value:.6f}\n",
+            FMT(samples, sampler_count(samples)),
+            FMT(value, num_to_double(last->y)));
     }
     bool ok = last && last->valid && fabs(num_to_double(last->y) - 2.0 / 3) < 1e-7;
     sampler_free(samples);

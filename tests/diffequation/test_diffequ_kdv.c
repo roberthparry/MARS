@@ -14,6 +14,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "format-t.h"
 #include "string-t.h"
 #include "diffequation-t.h"
 #include "test_harness.h"
@@ -134,7 +135,7 @@ void example_diffequation_kdv(void)
                            "2k²·sech²(k·(x - x₀ - 4k²t)); k > 0, x₀ real (arbitrary constants).";
     bool valid = de_solve_result_solver(result) == DE_SOLVER_KDV_SOLITARY_WAVE && text &&
                  strcmp(string_c_str(text), expected) == 0;
-    printf("  %s\n  %s\n", source, text ? string_c_str(text) : "NULL");
+    fmt_print("  {source}\n  {c_str}\n", FMT(source), FMT(c_str, text ? string_c_str(text) : "NULL"));
     string_free(text); de_solve_result_free(result); de_free(de);
     ASSERT_TRUE(valid);
 }

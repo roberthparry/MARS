@@ -38,23 +38,25 @@ void example_format_compiled(void)
     arguments[0] = FMT(count);
     string_t *text = fmt_render(format, arguments, 1u, NULL);
     if (text)
-        string_printf("%S\n", text);
+        fmt_print("{text}\n", FMT(text));
     TEST_ASSERT_TRUE(format && text && !strcmp(string_c_str(text), "count=0012"), "README compiled output");
     string_free(text);
     fmt_free(format);
 }
 
-/* README example: automatic and indexed fields with an explicitly named calculation and escaped braces. */
+/* README example: reorder named captures and bind a calculation without repeating its evaluation. */
 void example_format_positions(void)
 {
     static const char expected[] = "bolts: 3/3; total=21; {ready}\n";
     int quantity = 3;
     const char *item = "bolts";
-    int first = fmt_print("{} {}\n", FMT(quantity), FMT(item));
-    TEST_ASSERT_TRUE(first == 8, "README automatic positional output");
-    int bytes = fmt_print("{1}: {0}/{0}; total={total}; {{ready}}\n",
-                          FMT(quantity), FMT(item), fmt_named("total", FMT(quantity * 7)));
-    TEST_ASSERT_TRUE(bytes == (int)sizeof(expected) - 1, "README indexed fields and named calculation output");
+    int first = fmt_print("{quantity} {item}\n", FMT(item), FMT(quantity));
+    TEST_ASSERT_TRUE(first == 8, "README named output ignores capture ordering");
+    int bytes = fmt_print("{item}: {quantity}/{quantity}; total={total}; {{ready}}\n",
+        FMT(total, quantity * 7),
+        FMT(item),
+        FMT(quantity));
+    TEST_ASSERT_TRUE(bytes == (int)sizeof(expected) - 1, "README repeated named fields and calculated value output");
 }
 
 /* README example: own the returned string and apply visible-character precision and numeric prefix padding. */
@@ -66,7 +68,7 @@ void example_format_string(void)
     TEST_ASSERT_TRUE(text && !strcmp(string_c_str(text), "|   é| 0x002a"), "README Unicode and hexadecimal padding");
     if (!text)
         return;
-    int bytes = fmt_print("{}\n", FMT(text));
+    int bytes = fmt_print("{text}\n", FMT(text));
     string_free(text);
     TEST_ASSERT_TRUE(bytes == (int)sizeof("|   é| 0x002a\n") - 1, "README owned string output");
 }
@@ -80,9 +82,9 @@ void example_format_builder(void)
         return;
     int quantity = 3;
     int status = fmt_append(out, "items={quantity}", FMT(quantity)) < 0 ||
-                 fmt_append(out, ", total={total}", fmt_named("total", FMT(quantity * 7))) < 0;
+                 fmt_append(out, ", total={total}", FMT(total, quantity * 7)) < 0;
     if (!status)
-        status = fmt_fprint(stdout, "{}\n", FMT(out)) < 0;
+        status = fmt_fprint(stdout, "{out}\n", FMT(out)) < 0;
     bool matches = !strcmp(string_c_str(out), "items=3, total=21");
     string_builder_free(out);
     TEST_ASSERT_TRUE(status == 0 && matches, "README builder and stream output");
@@ -113,7 +115,7 @@ static string_t *point_format(const void *value, const fmt_options_t *options, f
         return NULL;
     }
     const point_t *point = value;
-    return fmt_string("({}, {})", FMT(point->x), FMT(point->y));
+    return fmt_string("({x}, {y})", FMT(x, point->x), FMT(y, point->y));
 }
 
 /* README example: borrow a custom object, return owned core text and let the formatter apply field width. */
@@ -134,7 +136,7 @@ void example_format_error(void)
         return;
     int appended = fmt_append(out, " {missing}", FMT(7));
     fmt_error_t failure = *fmt_last_error();
-    int bytes = fmt_print("{}; destination={}\n", FMT(failure.message), FMT(out));
+    int bytes = fmt_print("{message}; destination={out}\n", FMT(message, failure.message), FMT(out));
     int status = appended != -1 || failure.code != FMT_ERROR_MISSING || bytes < 0;
     bool matches = !strcmp(string_c_str(out), "unchanged");
     string_free(out);
@@ -170,12 +172,40 @@ void example_format_datetime(void)
     datetime_t *when = datetime_init_ymdt(datetime_alloc(), 2026, DT_June, 10, 13, 5, 6.125);
     if (!when)
         return;
-    int bytes = fmt_print("{when:dddd, do^ MMMM yyyy}\n{when:yyyy-MM-dd hh:mm:ss.000}\n"
-                          "{when:h:mm:ss AM/PM}\n{when:h:mm:ssam/pm}\n", FMT(when));
+    int bytes = fmt_print("{when:dddd, do^ MMMM yyyy}\n{when:yyyy-MM-dd hh:mm:ss.000}\n{when:h:mm:ss "
+                          "AM/PM}\n{when:h:mm:ssam/pm}\n",
+        FMT(when));
     datetime_dealloc(when);
     TEST_ASSERT_TRUE(bytes == (int)sizeof("Wednesday, 10ᵗʰ June 2026\n2026-06-10 13:05:06.125\n"
                                           "1:05:06 PM\n1:05:06pm\n") - 1,
                      "README datetime output byte count");
+}
+
+/* README example: six catalogue locales with translated date order and grammatical month forms. */
+void example_format_locales(void)
+{
+    datetime_t *dt = datetime_init_ymd(datetime_alloc(), 2026, DT_June, 10);
+    if (!dt)
+        return;
+    int bytes = fmt_print("France: {dt:fr_FR}\nSpain: {dt:es_ES}\nWales: {dt:cy_GB}\n"
+                          "Greece: {dt:el_GR}\nRussia: {dt:ru_RU}\nJapan: {dt:ja_JP}\n", FMT(dt));
+    datetime_dealloc(dt);
+    TEST_ASSERT_TRUE(bytes == (int)sizeof("France: 10 juin 2026\nSpain: 10 de junio de 2026\n"
+        "Wales: 10 Mehefin 2026\nGreece: 10 Ιουνίου 2026\nRussia: 10 июня 2026 г.\nJapan: 2026年6月10日\n") - 1,
+        "README multilingual output byte count");
+}
+
+/* README example: first-day suffix and native Greek and Japanese Lingua presentations. */
+void example_datetime_lingua_new_year(void)
+{
+    datetime_t *dt = datetime_init_ymd(datetime_alloc(), 2026, DT_January, 1);
+    if (!dt)
+        return;
+    int bytes = fmt_print("France: {dt:fr_FR}\nGreece: {dt:el_GR}\nJapan: {dt:ja_JP}\n", FMT(dt));
+    datetime_dealloc(dt);
+    TEST_ASSERT_TRUE(bytes == (int)sizeof("France: 1ᵉʳ janvier 2026\nGreece: 1 Ιανουαρίου 2026\n"
+                                        "Japan: 2026年1月1日\n") - 1,
+                     "README New Year Lingua output byte count");
 }
 
 /* README example: symbolic output with native typed bindings and ordinary ownership. */
@@ -190,9 +220,11 @@ void example_format_symbolic(void)
     TeX_t *notation = TeX_builder_finish(builder);
     int bytes = -1;
     if (expression && equation && notation)
-        bytes = fmt_print("Expression: {expression:unbound}\nEquation: {equation:unbound}\n"
-                          "Expression TeX: {expression:latex}\nEquation TeX: {equation:latex}\n"
-                          "TeX: {notation}\n", FMT(expression), FMT(equation), FMT(notation));
+        bytes = fmt_print("Expression: {expression:unbound}\nEquation: {equation:unbound}\nExpression TeX: "
+                          "{expression:latex}\nEquation TeX: {equation:latex}\nTeX: {notation}\n",
+            FMT(expression),
+            FMT(equation),
+            FMT(notation));
     TeX_free(notation);
     TeX_builder_free(builder);
     equ_free(equation);
@@ -209,12 +241,15 @@ void example_format_excel(void)
     double negative_zero = -0.0;
     double fraction = 1.25;
     number_t exact = num_create_from_string("123456789012345678901234567890");
-    int bytes = fmt_print("{positive:+#,##0.00;(#,##0.00);\"zero\"}\n"
-                          "{negative:+#,##0.00;(#,##0.00);\"zero\"}\n"
-                          "{zero:+#,##0.00;(#,##0.00);\"zero\"}\n"
-                          "Signed zero: {negative_zero:0.00}\n"
-                          "Fraction: {fraction:# ?/?}\nExact: {exact:#,##0}\n",
-                          FMT(positive), FMT(negative), FMT(zero), FMT(negative_zero), FMT(fraction), FMT(exact));
+    int bytes = fmt_print("{positive:+#,##0.00;(#,##0.00);\"zero\"}\n{negative:+#,##0.00;(#,##0.00);\"zero\"}\n{"
+                          "zero:+#,##0.00;(#,##0.00);\"zero\"}\nSigned zero: {negative_zero:0.00}\nFraction: "
+                          "{fraction:# ?/?}\nExact: {exact:#,##0}\n",
+        FMT(positive),
+        FMT(negative),
+        FMT(zero),
+        FMT(negative_zero),
+        FMT(fraction),
+        FMT(exact));
     num_destroy(&exact);
     TEST_ASSERT_TRUE(bytes == 108, "README excel output byte count");
 }
@@ -225,8 +260,7 @@ void example_format_date_literals(void)
     datetime_t *when = datetime_init_ymd(datetime_alloc(), 2026, DT_February, 10);
     if (!when)
         return;
-    int bytes = fmt_print("{when:do \"day of month\" MM}\n"
-                          "{when:do^ \"day of month\" MM}\n", FMT(when));
+    int bytes = fmt_print("{when:do \"day of month\" MM}\n{when:do^ \"day of month\" MM}\n", FMT(when));
     datetime_dealloc(when);
     TEST_ASSERT_TRUE(bytes == (int)sizeof("10th day of month 02\n10ᵗʰ day of month 02\n") - 1,
                      "README date literals and case-sensitive month output");

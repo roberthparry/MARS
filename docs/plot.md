@@ -344,6 +344,7 @@ over nearby tick numbers in the collision layout. The example below uses
 #include <stdbool.h>
 #include <stdio.h>
 
+#include "format-t.h"
 #include "plot-t.h"
 
 int main(void)
@@ -361,7 +362,7 @@ int main(void)
         num_destroy(&heights[i]);
     string_t *svg = added ? plot_to_svg(plot) : NULL;
     if (svg)
-        printf("Surface SVG ready; series: %zu; height: 0 to 1\n", plot_series_count(plot));
+        fmt_print("Surface SVG ready; series: {series}; height: 0 to 1\n", FMT(series, plot_series_count(plot)));
     bool ok = svg != NULL;
     string_free(svg);
     plot_free(plot);
@@ -384,6 +385,7 @@ This small paraboloid is mirrored as `example_plot_surface` in
 #include <stdbool.h>
 #include <stdio.h>
 
+#include "format-t.h"
 #include "plot-t.h"
 
 int main(void)
@@ -396,7 +398,7 @@ int main(void)
     bool ok = plot && plot_add_points(plot, points, 3, "Measurements", PLOT_LINES, 0x55aacc);
     string_t *svg = ok ? plot_to_svg(plot) : NULL;
     if (svg)
-        printf("SVG ready; series: %zu\n", plot_series_count(plot));
+        fmt_print("SVG ready; series: {series}\n", FMT(series, plot_series_count(plot)));
     ok = svg != NULL;
     string_free(svg);
     plot_free(plot);

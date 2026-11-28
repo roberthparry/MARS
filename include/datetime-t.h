@@ -22,8 +22,14 @@
  * All datetime_t values are heap-allocated; callers must call datetime_dealloc()
  * exactly once for each handle returned by a constructor.
  *
- * Including this header enables typed FMT() bindings through fmt_arg_datetime().
+ * Include format-t.h explicitly to enable typed FMT() bindings through fmt_arg_datetime(); either include order works.
+ * This header registers its adapter without importing the formatting API or its output dependencies.
+ * Default typed output uses the configured Jurisdiction Lingua date; catalogue locale codes such as fr_FR and
+ * el_GR override it. Explicit iso, date, time and date-code masks do not depend on the locale catalogue.
+ * Without a usable installed Lingua catalogue, default output falls back to ISO civil datetime.
  * Typed native date codes distinguish M (month) from m (minute); excel: selects contextual Excel date codes.
+ * Calendar presentations select Christian, Chinese, Hindu, Buddhist, Muslim, Jewish, Cherokee, Mayan, Aztec
+ * and Ethiopian native renderers without requiring intermediate strings in display code.
  */
 
 #ifndef MARS_DATETIME_H
@@ -32,8 +38,6 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <stddef.h>
-
-#include "format-t.h"
 
 /**
  * @brief the datetime type
@@ -1314,11 +1318,19 @@ datetime_t *datetime_next_moon_phase(const datetime_t *dttm, moon_phase_t phase)
  */
 datetime_t *datetime_next_weekday(const datetime_t *dttm, weekday_t weekday);
 
+/** @brief Opaque formatting binding, completed by explicitly including format-t.h before capturing values. */
+typedef struct _fmt_arg_t fmt_arg_t;
+
 /**
  * @brief Borrow a datetime value for typed formatting without taking ownership.
  * @param value Borrowed value, never released by formatting; NULL is rejected when rendered.
  * @return Allocation-free binding, valid while the value remains alive and unchanged; capturing cannot fail.
- * @note This header enables FMT() selection. Release the original value with its owning module's API after use.
+ * @note Include format-t.h explicitly to use this constructor or FMT(); either header order is supported.
+ * This header registers datetime selection without importing the formatting API.
+ * Release the original value with its owning module's API after use.
+ * Default presentation uses Jurisdiction's configured Lingua date; fr_FR and other exact catalogue locales
+ * override it. iso explicitly selects ISO civil datetime. Repeated locale rendering uses bounded snapshots;
+ * jurisdict_date_locale_cache_clear() discards this thread's snapshots after configuration changes.
  * Do not mutate or destroy it while a formatter call is using it; synchronise shared mutable values externally.
  */
 fmt_arg_t fmt_arg_datetime(const datetime_t *value);

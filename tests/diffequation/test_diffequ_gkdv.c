@@ -14,6 +14,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "format-t.h"
 #include "string-t.h"
 #include "diffequation-t.h"
 #include "test_harness.h"
@@ -166,7 +167,7 @@ void example_diffequation_gkdv(void)
         "positive real root; x - x₀ - vt ≠ 0 (moving singularity excluded).";
     bool valid = text && de_solve_result_solver(result) == DE_SOLVER_GKDV_TRAVELLING_WAVE &&
                  strcmp(string_c_str(text), expected) == 0;
-    printf("  %s\n  %s\n", gkdv_source, text ? string_c_str(text) : "NULL");
+    fmt_print("  {gkdv_source}\n  {c_str}\n", FMT(gkdv_source), FMT(c_str, text ? string_c_str(text) : "NULL"));
     string_free(text); de_solve_result_free(result); de_free(de);
     ASSERT_TRUE(valid);
 }

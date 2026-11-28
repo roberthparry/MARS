@@ -11,6 +11,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "format-t.h"
 #include "quaternion-t.h"
 #include "test_harness.h"
 
@@ -183,7 +184,7 @@ static void example_quaternion_rotation(void)
     bool ok = quaternion_axis_angle(rotation, axis, acos(-1) / 2) && quaternion_rotate(result, rotation, vector);
     TEST_ASSERT_TRUE(ok && fabs(result[0]) < 1e-12 && fabs(result[1] - 1) < 1e-12 && fabs(result[2]) < 1e-12,
                      "README quarter-turn result");
-    if (ok) printf("Rotated: %.0f %.0f %.0f\n", result[0], result[1], result[2]);
+    if (ok) fmt_print("Rotated: {x:.0f} {y:.0f} {z:.0f}\n", FMT(x, result[0]), FMT(y, result[1]), FMT(z, result[2]));
 }
 
 int tests_main(void)

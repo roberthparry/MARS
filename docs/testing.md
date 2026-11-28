@@ -404,6 +404,7 @@ test database, or add the row to the tracked SQL source. The standalone source i
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "format-t.h"
 #include "sqlite-t.h"
 #include "string-t.h"
 
@@ -426,14 +427,16 @@ int main(void)
     query = sqlite_stmt_prepare(database,
         "SELECT name, expected FROM expression_cases WHERE name = 'another_sum'");
     if (query && sqlite_stmt_step(query) == SQLITE_STEP_ROW &&
-        printf("%s|%s\n", sqlite_stmt_column_text(query, 0), sqlite_stmt_column_text(query, 1)) >= 0 &&
+        fmt_print("{name}|{expected}\n",
+            FMT(name, sqlite_stmt_column_text(query, 0)),
+            FMT(expected, sqlite_stmt_column_text(query, 1))) >= 0 &&
         sqlite_stmt_step(query) == SQLITE_STEP_DONE)
         status = EXIT_SUCCESS;
 done:
     sqlite_stmt_finalize(query);
     sqlite_close(database);
     if (status != EXIT_SUCCESS)
-        fputs("Could not add or read the example case.\n", stderr);
+        fmt_fprint(stderr, "Could not add or read the example case.\n");
     return status;
 }
 ```

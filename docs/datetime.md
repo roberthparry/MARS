@@ -68,6 +68,8 @@ work without coupling it to one country's holiday law.
 
 ```c
 #include <stdio.h>
+
+#include "format-t.h"
 #include "datetime-t.h"
 
 int main(void) {
@@ -77,15 +79,11 @@ int main(void) {
         datetime_t *dt = datetime_init_chinese_new_year(datetime_alloc(), years[i]);
 
         if (!dt) {
-            printf("Year %d is outside the supported range.\n", years[i]);
+            fmt_print("Year {year} is outside the supported range.\n", FMT(year, years[i]));
             continue;
         }
 
-        printf("Chinese New Year %d: %d-%02d-%02d\n",
-               years[i],
-               (int)datetime_year(dt),
-               (int)datetime_month(dt),
-               (int)datetime_day(dt));
+        fmt_print("Chinese New Year {dt:yyyy: yyyy-MM-dd}\n", FMT(dt));
 
         datetime_dealloc(dt);
     }
@@ -109,6 +107,8 @@ Chinese New Year 2025: 2025-01-29
 ```c
 #include <stdlib.h>
 #include <stdio.h>
+
+#include "format-t.h"
 #include "datetime-t.h"
 
 int main(void) {
@@ -117,12 +117,10 @@ int main(void) {
     long jdn = datetime_jdn(today);
 
     datetime_t *sr = datetime_init_sunrise(datetime_alloc(), jdn, 51.5, -0.1, 0.0);
-    char *s = datetime_format(sr, "Sunrise: @hh:@mm:@ss");
-    printf("%s\n", s);
-    free(s);
+    fmt_print("Sunrise: {sr:hh:mm:ss}\n", FMT(sr));
 
     moon_phase_t phase = datetime_moon_phase(today);
-    printf("Moon phase: %d\n", (int)phase);
+    fmt_print("Moon phase: {phase}\n", FMT(phase));
 
     datetime_dealloc(sr);
     datetime_dealloc(today);
@@ -140,28 +138,18 @@ Moon phase: 2
 ## Example: Additional Calendar Views
 
 ```c
-#include "string-t.h"
-#include <stdio.h>
+#include "format-t.h"
 #include "datetime-t.h"
 
-int main(void) {
+int main(void)
+{
     datetime_t *dt = datetime_init_ymd(datetime_alloc(), 2026, DT_June, 21);
-    string_t *cherokee = datetime_cherokee_calendar_date_text(dt);
-    string_t *mayan = datetime_mayan_calendar_date_text(dt);
-    string_t *aztec = datetime_aztec_calendar_date_text(dt);
-    string_t *ethiopian = datetime_ethiopian_calendar_date_text(dt);
-
-    printf("Cherokee: %s\n", string_c_str(cherokee));
-    printf("Mayan: %s\n", string_c_str(mayan));
-    printf("Aztec: %s\n", string_c_str(aztec));
-    printf("Ethiopian: %s\n", string_c_str(ethiopian));
-
-    string_free(cherokee);
-    string_free(mayan);
-    string_free(aztec);
-    string_free(ethiopian);
+    if (!dt)
+        return 1;
+    int bytes = fmt_print("Cherokee: {dt:cherokee}\nMayan: {dt:mayan}\n"
+                          "Aztec: {dt:aztec}\nEthiopian: {dt:ethiopian}\n", FMT(dt));
     datetime_dealloc(dt);
-    return 0;
+    return bytes < 0;
 }
 ```
 
@@ -172,6 +160,47 @@ Cherokee: Cherokee civil Green Corn Moon, day 21, year 2026
 Mayan: Long Count 13.0.13.12.10; Tzolk'in 7 Ok; Haab 3 Sek
 Aztec: Tonalpohualli 5 Mazatl; Xiuhpohualli day 19 of Etzalcualiztli; year 1 Tochtli
 Ethiopian: 14 Sene 2018 EC
+```
+
+The datetime adapter also accepts `christian`, `chinese`, `hindu`, `buddhist`,
+`muslim` and `jewish`. These calendar presentations call the same native
+renderers as the corresponding calendar APIs. The plain `{dt}` presentation
+uses the configured Jurisdiction Lingua date. Locale codes such as `{dt:fr_FR}`,
+`{dt:el_GR}` and `{dt:ja_JP}` request French, Greek and Japanese Lingua dates;
+see the runnable [multilingual example](format.md#datetimes). `{dt:iso}` explicitly
+requests ISO civil datetime, and explicit date masks use the Gregorian calendar.
+Without a usable installed Lingua catalogue, the default falls back to ISO.
+
+Include `format-t.h` explicitly when using typed interpolation. Including
+`datetime-t.h` alone provides datetime operations without importing the format
+API. Either include order works; the New Year example below includes the
+datetime header first and then opts into formatting.
+
+French treats the first day specially; Greek retains its own grammatical month
+form. Japanese places the year first. These are complete Lingua presentations
+from the installed catalogue, including their punctuation and script.
+
+```c
+#include "datetime-t.h"
+#include "format-t.h"
+
+int main(void)
+{
+    datetime_t *dt = datetime_init_ymd(datetime_alloc(), 2026, DT_January, 1);
+    if (!dt)
+        return 1;
+    int bytes = fmt_print("France: {dt:fr_FR}\nGreece: {dt:el_GR}\nJapan: {dt:ja_JP}\n", FMT(dt));
+    datetime_dealloc(dt);
+    return bytes < 0;
+}
+```
+
+Output:
+
+```text
+France: 1ᵉʳ janvier 2026
+Greece: 1 Ιανουαρίου 2026
+Japan: 2026年1月1日
 ```
 
 ## Design Notes

@@ -38,12 +38,16 @@ README signum example:
 
 ```c
 #include <stdio.h>
+
+#include "format-t.h"
 #include "qfloat-t.h"
 
 int main(void)
 {
-    printf("sgn(-2), sgn(0), sgn(2) = %.0f, %.0f, %.0f\n",
-           qf_to_double(qf_sgn(qf_neg(QF_TWO))), qf_to_double(qf_sgn(QF_ZERO)), qf_to_double(qf_sgn(QF_TWO)));
+    fmt_print("sgn(-2), sgn(0), sgn(2) = {negative:.0f}, {zero:.0f}, {positive:.0f}\n",
+        FMT(negative, qf_to_double(qf_sgn(qf_neg(QF_TWO)))),
+        FMT(zero, qf_to_double(qf_sgn(QF_ZERO))),
+        FMT(positive, qf_to_double(qf_sgn(QF_TWO))));
     return 0;
 }
 ```
@@ -58,12 +62,14 @@ README example:
 
 ```c
 #include <stdio.h>
+
+#include "format-t.h"
 #include "qfloat-t.h"
 
 int main(void)
 {
     double half = qf_to_double(qf_step(QF_ZERO));
-    printf("step(0) = %.1f\n", half);
+    fmt_print("step(0) = {half:.1f}\n", FMT(half));
     return 0;
 }
 ```
@@ -102,6 +108,8 @@ maintained after every operation.
 
 ```c
 #include <stdio.h>
+
+#include "format-t.h"
 #include "qfloat-t.h"
 
 int main(void) {
@@ -113,7 +121,7 @@ int main(void) {
     for (int i = 0; inputs[i] != NULL; i++) {
         qfloat_t x = qf_from_string(inputs[i]);
         qfloat_t w = qf_lambert_W0(x);
-        qf_printf("W0(%s) = %q\n", inputs[i], w);
+        fmt_print("W0({input}) = {w}\n", FMT(input, inputs[i]), FMT(w));
     }
     return 0;
 }
@@ -437,12 +445,14 @@ also return NaN.
 
 ```c
 #include <stdio.h>
+
+#include "format-t.h"
 #include "qfloat-t.h"
 
 int main(void)
 {
     qfloat_t value = qf_bessel_Y(QF_ZERO, QF_ONE);
-    printf("Y_0(1) = %.15f\n", qf_to_double(value));
+    fmt_print("Y_0(1) = {value:.15f}\n", FMT(value, qf_to_double(value)));
     return 0;
 }
 ```
@@ -544,13 +554,15 @@ Input and output for a simple pFq identity:
 
 ```c
 #include <stdio.h>
+
+#include "format-t.h"
 #include "qfloat-t.h"
 
 int main(void)
 {
     qfloat_t x = qf_from_string("0.2");
     qfloat_t value = qf_hypergeometric_pFq(NULL, 0, NULL, 0, x);
-    qf_printf("0F0(0.2) = %.34q\n", value);
+    fmt_print("0F0(0.2) = {value:.34q}\n", FMT(value));
     return 0;
 }
 ```
@@ -592,12 +604,14 @@ can overflow to infinity or underflow to zero. There is no asymptotic kernel.
 
 ```c
 #include <stdio.h>
+
+#include "format-t.h"
 #include "qfloat-t.h"
 
 int main(void)
 {
     qfloat_t bessel = qf_bessel_I(QF_ZERO, QF_ONE);
-    qf_printf("I_0(1) = %.16q\n", bessel);
+    fmt_print("I_0(1) = {bessel:.16q}\n", FMT(bessel));
     return 0;
 }
 ```
@@ -630,12 +644,14 @@ input bounds do not guarantee success at every point.
 
 ```c
 #include <stdio.h>
+
+#include "format-t.h"
 #include "qfloat-t.h"
 
 int main(void)
 {
     qfloat_t ordinary = qf_struve_H(QF_ZERO, QF_ONE);
-    qf_printf("H_0(1) = %.15q\n", ordinary);
+    fmt_print("H_0(1) = {ordinary:.15q}\n", FMT(ordinary));
     return 0;
 }
 ```
@@ -667,12 +683,14 @@ kernel uses MPFR/MPC internally, as does `qf_bessel_K`.
 
 ```c
 #include <stdio.h>
+
+#include "format-t.h"
 #include "qfloat-t.h"
 
 int main(void)
 {
     qfloat_t value = qf_struve_L(QF_ZERO, QF_ONE);
-    qf_printf("L_0(1) = %.16q\n", value);
+    fmt_print("L_0(1) = {value:.16q}\n", FMT(value));
     return 0;
 }
 ```
@@ -691,14 +709,16 @@ Pass `qfloat_t` values **by value** to `%q`/`%Q` specifiers.
 
 ```c
 #include <stdio.h>
+
+#include "format-t.h"
 #include "qfloat-t.h"
 
 int main(void)
 {
     qfloat_t x = qf_from_string("1");
     qfloat_t w = qf_lambert_W0(x);
-    qf_printf("W0(1) = %.34q\n", w);   // 34 significant digits
-    qf_printf("W0(1) = %Q\n",   w);    // scientific notation
+    fmt_print("W0(1) = {w:.34q}\n", FMT(w));   // 34 significant digits
+    fmt_print("W0(1) = {w:Q}\n", FMT(w));    // scientific notation
     return 0;
 }
 ```
@@ -989,12 +1009,14 @@ README example:
 
 ```c
 #include <stdio.h>
+
+#include "format-t.h"
 #include "qfloat-t.h"
 
 int main(void)
 {
     qfloat_t value = qf_chebyshev_Tn(3, qf_from_double(2));
-    qf_printf("T3(2) = %.0q\n", value);
+    fmt_print("T3(2) = {value:.0q}\n", FMT(value));
     return 0;
 }
 ```

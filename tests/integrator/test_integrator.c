@@ -18,6 +18,7 @@
 #include <string.h>
 #include <time.h>
 
+#include "format-t.h"
 #include "expression-t.h"
 #include "integrator-t.h"
 #define MARS_SHARED_NUMBER_INTERNAL_ACCESS
@@ -190,7 +191,7 @@ static void example_improper_logarithmic_moment(void)
     string_t *text = exact ? expr_to_text(exact, style_UNBOUND) : NULL;
     bool ok = status == 0 && text && !strcmp(string_c_str(text), "ζ(3)");
     if (ok)
-        printf("Exact result: %s\n", string_c_str(text));
+        fmt_print("Exact result: {text}\n", FMT(text));
     string_free(text); num_destroy(&value); intg_free(ig); expr_free(formula); expr_bindings_free(bindings);
     TEST_ASSERT_TRUE(ok, "README improper integral example retains its exact zeta result");
 }
@@ -3618,9 +3619,9 @@ static void example_integrator(void)
 
     intg_integral(ig, expr, x, lo, hi, &result, &err);
 
-    num_printf("∫₋₃³ exp(-x²) dx ≈ %.64N\n", result);
-    num_printf("  error estimate   ≈ %.6N\n", err);
-    printf("  subintervals used: %zu\n", intg_get_interval_count_used(ig));
+    fmt_print("∫₋₃³ exp(-x²) dx ≈ {result:.64N}\n", FMT(result));
+    fmt_print("  error estimate   ≈ {err:.6N}\n", FMT(err));
+    fmt_print("  subintervals used: {subintervals_used}\n", FMT(subintervals_used, intg_get_interval_count_used(ig)));
 
     num_destroy(&err);
     num_destroy(&result);
@@ -3648,9 +3649,9 @@ static void example_expression_backed_integration(void)
 
     intg_integral(ig, expr, x, lo, hi, &result, &err);
 
-    num_printf("∫₀¹ exp(x) dx ≈ %.64N\n", result);
-    num_printf("  error estimate   ≈ %.6N\n", err);
-    printf("  subintervals used: %zu\n", intg_get_interval_count_used(ig));
+    fmt_print("∫₀¹ exp(x) dx ≈ {result:.64N}\n", FMT(result));
+    fmt_print("  error estimate   ≈ {err:.6N}\n", FMT(err));
+    fmt_print("  subintervals used: {subintervals_used}\n", FMT(subintervals_used, intg_get_interval_count_used(ig)));
 
     num_destroy(&err);
     num_destroy(&result);
@@ -3684,8 +3685,8 @@ static void example_symbolic_fast_path(void)
 
     intg_integral_multi(ig, expr, 2, vars, lo, hi, &result, &err);
 
-    num_printf("result = %.64N\n", result);
-    printf("intervals = %zu\n", intg_get_interval_count_used(ig));
+    fmt_print("result = {result:.64N}\n", FMT(result));
+    fmt_print("intervals = {intervals}\n", FMT(intervals, intg_get_interval_count_used(ig)));
 
     num_destroy(&err);
     num_destroy(&result);
@@ -3722,8 +3723,8 @@ static void example_ctx(void)
 
     intg_integral(ig, expr, x, lo, hi, &result, &err);
 
-    num_printf("∫₀¹ x^2.5 dx ≈ %.64N\n", result);
-    num_printf("  error estimate   ≈ %.6N\n", err);
+    fmt_print("∫₀¹ x^2.5 dx ≈ {result:.64N}\n", FMT(result));
+    fmt_print("  error estimate   ≈ {err:.6N}\n", FMT(err));
 
     num_destroy(&err);
     num_destroy(&result);

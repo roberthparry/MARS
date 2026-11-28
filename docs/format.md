@@ -3,12 +3,27 @@
 The `format` module provides typed brace formatting and named interpolation.
 It creates strings, appends to strings or builders, and writes to `FILE` streams.
 
-Include `format-t.h` for C values and text. Including a mathematical type's own
-header also enables its `FMT(value)` selection and the `fmt_` output functions;
-no additional integration header is required.
+`fmt_print()` and `fmt_fprint()` reuse up to eight small compiled templates per
+thread. Cache entries contain owned template text and binding layouts, never
+bound values. Templates and names are compared by content, so changing a buffer
+or reusing its address remains safe. Only templates of at most 512 bytes, with
+at most 16 arguments and 512 binding-name bytes, enter this bounded cache;
+larger calls use a temporary plan. Worker-thread exit releases its entries.
+Common scalar fields and up to 1024 output bytes use stack storage. Larger
+results grow temporary storage, and Unicode precision, calendar masks and
+module-owned renderers retain their normal formatting rules. Every call stages
+its complete result before writing, including calls that reuse a template.
 
-The examples include `format-t.h` explicitly to show which API supplies formatting;
-a type header such as `qfloat-t.h` also includes it transitively.
+Use `FMT(value)` to bind a variable by its own name, or `FMT(name, expression)`
+to give a computed value an explicit label. Named fields make argument order
+irrelevant. Each value is evaluated once; labels are captured at compilation
+without runtime string parsing. Use `fmt_named()` when the name itself comes
+from a runtime C string.
+
+Include `format-t.h` explicitly for formatting, together with the owning header
+of each native type being formatted. No additional integration header is required.
+`datetime-t.h` registers its adapter without importing the formatting API;
+including `format-t.h` enables it in either header order.
 
 ## Named bindings
 
@@ -32,7 +47,7 @@ Ada: x=1.250
 ```
 
 `FMT(x)` captures the spelling `x`, selects a typed constructor with C17
-`_Generic`, and evaluates the value once. Use `fmt_named("result", FMT(a + b))`
+`_Generic`, and evaluates the value once. Use `FMT(result, a + b)`
 to give an expression an explicit name. Arguments are stored in a typed array,
 including calls with no bindings. C variables must be supplied explicitly:
 names inside a template do not access C scope or evaluate C expressions.
@@ -89,10 +104,10 @@ Presentation names contain ASCII letters and underscores.
 | `qfloat_t` | Native `q`; `q`, `Q`, `f`, `F`, `e`, `E`, `g`, `G` |
 | `qcomplex_t` | Native complex notation; component-wise `q`, `Q`, `f`, `F`, `e`, `E`, `g`, `G` |
 | `number_t` | Native `n`; `n`, `N`, preserving backend precision and exact representations |
-| `matrix_t *` | Native `expression`; `expression`, `function`, `latex`, `pretty`, `scientific`, `layout` |
+| `matrix_t *` | Native `expression`; `expression`, `function`, `latex`, `pretty`, `scientific`, `layout`, `pretty_layout`, `scientific_layout` |
 | `expr_t *` | Native `expression`; `expression`, `function`, `latex`, `unbound` |
 | `equation_t *` | Native `expression`; `expression`, `function`, `latex`, `unbound` |
-| `datetime_t *` | ISO civil datetime; `iso`, `date`, `time`, or Excel custom date/time codes |
+| `datetime_t *` | Configured Lingua date; locale codes, `iso`, `date`, `time`, native calendar names, or custom date/time codes |
 | `TeX_t *` | Native TeX source; optional `latex` |
 
 Ordinary floats use their respective decimal precision by default. An explicit
@@ -133,7 +148,7 @@ int main(void)
     arguments[0] = FMT(count);
     string_t *text = fmt_render(format, arguments, 1u, NULL);
     if (text)
-        string_printf("%S\n", text);
+        fmt_print("{text}\n", FMT(text));
     int status = !format || !text;
     string_free(text);
     fmt_free(format);
@@ -155,12 +170,14 @@ Supply the same argument count and ordering, updating descriptor values as neede
 
 `fmt_t` is immutable and shareable between threads with independent outputs.
 Borrowed objects and callbacks must independently support any concurrent use.
-There is no implicit global template cache. Release templates with `fmt_free()`.
+Stream convenience calls use the bounded per-thread cache described above.
+Release explicitly compiled templates with `fmt_free()`.
 
-## Positional fields and expressions
+## Explicit names and expressions
 
-Automatic fields are useful for short messages; indexed fields can reorder or
-repeat arguments. Use `fmt_named()` to label a calculated value explicitly.
+Label a calculated value with `FMT(name, expression)`. Fields can repeat a
+binding, and descriptors can be supplied in either order. Automatic `{}` and
+indexed `{0}` fields remain available when positional formatting is intentional.
 
 ```c
 #include "format-t.h"
@@ -169,11 +186,13 @@ int main(void)
 {
     int quantity = 3;
     const char *item = "bolts";
-    int first = fmt_print("{} {}\n", FMT(quantity), FMT(item));
+    int first = fmt_print("{quantity} {item}\n", FMT(item), FMT(quantity));
     if (first < 0)
         return 1;
-    int bytes = fmt_print("{1}: {0}/{0}; total={total}; {{ready}}\n",
-                          FMT(quantity), FMT(item), fmt_named("total", FMT(quantity * 7)));
+    int bytes = fmt_print("{item}: {quantity}/{quantity}; total={total}; {{ready}}\n",
+        FMT(total, quantity * 7),
+        FMT(item),
+        FMT(quantity));
     return bytes < 0;
 }
 ```
@@ -202,7 +221,7 @@ int main(void)
     string_t *text = fmt_string("|{word:>4.1s}| {code:#06x}", FMT(word), FMT(code));
     if (!text)
         return 1;
-    int bytes = fmt_print("{}\n", FMT(text));
+    int bytes = fmt_print("{text}\n", FMT(text));
     string_free(text);
     return bytes < 0;
 }
@@ -231,9 +250,9 @@ int main(void)
         return 1;
     int quantity = 3;
     int status = fmt_append(out, "items={quantity}", FMT(quantity)) < 0 ||
-                 fmt_append(out, ", total={total}", fmt_named("total", FMT(quantity * 7))) < 0;
+                 fmt_append(out, ", total={total}", FMT(total, quantity * 7)) < 0;
     if (!status)
-        status = fmt_fprint(stdout, "{}\n", FMT(out)) < 0;
+        status = fmt_fprint(stdout, "{out}\n", FMT(out)) < 0;
     string_builder_free(out);
     return status;
 }
@@ -277,6 +296,7 @@ z=1.25 - 2.50i; ratio=⅚
 | API | Result and ownership |
 |---|---|
 | `FMT(value)` | Capture a typed value and its source name once |
+| `FMT(name, value)` | Capture a typed value once with an explicit label |
 | `fmt_named(name, argument)` | Assign an explicit borrowed name |
 | `fmt_string(pattern, ...)` | Owned string; release with `string_free()` |
 | `fmt_append(out, pattern, ...)` | Append to a string or `string_builder_t`; bytes or `-1` |
@@ -339,7 +359,7 @@ static string_t *point_format(const void *value, const fmt_options_t *options, f
         return NULL;
     }
     const point_t *point = value;
-    return fmt_string("({}, {})", FMT(point->x), FMT(point->y));
+    return fmt_string("({x}, {y})", FMT(x, point->x), FMT(y, point->y));
 }
 
 int main(void)
@@ -401,7 +421,7 @@ int main(void)
         return 1;
     int appended = fmt_append(out, " {missing}", FMT(7));
     fmt_error_t failure = *fmt_last_error();
-    int bytes = fmt_print("{}; destination={}\n", FMT(failure.message), FMT(out));
+    int bytes = fmt_print("{message}; destination={out}\n", FMT(message, failure.message), FMT(out));
     int status = appended != -1 || failure.code != FMT_ERROR_MISSING || bytes < 0;
     string_free(out);
     return status;
@@ -470,9 +490,14 @@ Hello, Ada 🙂
 
 ## Datetimes
 
-Including `datetime-t.h` enables `FMT()` for `datetime_t *` and const pointers.
-The default and `iso` modes produce an ISO civil datetime; `date` and `time`
-select its individual parts. Excel custom codes support names, month/minute
+Include both `format-t.h` and `datetime-t.h` to use `FMT()` with `datetime_t *`
+and const pointers. The datetime header alone keeps the formatting API out of
+datetime-only programmes. Both include orders work.
+The default `{dt}` and `{dt:lingua}` use the installed Jurisdiction Lingua date
+presentation. An exact catalogue locale such as `{dt:fr_FR}` overrides that
+choice for one field, including its wording and date order. `iso` produces an
+ISO civil datetime; `date` and `time` select its individual parts.
+Excel custom codes support names, month/minute
 context, fractional seconds and twelve-hour time. Native date codes use `MM` for
 months and `mm` for minutes, independently of context. Prefix a code with
 `excel:` to request Excel's contextual month/minute rules. Native civil components keep
@@ -487,8 +512,9 @@ int main(void)
     datetime_t *when = datetime_init_ymdt(datetime_alloc(), 2026, DT_June, 10, 13, 5, 6.125);
     if (!when)
         return 1;
-    int bytes = fmt_print("{when:dddd, do^ MMMM yyyy}\n{when:yyyy-MM-dd hh:mm:ss.000}\n"
-                          "{when:h:mm:ss AM/PM}\n{when:h:mm:ssam/pm}\n", FMT(when));
+    int bytes = fmt_print("{when:dddd, do^ MMMM yyyy}\n{when:yyyy-MM-dd hh:mm:ss.000}\n{when:h:mm:ss "
+                          "AM/PM}\n{when:h:mm:ssam/pm}\n",
+        FMT(when));
     datetime_dealloc(when);
     return bytes < 0;
 }
@@ -502,6 +528,55 @@ Wednesday, 10ᵗʰ June 2026
 1:05:06 PM
 1:05:06pm
 ```
+
+Locale codes select a Lingua date, rather than translating the month in an
+otherwise English mask. This example includes Greek, Cyrillic and Japanese
+writing as well as French, Spanish and Welsh. The jurisdiction database must
+contain the requested locale data; including `jurisdiction-t.h` is unnecessary
+for these ordinary datetime bindings.
+
+```c
+#include "format-t.h"
+#include "datetime-t.h"
+
+int main(void)
+{
+    datetime_t *dt = datetime_init_ymd(datetime_alloc(), 2026, DT_June, 10);
+    if (!dt)
+        return 1;
+    int bytes = fmt_print("France: {dt:fr_FR}\nSpain: {dt:es_ES}\nWales: {dt:cy_GB}\n"
+                          "Greece: {dt:el_GR}\nRussia: {dt:ru_RU}\nJapan: {dt:ja_JP}\n", FMT(dt));
+    datetime_dealloc(dt);
+    return bytes < 0;
+}
+```
+
+Output:
+
+```text
+France: 10 juin 2026
+Spain: 10 de junio de 2026
+Wales: 10 Mehefin 2026
+Greece: 10 Ιουνίου 2026
+Russia: 10 июня 2026 г.
+Japan: 2026年6月10日
+```
+
+The catalogue preserves grammatical month forms, such as Greek `Ιουνίου` and
+Russian `июня`. French uses `1ᵉʳ` for the first day. Arabic Lingua locales use
+the civil Islamic calendar and Arabic-Indic digits; Hebrew Lingua locales use
+the fixed Hebrew calendar. These follow Jurisdiction's existing **Date Lingua**
+conventions. Time of day is omitted from a Lingua date; request `time`, `iso`
+or an explicit date/time mask when needed.
+
+The first use loads an immutable presentation snapshot; repeated rendering
+performs no SQL or locale parsing. The per-thread cache holds at most eight
+presentations, independently of the number of dates or print calls. It retains
+the configuration observed when loaded; applications that change configuration
+can call `jurisdict_date_locale_cache_clear()` on each affected thread.
+If no usable installed Lingua catalogue exists, the default falls back to ISO
+civil datetime. An unavailable explicit locale reports a checked formatting
+error. No database is created or updated by printing, and no ICU is required.
 
 ## Expressions, equations and TeX
 
@@ -528,9 +603,11 @@ int main(void)
     TeX_t *notation = TeX_builder_finish(builder);
     int bytes = -1;
     if (expression && equation && notation)
-        bytes = fmt_print("Expression: {expression:unbound}\nEquation: {equation:unbound}\n"
-                          "Expression TeX: {expression:latex}\nEquation TeX: {equation:latex}\n"
-                          "TeX: {notation}\n", FMT(expression), FMT(equation), FMT(notation));
+        bytes = fmt_print("Expression: {expression:unbound}\nEquation: {equation:unbound}\nExpression TeX: "
+                          "{expression:latex}\nEquation TeX: {equation:latex}\nTeX: {notation}\n",
+            FMT(expression),
+            FMT(equation),
+            FMT(notation));
     TeX_free(notation);
     TeX_builder_free(builder);
     equ_free(equation);
@@ -572,12 +649,15 @@ int main(void)
     double negative_zero = -0.0;
     double fraction = 1.25;
     number_t exact = num_create_from_string("123456789012345678901234567890");
-    int bytes = fmt_print("{positive:+#,##0.00;(#,##0.00);\"zero\"}\n"
-                          "{negative:+#,##0.00;(#,##0.00);\"zero\"}\n"
-                          "{zero:+#,##0.00;(#,##0.00);\"zero\"}\n"
-                          "Signed zero: {negative_zero:0.00}\n"
-                          "Fraction: {fraction:# ?/?}\nExact: {exact:#,##0}\n",
-                          FMT(positive), FMT(negative), FMT(zero), FMT(negative_zero), FMT(fraction), FMT(exact));
+    int bytes = fmt_print("{positive:+#,##0.00;(#,##0.00);\"zero\"}\n{negative:+#,##0.00;(#,##0.00);\"zero\"}\n{"
+                          "zero:+#,##0.00;(#,##0.00);\"zero\"}\nSigned zero: {negative_zero:0.00}\nFraction: "
+                          "{fraction:# ?/?}\nExact: {exact:#,##0}\n",
+        FMT(positive),
+        FMT(negative),
+        FMT(zero),
+        FMT(negative_zero),
+        FMT(fraction),
+        FMT(exact));
     num_destroy(&exact);
     return bytes < 0;
 }
@@ -679,8 +759,7 @@ int main(void)
     datetime_t *when = datetime_init_ymd(datetime_alloc(), 2026, DT_February, 10);
     if (!when)
         return 1;
-    int bytes = fmt_print("{when:do \"day of month\" MM}\n"
-                          "{when:do^ \"day of month\" MM}\n", FMT(when));
+    int bytes = fmt_print("{when:do \"day of month\" MM}\n{when:do^ \"day of month\" MM}\n", FMT(when));
     datetime_dealloc(when);
     return bytes < 0;
 }

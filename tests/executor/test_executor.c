@@ -12,6 +12,7 @@
 #include <string.h>
 #include <unistd.h>
 
+#include "format-t.h"
 #include "string-t.h"
 #include "thread-t.h"
 #include "executor-t.h"
@@ -514,7 +515,7 @@ static void example_executor_result(void)
     ok = executor_free(pool) && ok;
     void *result = NULL;
     if (ok && executor_task_result(task, &result))
-        printf("Result: %d\n", *(int *)result);
+        fmt_print("Result: {result}\n", FMT(result, *(int *)result));
     else
         ok = false;
     executor_task_free(task);
@@ -531,7 +532,7 @@ static void example_executor_diagnostic(void)
     diagnostic_t *error = ok ? executor_task_diagnostic(task) : NULL;
     string_t *text = error ? diagnostic_to_string(error) : NULL;
     if (text)
-        printf("%s\n", string_c_str(text));
+        fmt_print("{text}\n", FMT(text));
     ok = ok && text && executor_task_error(task) == EDOM;
     string_free(text);
     diagnostic_free(error);

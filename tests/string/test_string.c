@@ -14,6 +14,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "format-t.h"
 #include "string-t.h"
 #include "test_database.h"
 #include "test_string.h"
@@ -488,7 +489,7 @@ static void test_parser_append_token(string_t *out, test_parser_token_kind_t kin
             break;
     }
 
-    string_append_format(out, "%S]", text);
+    fmt_append(out, "{text}]", FMT(text));
 }
 
 static bool test_parser_read_identifier(string_cursor_t *cursor, string_t *out)
@@ -834,7 +835,7 @@ static void test_readme_example_Basic_UTF_8_Manipulation(void)
     /* Insert at character index */
     string_insert(s, 1, "🙂");
 
-    string_printf("%S\n", s);
+    fmt_print("{s}\n", FMT(s));
 
     string_free(s);
 }
@@ -842,7 +843,7 @@ static void test_readme_example_Basic_UTF_8_Manipulation(void)
 static int print_character(rune_t rune, size_t index, void *user)
 {
     (void)user;
-    return string_printf("[%zu] %R\n", index, rune) < 0 ? -1 : 0;
+    return fmt_print("[{index}] {rune}\n", FMT(index), FMT(rune)) < 0 ? -1 : 0;
 }
 
 static void test_readme_example_Character_Iteration(void)
@@ -851,7 +852,7 @@ static void test_readme_example_Character_Iteration(void)
 
     size_t count = string_length(s);
 
-    string_printf("Characters: %zu\n", count);
+    fmt_print("Characters: {count}\n", FMT(count));
 
     string_each(s, print_character, NULL);
 
@@ -865,12 +866,12 @@ static void test_readme_example_Unicode_Text_Just_Works(void)
     string_t *first_text = rune_to_string(first);
     string_t *word = string_substring(s, 2, 4);
 
-    string_printf("Characters: %zu\n", string_length(s));
-    string_printf("First: %S\n", first_text);
-    string_printf("Word: %S\n", word);
+    fmt_print("Characters: {characters}\n", FMT(characters, string_length(s)));
+    fmt_print("First: {first_text}\n", FMT(first_text));
+    fmt_print("Word: {word}\n", FMT(word));
 
     string_reverse(s);
-    string_printf("Reversed: %S\n", s);
+    fmt_print("Reversed: {s}\n", FMT(s));
 
     string_free(first_text);
     string_free(word);
@@ -886,7 +887,7 @@ static void test_readme_example_Using_the_Builder_API(void)
 
     string_t *out = b;
 
-    string_printf("%S\n", out);
+    fmt_print("{out}\n", FMT(out));
 
     string_free(out);
 }
@@ -895,7 +896,7 @@ static void test_readme_example_Escaping_Wide_C_Strings(void)
 {
     string_t *s = string_new_wide(L"hello \u03C0");
 
-    string_printf("%S\n", s);
+    fmt_print("{s}\n", FMT(s));
 
     string_free(s);
 }
@@ -905,7 +906,7 @@ static void test_readme_example_Using_string_t_With_a_Parser(void)
     string_t *source = string_new_with("cdf(α_1) + 355/113");
     string_t *tokens = test_parser_tokenise(source);
 
-    string_printf("%S\n", tokens);
+    fmt_print("{tokens}\n", FMT(tokens));
 
     string_free(tokens);
     string_free(source);
@@ -919,7 +920,7 @@ static void test_readme_example_Fixed_Capacity_Buffer(void)
     string_buffer_init(&buf, storage, sizeof(storage));
     string_buffer_append(&buf, "Hello");
     string_buffer_append_char(&buf, '!');
-    string_printf("%s\n", string_buffer_c_str(&buf));
+    fmt_print("{buffer_c_str}\n", FMT(buffer_c_str, string_buffer_c_str(&buf)));
 }
 
 static void example_readme_examples(void)
@@ -983,7 +984,7 @@ static void example_utf8_exact(void)
 {
     string_t *text = string_new();
     int status = string_append_utf8_exact(text, "e\xcc\x81", 3);
-    string_printf("status=%d bytes=%zu\n", status, string_byte_length(text));
+    fmt_print("status={status} bytes={bytes}\n", FMT(status), FMT(bytes, string_byte_length(text)));
     TEST_ASSERT_TRUE(status == 0 && string_byte_length(text) == 3, "README exact UTF-8");
     string_free(text);
 }
@@ -1068,7 +1069,7 @@ static void example_unquote_shell(void)
 {
     string_t *quoted = string_new_with("'pa'\"'\"'ss word'");
     string_t *value = string_unquote_shell(quoted);
-    string_printf("%S\n", value);
+    fmt_print("{value}\n", FMT(value));
     bool ok = value && string_view_equals_literal(string_view_all(value), "pa'ss word");
     string_free(value);
     string_free(quoted);

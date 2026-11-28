@@ -12,6 +12,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "format-t.h"
 #include "file-t.h"
 #include "json-t.h"
 #include "number-t.h"
@@ -341,9 +342,9 @@ static void example_json_parse_and_inspect(void)
 
     json_bool_value(enabled_json, &enabled);
 
-    string_printf("name=%S\n", json_string_value(name));
-    string_printf("enabled=%s\n", enabled ? "true" : "false");
-    string_printf("items=%zu\n", json_array_size(items));
+    fmt_print("name={name}\n", FMT(name, json_string_value(name)));
+    fmt_print("enabled={enabled}\n", FMT(enabled));
+    fmt_print("items={items}\n", FMT(items, json_array_size(items)));
 
     json_free(root);
     string_free(items_key);
@@ -367,7 +368,7 @@ static void example_json_build_and_serialise(void)
     json_array_append(items, two_value);
 
     out = json_to_string_pretty(items, 2);
-    string_printf("%S", out);
+    fmt_print("{out}", FMT(out));
 
     string_free(out);
     json_free(two_value);
@@ -384,7 +385,7 @@ static void example_json_number_fidelity(void)
     json_t *json = json_new_number_value(rational);
     string_t *text = json_to_string(json);
 
-    string_printf("%S\n", text);
+    fmt_print("{text}\n", FMT(text));
 
     string_free(text);
     json_free(json);
@@ -404,7 +405,7 @@ static void example_json_file_round_trip(void)
     json_to_file_pretty(root, path, 2);
 
     loaded = json_from_file(path);
-    string_printf("type=%d\n", (int)json_type(loaded));
+    fmt_print("type={type}\n", FMT(type, json_type(loaded)));
 
     json_free(loaded);
     json_free(enabled);

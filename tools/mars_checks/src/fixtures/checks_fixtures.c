@@ -7,6 +7,7 @@
  * cleanup is bounded and escalates to SIGKILL before reaping when necessary.
  * Globe reader examples use a tiny disposable SQLite file with child-only configuration.
  * Examples requiring installed resources load the application's saved settings once, before verification snapshots.
+ * Datetime Lingua locale examples resolve those settings without requiring an explicit jurisdiction include.
  */
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE
@@ -21,6 +22,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <signal.h>
+#include <string.h>
 #include <spawn.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -224,12 +226,33 @@ bool checks_fixtures_arguments(checks_fixtures_t *fixtures, const string_t *path
     return true;
 }
 
+static bool checks_fixtures_lingua(const string_t *code)
+{
+    if (string_find(code, "fmt_") < 0 || string_find(code, "datetime_t") < 0)
+        return false;
+    if (string_find(code, ":lingua}") >= 0)
+        return true;
+    const char *text = string_c_str(code);
+    /* Source inspection is bounded by the programme length and runs only during fixture preparation. */
+    for (const char *at = text; (at = strchr(at, ':')) != NULL; ++at) {
+        const char *name = at + 1;
+        size_t letters = strspn(name, "abcdefghijklmnopqrstuvwxyz");
+        if ((letters != 2u && letters != 3u) || name[letters] != '_')
+            continue;
+        name += letters + 1u;
+        size_t region = strspn(name, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_");
+        if (region && name[region] == '}')
+            return true;
+    }
+    return false;
+}
+
 /* Prepare settings before a runner fingerprints its environment, retaining lazy loading for other callers. */
 bool checks_fixtures_settings(checks_fixtures_t *fixtures, const string_t *code)
 {
     bool installed = string_find(code, "globe_reader_identity(") < 0 &&
         (string_find(code, "almanac_open(") >= 0 || string_find(code, "jurisdict_open(") >= 0 ||
-         string_find(code, "globe_open_configured(") >= 0);
+         string_find(code, "globe_open_configured(") >= 0 || checks_fixtures_lingua(code));
     if (!installed || fixtures->settings_loaded) return true;
     if (!mars_settings_isolate() || !mars_settings_load()) {
         fputs("Cannot load README settings; check mars.json and access to the desktop key store.\n", stderr);

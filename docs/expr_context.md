@@ -110,6 +110,7 @@ remain in their owning APIs.
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "format-t.h"
 #include "expr_context-t.h"
 
 int main(void)
@@ -123,7 +124,7 @@ int main(void)
         abort();
     expr_t *display = expr_context_simplify(context, source);
     char *text = expr_to_string(display, style_UNBOUND);
-    printf("Positive binding: %s\n", text);
+    fmt_print("Positive binding: {text}\n", FMT(text));
     free(text);
     expr_free(display);
 
@@ -133,7 +134,7 @@ int main(void)
     num_destroy(&negative);
     display = expr_context_simplify(context, source);
     text = expr_to_string(display, style_UNBOUND);
-    printf("Negative binding: %s\n", text);
+    fmt_print("Negative binding: {text}\n", FMT(text));
     free(text);
     expr_free(display);
     expr_context_free(context);

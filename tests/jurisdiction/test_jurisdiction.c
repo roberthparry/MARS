@@ -17,6 +17,7 @@
 #include <string.h>
 #include <strings.h>
 
+#include "format-t.h"
 #include "array-t.h"
 #include "datetime-t.h"
 #include "file-t.h"
@@ -705,24 +706,21 @@ static void example_holiday_readme_queries(void)
     ASSERT_NOT_NULL(events);
     ASSERT_EQ_LONG((long)array_size(events), 2L);
 
-    printf("Holidays between 2021-12-24 and 2021-12-31:\n");
+    fmt_print("Holidays between 2021-12-24 and 2021-12-31:\n");
     for (i = 0u; i < array_size(events); ++i) {
         holiday_event_t *event = array_get(events, i);
-        char *date_text;
-
         ASSERT_NOT_NULL(event);
-        date_text = datetime_format(event->holiday_date, "%yyyy-%MM-%dd");
-        printf("- %s: %s\n", event->holiday_name ? event->holiday_name : "(unavailable)",
-               date_text ? date_text : "(unavailable)");
-        free(date_text);
+        fmt_print("- {name}: {date:yyyy-MM-dd}\n", FMT(name, event->holiday_name), FMT(date, event->holiday_date));
     }
 
-    printf("2021-12-25 weekend: %s\n", jurisdict_is_weekend(holiday, bank_holiday) ? "yes" : "no");
-    printf("2021-12-25 national holiday: %s\n", jurisdict_is_national_holiday(holiday, bank_holiday) ? "yes" : "no");
+    fmt_print("2021-12-25 weekend: {is_weekend}\n",
+        FMT(is_weekend, jurisdict_is_weekend(holiday, bank_holiday) ? "yes" : "no"));
+    fmt_print("2021-12-25 national holiday: {is_national_holiday}\n",
+        FMT(is_national_holiday, jurisdict_is_national_holiday(holiday, bank_holiday) ? "yes" : "no"));
 
     working_days = jurisdict_working_days_between(holiday, range_start, range_end);
     ASSERT_EQ_LONG(working_days, 4L);
-    printf("Working days between 2021-12-24 and 2021-12-31: %ld\n", working_days);
+    fmt_print("Working days between 2021-12-24 and 2021-12-31: {working_days}\n", FMT(working_days));
 
     array_destroy(events);
     datetime_dealloc(range_end);
@@ -870,8 +868,12 @@ static bool readme_location(const jurisdict_place_t *place, void *context)
     bool *found = context;
     if (strcmp(place->jurisdiction_code, "AD"))
         return true;
-    printf("%s: %s (%s, %s), %s\n", place->jurisdiction_code, place->name, place->latitude, place->longitude,
-           place->timezone);
+    fmt_print("{jurisdiction_code}: {name} ({latitude}, {longitude}), {timezone}\n",
+        FMT(jurisdiction_code, place->jurisdiction_code),
+        FMT(name, place->name),
+        FMT(latitude, place->latitude),
+        FMT(longitude, place->longitude),
+        FMT(timezone, place->timezone));
     *found = true;
     return false;
 }

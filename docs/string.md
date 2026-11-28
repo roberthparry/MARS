@@ -20,6 +20,7 @@ sequences as characters.
 ## Example: Basic Text Manipulation
 
 ```c
+#include "format-t.h"
 #include "string-t.h"
 
 int main(void) {
@@ -28,7 +29,7 @@ int main(void) {
     string_append_cstr(s, " 🌍");
     string_insert(s, 1, "🙂");
 
-    string_printf("%S\n", s);
+    fmt_print("{s}\n", FMT(s));
 
     string_free(s);
     return 0;
@@ -44,6 +45,7 @@ H🙂éllo 🌍
 ## Example: Unicode Text Just Works
 
 ```c
+#include "format-t.h"
 #include "string-t.h"
 
 int main(void) {
@@ -53,12 +55,12 @@ int main(void) {
     string_t *first_text = rune_to_string(first);
     string_t *word = string_substring(s, 2, 4);
 
-    string_printf("Characters: %zu\n", string_length(s));
-    string_printf("First: %S\n", first_text);
-    string_printf("Word: %S\n", word);
+    fmt_print("Characters: {characters}\n", FMT(characters, string_length(s)));
+    fmt_print("First: {first_text}\n", FMT(first_text));
+    fmt_print("Word: {word}\n", FMT(word));
 
     string_reverse(s);
-    string_printf("Reversed: %S\n", s);
+    fmt_print("Reversed: {s}\n", FMT(s));
 
     string_free(first_text);
     string_free(word);
@@ -79,12 +81,13 @@ Reversed: 🇬🇧 éfac 👨‍👩‍👧‍👦
 ## Example: Escaping Wide C Strings
 
 ```c
+#include "format-t.h"
 #include "string-t.h"
 
 int main(void) {
     string_t *s = string_new_wide(L"hello π");
 
-    string_printf("%S\n", s);
+    fmt_print("{s}\n", FMT(s));
 
     string_free(s);
     return 0;
@@ -100,16 +103,17 @@ hello π
 ## Example: Character Iteration
 
 ```c
+#include "format-t.h"
 #include "string-t.h"
 
 int main(void) {
     string_t *s = string_new_with("👨‍👩‍👧‍👦 family");
 
     size_t count = string_length(s);
-    string_printf("Characters: %zu\n", count);
+    fmt_print("Characters: {count}\n", FMT(count));
 
     for (size_t i = 0; i < count; i++) {
-        string_printf("[%zu] %R\n", i, string_at(s, i));
+        fmt_print("[{i}] {at}\n", FMT(i), FMT(at, string_at(s, i)));
     }
 
     string_free(s);
@@ -139,6 +143,8 @@ slices without inspecting raw storage.
 
 ```c
 #include <stdbool.h>
+
+#include "format-t.h"
 #include "string-t.h"
 
 static bool name_rune(rune_t rune) {
@@ -167,7 +173,7 @@ static void append_token(string_t *out, token_kind_t kind, const string_t *text)
             break;
     }
 
-    string_append_format(out, "%S]", text);
+    fmt_append(out, "{text}]", FMT(text));
 }
 
 static bool read_name(string_cursor_t *cursor, string_t *out) {
@@ -233,7 +239,7 @@ int main(void) {
         read_operator(cursor, tokens);
     }
 
-    string_printf("%S\n", tokens);
+    fmt_print("{tokens}\n", FMT(tokens));
 
     string_free(tokens);
     string_cursor_free(cursor);
@@ -251,6 +257,7 @@ id[cdf] op[(] id[α_1] op[)] op[+] number[355/113]
 ## Example: Fixed-Capacity Buffer
 
 ```c
+#include "format-t.h"
 #include "string-t.h"
 
 int main(void) {
@@ -259,7 +266,7 @@ int main(void) {
     string_buffer_init(&buf, storage, sizeof(storage));
     string_buffer_append(&buf, "Hello");
     string_buffer_append_char(&buf, '!');
-    string_printf("%s\n", string_buffer_c_str(&buf));
+    fmt_print("{buffer_c_str}\n", FMT(buffer_c_str, string_buffer_c_str(&buf)));
     return 0;
 }
 ```
@@ -388,26 +395,32 @@ All declarations are in `include/string-t.h`.
 For typed brace placeholders, named bindings and reusable templates, use the
 [format module](format.md), with `fmt_` functions and `FMT(value)`. Its append
 API accepts both `string_t` and `string_builder_t` destinations.
+`fmt_append()` stages its result and preserves the destination if formatting fails.
 
 - `int string_append_format(string_t *s, const char *fmt, ...)` — append formatted text
+
 - `int string_append_vformat(string_t *s, const char *fmt, va_list ap)` — `va_list` append variant
 - `string_t *string_sprintf(const char *fmt, ...)` — create a new formatted string
 - `string_t *string_vsprintf(const char *fmt, va_list ap)` — `va_list` creation variant
 - `int string_printf(const char *fmt, ...)` — print formatted text to stdout
 
-Use `%S` for `const string_t *`, `%W` for `string_view_t`, and `%R` for
-`rune_t`:
+The printf-style functions use `%S` for `const string_t *`, `%W` for
+`string_view_t`, and `%R` for `rune_t`. With typed formatting, `FMT(value)`
+captures each of these types directly, as in this append example:
 
 ```c
 #include <stdio.h>
+
+#include "format-t.h"
 #include "string-t.h"
 
 int main(void)
 {
     string_t *out = string_new();
     string_t *name = string_new_with("MARS");
-    string_append_format(out, "name=%S first=%R", name, string_at(name, 0));
-    string_printf("%S\n", out);
+    rune_t first = string_at(name, 0);
+    fmt_append(out, "name={name} first={first}", FMT(name), FMT(first));
+    fmt_print("{out}\n", FMT(out));
     string_free(out);
     string_free(name);
     return 0;
@@ -650,13 +663,14 @@ The return value is zero on success or -1 for invalid input, overflow or
 allocation failure. The caller owns both the destination and source storage.
 
 ```c
+#include "format-t.h"
 #include "string-t.h"
 
 int main(void)
 {
     string_t *text = string_new();
     int status = string_append_utf8_exact(text, "e\xcc\x81", 3);
-    string_printf("status=%d bytes=%zu\n", status, string_byte_length(text));
+    fmt_print("status={status} bytes={bytes}\n", FMT(status), FMT(bytes, string_byte_length(text)));
     string_free(text);
     return 0;
 }
@@ -704,13 +718,14 @@ unrepresentable storage size gives `EOVERFLOW`. Time and storage are linear in t
 input size; output never exceeds its input byte count.
 
 ```c
+#include "format-t.h"
 #include "string-t.h"
 
 int main(void)
 {
     string_t *quoted = string_new_with("'pa'\"'\"'ss word'");
     string_t *value = string_unquote_shell(quoted);
-    string_printf("%S\n", value);
+    fmt_print("{value}\n", FMT(value));
     string_free(value);
     string_free(quoted);
     return 0;

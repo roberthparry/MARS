@@ -13,11 +13,11 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "format-t.h"
 #include "string-t.h"
 #include "diffequation-t.h"
 #define MARS_EXPR_INTERNAL_ACCESS
 #include "expression/expr_internal.h"
-
 #include "test_harness.h"
 #include "test_diffequ_affine.h"
 
@@ -112,7 +112,8 @@ bool test_diffequ_affine_solution_verified(const diffequ_t *de, const equation_t
     bool valid = sampled || (dependent && zero && (expr_is_exact_zero(zero) || affine_zero_at_samples(zero, de)));
     if (!valid) {
         char *debug = zero ? expr_to_string(zero, style_UNBOUND) : NULL;
-        printf("  substitution residual: %s\n", debug ? debug : "NULL");
+        fmt_print("  substitution residual: {substitution_residual}\n",
+            FMT(substitution_residual, debug ? debug : "NULL"));
         free(debug);
     }
     expr_free(zero);
@@ -248,7 +249,7 @@ void example_diffequation_affine_transport(void)
     diffequ_solve_result_t *result = de ? de_solve(de) : NULL;
     const equation_t *solution = de_solve_result_at(result, 0u);
     string_t *text = solution ? equ_to_text(solution, style_UNBOUND) : NULL;
-    printf("  %s\n  %s\n", source, text ? string_c_str(text) : "NULL");
+    fmt_print("  {source}\n  {c_str}\n", FMT(source), FMT(c_str, text ? string_c_str(text) : "NULL"));
     bool valid = text && strcmp(string_c_str(text), "u = F(x - t, y·exp(-t)) - cos(t)") == 0 &&
                  solution && test_diffequ_affine_solution_verified(de, solution);
     string_free(text);
@@ -265,7 +266,7 @@ void example_diffequation_time_affine_transport(void)
     diffequ_solve_result_t *result = de ? de_solve(de) : NULL;
     const equation_t *solution = de_solve_result_at(result, 0u);
     string_t *text = solution ? equ_to_text(solution, style_UNBOUND) : NULL;
-    printf("  %s\n  %s\n", source, text ? string_c_str(text) : "NULL");
+    fmt_print("  {source}\n  {c_str}\n", FMT(source), FMT(c_str, text ? string_c_str(text) : "NULL"));
     bool valid = text && strcmp(string_c_str(text), "f = F(x·exp(-t), y - t³)") == 0 &&
                  solution && test_diffequ_affine_solution_verified(de, solution);
     string_free(text);
@@ -283,7 +284,7 @@ void example_diffequation_symbolic_affine_transport(void)
     const equation_t *solution = de_solve_result_at(result, 0u);
     string_t *text = solution ? equ_to_text(solution, style_UNBOUND) : NULL;
     char *TeX = de ? de_to_string(de, style_LATEX) : NULL;
-    printf("  %s\n  %s\n", source, text ? string_c_str(text) : "NULL");
+    fmt_print("  {source}\n  {c_str}\n", FMT(source), FMT(c_str, text ? string_c_str(text) : "NULL"));
     bool valid = de_solve_result_status(result) == DE_SOLVE_STATUS_SOLVED && text &&
                  strcmp(string_c_str(text), "u = F(½·(2x - 2αt - βt²), y - γ·exp(t))") == 0 &&
                  solution && test_diffequ_affine_solution_verified(de, solution);

@@ -13,10 +13,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "format-t.h"
 #include "string-t.h"
 #include "test_diffequ_wave_ivp.h"
 #include "test_harness.h"
-
 #define MARS_SHARED_EXPR_INTERNAL_ACCESS
 #include "internal/expr_internal.h"
 
@@ -188,7 +188,7 @@ void example_diffequation_wave_zero_data(void)
     const char *expected = "u = ½·∫^t_0 ∫^(t + x - s)_(s - t + x) cos(s)·f(ξ)·dξ·ds";
     bool valid = text && strcmp(string_c_str(text), expected) == 0 && TeX &&
                  !strstr(TeX, "0 + 0") && !strstr(TeX, "\\frac{0}");
-    printf("  %s\n  %s\n", source, text ? string_c_str(text) : "NULL");
+    fmt_print("  {source}\n  {c_str}\n", FMT(source), FMT(c_str, text ? string_c_str(text) : "NULL"));
     free(TeX); string_free(text); de_solve_result_free(result); de_free(de);
     ASSERT_TRUE(valid);
 }

@@ -14,9 +14,11 @@
 #include <limits.h>
 #include <math.h>
 
+#include "string-t.h"
+#define MARS_SHARED_DATETIME_CALENDAR_INTERNAL_ACCESS
+#include "internal/datetime_calendar_internal.h"
 #define MARS_DATETIME_INTERNAL_ACCESS
 #include "datetime_internal.h"
-#include "string-t.h"
 
 static long datetime_ethiopian_ymd_to_jdn(int year, int month, int day);
 
@@ -284,6 +286,14 @@ static void datetime_jdn_to_islamic_ymd(long jdn, int *year, int *month, int *da
     }
 }
 
+bool datetime_islamic_components(const datetime_t *value, int *year, int *month, int *day)
+{
+    if (!value || !year || !month || !day || datetime_jdn(value) == LONG_MAX)
+        return false;
+    datetime_jdn_to_islamic_ymd(datetime_jdn(value), year, month, day);
+    return *year >= 1 && *month >= 1 && *month <= 12 && *day >= 1 && *day <= 30;
+}
+
 /* Format the selected date in the civil Islamic calendar. */
 string_t *datetime_muslim_calendar_date_text(const datetime_t *dttm)
 {
@@ -295,10 +305,9 @@ string_t *datetime_muslim_calendar_date_text(const datetime_t *dttm)
     int day;
     string_t *out;
 
-    if (!dttm || datetime_jdn(dttm) == LONG_MAX)
+    if (!datetime_islamic_components(dttm, &year, &month, &day))
         return NULL;
 
-    datetime_jdn_to_islamic_ymd(datetime_jdn(dttm), &year, &month, &day);
     out = string_new();
     if (!out || string_append_format(out, "%d %s %d AH", day, monthNames[month], year) < 0) {
         string_free(out);
@@ -403,8 +412,7 @@ static const char *datetime_hebrew_month_name(int year, int monthIndexFromTishre
     return commonNames[monthIndexFromTishrei];
 }
 
-/* Format the selected date in the Jewish calendar. */
-string_t *datetime_jewish_calendar_date_text(const datetime_t *dttm)
+bool datetime_hebrew_components(const datetime_t *dttm, int *year, int *month, int *day)
 {
     long jdn;
     long newYearJdn;
@@ -412,11 +420,9 @@ string_t *datetime_jewish_calendar_date_text(const datetime_t *dttm)
     int dayOfYear;
     int monthIndex;
     int monthCount;
-    int day;
-    string_t *out;
 
-    if (!dttm || datetime_jdn(dttm) == LONG_MAX)
-        return NULL;
+    if (!dttm || !year || !month || !day || datetime_jdn(dttm) == LONG_MAX)
+        return false;
 
     jdn = datetime_jdn(dttm);
     hebrewYear = datetime_year(dttm) + 3760;
@@ -437,12 +443,23 @@ string_t *datetime_jewish_calendar_date_text(const datetime_t *dttm)
         monthIndex++;
     }
     if (monthIndex >= monthCount)
-        return NULL;
-    day = dayOfYear;
+        return false;
+    *year = hebrewYear;
+    *month = monthIndex + 1 + (!datetime_hebrew_leap_year(hebrewYear) && monthIndex >= 5);
+    *day = dayOfYear;
+    return true;
+}
 
-    out = string_new();
-    if (!out || string_append_format(out, "%d %s %d AM", day, datetime_hebrew_month_name(hebrewYear, monthIndex),
-                                     hebrewYear) < 0) {
+/* Format the selected date in the Jewish calendar. */
+string_t *datetime_jewish_calendar_date_text(const datetime_t *dttm)
+{
+    int year, month, day;
+    if (!datetime_hebrew_components(dttm, &year, &month, &day))
+        return NULL;
+    int index = month - 1 - (!datetime_hebrew_leap_year(year) && month >= 7);
+
+    string_t *out = string_new();
+    if (!out || string_append_format(out, "%d %s %d AM", day, datetime_hebrew_month_name(year, index), year) < 0) {
         string_free(out);
         return NULL;
     }

@@ -19,6 +19,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "format-t.h"
 #include "datetime-t.h"
 #include "string-t.h"
 #include "test_harness.h"
@@ -998,16 +999,11 @@ static void example_chinese_new_years(void)
         datetime_t *dt = datetime_init_chinese_new_year(datetime_alloc(), cases[i].year);
 
         if (!dt) {
-            printf("Year %d is outside the supported range.\n", cases[i].year);
+            fmt_print("Year {year} is outside the supported range.\n", FMT(year, cases[i].year));
             continue;
         }
 
-        /* Extract components */
-        short y = datetime_year(dt);
-        month_t m = datetime_month(dt);
-        unsigned char d = datetime_day(dt);
-
-        printf("Chinese New Year %d: %d-%02d-%02d\n", cases[i].year, y, (int)m, d);
+        fmt_print("Chinese New Year {dt:yyyy: yyyy-MM-dd}\n", FMT(dt));
 
         datetime_dealloc(dt);
     }

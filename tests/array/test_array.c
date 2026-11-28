@@ -17,6 +17,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "format-t.h"
 #include "test_harness.h"
 #include "array-t.h"
 
@@ -243,8 +244,8 @@ void example_array_primitive(void)
     array_sort(arr, int_cmp);
 
     for (size_t i = 0; i < array_size(arr); ++i)
-        printf("%d ", *(int *)array_get(arr, i));
-    printf("\n");
+        fmt_print("{value} ", FMT(value, *(int *)array_get(arr, i)));
+    fmt_print("\n");
 
     array_destroy(arr);
 }
@@ -263,7 +264,7 @@ void example_array_deep_struct(void)
 
     for (size_t i = 0; i < array_size(arr); ++i) {
         struct deep *p = array_get(arr, i);
-        printf("%s: %d\n", p->name, p->value);
+        fmt_print("{name}: {value}\n", FMT(name, p->name), FMT(value, p->value));
     }
 
     // Clean up original structs
@@ -645,8 +646,8 @@ void example_slice_subrange(void)
     array_slice_t *slice = array_slice(arr, 2, 4);
 
     for (size_t i = 0; i < array_slice_size(slice); ++i)
-        printf("%d ", *(int *)array_slice_get(slice, i));
-    printf("\n");
+        fmt_print("{value} ", FMT(value, *(int *)array_slice_get(slice, i)));
+    fmt_print("\n");
 
     array_slice_destroy(slice);
     array_destroy(arr);
@@ -663,15 +664,15 @@ void example_slice_sort(void)
     array_slice_t *slice = array_slice(arr, 0, 5);
     array_slice_sort(slice, int_cmp);
 
-    printf("slice (sorted): ");
+    fmt_print("slice (sorted): ");
     for (size_t i = 0; i < array_slice_size(slice); ++i)
-        printf("%d ", *(int *)array_slice_get(slice, i));
-    printf("\n");
+        fmt_print("{value} ", FMT(value, *(int *)array_slice_get(slice, i)));
+    fmt_print("\n");
 
-    printf("array (unchanged): ");
+    fmt_print("array (unchanged): ");
     for (size_t i = 0; i < array_size(arr); ++i)
-        printf("%d ", *(int *)array_get(arr, i));
-    printf("\n");
+        fmt_print("{value} ", FMT(value, *(int *)array_get(arr, i)));
+    fmt_print("\n");
 
     array_slice_destroy(slice);
     array_destroy(arr);
@@ -691,8 +692,8 @@ void example_slice_materialise(void)
     array_destroy(arr);
 
     for (size_t i = 0; i < array_size(copy); ++i)
-        printf("%d ", *(int *)array_get(copy, i));
-    printf("\n");
+        fmt_print("{value} ", FMT(value, *(int *)array_get(copy, i)));
+    fmt_print("\n");
 
     array_destroy(copy);
 }
@@ -707,7 +708,7 @@ void example_stack_basic(void)
 
     int *v;
     while ((v = stack_pop(s)) != NULL) {
-        printf("%d\n", *v);
+        fmt_print("{value}\n", FMT(value, *v));
         free(v);
     }
 
@@ -724,7 +725,7 @@ void example_stack_deep(void)
 
     char **top;
     while ((top = stack_pop(s)) != NULL) {
-        printf("%s\n", *top);
+        fmt_print("{value}\n", FMT(value, *top));
         free(*top);
         free(top);
     }
