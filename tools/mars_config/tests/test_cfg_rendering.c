@@ -265,7 +265,7 @@ static bool test_cfg_rendering_uk_ordinals(const char *directory)
             ok = test_cfg_rendering_settings(db, jurisdictions[i], explicit_locale ? "en_GB" : NULL) &&
                  test_cfg_rendering_expect_rows(db,
                                                 "SELECT [Date Lingua],[Date UK],[Date Regional] FROM calendar_local "
-                                                "ORDER BY FullDateAlternateKey",
+                                                "ORDER BY DateKey",
                                                 expected);
     string_free(expected);
     ok = ok && test_cfg_rendering_sample_dates(db);
@@ -273,11 +273,11 @@ static bool test_cfg_rendering_uk_ordinals(const char *directory)
     for (size_t i = 0; ok && i < sizeof other / sizeof *other; ++i) {
         ok = test_cfg_rendering_settings(db, "NL", other[i]) &&
              test_cfg_rendering_sql_ok(db, "DROP TABLE IF EXISTS reference; CREATE TEMP TABLE reference AS "
-                                           "SELECT FullDateAlternateKey,[Date Lingua] AS lingua FROM calendar_local") &&
+                                           "SELECT DateKey,[Date Lingua] AS lingua FROM calendar_local") &&
              test_cfg_rendering_settings(db, "GB-WLS", other[i]) &&
              test_cfg_rendering_expect_literal(
                  db,
-                 "SELECT count(*) FROM calendar_local JOIN reference USING(FullDateAlternateKey) "
+                 "SELECT count(*) FROM calendar_local JOIN reference USING(DateKey) "
                  "WHERE [Date Lingua] IS NOT lingua",
                  "0");
     }
@@ -289,7 +289,7 @@ static bool test_cfg_rendering_uk_ordinals(const char *directory)
     for (size_t i = 0; ok && i < sizeof overseas / sizeof *overseas; ++i)
         ok = test_cfg_rendering_settings(db, overseas[i].jurisdiction, overseas[i].locale) &&
              test_cfg_rendering_expect_literal(
-                 db, "SELECT [Date Lingua] FROM calendar_local WHERE FullDateAlternateKey='2024-01-01'",
+                 db, "SELECT [Date Lingua] FROM calendar_local WHERE DateKey='2024-01-01'",
                  overseas[i].date);
     sqlite_close(db);
     return ok;
@@ -316,11 +316,11 @@ static bool test_cfg_rendering_french_ordinals(const char *directory)
         ok =
             test_cfg_rendering_settings(db, "CA-QC", sqlite_stmt_column_text(locales, 0)) &&
             test_cfg_rendering_expect_rows(
-                db, "SELECT [Date Lingua],[Date Regional] FROM calendar_local ORDER BY FullDateAlternateKey", expected);
+                db, "SELECT [Date Lingua],[Date Regional] FROM calendar_local ORDER BY DateKey", expected);
     }
     ok = ok && count && step == SQLITE_STEP_DONE && test_cfg_rendering_settings(db, "CA-QC", "en_CA") &&
          test_cfg_rendering_expect_literal(
-             db, "SELECT [Date Lingua],[Date Regional] FROM calendar_local WHERE FullDateAlternateKey='2024-01-01'",
+             db, "SELECT [Date Lingua],[Date Regional] FROM calendar_local WHERE DateKey='2024-01-01'",
              "January 1, 2024|1ᵉʳ janvier 2024");
     sqlite_stmt_finalize(locales);
     string_free(expected);
@@ -347,13 +347,13 @@ static bool test_cfg_rendering_regional_and_grammar(const char *directory)
         ok = expected && test_cfg_rendering_settings(db, regional[i].jurisdiction, regional[i].locale) &&
              test_cfg_rendering_expect_rows(db,
                                             "SELECT [Date Regional],[Date UK],[Date Lingua] FROM calendar_local "
-                                            "WHERE FullDateAlternateKey='2026-07-04'",
+                                            "WHERE DateKey='2026-07-04'",
                                             expected);
         string_free(expected);
     }
     ok = ok && test_cfg_rendering_settings(db, "US-NY", NULL) &&
          test_cfg_rendering_expect_literal(
-             db, "SELECT [Date Regional]=[Date Lingua] FROM calendar_local WHERE FullDateAlternateKey='2026-07-04'",
+             db, "SELECT [Date Regional]=[Date Lingua] FROM calendar_local WHERE DateKey='2026-07-04'",
              "1");
     const struct {
         const char *locale, *date, *month;
@@ -368,7 +368,7 @@ static bool test_cfg_rendering_regional_and_grammar(const char *directory)
         ok = expected && test_cfg_rendering_settings(db, "GB-ENG", grammar[i].locale) &&
              test_cfg_rendering_expect_rows(db,
                                             "SELECT [Date Lingua],[Month Name],[Date UK] FROM calendar_local WHERE "
-                                            "FullDateAlternateKey='2024-06-21'",
+                                            "DateKey='2024-06-21'",
                                             expected);
         string_free(expected);
     }
@@ -376,7 +376,7 @@ static bool test_cfg_rendering_regional_and_grammar(const char *directory)
          test_cfg_rendering_expect_literal(
              db,
              "SELECT [Day Name],[Month Name Abbrev],[Date UK],[Public Holiday] FROM calendar_local "
-             "WHERE FullDateAlternateKey='2024-06-21'",
+             "WHERE DateKey='2024-06-21'",
              "Veneris|Iun|21ˢᵗ June 2024|<NULL>");
     sqlite_close(db);
     return ok;
@@ -436,7 +436,7 @@ static bool test_cfg_rendering_supplemental_names(const char *directory)
         ok = ok &&
              test_cfg_rendering_expect_rows(db,
                                             "SELECT [Date Lingua],[Month Name],[Month Name Abbrev] FROM calendar_local "
-                                            "ORDER BY FullDateAlternateKey",
+                                            "ORDER BY DateKey",
                                             expected) &&
              test_cfg_rendering_fill_range(db, (civil_date_t){2026, cases[i].weekday_month, cases[i].weekday_first},
                                            (civil_date_t){2026, cases[i].weekday_month, cases[i].weekday_first + 6},
@@ -447,7 +447,7 @@ static bool test_cfg_rendering_supplemental_names(const char *directory)
             ok = test_cfg_rendering_append_format(expected, "%S|%S\n", words[2][day], words[3][day]) >= 0;
         ok = ok &&
              test_cfg_rendering_expect_rows(
-                 db, "SELECT [Day Name],[Day Name Abbrev] FROM calendar_local ORDER BY FullDateAlternateKey", expected);
+                 db, "SELECT [Day Name],[Day Name Abbrev] FROM calendar_local ORDER BY DateKey", expected);
         string_free(expected);
         for (size_t j = 0; j < 4; ++j)
             string_split_free(words[j], counts[j]);
@@ -457,7 +457,7 @@ static bool test_cfg_rendering_supplemental_names(const char *directory)
          test_cfg_rendering_expect_literal(
              db,
              "SELECT [Date Lingua],[Day Name],[Day Name Abbrev],[Month Name] FROM calendar_local ORDER BY "
-             "FullDateAlternateKey",
+             "DateKey",
              "16 Maii 2027|Solis|Sol|Maius\n17 Maii 2027|Lunae|Lun|Maius\n18 Maii 2027|Martis|Mar|Maius\n"
              "19 Maii 2027|Mercurii|Mer|Maius\n20 Maii 2027|Iovis|Iov|Maius\n21 Maii 2027|Veneris|Ven|Maius\n"
              "22 Maii 2027|Saturni|Sat|Maius");
@@ -470,9 +470,9 @@ static bool test_cfg_rendering_babel_reference(const char *directory)
     sqlite_t *db = test_cfg_rendering_database(directory);
     file_t *fixture = file_new_cstr(MARS_CONFIG_ROOT_DIR "/tools/mars_config/tests/fixtures/babel_2_17_0_calendar.tsv");
     bool ok = db && test_cfg_rendering_sample_dates(db) && fixture && file_open_text(fixture);
-    sqlite_stmt_t *query = ok ? sqlite_stmt_prepare(db, "SELECT FullDateAlternateKey,[Date Lingua],[Month Name],[Month "
+    sqlite_stmt_t *query = ok ? sqlite_stmt_prepare(db, "SELECT DateKey,[Date Lingua],[Month Name],[Month "
                                                         "Name Abbrev],[Day Name],[Day Name Abbrev] "
-                                                        "FROM calendar_local ORDER BY FullDateAlternateKey")
+                                                        "FROM calendar_local ORDER BY DateKey")
                               : NULL;
     string_t *previous = NULL;
     size_t locales = 0, rows = 0;
@@ -587,8 +587,8 @@ static bool test_cfg_rendering_arabic_and_hebrew_boundaries(const char *director
     for (size_t i = 0; ok && i < sizeof locales / sizeof *locales; ++i) {
         ok = test_cfg_rendering_settings(db, "GB-ENG", locales[i]) &&
              test_cfg_rendering_expect_rows(db,
-                                            "SELECT FullDateAlternateKey,[Date Lingua],[Date UK],[Year],[Month],[Day] "
-                                            "FROM calendar_local ORDER BY FullDateAlternateKey",
+                                            "SELECT DateKey,[Date Lingua],[Date UK],[Year],[Month],[Day] "
+                                            "FROM calendar_local ORDER BY DateKey",
                                             expected);
         sqlite_stmt_t *query = sqlite_stmt_prepare(db, "SELECT [Date Lingua] FROM calendar_local");
         sqlite_step_result_t step = SQLITE_STEP_ERROR;
@@ -636,11 +636,11 @@ static bool test_cfg_rendering_arabic_and_hebrew_boundaries(const char *director
         ok = test_cfg_rendering_settings(db, "GB-ENG", hebrew_locales[i]) &&
              test_cfg_rendering_expect_rows(
                  db,
-                 "SELECT FullDateAlternateKey,[Date Lingua],[Year],[Month],[Day] FROM calendar_local "
-                 "ORDER BY FullDateAlternateKey",
+                 "SELECT DateKey,[Date Lingua],[Year],[Month],[Day] FROM calendar_local "
+                 "ORDER BY DateKey",
                  expected) &&
              test_cfg_rendering_expect_literal(
-                 db, "SELECT [Date UK] FROM calendar_local WHERE FullDateAlternateKey='2026-04-02'", "2ⁿᵈ April 2026");
+                 db, "SELECT [Date UK] FROM calendar_local WHERE DateKey='2026-04-02'", "2ⁿᵈ April 2026");
     string_free(expected);
     sqlite_close(db);
     return ok;
@@ -655,12 +655,12 @@ static bool test_cfg_rendering_fields_fixture(const char *directory)
     civil_date_t first = {2015, 1, 1}, last = {current.tm_year + 1900 + 7, 12, 31};
     sqlite_t *db = test_cfg_rendering_database(directory);
     bool ok = db && test_cfg_rendering_fill_range(db, first, last, true);
-    const char *query = "SELECT FullDateAlternateKey,[FullDate and End Time],[Year],[Month],[Day],"
+    const char *query = "SELECT DateKey,[FullDate and End Time],[Year],[Month],[Day],"
                         "[Days in Month],[MC Dates],[ME Dates],[WC Dates],[WE Dates],[WEDates (Friday)],"
                         "[WE Dates plus End Time],[Day of Week],[Fiscal Year End],[Fiscal Month],[Fiscal Quarter No],"
                         "[Fiscal Qtr],[Fiscal Quarter Name],[Fiscal Years],[Date UK],[Date Lingua],[Workday Type],"
                         "[Working Day No],[Day Type],[Non working day Type],[Moon Phase %] "
-                        "FROM calendar_local ORDER BY FullDateAlternateKey";
+                        "FROM calendar_local ORDER BY DateKey";
     string_t *expected = string_new();
     int total = 0;
     for (civil_date_t day = first; ok && test_cfg_rendering_civil_index(day) <= test_cfg_rendering_civil_index(last);
@@ -699,18 +699,18 @@ static bool test_cfg_rendering_fields_fixture(const char *directory)
          test_cfg_rendering_expect_literal(
              db,
              "SELECT [Day Name],[Month Name Abbrev],[ME Dates Text],[WE Dates Text] FROM calendar_local "
-             "WHERE FullDateAlternateKey='2024-12-31'",
+             "WHERE DateKey='2024-12-31'",
              "Tuesday|Dec|Dec 2024|05 Jan 2025") &&
          test_cfg_rendering_expect_literal(
              db, "SELECT count(*) FROM calendar_local WHERE typeof([Working Day No])!='integer'", "0");
     string_free(expected);
     /* Independently accumulate fixture inputs before applying caller filters and LIMIT. */
-    const char *predicates[] = {"FullDateAlternateKey >= '2024-12-28'", "[Workday Type]=0"};
+    const char *predicates[] = {"DateKey >= '2024-12-28'", "[Workday Type]=0"};
     for (size_t i = 0; ok && i < 2; ++i) {
         string_t *sql = string_sprintf(
-            "SELECT count(*) FROM (SELECT FullDateAlternateKey,[Working Day No] AS n "
-            "FROM calendar_local WHERE %s ORDER BY FullDateAlternateKey DESC LIMIT 10) AS v WHERE n != "
-            "(SELECT count(*) FROM calendar_local_days AS d WHERE d.calendar_date<=v.FullDateAlternateKey "
+            "SELECT count(*) FROM (SELECT DateKey,[Working Day No] AS n "
+            "FROM calendar_local WHERE %s ORDER BY DateKey DESC LIMIT 10) AS v WHERE n != "
+            "(SELECT count(*) FROM calendar_local_days AS d WHERE d.calendar_date<=v.DateKey "
             "AND d.is_weekend=0 AND d.holiday_name IS NULL)",
             predicates[i]);
         ok = sql && test_cfg_rendering_expect_literal(db, string_c_str(sql), "0");
@@ -730,10 +730,10 @@ static bool test_cfg_rendering_working_fixture(const char *directory)
             "INSERT INTO calendar_local_days VALUES ('2025-01-01','Holiday',0,0),('2024-12-31',NULL,0,0),"
             "('2024-12-30','Holiday',0,0),('2024-12-29',NULL,0,0),('2024-12-28',NULL,1,0),('2024-12-27',NULL,1,0)") &&
         test_cfg_rendering_expect_literal(
-            db, "SELECT [Working Day No],[Workday Type] FROM calendar_local ORDER BY FullDateAlternateKey",
+            db, "SELECT [Working Day No],[Workday Type] FROM calendar_local ORDER BY DateKey",
             "0|0\n0|0\n1|1\n1|0\n2|1\n2|0") &&
         test_cfg_rendering_expect_literal(
-            db, "SELECT [Working Day No] FROM calendar_local WHERE FullDateAlternateKey='2025-01-01'", "2") &&
+            db, "SELECT [Working Day No] FROM calendar_local WHERE DateKey='2025-01-01'", "2") &&
         test_cfg_rendering_sql_ok(db, "DELETE FROM calendar_local_days WHERE calendar_date!='2024-12-29'") &&
         test_cfg_rendering_expect_literal(db, "SELECT [Working Day No],[Workday Type] FROM calendar_local", "1|1");
     sqlite_close(db);
@@ -901,7 +901,7 @@ static bool test_cfg_rendering_seed_fixture(const char *directory)
         db && test_cfg_rendering_seed_snapshot(db) &&
         test_cfg_rendering_expect_literal(
             db, "SELECT name FROM pragma_table_info('calendar_local') ORDER BY cid",
-            "FullDateAlternateKey\nFullDate and End Time\nYear\nMonth\nDay\nDays in Month\nMC Dates\nME Dates\n"
+            "DateKey\nFullDate and End Time\nYear\nMonth\nDay\nDays in Month\nMC Dates\nME Dates\n"
             "ME Dates Text\nWC Dates\nWE Dates\nWEDates (Friday)\nWE Dates plus End Time\nWE Dates Text\nDay of Week\n"
             "Day Name\nMonth Name\nFiscal Year End\nFiscal Month\nFiscal Quarter No\nFiscal Qtr\nFiscal Quarter Name\n"
             "Fiscal Years\nPublic Holiday\nNon working day Type\nWorkday Type\nWorking Day No\nDay "
@@ -997,8 +997,8 @@ static bool test_cfg_rendering_solar_fixture(const char *directory)
                                             "calendar_date BETWEEN '2025-03-30' AND '2025-10-25'") &&
               test_cfg_rendering_expect_literal(
                   db,
-                  "SELECT Sunrise,Sunset FROM calendar_local WHERE FullDateAlternateKey IN ('2024-06-21','2024-12-21') "
-                  "ORDER BY FullDateAlternateKey",
+                  "SELECT Sunrise,Sunset FROM calendar_local WHERE DateKey IN ('2024-06-21','2024-12-21') "
+                  "ORDER BY DateKey",
                   "04:47:00|21:39:00\n08:21:00|15:58:00") &&
               test_cfg_rendering_expect_literal(
                   db,
@@ -1009,18 +1009,18 @@ static bool test_cfg_rendering_solar_fixture(const char *directory)
                   db,
                   "WITH pairs(a,b,delta) AS (VALUES('2024-03-30','2024-03-31',60),('2024-10-26','2024-10-27',-60),"
                   "('2025-03-29','2025-03-30',60),('2025-10-25','2025-10-26',-60)) SELECT count(*) FROM pairs "
-                  "JOIN calendar_local x ON x.FullDateAlternateKey=a JOIN calendar_local y ON y.FullDateAlternateKey=b "
+                  "JOIN calendar_local x ON x.DateKey=a JOIN calendar_local y ON y.DateKey=b "
                   "WHERE abs((strftime('%s',y.Sunrise)-strftime('%s',x.Sunrise))/60-delta)>3 OR "
                   "abs((strftime('%s',y.Sunset)-strftime('%s',x.Sunset))/60-delta)>3",
                   "0");
     for (int i = 0; ok && i < 2; ++i)
         ok = test_cfg_rendering_load_sql(db, "packaging/jurisdiction-db/mars_calendar_local.sql") &&
              test_cfg_rendering_expect_literal(
-                 db, "SELECT Sunrise,Sunset FROM calendar_local WHERE FullDateAlternateKey='2024-06-21'",
+                 db, "SELECT Sunrise,Sunset FROM calendar_local WHERE DateKey='2024-06-21'",
                  "04:47:00|21:39:00");
     ok = ok && test_cfg_rendering_sql_ok(db, "UPDATE calendar_local_settings SET latitude=90") &&
          test_cfg_rendering_expect_literal(
-             db, "SELECT Sunrise,Sunset FROM calendar_local WHERE FullDateAlternateKey='2024-06-21'", "<NULL>|<NULL>");
+             db, "SELECT Sunrise,Sunset FROM calendar_local WHERE DateKey='2024-06-21'", "<NULL>|<NULL>");
     sqlite_close(db);
     return ok;
 }
@@ -1128,7 +1128,7 @@ static bool test_cfg_rendering_cycle_fixture(const char *directory, bool hebrew)
          test_cfg_rendering_settings(db, "GB-ENG", hebrew ? "he_IL" : "ar_EG");
     sqlite_stmt_t *query =
         ok ? sqlite_stmt_prepare(
-                 db, "SELECT FullDateAlternateKey,[Date Lingua] FROM calendar_local ORDER BY FullDateAlternateKey")
+                 db, "SELECT DateKey,[Date Lingua] FROM calendar_local ORDER BY DateKey")
            : NULL;
     int previous_day = 0, previous_start = -1;
     unsigned year_lengths = 0, month_lengths = 0, adars = 0;
@@ -1207,12 +1207,12 @@ static bool test_cfg_rendering_hijri_fixture(const char *directory)
 
 static bool test_cfg_rendering_readme_holidays(sqlite_t *db, const string_t *guide)
 {
-    const char *rhyl_query = "select FullDateAlternateKey, [Date Lingua], [Public Holiday]\nfrom calendar_local\n"
-                             "where FullDateAlternateKey between '2026-12-25' and '2026-12-28'\n"
-                             "  and [Public Holiday] is not null\norder by FullDateAlternateKey;";
+    const char *rhyl_query = "select DateKey, [Date Lingua], [Public Holiday]\nfrom calendar_local\n"
+                             "where DateKey between '2026-12-25' and '2026-12-28'\n"
+                             "  and [Public Holiday] is not null\norder by DateKey;";
     const char *spanish_query =
-        "select FullDateAlternateKey, [Date Lingua], [Public Holiday]\nfrom calendar_local\n"
-        "where FullDateAlternateKey in ('2026-01-01', '2026-07-04', '2026-12-25')\norder by FullDateAlternateKey;";
+        "select DateKey, [Date Lingua], [Public Holiday]\nfrom calendar_local\n"
+        "where DateKey in ('2026-01-01', '2026-07-04', '2026-12-25')\norder by DateKey;";
     const struct {
         const char *jurisdiction, *locale, *inputs, *expected;
     } cases[] = {
@@ -1234,7 +1234,7 @@ static bool test_cfg_rendering_readme_holidays(sqlite_t *db, const string_t *gui
         const char *query = i == 2 ? spanish_query : rhyl_query;
         string_t *setup = string_sprintf("DELETE FROM calendar_local_days; INSERT INTO calendar_local_days VALUES %s",
                                          cases[i].inputs);
-        string_t *output = string_sprintf("FullDateAlternateKey|Date Lingua|Public Holiday\n%s", cases[i].expected);
+        string_t *output = string_sprintf("DateKey|Date Lingua|Public Holiday\n%s", cases[i].expected);
         ok = setup && output && string_find(guide, query) >= 0 && string_find_string(guide, output) >= 0 &&
              test_cfg_rendering_sql_ok(db, string_c_str(setup)) &&
              test_cfg_rendering_settings(db, cases[i].jurisdiction, cases[i].locale) &&
@@ -1255,57 +1255,57 @@ static bool test_cfg_rendering_readme_fixture(const char *directory)
     } cases[] = {
         {"NL", "fy_NL",
          "select [Date Lingua], [Date Regional], [Public Holiday]\n"
-         "from calendar_local where FullDateAlternateKey = '2026-12-25';",
+         "from calendar_local where DateKey = '2026-12-25';",
          "Date Lingua|Date Regional|Public Holiday\n", "25 Desimber 2026|25 december 2026|Earste Krystdei"},
         {"JM", "jam",
-         "select FullDateAlternateKey, [Date Lingua], [Day Name], [Public Holiday]\n"
-         "from calendar_local\nwhere FullDateAlternateKey = '2026-08-06';",
-         "FullDateAlternateKey|Date Lingua|Day Name|Public Holiday\n",
+         "select DateKey, [Date Lingua], [Day Name], [Public Holiday]\n"
+         "from calendar_local\nwhere DateKey = '2026-08-06';",
+         "DateKey|Date Lingua|Day Name|Public Holiday\n",
          "2026-08-06|6 Aagus 2026|Turzdeh|Independence Deh"},
         {"GB-ENG", "he_IL",
-         "select [Date Lingua], [Date UK]\nfrom calendar_local\nwhere FullDateAlternateKey = '2026-04-02';", "",
+         "select [Date Lingua], [Date UK]\nfrom calendar_local\nwhere DateKey = '2026-04-02';", "",
          "15 בניסן 5786|2ⁿᵈ April 2026"},
         {"GB-ENG", "ar_PS",
-         "select [Date Lingua], [Date UK]\nfrom calendar_local\nwhere FullDateAlternateKey = '2026-04-02';", "",
+         "select [Date Lingua], [Date UK]\nfrom calendar_local\nwhere DateKey = '2026-04-02';", "",
          "١٤ شوال ١٤٤٧|2ⁿᵈ April 2026"},
         {"GB-ENG", "br_FR",
          "select [Date Lingua], [Month Name], [Month Name Abbrev], [Day Name], [Day Name Abbrev]\n"
-         "from calendar_local\nwhere FullDateAlternateKey = '2024-06-21';",
+         "from calendar_local\nwhere DateKey = '2024-06-21';",
          "", "21 Mezheven 2024|Mezheven|Mezh.|Gwener|Gwe."},
         {"GB-ENG", "kw_GB",
          "select [Date Lingua], [Month Name], [Month Name Abbrev], [Day Name], [Day Name Abbrev]\n"
-         "from calendar_local\nwhere FullDateAlternateKey = '2024-06-21';",
+         "from calendar_local\nwhere DateKey = '2024-06-21';",
          "", "21 mis Metheven 2024|mis Metheven|Met|dy Gwener|Gwe"},
         {"CA-QC", "fr_CA",
          "select [Date Lingua], [Date Regional], [Public Holiday]\n"
-         "from calendar_local where FullDateAlternateKey = '2026-07-01';",
+         "from calendar_local where DateKey = '2026-07-01';",
          "", "1ᵉʳ juillet 2026|1ᵉʳ juillet 2026|Fête du Canada"},
         {"VA", "la_VA",
          "select [Date Lingua], \"Day Name\", \"Day Name Abbrev\", \"Month Name\", \"Month Name Abbrev\", [Date UK]\n"
-         "from calendar_local\nwhere FullDateAlternateKey = '2024-06-21';",
+         "from calendar_local\nwhere DateKey = '2024-06-21';",
          "Date Lingua|Day Name|Day Name Abbrev|Month Name|Month Name Abbrev|Date UK\n",
          "21 Iunii 2024|Veneris|Ven|Iunius|Iun|21ˢᵗ June 2024"},
         {"NL", "nl_NL",
          "select [Date Lingua], \"Day Name\", \"Day Name Abbrev\", \"Month Name\", \"Month Name Abbrev\",\n"
-         "       \"ME Dates Text\", \"WE Dates Text\"\nfrom calendar_local\nwhere FullDateAlternateKey = '2024-06-21';",
+         "       \"ME Dates Text\", \"WE Dates Text\"\nfrom calendar_local\nwhere DateKey = '2024-06-21';",
          "Date Lingua|Day Name|Day Name Abbrev|Month Name|Month Name Abbrev|ME Dates Text|WE Dates Text\n",
          "21 juni 2024|vrijdag|vr|juni|jun|jun 2024|23 jun 2024"},
         {"GB-ENG", "en_GB",
-         "select FullDateAlternateKey, [Date UK], [Date Lingua], \"Day Name\", Sunrise, Sunset\n"
-         "from calendar_local\nwhere FullDateAlternateKey = '2024-06-21';",
-         "FullDateAlternateKey|Date UK|Date Lingua|Day Name|Sunrise|Sunset\n",
+         "select DateKey, [Date UK], [Date Lingua], \"Day Name\", Sunrise, Sunset\n"
+         "from calendar_local\nwhere DateKey = '2024-06-21';",
+         "DateKey|Date UK|Date Lingua|Day Name|Sunrise|Sunset\n",
          "2024-06-21|21ˢᵗ June 2024|21ˢᵗ June 2024|Friday|04:47:00|21:39:00"},
         {"GB-ENG", "en_GB",
-         "select FullDateAlternateKey, [Fiscal Quarter Name]\nfrom calendar_local\n"
-         "where FullDateAlternateKey in ('2024-03-31', '2024-04-01', '2024-07-01', '2025-01-01')\n"
-         "order by FullDateAlternateKey;",
-         "FullDateAlternateKey|Fiscal Quarter Name\n",
+         "select DateKey, [Fiscal Quarter Name]\nfrom calendar_local\n"
+         "where DateKey in ('2024-03-31', '2024-04-01', '2024-07-01', '2025-01-01')\n"
+         "order by DateKey;",
+         "DateKey|Fiscal Quarter Name\n",
          "2024-03-31|2024 Q4\n2024-04-01|2025 Q1\n"
          "2024-07-01|2025 Q2\n2025-01-01|2025 Q4"},
         {"GB-ENG", "en_GB",
-         "select FullDateAlternateKey, [Workday Type], [Working Day No]\nfrom calendar_local\n"
-         "where FullDateAlternateKey between '2015-01-01' and '2015-01-05'\norder by FullDateAlternateKey;",
-         "FullDateAlternateKey|Workday Type|Working Day No\n",
+         "select DateKey, [Workday Type], [Working Day No]\nfrom calendar_local\n"
+         "where DateKey between '2015-01-01' and '2015-01-05'\norder by DateKey;",
+         "DateKey|Workday Type|Working Day No\n",
          "2015-01-01|0|0\n2015-01-02|1|1\n2015-01-03|0|1\n2015-01-04|0|1\n2015-01-05|1|2"}};
     sqlite_t *db = test_cfg_rendering_database(directory);
     file_t *file = file_new_cstr(MARS_CONFIG_ROOT_DIR "/docs/jurisdiction.md");

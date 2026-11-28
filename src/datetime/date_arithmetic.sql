@@ -408,7 +408,7 @@ GO
  *  List all the calendar dates for a given start year and year count, with various attributes of those dates. This select statement
  *  generates a calendar for the years 2015 to 7 years after the current year.
  *  The columns in the output are as follows:
- *      - FullDateAlternateKey:     - the date of type DATE
+ *      - DateKey:     - the date of type DATE
  *      - FullDate and End Time:    - the date with time set to 23:59:59
  *      - Year, Month, Day:         - the year, month and day of the date
  *      - Days in Month:            - the number of days in the month of the date
@@ -454,7 +454,7 @@ from (
 ) as Params
 cross apply (
     select
-        Cal.FullDateAlternateKey,
+        Cal.DateKey,
         datetimefromparts(Cal.[Year], Cal.[Month], Cal.[Day], 23, 59, 59, 0) as [FullDate and End Time],
         Cal.[Year],
         Cal.[Month],
@@ -485,7 +485,7 @@ cross apply (
         Cal.[Moon Phase %]
     from (
         select
-            rw.[Date] as FullDateAlternateKey,
+            rw.[Date] as DateKey,
             rw.[Year],
             rw.[Month],
             rw.[Day],

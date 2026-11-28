@@ -133,6 +133,18 @@ bool cfg_database_public_ddl(sqlite_t *db, const char *sql)
     return executed && restored;
 }
 
+/* Refresh an installed calendar view without replacing its settings or daily policy rows. */
+static bool cfg_database_calendar_refresh(sqlite_t *db, const string_t *root)
+{
+    sqlite_stmt_t *view = sqlite_stmt_prepare(db,
+        "SELECT 1 FROM sqlite_master WHERE type='view' AND name='calendar_local'");
+    sqlite_step_result_t step = view ? sqlite_stmt_step(view) : SQLITE_STEP_ERROR;
+    sqlite_stmt_finalize(view);
+    return step == SQLITE_STEP_DONE ||
+           (step == SQLITE_STEP_ROW &&
+            cfg_database_source(db, root, "packaging/jurisdiction-db/mars_calendar_local.sql", false));
+}
+
 static bool cfg_database_jurisdiction_refresh(sqlite_t *db, const string_t *root, const string_t *staging)
 {
     (void)staging;
@@ -159,7 +171,8 @@ static bool cfg_database_jurisdiction_refresh(sqlite_t *db, const string_t *root
            (revision >= 18 ||
             cfg_database_source(db, root, "packaging/jurisdiction-db/location_subdivisions.sql", false)) &&
            cfg_database_source(db, root, "packaging/jurisdiction-db/country_labels.sql", false) &&
-           cfg_database_source(db, root, "packaging/jurisdiction-db/town_search.sql", false);
+           cfg_database_source(db, root, "packaging/jurisdiction-db/town_search.sql", false) &&
+           cfg_database_calendar_refresh(db, root);
 }
 
 /* Missing offline preparation files do not imply that an installed, current catalogue has changed. */
@@ -248,7 +261,7 @@ static int cfg_databases_prepare(bool install_missing)
          CFG_GLOBE_DATA_REVISION, cfg_database_globe_refresh, NULL, true},
         {"almanac", "MARS_ALMANAC_DB_PATH", "MARS_ALMANAC_DB_KEY", "almanac/almanac.db", 0, NULL, &cfg_database_almanac, false},
         {"jurisdiction", "MARS_JURISDICTION_DB_PATH", "MARS_JURISDICTION_DB_KEY",
-         "jurisdiction/mars_jurisdiction_rules.db", 23, cfg_database_jurisdiction_refresh, &cfg_database_jurisdiction, false},
+         "jurisdiction/mars_jurisdiction_rules.db", 24, cfg_database_jurisdiction_refresh, &cfg_database_jurisdiction, false},
     };
     /* Three independent stores, in installation order; stop before later stores on failure. */
     for (size_t i = 0; i < sizeof(migrations) / sizeof(migrations[0]); ++i)

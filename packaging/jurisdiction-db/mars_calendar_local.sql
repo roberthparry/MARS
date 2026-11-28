@@ -248,7 +248,7 @@ solar_circumstances as materialized (
     from solar_declination
 )
 select
-    c.calendar_date as FullDateAlternateKey,
+    c.calendar_date as DateKey,
     c.calendar_date || ' 23:59:59' as "FullDate and End Time",
     c.year_no as "Year",
     c.month_no as "Month",

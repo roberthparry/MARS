@@ -583,11 +583,7 @@ void test_readme_example_deep(void)
     struct deep k1 = {"k1", 1};
     struct deep v1 = {"v1", 10};
 
-    struct deep k2 = {"k2", 2};
-    struct deep v2 = {"v2", 20};
-
     dictionary_set(dict, &k1, &v1);
-    dictionary_set(dict, &k2, &v2);
 
     struct deep out;
 
@@ -599,40 +595,22 @@ void test_readme_example_deep(void)
         free(out.name);
     }
 
-    if (dictionary_get(dict, &k2, &out)) {
-        fmt_print("Value for key '{name}': {name_2} ({value})\n",
-            FMT(name, k2.name),
-            FMT(name_2, out.name),
-            FMT(value, out.value));
-        free(out.name);
-    }
-
     dictionary_destroy(dict);
 }
 
 void test_readme_example_shallow(void)
 {
     dictionary_t *dict =
-        dictionary_create(sizeof(int), sizeof(char *), int_hash, int_cmp, NULL, NULL, str_cmp, str_clone, str_destroy);
+        dictionary_create(sizeof(char *), sizeof(char *), str_hash, str_cmp, NULL, NULL, str_cmp, NULL, NULL);
 
-    int k1 = 5, k2 = 6;
-    const char *v1 = "hello";
-    const char *v2 = "world";
+    const char *k1 = "alpha";
+    const char *v1 = "one";
+    const char *out = NULL;
 
     dictionary_set(dict, &k1, &v1);
-    dictionary_set(dict, &k2, &v2);
 
-    char *out;
-
-    if (dictionary_get(dict, &k1, &out)) {
-        fmt_print("Value for key {k1}: {out}\n", FMT(k1), FMT(out));
-        free(out);
-    }
-
-    if (dictionary_get(dict, &k2, &out)) {
-        fmt_print("Value for key {k2}: {out}\n", FMT(k2), FMT(out));
-        free(out);
-    }
+    if (dictionary_get(dict, &k1, &out))
+        fmt_print("Value for '{k1}': {out}\n", FMT(k1), FMT(out));
 
     dictionary_destroy(dict);
 }
@@ -709,6 +687,57 @@ static void example_dictionary_readme_examples(void)
     test_readme_example_shallow();
 }
 
+typedef struct {
+    size_t count;
+    int total;
+    const char *largest_name;
+    int largest_quantity;
+} stock_summary_t;
+
+static void summarise_stock(const dictionary_entry_t *entry, void *user_data)
+{
+    stock_summary_t *summary = user_data;
+    const char *name = *(const char *const *)dictionary_entry_key(entry);
+    int quantity = *(const int *)dictionary_entry_value(entry);
+    ++summary->count;
+    summary->total += quantity;
+    if (!summary->largest_name || quantity > summary->largest_quantity) {
+        summary->largest_name = name;
+        summary->largest_quantity = quantity;
+    }
+}
+
+/* README programme: read entry keys and values and update a caller-owned callback context. */
+static int dictionary_foreach_readme_programme(void)
+{
+    dictionary_t *dict = dictionary_create(sizeof(const char *), sizeof(int), str_hash, str_cmp,
+                                           NULL, NULL, NULL, NULL, NULL);
+    if (!dict)
+        return 1;
+    const char *names[] = {"apples", "bananas", "oranges"};
+    const int quantities[] = {4, 7, 2};
+    for (size_t i = 0; i < sizeof(names) / sizeof(names[0]); ++i) {
+        if (!dictionary_set(dict, &names[i], &quantities[i])) {
+            dictionary_destroy(dict);
+            return 1;
+        }
+    }
+    stock_summary_t summary = {0};
+    dictionary_foreach_fn visit = summarise_stock;
+    dictionary_foreach(dict, visit, &summary);
+    int bytes = fmt_print("Products: {count}; total units: {total}\nLargest stock: {name} ({quantity})\n",
+                          FMT(count, summary.count), FMT(total, summary.total),
+                          FMT(name, summary.largest_name), FMT(quantity, summary.largest_quantity));
+    dictionary_destroy(dict);
+    return bytes < 0;
+}
+
+/* README example: run the documented foreach programme after ordinary checks and older examples. */
+static void example_dictionary_foreach(void)
+{
+    TEST_ASSERT_INT_EQ(dictionary_foreach_readme_programme(), 0);
+}
+
 /* -------------------------------------------------------------
  * Main
  * ------------------------------------------------------------- */
@@ -735,8 +764,7 @@ int tests_main(void)
 
     TEST_SECTION("README");
     TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_dictionary_readme_examples, readme_examples, "dictionary,readme,output");
-
-    printf(BLUE "Done.\n" RESET);
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_dictionary_foreach, readme_examples, "dictionary,readme,foreach,output");
 
     return TEST_EXIT_CODE();
 }

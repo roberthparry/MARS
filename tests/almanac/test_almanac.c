@@ -3,7 +3,7 @@
  * @brief Almanac engine and astronomical event regressions.
  *
  * Exercises configured catalogue access, coordinate results, observer events and eclipse or transit searches
- * against reference expectations. It also runs the documented almanac example after ordinary checks.
+ * against reference expectations. It also runs the documented almanac examples after ordinary checks.
  *
  * Used by the project test harness for regression verification. Select cases through tests/test_config.json and
  * run suites sequentially; this source is not part of the installed library.
@@ -29,6 +29,8 @@
 #include "almanac/almanac_engine_internal.h"
 #include "spice_oracle.h"
 #include "test_harness.h"
+#define MARS_TEST_ALMANAC_INTERNAL_ACCESS
+#include "test_almanac_readme.h"
 
 TEST_SUITE_CONFIG(TEST_CONFIG_GLOBAL);
 static bool test_almanac_suite_setup(void);
@@ -1285,5 +1287,8 @@ int tests_main(void)
     printf(C_BOLD C_YELLOW "Running README examples...\n" C_RESET);
     TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_almanac_shrewsbury_eclipse_watch, readme_examples, "almanac,readme");
     TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_almanac_eclipse_preview, readme_examples, "almanac,readme");
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_almanac_sky_positions, readme_examples, "almanac,readme,positions");
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_almanac_bright_stars, readme_examples, "almanac,readme,stars");
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_almanac_moon_details, readme_examples, "almanac,readme,moon");
     return TEST_EXIT_CODE();
 }

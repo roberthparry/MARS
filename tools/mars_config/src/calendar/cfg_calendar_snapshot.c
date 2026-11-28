@@ -168,7 +168,7 @@ static bool cfg_calendar_days(sqlite_t *db, int first_year, int last_year, const
 static bool cfg_calendar_validate(sqlite_t *db, long expected)
 {
     sqlite_stmt_t *stmt = sqlite_stmt_prepare(
-        db, "SELECT count(*),count(DISTINCT FullDateAlternateKey),count([Date UK]),count([Date Lingua]),"
+        db, "SELECT count(*),count(DISTINCT DateKey),count([Date UK]),count([Date Lingua]),"
             "count([Date Regional]) FROM calendar_local");
     bool ok = stmt && sqlite_stmt_step(stmt) == SQLITE_STEP_ROW;
     for (int column = 0; column < 5 && ok; ++column)

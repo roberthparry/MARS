@@ -526,7 +526,7 @@ With French selected:
 
 ```sql
 select [Date Lingua], [Date Regional], [Public Holiday]
-from calendar_local where FullDateAlternateKey = '2026-07-01';
+from calendar_local where DateKey = '2026-07-01';
 ```
 
 ```text
@@ -562,7 +562,7 @@ After selecting either language, this query shows the full and abbreviated names
 ```sql
 select [Date Lingua], [Month Name], [Month Name Abbrev], [Day Name], [Day Name Abbrev]
 from calendar_local
-where FullDateAlternateKey = '2024-06-21';
+where DateKey = '2024-06-21';
 ```
 
 Breton output:
@@ -598,7 +598,7 @@ In that installed database:
 ```sql
 select [Date Lingua], "Day Name", "Day Name Abbrev", "Month Name", "Month Name Abbrev", [Date UK]
 from calendar_local
-where FullDateAlternateKey = '2024-06-21';
+where DateKey = '2024-06-21';
 ```
 
 Output:
@@ -690,15 +690,15 @@ Holiday dates, working-day counts, `Date UK` and `Date Regional` are unchanged.
 For `Kingston, JM` with Patwa selected:
 
 ```sql
-select FullDateAlternateKey, [Date Lingua], [Day Name], [Public Holiday]
+select DateKey, [Date Lingua], [Day Name], [Public Holiday]
 from calendar_local
-where FullDateAlternateKey = '2026-08-06';
+where DateKey = '2026-08-06';
 ```
 
 Output:
 
 ```text
-FullDateAlternateKey|Date Lingua|Day Name|Public Holiday
+DateKey|Date Lingua|Day Name|Public Holiday
 2026-08-06|6 Aagus 2026|Turzdeh|Independence Deh
 ```
 
@@ -714,16 +714,16 @@ uses the Jewish calendar. Reinstall to add this column to an existing database.
 For a New York City calendar installed with Spanish selected:
 
 ```sql
-select FullDateAlternateKey, [Date Lingua], [Public Holiday]
+select DateKey, [Date Lingua], [Public Holiday]
 from calendar_local
-where FullDateAlternateKey in ('2026-01-01', '2026-07-04', '2026-12-25')
-order by FullDateAlternateKey;
+where DateKey in ('2026-01-01', '2026-07-04', '2026-12-25')
+order by DateKey;
 ```
 
 Output:
 
 ```text
-FullDateAlternateKey|Date Lingua|Public Holiday
+DateKey|Date Lingua|Public Holiday
 2026-01-01|1 de enero de 2026|Día de Año Nuevo
 2026-07-04|4 de julio de 2026|Día de la Independencia
 2026-12-25|25 de diciembre de 2026|Día de Navidad
@@ -747,17 +747,17 @@ jurisdiction ancestry remains unchanged.
 After installing for Rhyl and choosing Welsh, the Christmas bank holidays are:
 
 ```sql
-select FullDateAlternateKey, [Date Lingua], [Public Holiday]
+select DateKey, [Date Lingua], [Public Holiday]
 from calendar_local
-where FullDateAlternateKey between '2026-12-25' and '2026-12-28'
+where DateKey between '2026-12-25' and '2026-12-28'
   and [Public Holiday] is not null
-order by FullDateAlternateKey;
+order by DateKey;
 ```
 
 Output:
 
 ```text
-FullDateAlternateKey|Date Lingua|Public Holiday
+DateKey|Date Lingua|Public Holiday
 2026-12-25|25 Rhagfyr 2026|Dydd Nadolig
 2026-12-28|28 Rhagfyr 2026|Dydd San Steffan (diwrnod amgen)
 ```
@@ -773,7 +773,7 @@ names retain their source text rather than losing their qualification.
 For Rhyl with Irish selected, the same Christmas query above produces:
 
 ```text
-FullDateAlternateKey|Date Lingua|Public Holiday
+DateKey|Date Lingua|Public Holiday
 2026-12-25|25 Nollaig 2026|Lá Nollag
 2026-12-28|28 Nollaig 2026|Lá Fhéile Stiofáin (lá ionaid)
 ```
@@ -788,7 +788,7 @@ For Limmen with Western Frisian selected:
 
 ```sql
 select [Date Lingua], [Date Regional], [Public Holiday]
-from calendar_local where FullDateAlternateKey = '2026-12-25';
+from calendar_local where DateKey = '2026-12-25';
 ```
 
 Output:
@@ -819,16 +819,16 @@ the view to a later date range does not restart it either.
 For a Shrewsbury calendar beginning on 1 January 2015:
 
 ```sql
-select FullDateAlternateKey, [Workday Type], [Working Day No]
+select DateKey, [Workday Type], [Working Day No]
 from calendar_local
-where FullDateAlternateKey between '2015-01-01' and '2015-01-05'
-order by FullDateAlternateKey;
+where DateKey between '2015-01-01' and '2015-01-05'
+order by DateKey;
 ```
 
 Output:
 
 ```text
-FullDateAlternateKey|Workday Type|Working Day No
+DateKey|Workday Type|Working Day No
 2015-01-01|0|0
 2015-01-02|1|1
 2015-01-03|0|1
@@ -842,16 +842,16 @@ runs from April to March, so April–June 2024 belongs to fiscal year 2025,
 quarter 1. For example:
 
 ```sql
-select FullDateAlternateKey, [Fiscal Quarter Name]
+select DateKey, [Fiscal Quarter Name]
 from calendar_local
-where FullDateAlternateKey in ('2024-03-31', '2024-04-01', '2024-07-01', '2025-01-01')
-order by FullDateAlternateKey;
+where DateKey in ('2024-03-31', '2024-04-01', '2024-07-01', '2025-01-01')
+order by DateKey;
 ```
 
 Output:
 
 ```text
-FullDateAlternateKey|Fiscal Quarter Name
+DateKey|Fiscal Quarter Name
 2024-03-31|2024 Q4
 2024-04-01|2025 Q1
 2024-07-01|2025 Q2
@@ -940,7 +940,7 @@ With Arabic selected:
 ```sql
 select [Date Lingua], [Date UK]
 from calendar_local
-where FullDateAlternateKey = '2026-04-02';
+where DateKey = '2026-04-02';
 ```
 
 Output:
@@ -954,7 +954,7 @@ With Hebrew selected, the same query gives a Jewish calendar date:
 ```sql
 select [Date Lingua], [Date UK]
 from calendar_local
-where FullDateAlternateKey = '2026-04-02';
+where DateKey = '2026-04-02';
 ```
 
 Output:
@@ -977,7 +977,7 @@ For an installed Limmen calendar:
 select [Date Lingua], "Day Name", "Day Name Abbrev", "Month Name", "Month Name Abbrev",
        "ME Dates Text", "WE Dates Text"
 from calendar_local
-where FullDateAlternateKey = '2024-06-21';
+where DateKey = '2024-06-21';
 ```
 
 Output (pipe-separated, with a header):
@@ -1002,15 +1002,15 @@ For a calendar installed for Shrewsbury, run this query on a SQLCipher
 connection with the database key already set:
 
 ```sql
-select FullDateAlternateKey, [Date UK], [Date Lingua], "Day Name", Sunrise, Sunset
+select DateKey, [Date UK], [Date Lingua], "Day Name", Sunrise, Sunset
 from calendar_local
-where FullDateAlternateKey = '2024-06-21';
+where DateKey = '2024-06-21';
 ```
 
 Output (pipe-separated, with a header):
 
 ```text
-FullDateAlternateKey|Date UK|Date Lingua|Day Name|Sunrise|Sunset
+DateKey|Date UK|Date Lingua|Day Name|Sunrise|Sunset
 2024-06-21|21ˢᵗ June 2024|21ˢᵗ June 2024|Friday|04:47:00|21:39:00
 ```
 

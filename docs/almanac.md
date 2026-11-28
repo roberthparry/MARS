@@ -9,6 +9,10 @@ calendar and light astronomical helpers such as sunrise, sunset, and moon
 phase, `almanac_t` provides catalogue-backed apparent place data for navigation
 and observational work.
 
+For practical observing examples, see [sky positions at an observer's location](#sky-positions-at-an-observers-location):
+locate the Sun, Moon, planets and named stars, select bright stars above the horizon,
+and obtain a detailed Moon report from a southern-hemisphere location.
+
 Event-search algorithms in this module draw on Seidelmann, P. Kenneth (ed.),
 *Explanatory Supplement to the Astronomical Almanac*, University Science
 Books, 1992. Subsequent references in this document use *ESAA*.
@@ -1010,4 +1014,244 @@ Output:
 
 ```text
 Stopped: 1
+```
+
+## Sky positions at an observer's location
+
+These programmes require the configured ephemeris database described under [Configuration](#configuration).
+Supply its path and, when encrypted, its key through the inherited settings before running them.
+They use the packaged catalogue and a fixed instant so the output can be reproduced.
+
+The observer coordinates use decimal degrees: north and east are positive, south and west negative.
+Elevation is in metres above sea level. Enter the observation moment in UTC; these constructors
+do not infer the observer's civil time zone from latitude and longitude.
+
+Altitude is the angle of the body's centre above the local horizontal: 0° at the horizon and 90°
+at the zenith; negative values are below the horizon. Azimuth is a compass bearing clockwise
+from north: 0° north, 90° east, 180° south and 270° west. Solar-system positions include
+topocentric parallax. These are geometric coordinates, without atmospheric refraction or
+sea-horizon dip; a centre above the horizon does not establish visibility through daylight, clouds or terrain.
+
+The packaged planetary models cover **Mercury, Venus, Mars, Jupiter and Saturn**, alongside the
+Sun, Moon and catalogue stars. `ALMANAC_BODY_ID_URANUS` and `ALMANAC_BODY_ID_NEPTUNE` exist in
+the API, but their position models are not supplied in the packaged database. Available bodies,
+catalogue order and date coverage follow the installed data. Printed decimal places describe
+the display precision; see [data provenance](almanac-data-provenance.md) for the ephemeris models.
+
+### Sun, Moon, planets and named stars
+
+This programme asks for ten bodies at the same UTC instant from London. Change the observer's
+latitude, longitude and elevation, the UTC moment, or the body identifiers to query another sky.
+It opens the engine once and computes only the requested entries; each entry is released after
+its observer-relative coordinates have been obtained.
+
+```c
+#include <stdio.h>
+
+#include "format-t.h"
+#include "almanac-t.h"
+#include "datetime-t.h"
+
+int main(void)
+{
+    const almanac_observer_t observer = {
+        .latitude_degrees = 51.5074, .longitude_degrees = -0.1278, .elevation_metres = 11.0
+    };
+    const almanac_body_id_t bodies[] = {
+        ALMANAC_BODY_ID_SUN, ALMANAC_BODY_ID_MOON,
+        ALMANAC_BODY_ID_MERCURY, ALMANAC_BODY_ID_VENUS, ALMANAC_BODY_ID_MARS,
+        ALMANAC_BODY_ID_JUPITER, ALMANAC_BODY_ID_SATURN,
+        ALMANAC_BODY_ID_SIRIUS, ALMANAC_BODY_ID_POLARIS, ALMANAC_BODY_ID_VEGA
+    };
+    almanac_t *almanac = almanac_open();
+    datetime_t *moment = datetime_init_ymdt(datetime_alloc(), 2026, DT_January, 3, 21, 0, 0.0);
+    int status = 1;
+    if (!almanac || !moment)
+        goto done;
+    if (fmt_print("London sky at {moment:yyyy-MM-dd hh:mm:ss} UTC\n"
+                  "Latitude {latitude:.4f}°, longitude {longitude:.4f}°, elevation {elevation:.0f} m\n"
+                  "Body         Alt (°)   Az (°)  Centre\n", FMT(moment),
+                  FMT(latitude, observer.latitude_degrees), FMT(longitude, observer.longitude_degrees),
+                  FMT(elevation, observer.elevation_metres)) < 0)
+        goto done;
+    for (size_t i = 0; i < sizeof(bodies) / sizeof(bodies[0]); ++i) {
+        almanac_entry_t *entry = almanac_new_body_entry(almanac, bodies[i], moment);
+        almanac_observables_t sky;
+        bool ok = entry && almanac_observables(almanac, entry, &observer, &sky);
+        almanac_entry_dealloc(entry);
+        if (!ok) {
+            fmt_fprint(stderr, "{name}: {error}\n", FMT(name, almanac_body_display_name(bodies[i])),
+                       FMT(error, almanac_last_error(almanac)));
+            goto done;
+        }
+        if (fmt_print("{name:<10} {altitude:>8.2f} {azimuth:>8.2f}  {horizon}\n",
+                      FMT(name, almanac_body_display_name(bodies[i])), FMT(altitude, sky.altitude_degrees),
+                      FMT(azimuth, sky.azimuth_degrees), FMT(horizon, sky.above_horizon ? "above" : "below")) < 0)
+            goto done;
+    }
+    status = 0;
+done:
+    almanac_close(almanac);
+    datetime_dealloc(moment);
+    return status;
+}
+```
+
+Output:
+
+```text
+London sky at 2026-01-03 21:00:00 UTC
+Latitude 51.5074°, longitude -0.1278°, elevation 11 m
+Body         Alt (°)   Az (°)  Centre
+Sun          -44.37   291.16  below
+Moon          41.56   101.34  above
+Mercury      -51.87   302.15  below
+Venus        -45.28   291.22  below
+Mars         -44.01   288.89  below
+Jupiter       39.05   104.10  above
+Saturn        14.76   244.33  above
+Sirius        12.05   137.90  above
+Polaris       52.12   359.79  above
+Vega           7.17   328.93  above
+```
+
+### Find bright stars above the local horizon
+
+Use `almanac_snapshot()` when choosing targets from the whole enabled catalogue. This example
+selects stars of visual magnitude 1.0 or brighter whose centres are above London's horizon.
+Smaller and negative magnitudes indicate brighter stars. It checks kind and magnitude before
+computing horizon coordinates, and retains catalogue order rather than sorting by brightness.
+Snapshot entries are borrowed; destroying the array releases them together.
+
+```c
+#include <math.h>
+#include <stdio.h>
+
+#include "format-t.h"
+#include "almanac-t.h"
+#include "array-t.h"
+#include "datetime-t.h"
+
+int main(void)
+{
+    const almanac_observer_t observer = {51.5074, -0.1278, 11.0};
+    almanac_t *almanac = almanac_open();
+    datetime_t *moment = datetime_init_ymdt(datetime_alloc(), 2026, DT_January, 3, 21, 0, 0.0);
+    array_t *catalogue = almanac && moment ? almanac_snapshot(almanac, moment) : NULL;
+    int status = 1;
+    if (!catalogue)
+        goto done;
+    if (fmt_print("London: stars of magnitude 1.0 or brighter above the horizon\n"
+                  "{moment:yyyy-MM-dd hh:mm:ss} UTC\n"
+                  "Star        Magnitude   Alt (°)   Az (°)\n", FMT(moment)) < 0)
+        goto done;
+    for (size_t i = 0; i < array_size(catalogue); ++i) {
+        const almanac_entry_t *entry = array_get(catalogue, i);
+        if (almanac_entry_body_kind(entry) != ALMANAC_BODY_STAR)
+            continue;
+        double magnitude = almanac_entry_visual_magnitude(entry);
+        if (!isfinite(magnitude) || magnitude > 1.0)
+            continue;
+        almanac_observables_t sky;
+        if (!almanac_observables(almanac, entry, &observer, &sky))
+            goto done;
+        if (!sky.above_horizon)
+            continue;
+        if (fmt_print("{name:<10} {magnitude:>9.2f} {altitude:>9.2f} {azimuth:>8.2f}\n",
+                      FMT(name, almanac_body_display_name(almanac_entry_body_id(entry))), FMT(magnitude),
+                      FMT(altitude, sky.altitude_degrees), FMT(azimuth, sky.azimuth_degrees)) < 0)
+            goto done;
+    }
+    status = 0;
+done:
+    array_destroy(catalogue);
+    datetime_dealloc(moment);
+    almanac_close(almanac);
+    return status;
+}
+```
+
+Output:
+
+```text
+London: stars of magnitude 1.0 or brighter above the horizon
+2026-01-03 21:00:00 UTC
+Star        Magnitude   Alt (°)   Az (°)
+Aldebaran       0.86     53.97   161.90
+Betelgeuse      0.42     39.14   139.13
+Capella         0.08     75.00   103.05
+Procyon         0.37     24.19   113.99
+Rigel           0.13     27.74   156.84
+Sirius         -1.46     12.05   137.90
+Vega            0.03      7.17   328.93
+```
+
+### Moon position, phase, size and atmospheric refraction
+
+This southern-hemisphere example uses Sydney's east-positive longitude. It combines the Moon's
+observer-relative position with apparent geocentric right ascension and declination, geocentric
+distance, angular diameter and illuminated fraction. Right ascension is measured in hours;
+declination is measured in degrees. One astronomical unit is 149597870.7 kilometres, and the
+angular diameter in arcminutes is twice the semi-diameter in degrees multiplied by 60.
+
+The optional refraction correction uses the supplied air temperature and pressure. Adding it
+gives an approximate refracted altitude; the original geometric altitude is also printed.
+Observer elevation participates in topocentric geometry. This example does not apply sea-horizon dip.
+
+```c
+#include <math.h>
+#include <stdio.h>
+
+#include "format-t.h"
+#include "almanac-t.h"
+#include "datetime-t.h"
+
+int main(void)
+{
+    const almanac_observer_t observer = {-33.8688, 151.2093, 58.0};
+    almanac_t *almanac = almanac_open();
+    datetime_t *moment = datetime_init_ymdt(datetime_alloc(), 2026, DT_January, 3, 12, 0, 0.0);
+    almanac_entry_t *moon = almanac && moment ? almanac_new_body_entry(almanac, ALMANAC_BODY_ID_MOON, moment) : NULL;
+    almanac_observables_t sky;
+    almanac_phase_details_t phase;
+    int status = 1;
+    if (!moon || !almanac_observables(almanac, moon, &observer, &sky) || !almanac_phase_details(moon, &phase))
+        goto done;
+    double refraction = almanac_refraction_degrees(sky.altitude_degrees, 18.0, 1010.0);
+    if (!isfinite(refraction))
+        goto done;
+    status = fmt_print("Moon from Sydney at {moment:yyyy-MM-dd hh:mm:ss} UTC\n"
+                       "Latitude {latitude:.4f}°, longitude {longitude:.4f}°, elevation {elevation:.0f} m\n"
+                       "Geometric altitude: {altitude:.3f}°; azimuth: {azimuth:.3f}°\n"
+                       "Refraction at 18 °C, 1010 hPa: {refraction:.4f}°; adjusted altitude: {adjusted:.3f}°\n"
+                       "Right ascension: {ra:.6f} h; declination: {declination:.6f}°\n"
+                       "Geocentric distance: {distance:.0f} km; angular diameter: {diameter:.2f} arcmin\n"
+                       "Illuminated: {illuminated:.2f}%; phase angle: {angle:.2f}°\n",
+                       FMT(moment), FMT(latitude, observer.latitude_degrees),
+                       FMT(longitude, observer.longitude_degrees), FMT(elevation, observer.elevation_metres),
+                       FMT(altitude, sky.altitude_degrees), FMT(azimuth, sky.azimuth_degrees), FMT(refraction),
+                       FMT(adjusted, sky.altitude_degrees + refraction),
+                       FMT(ra, almanac_entry_right_ascension_hours(moon)),
+                       FMT(declination, almanac_entry_declination_degrees(moon)),
+                       FMT(distance, almanac_entry_geocentric_distance_au(moon) * 149597870.7),
+                       FMT(diameter, sky.semi_diameter_degrees * 120.0),
+                       FMT(illuminated, phase.illuminated_fraction * 100.0), FMT(angle, phase.phase_angle_degrees)) < 0;
+done:
+    almanac_entry_dealloc(moon);
+    datetime_dealloc(moment);
+    almanac_close(almanac);
+    return status;
+}
+```
+
+Output:
+
+```text
+Moon from Sydney at 2026-01-03 12:00:00 UTC
+Latitude -33.8688°, longitude 151.2093°, elevation 58 m
+Geometric altitude: 21.314°; azimuth: 30.362°
+Refraction at 18 °C, 1010 hPa: 0.0398°; adjusted altitude: 21.353°
+Right ascension: 7.064470 h; declination: 26.876675°
+Geocentric distance: 362527 km; angular diameter: 33.17 arcmin
+Illuminated: 99.86%; phase angle: 4.36°
 ```

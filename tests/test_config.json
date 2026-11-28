@@ -337,8 +337,11 @@
   "tests/almanac/test_almanac.c": {
     "readme_examples": {
       "enabled": true,
+      "example_almanac_bright_stars": true,
       "example_almanac_eclipse_preview": true,
-      "example_almanac_shrewsbury_eclipse_watch": true
+      "example_almanac_moon_details": true,
+      "example_almanac_shrewsbury_eclipse_watch": true,
+      "example_almanac_sky_positions": true
     },
     "tests": {
       "enabled": true,
@@ -562,6 +565,7 @@
   "tests/dictionary/test_dictionary.c": {
     "readme_examples": {
       "enabled": true,
+      "example_dictionary_foreach": true,
       "example_dictionary_readme_examples": true
     },
     "tests": {
@@ -7634,7 +7638,8 @@
       "test_calendar_snapshot": true,
       "test_calendar_translation_snapshots": true,
       "test_calendar_translations": true,
-      "test_calendar_unicode_keys": true
+      "test_calendar_unicode_keys": true,
+      "test_calendar_view": true
     }
   },
   "tools/mars_config/tests/test_cfg_database.c": {

@@ -257,6 +257,102 @@ typedef void (*dictionary_foreach_fn)(const dictionary_entry_t *entry, void *use
 
 - `void dictionary_foreach(const dictionary_t *dict, dictionary_foreach_fn fn, void *user_data)` — call `fn(entry, user_data)` for every entry in unspecified order. For sorted iteration use `dictionary_get_entry_sorted()`.
 
+The [callback example](#callback-example) below shows the callback type, entry
+accessors and a caller-owned context that accumulates results.
+
 ### Cloning
 
 - `dictionary_t *dictionary_clone(const dictionary_t *dict)` — create a fully independent copy. Keys and values are copied using the configured clone functions (or `memcpy`). Returns NULL on allocation failure.
+
+## Callback Example
+
+`dictionary_foreach_fn` receives a borrowed entry and the `user_data` pointer
+passed to `dictionary_foreach()`. Cast the entry's key and value to the types
+chosen at construction, and cast `user_data` to your own context type.
+
+This inventory example counts products, totals their stock and finds the most
+stocked product. Its output does not depend on iteration order; the largest
+quantity is unique. The explicit `dictionary_foreach_fn visit` declaration
+shows how to store a callback before passing it to `dictionary_foreach()`.
+
+```c
+#include <stdio.h>
+#include <string.h>
+
+#include "format-t.h"
+#include "dictionary-t.h"
+
+static size_t str_hash(const void *p)
+{
+    const char *s = *(const char *const *)p;
+    size_t h = 146527;
+    for (size_t i = 0; s[i] != '\0'; ++i)
+        h = (h * 33) ^ (unsigned char)s[i];
+    return h;
+}
+
+static int str_cmp(const void *a, const void *b)
+{
+    const char *sa = *(const char *const *)a;
+    const char *sb = *(const char *const *)b;
+    return strcmp(sa, sb);
+}
+
+typedef struct {
+    size_t count;
+    int total;
+    const char *largest_name;
+    int largest_quantity;
+} stock_summary_t;
+
+static void summarise_stock(const dictionary_entry_t *entry, void *user_data)
+{
+    stock_summary_t *summary = user_data;
+    const char *name = *(const char *const *)dictionary_entry_key(entry);
+    int quantity = *(const int *)dictionary_entry_value(entry);
+    ++summary->count;
+    summary->total += quantity;
+    if (!summary->largest_name || quantity > summary->largest_quantity) {
+        summary->largest_name = name;
+        summary->largest_quantity = quantity;
+    }
+}
+
+int main(void)
+{
+    dictionary_t *dict = dictionary_create(sizeof(const char *), sizeof(int), str_hash, str_cmp,
+                                           NULL, NULL, NULL, NULL, NULL);
+    if (!dict)
+        return 1;
+    const char *names[] = {"apples", "bananas", "oranges"};
+    const int quantities[] = {4, 7, 2};
+    for (size_t i = 0; i < sizeof(names) / sizeof(names[0]); ++i) {
+        if (!dictionary_set(dict, &names[i], &quantities[i])) {
+            dictionary_destroy(dict);
+            return 1;
+        }
+    }
+    stock_summary_t summary = {0};
+    dictionary_foreach_fn visit = summarise_stock;
+    dictionary_foreach(dict, visit, &summary);
+    int bytes = fmt_print("Products: {count}; total units: {total}\nLargest stock: {name} ({quantity})\n",
+                          FMT(count, summary.count), FMT(total, summary.total),
+                          FMT(name, summary.largest_name), FMT(quantity, summary.largest_quantity));
+    dictionary_destroy(dict);
+    return bytes < 0;
+}
+```
+
+Expected output:
+
+```text
+Products: 3; total units: 13
+Largest stock: bananas (7)
+```
+
+The entry pointer is a temporary view valid during its callback; do not retain
+it or modify the dictionary during iteration. Here, keys contain borrowed
+string-literal pointers and values are copied integers, so no clone or destroy
+callbacks are needed. The summary's name points to one of those literals;
+retaining it does not retain the temporary entry. The caller owns `summary`,
+and `dictionary_foreach()` finishes all callbacks before returning.

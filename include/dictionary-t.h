@@ -15,6 +15,7 @@
  *   - optional deep or shallow copy behaviour for keys and values
  *   - stable opaque entry handles for efficient repeated access
  *   - sorted views of keys, values, or entries
+ *   - synchronous entry callbacks with caller-owned context
  *
  * The internal representation is intentionally hidden. Users interact only
  * through the public API and its documented behaviour.
@@ -323,7 +324,14 @@ const void *dictionary_entry_value(const dictionary_entry_t *entry);
  * @typedef dictionary_foreach_fn
  * @brief Callback type for dictionary_foreach().
  *
- * Called once for each entry in the dictionary.
+ * Called once for each entry, in unspecified order. The entry is a temporary
+ * borrowed view; read its key and value during the call and do not retain the
+ * entry pointer. Keep the dictionary unchanged throughout iteration.
+ *
+ * @param entry Borrowed entry view, valid only until this callback returns.
+ * @param user_data Caller-owned context supplied to dictionary_foreach(); may be NULL.
+ * The callback may update this context without transferring ownership.
+ * @return Nothing. The callback cannot stop iteration or report failure through its return value.
  */
 typedef void (*dictionary_foreach_fn)(const dictionary_entry_t *entry, void *user_data);
 
@@ -332,6 +340,12 @@ typedef void (*dictionary_foreach_fn)(const dictionary_entry_t *entry, void *use
  *
  * The order is not guaranteed and may change after modifications. For sorted
  * iteration, use dictionary_get_entry_sorted().
+ *
+ * @param dict Borrowed dictionary; must remain alive and unchanged until iteration finishes.
+ * @param fn Callback invoked synchronously for each entry; NULL performs no work.
+ * @param user_data Borrowed context passed unchanged to each callback; may be NULL.
+ * @return Nothing. A NULL dictionary performs no work. No ownership is transferred;
+ * entry views expire after their callback, and the context is not retained after iteration.
  */
 void dictionary_foreach(const dictionary_t *dict, dictionary_foreach_fn fn, void *user_data);
 

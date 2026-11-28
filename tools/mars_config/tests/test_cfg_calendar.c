@@ -13,6 +13,8 @@
 #include <unistd.h>
 
 #include "file-t.h"
+#include "sqlite-t.h"
+#include "cfg_database.h"
 #include "cfg_calendar.h"
 #define MARS_CFG_CALENDAR_INTERNAL_ACCESS
 #include "cfg_calendar_internal.h"
@@ -135,13 +137,13 @@ static bool test_calendar_catalogue_fixture(const char *directory)
                  {"Shrewsbury, GB", "Shrewsbury, GB"},
                  {"Quebec", "Québec, CA-QC"},
                  {"Québec", "Québec, CA-QC"},
-                 {"QUÉBEC", "Québec, CA-QC"},
+                 {"QUÉBEC", "Québec, CA-QC"},
                  {"  Quebec  City ", "Québec, CA-QC"},
                  {"Québec, ca-qc", "Québec, CA-QC"},
                  {"Quebec, CA", "Québec, CA"},
                  {"Montreal", "Montréal, CA"},
                  {"Montréal", "Montréal, CA"},
-                 {"Montréal", "Montréal, CA"},
+                 {"Montréal", "Montréal, CA"},
                  {"limmen'; drop table jurisdiction; --", NULL},
                  {"Quebc", NULL}};
     for (size_t i = 0; i < sizeof(cases) / sizeof(*cases) && ok; ++i)
@@ -603,12 +605,12 @@ static bool test_calendar_translated_snapshot(sqlite_t *db, const string_t *path
                             "LEFT JOIN cfg_calendar_labels l ON l.source=e.name)",
                             "0") &&
         test_calendar_query(db,
-                            "SELECT count(*)=count(DISTINCT FullDateAlternateKey) "
+                            "SELECT count(*)=count(DISTINCT DateKey) "
                             "AND count(*)=count([Date UK]) AND count(*)=count([Date Lingua]) "
                             "AND count(*)=count([Date Regional]) FROM calendar_local",
                             "1");
     string_t *query =
-        string_sprintf("SELECT [Public Holiday] FROM calendar_local WHERE FullDateAlternateKey='%s'", date);
+        string_sprintf("SELECT [Public Holiday] FROM calendar_local WHERE DateKey='%s'", date);
     ok = ok && query && test_calendar_query(db, string_c_str(query), expected);
     string_free(query);
     cfg_calendar_place_clear(&place);
@@ -665,6 +667,36 @@ static bool test_calendar_translation_snapshots_fixture(const char *directory)
          test_calendar_query(db, "SELECT count(*) FROM calendar_local_days", "366");
     cfg_calendar_place_clear(&place);
     string_free(request); string_free(locale);
+    sqlite_close(db);
+    string_free(path);
+    string_free(key);
+    return ok;
+}
+
+static bool test_calendar_view_fixture(const char *directory)
+{
+    string_t *path = NULL, *key = NULL;
+    sqlite_t *db = test_cfg_calendar_database(directory, &path, &key);
+    bool ok = db && sqlite_exec_cstr(db,
+        "CREATE TABLE IF NOT EXISTS mars_database_revision(name TEXT PRIMARY KEY,revision INTEGER NOT NULL);"
+        "INSERT OR REPLACE INTO mars_database_revision VALUES('jurisdiction',23);"
+        "CREATE TABLE saved_calendar_days AS SELECT * FROM calendar_local_days;"
+        "CREATE TABLE saved_calendar_settings AS SELECT * FROM calendar_local_settings;"
+        "DROP VIEW calendar_local;"
+        "CREATE VIEW calendar_local AS SELECT calendar_date AS DateKey FROM calendar_local_days;");
+    sqlite_close(db);
+    ok = ok && cfg_databases_update() == 0;
+    db = ok ? (string_byte_length(key) ? sqlite_open_encrypted(path, key) : sqlite_open_plain(path)) : NULL;
+    ok = ok && db && test_calendar_query(db, "SELECT revision FROM mars_database_revision "
+                                            "WHERE name='jurisdiction'", "24") &&
+         test_calendar_query(db, "SELECT count(*) FROM pragma_table_info('calendar_local') "
+                                 "WHERE name IN ('DateKey','Date Lingua','Date Regional')", "3") &&
+         test_calendar_query(db,
+             "SELECT NOT EXISTS(SELECT * FROM saved_calendar_days EXCEPT SELECT * FROM calendar_local_days) "
+             "AND NOT EXISTS(SELECT * FROM calendar_local_days EXCEPT SELECT * FROM saved_calendar_days) "
+             "AND NOT EXISTS(SELECT * FROM saved_calendar_settings EXCEPT SELECT * FROM calendar_local_settings) "
+             "AND NOT EXISTS(SELECT * FROM calendar_local_settings EXCEPT SELECT * FROM saved_calendar_settings)", "1") &&
+         test_calendar_query(db, "SELECT DateKey FROM calendar_local WHERE DateKey='2026-06-21'", "2026-06-21");
     sqlite_close(db);
     string_free(path);
     string_free(key);
@@ -788,39 +820,39 @@ static bool test_calendar_readme_fixture(const char *directory)
     } cases[] = {
         {"Québec", "French",
          "select [Date Lingua], [Date Regional], [Public Holiday]\n"
-         "from calendar_local where FullDateAlternateKey = '2026-07-01';",
+         "from calendar_local where DateKey = '2026-07-01';",
          "Date Lingua|Date Regional|Public Holiday", "1ᵉʳ juillet 2026|1ᵉʳ juillet 2026|Fête du Canada"},
         {"Limmen", "Western Frisian",
          "select [Date Lingua], [Date Regional], [Public Holiday]\n"
-         "from calendar_local where FullDateAlternateKey = '2026-12-25';",
+         "from calendar_local where DateKey = '2026-12-25';",
          "Date Lingua|Date Regional|Public Holiday", "25 Desimber 2026|25 december 2026|Earste Krystdei"},
         {"Rhyl", "Welsh",
-         "select FullDateAlternateKey, [Date Lingua], [Public Holiday]\nfrom calendar_local\n"
-         "where FullDateAlternateKey between '2026-12-25' and '2026-12-28'\n"
-         "  and [Public Holiday] is not null\norder by FullDateAlternateKey;",
-         "FullDateAlternateKey|Date Lingua|Public Holiday",
+         "select DateKey, [Date Lingua], [Public Holiday]\nfrom calendar_local\n"
+         "where DateKey between '2026-12-25' and '2026-12-28'\n"
+         "  and [Public Holiday] is not null\norder by DateKey;",
+         "DateKey|Date Lingua|Public Holiday",
          "2026-12-25|25 Rhagfyr 2026|Dydd Nadolig\n2026-12-28|28 Rhagfyr 2026|Dydd San Steffan (diwrnod amgen)"},
         {"Rhyl", "Irish",
-         "select FullDateAlternateKey, [Date Lingua], [Public Holiday]\nfrom calendar_local\n"
-         "where FullDateAlternateKey between '2026-12-25' and '2026-12-28'\n"
-         "  and [Public Holiday] is not null\norder by FullDateAlternateKey;",
-         "FullDateAlternateKey|Date Lingua|Public Holiday",
+         "select DateKey, [Date Lingua], [Public Holiday]\nfrom calendar_local\n"
+         "where DateKey between '2026-12-25' and '2026-12-28'\n"
+         "  and [Public Holiday] is not null\norder by DateKey;",
+         "DateKey|Date Lingua|Public Holiday",
          "2026-12-25|25 Nollaig 2026|Lá Nollag\n2026-12-28|28 Nollaig 2026|Lá Fhéile Stiofáin (lá ionaid)"},
         {"Kingston, JM", "Patwa",
-         "select FullDateAlternateKey, [Date Lingua], [Day Name], [Public Holiday]\nfrom calendar_local\n"
-         "where FullDateAlternateKey = '2026-08-06';",
-         "FullDateAlternateKey|Date Lingua|Day Name|Public Holiday",
+         "select DateKey, [Date Lingua], [Day Name], [Public Holiday]\nfrom calendar_local\n"
+         "where DateKey = '2026-08-06';",
+         "DateKey|Date Lingua|Day Name|Public Holiday",
          "2026-08-06|6 Aagus 2026|Turzdeh|Independence Deh"},
         {"New York City", "Spanish",
-         "select FullDateAlternateKey, [Date Lingua], [Public Holiday]\nfrom calendar_local\n"
-         "where FullDateAlternateKey in ('2026-01-01', '2026-07-04', '2026-12-25')\n"
-         "order by FullDateAlternateKey;",
-         "FullDateAlternateKey|Date Lingua|Public Holiday",
+         "select DateKey, [Date Lingua], [Public Holiday]\nfrom calendar_local\n"
+         "where DateKey in ('2026-01-01', '2026-07-04', '2026-12-25')\n"
+         "order by DateKey;",
+         "DateKey|Date Lingua|Public Holiday",
          "2026-01-01|1 de enero de 2026|Día de Año Nuevo\n"
          "2026-07-04|4 de julio de 2026|Día de la Independencia\n2026-12-25|25 de diciembre de 2026|Día de Navidad"},
         {"Vatican City", "Latin",
          "select [Date Lingua], \"Day Name\", \"Day Name Abbrev\", \"Month Name\", \"Month Name Abbrev\", [Date UK]\n"
-         "from calendar_local\nwhere FullDateAlternateKey = '2024-06-21';",
+         "from calendar_local\nwhere DateKey = '2024-06-21';",
          "Date Lingua|Day Name|Day Name Abbrev|Month Name|Month Name Abbrev|Date UK",
          "21 Iunii 2024|Veneris|Ven|Iunius|Iun|21ˢᵗ June 2024"}};
     for (size_t i = 0; i < sizeof(cases) / sizeof(*cases) && ok; ++i) {
@@ -878,8 +910,8 @@ static void test_calendar_unicode_keys(void)
 {
     static const struct {
         const char *input, *expected;
-    } cases[] = {{"Québec", "quebec"},  {"QUÉBEC", "quebec"},           {"  Québec\t City  ", "quebec city"},
-                 {"Straße", "strasse"}, {"Ångström", "angstrom"},       {"Ångström", "angstrom"},
+    } cases[] = {{"Québec", "quebec"},  {"QUÉBEC", "quebec"},           {"  Québec\t City  ", "quebec city"},
+                 {"Straße", "strasse"}, {"Ångström", "angstrom"},       {"Ångström", "angstrom"},
                  {"ייִדיש", "יידיש"},    {"👩‍💻", "👩‍💻"}, {"क्ष", "कष"}};
     for (size_t i = 0; i < sizeof(cases) / sizeof(*cases); ++i) {
         string_t *text = string_new_with(cases[i].input);
@@ -935,6 +967,11 @@ static void test_calendar_readme(void)
     TEST_ASSERT_TRUE(test_cfg_calendar_isolated(test_calendar_readme_fixture), "README translated calendar snapshots");
 }
 
+static void test_calendar_view(void)
+{
+    TEST_ASSERT_TRUE(test_cfg_calendar_isolated(test_calendar_view_fixture), "calendar view and retained daily policy");
+}
+
 static void test_calendar_seed_reload(void)
 {
     TEST_ASSERT_TRUE(test_cfg_calendar_isolated(test_calendar_seed_reload_fixture),
@@ -962,6 +999,7 @@ void test_cfg_calendar_cases(void)
     TEST_RUN_IN_GROUP(test_calendar_snapshot, tests, NULL);
     TEST_RUN_IN_GROUP(test_calendar_translation_snapshots, tests, NULL);
     TEST_RUN_IN_GROUP(test_calendar_seed_reload, tests, NULL);
+    TEST_RUN_IN_GROUP(test_calendar_view, tests, NULL);
     TEST_RUN_IN_GROUP(test_calendar_historical, tests, NULL);
 }
 
