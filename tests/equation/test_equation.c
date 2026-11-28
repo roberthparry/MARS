@@ -820,7 +820,7 @@ static void test_equation_display_preserves_symbolic_coefficients(void)
         string_t *text = equ_to_text(expanded, style_UNBOUND);
         ASSERT_NOT_NULL(text);
         if (!strstr(string_c_str(text), symbols[i]))
-            string_printf("Symbolic coefficient lost in %s: %S\n", sources[i], text);
+            fmt_print("Symbolic coefficient lost in {:s}: {:s}\n", FMT(sources[i]), FMT(text));
         ASSERT_TRUE(strstr(string_c_str(text), symbols[i]) != NULL);
         string_free(text);
         if (!i) {
@@ -1437,7 +1437,7 @@ static void rational_relation_row(const void *data)
         expr_free(raw_difference);
         expr_free(linked);
     }
-    string_printf("%S -> %S\n", row->input, plain);
+    fmt_print("{:s} -> {:s}\n", FMT(row->input), FMT(plain));
     string_free(plain);
     string_free(after);
     string_free(before);

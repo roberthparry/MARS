@@ -12,6 +12,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "format-t.h"
 #include "datetime-t.h"
 #define MARS_SHARED_LAB_CALENDAR_INTERNAL_ACCESS
 #include "internal/lab_calendar_internal.h"
@@ -301,13 +302,16 @@ static bool calendar_worker_fixture(const char *directory)
     for (size_t i = 0; i < sizeof(expected) / sizeof(*expected); ++i) {
         size_t count = json_array_size(section_rows(response, "calendar_sections", i));
         if (count != expected[i]) {
-            string_printf("Calendar section %zu: expected %zu rows, received %zu\n", i, expected[i], count);
+            fmt_print("Calendar section {:d}: expected {:d} rows, received {:d}\n",
+                FMT(i),
+                FMT(expected[i]),
+                FMT(count));
             ok = false;
         }
     }
     if (!ok) {
         string_t *text = fields ? json_to_string(fields) : string_clone(diagnostic);
-        string_printf("%S\n", text);
+        fmt_print("{:s}\n", FMT(text));
         string_free(text);
     }
     /* Preserve the old record, and verify complete native output survives a new-cache round trip. */

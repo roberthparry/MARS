@@ -11,6 +11,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "format-t.h"
 #include "computation-t.h"
 #include "expression-t.h"
 #include "json-t.h"
@@ -128,8 +129,10 @@ static void lambert_value_row(const void *data)
     number_t actual = num_lambert_S(a[0], a[1], a[2], a[3], a[4], a[5]);
     TEST_ASSERT_TRUE(num_get_default_prec_bits() == bits, "Lambert evaluation preserves the caller's precision");
     if (!lambert_close(actual, expected, bits))
-        string_printf("Lambert value %S: actual %.17g, expected %.17g\n", row->name,
-                      num_to_double(actual), num_to_double(expected));
+        fmt_print("Lambert value {:s}: actual {:.17g}, expected {:.17g}\n",
+            FMT(row->name),
+            FMT(num_to_double(actual)),
+            FMT(num_to_double(expected)));
     TEST_ASSERT_TRUE(lambert_close(actual, expected, bits),
                      "Lambert values retain the selected precision against independent sums");
     qcomplex_t fixed[6];
@@ -218,8 +221,10 @@ static void quotient_recognition_row(const void *data)
         expr_free(sample); expr_free(shared);
     }
     if (!ok)
-        string_printf("Expanded quotient recognition %S: expected %s, got %s\n", row->name,
-                      recognised ? "a linked Lambert identity" : "no match", closed ? "a match" : "no match");
+        fmt_print("Expanded quotient recognition {:s}: expected {:s}, got {:s}\n",
+            FMT(row->name),
+            FMT(recognised ? "a linked Lambert identity" : "no match"),
+            FMT(closed ? "a match" : "no match"));
     expr_free(closed); expr_free(source);
     expr_bindings_free(bindings); json_free(expected);
     num_set_default_prec_bits(saved);
@@ -267,7 +272,11 @@ static void lambert_calculus_row(const void *data)
     number_t value = actual ? expr_eval(actual) : num_clone(NUM_NAN), want = reference ? expr_eval(reference) : num_clone(NUM_NAN);
     if (!lambert_close(value, want, bits)) {
         char *text = actual ? expr_to_string(actual, style_UNBOUND) : NULL;
-        string_printf("Lambert calculus %S: %.17g versus %.17g\n%s\n", row->name, num_to_double(value), num_to_double(want), text);
+        fmt_print("Lambert calculus {:s}: {:.17g} versus {:.17g}\n{:s}\n",
+            FMT(row->name),
+            FMT(num_to_double(value)),
+            FMT(num_to_double(want)),
+            FMT(text));
         free(text);
     }
     TEST_ASSERT_TRUE(lambert_close(value, want, bits), "analytic chain rules and primitives agree with direct finite sums");
@@ -304,7 +313,7 @@ static void lambert_notation_row(const void *data)
         ok = position && position < line;
     }
     if (!ok)
-        string_printf("Lambert notation %S:\n%s\n", row->name, wrapped ? wrapped : "(null)");
+        fmt_print("Lambert notation {:s}:\n{:s}\n", FMT(row->name), FMT(wrapped ? wrapped : "(null)"));
     TEST_ASSERT_TRUE(ok, "the complete signed result precedes one separate Lambert definition");
     free(wrapped);
     free(body);

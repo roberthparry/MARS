@@ -712,6 +712,7 @@ string_t *qf_sprintf_text(const char *fmt, ...)
     return out;
 }
 
+/* Retain the original printf-style real formatting and stream semantics. */
 int qf_printf(const char *fmt, ...)
 {
     string_t *text;
@@ -725,7 +726,7 @@ int qf_printf(const char *fmt, ...)
     if (!text)
         return -1;
 
-    written = string_printf("%S", text);
+    written = string_fprintf(stdout, "%S", text);
     string_free(text);
     return written;
 }

@@ -11,6 +11,7 @@
 #include <sys/utsname.h>
 #include <time.h>
 
+#include "format-t.h"
 #include "checks_evidence.h"
 #define MARS_CHECKS_EVIDENCE_INTERNAL_ACCESS
 #include "evidence_private.h"
@@ -170,7 +171,7 @@ int checks_evidence(const string_t *root, int argc, char **argv)
         bool help = checks_equal(argument, "--help") || checks_equal(argument, "-h");
         string_free(argument);
         if (help) {
-            string_printf("mars_checks release-evidence [--library PATH] [--output PATH] [--allow-dirty]\n");
+            fmt_print("mars_checks release-evidence [--library PATH] [--output PATH] [--allow-dirty]\n");
             return 0;
         }
         if ((library_value && argv[i][10]) || (output_value && argv[i][9])) {
@@ -199,7 +200,7 @@ int checks_evidence(const string_t *root, int argc, char **argv)
                            : NULL;
     bool ok = document && evidence_publish(root, artefact, destination, document);
     if (ok)
-        string_printf("%s\n", string_c_str(destination));
+        fmt_print("{:s}\n", FMT(string_c_str(destination)));
     else
         string_fprintf(stderr, "could not write release evidence: mandatory inspection or atomic publication failed\n");
     json_free(document);

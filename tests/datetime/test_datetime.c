@@ -962,24 +962,24 @@ void test_datetime_adjacent_sun_events_resolve_neighbouring_days(void)
 void test_datetime_format_uses_string_builder(void)
 {
     datetime_t *dt = datetime_init_ymdt(datetime_alloc(), 2024, DT_June, 15, 13, 5, 9.0);
-    char *formatted = datetime_format(dt, "%Dddd %d%o %Mmmm %yyyy @hh:@mm:@ss @p %% @@");
+    string_t *formatted = fmt_string("{dt:dddd do MMMM yyyy hh:mm:ss am/pm \"% @\"}", FMT(dt));
 
     ASSERT_NOT_NULL(formatted);
-    TEST_ASSERT_STR_EQ(formatted, "Saturday 15th June 2024 01:05:09 pm % @");
+    TEST_ASSERT_STR_EQ(string_c_str(formatted), "Saturday 15th June 2024 01:05:09 pm % @");
 
-    free(formatted);
+    string_free(formatted);
     datetime_dealloc(dt);
 }
 
 void test_datetime_format_superscript_ordinal_suffix(void)
 {
     datetime_t *dt = datetime_init_ymd(datetime_alloc(), 2026, DT_April, 1);
-    char *formatted = datetime_format(dt, "%Dddd %d%q %Mmmm %yyyy");
+    string_t *formatted = fmt_string("{dt:dddd do^ MMMM yyyy}", FMT(dt));
 
     ASSERT_NOT_NULL(formatted);
-    TEST_ASSERT_STR_EQ(formatted, "Wednesday 1ˢᵗ April 2026");
+    TEST_ASSERT_STR_EQ(string_c_str(formatted), "Wednesday 1ˢᵗ April 2026");
 
-    free(formatted);
+    string_free(formatted);
     datetime_dealloc(dt);
 }
 

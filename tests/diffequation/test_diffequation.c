@@ -2775,14 +2775,17 @@ static void test_diffequ_solves_reciprocal_trigonometric_forcing(void)
             valid = num_is_real(value) && num_is_finite(value) && num_is_finite(magnitude) && num_lt(magnitude, tolerance);
             if (!valid) {
                 string_t *error_text = num_to_string(error), *value_text = num_to_string(value);
-                string_printf("ODE sample %ld: value=%S residual=%S\n", samples[j], value_text, error_text);
+                fmt_print("ODE sample {:d}: value={:s} residual={:s}\n",
+                    FMT(samples[j]),
+                    FMT(value_text),
+                    FMT(error_text));
                 string_free(value_text); string_free(error_text);
             }
             num_destroy(&tolerance); num_destroy(&magnitude); num_destroy(&value); num_destroy(&error);
             expr_free(value_at); expr_free(at); expr_free(point);
         }
         if (!valid)
-            string_printf("Reciprocal forcing %s: %s\n", sources[i], text ? string_c_str(text) : "NULL");
+            fmt_print("Reciprocal forcing {:s}: {:s}\n", FMT(sources[i]), FMT(text ? string_c_str(text) : "NULL"));
         ok = valid && ok;
         expr_free(applied); expr_free(residual); string_free(TeX); string_free(text);
         expr_bindings_free(bindings);

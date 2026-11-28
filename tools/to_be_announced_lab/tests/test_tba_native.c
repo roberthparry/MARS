@@ -8,9 +8,11 @@
  */
 #include <errno.h>
 #include <math.h>
+
 /* Distinguish the POSIX signal-stack typedef from the MARS stack API. */
 #define stack_t posix_signal_stack_t
 #include <signal.h>
+
 #undef stack_t
 #include <stdio.h>
 #include <stdlib.h>
@@ -18,6 +20,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+#include "format-t.h"
 #include "http-t.h"
 #include "mars_settings.h"
 #include "tba_wire.h"
@@ -436,7 +439,7 @@ static void test_tba_native_routes(void)
     file_t *root = file_new_cstr(directory);
     ok = root && test_tba_cleanup(root) && ok;
     file_free(root);
-    string_printf("Native CSV, dates and loopback routes: %s\n", ok ? "PASS" : "FAIL");
+    fmt_print("Native CSV, dates and loopback routes: {:s}\n", FMT(value, ok ? "PASS" : "FAIL"));
     TEST_ASSERT_TRUE(ok, "native CSV, dates and loopback routes work without Python");
 }
 

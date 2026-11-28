@@ -31,8 +31,10 @@ static void solution_notation_row(const void *data)
     bool ok = TeX && strstr(TeX, string_c_str(row->expected)) &&
               expr_is_variable(equ_lhs(solution));
     if (!ok)
-        string_printf("Solution notation: %S\nExpected notation: %S\nActual: %s\n", row->input, row->expected,
-                        TeX ? TeX : "(none)");
+        fmt_print("Solution notation: {:s}\nExpected notation: {:s}\nActual: {:s}\n",
+            FMT(row->input),
+            FMT(row->expected),
+            FMT(TeX ? TeX : "(none)"));
     free(TeX); de_solve_result_free(result); de_free(problem);
     TEST_ASSERT_TRUE(ok, "explicit ODE notation labels the native solution by its declared coordinate");
 }

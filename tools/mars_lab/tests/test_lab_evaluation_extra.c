@@ -14,6 +14,7 @@
 #include <string.h>
 #include <time.h>
 
+#include "format-t.h"
 #include "expression-t.h"
 #include "diffequation-t.h"
 #include "xml-t.h"
@@ -53,7 +54,7 @@ static bool contains(const json_t *fields, const char *key, const char *expected
 static void show_failure(const json_t *result)
 {
     string_t *output = result ? json_to_string(result) : string_new_with("null");
-    string_printf("%s\n", output ? string_c_str(output) : "allocation failure");
+    fmt_print("{:s}\n", FMT(output ? string_c_str(output) : "allocation failure"));
     string_free(output);
 }
 
@@ -107,7 +108,7 @@ static void expect_response(const char *route, const char *payload, unsigned exp
     bool ok = response && status == expected_status && contains(response, field, expected) &&
               test_lab_ok(response, expected_status == 200u);
     if (!ok) {
-        string_printf("route %s: expected HTTP %u, received %u\n", route, expected_status, status);
+        fmt_print("route {:s}: expected HTTP {:d}, received {:d}\n", FMT(route), FMT(expected_status), FMT(status));
         show_failure(response);
     }
     json_free(response);
@@ -299,7 +300,7 @@ static bool paired_mesh_edges(const char *svg, bool open)
         i = end;
     }
     if (unmatched)
-        string_printf("Unpaired mesh edges: %zu of %zu\n", unmatched, count);
+        fmt_print("Unpaired mesh edges: {:d} of {:d}\n", FMT(unmatched), FMT(count));
     free(edges);
     return ok && count > 0 && unmatched == 0;
 }
@@ -1195,7 +1196,7 @@ static void test_lab_extra_plot_preview(void)
             string_free(payload);
         }
         if (!lengths[0] || lengths[1] <= lengths[0])
-            string_printf("%s preview/full SVG sizes: %zu/%zu bytes\n", modes[i], lengths[0], lengths[1]);
+            fmt_print("{:s} preview/full SVG sizes: {:d}/{:d} bytes\n", FMT(modes[i]), FMT(lengths[0]), FMT(lengths[1]));
         TEST_ASSERT_TRUE(lengths[0] > 0 && lengths[1] > lengths[0],
                          "all curve modes use reduced sampling for previews and restore full detail");
     }
@@ -1705,7 +1706,10 @@ static void progression_plot_row(const void *data)
     num_destroy(&actual);
     num_destroy(&minimum);
     if (!ok) {
-        string_printf("Progression plot %S: status %u, visible path segments %zu\n", row->name, status, paths);
+        fmt_print("Progression plot {:s}: status {:d}, visible path segments {:d}\n",
+            FMT(row->name),
+            FMT(status),
+            FMT(paths));
         show_failure(response);
     }
     json_free(response);
@@ -1780,8 +1784,12 @@ static void curve_continuity_row(const void *data)
     if (*peak_text)
         ok = ok && maximum >= 0.995 * peak && maximum <= (1 + 1e-8) * peak;
     if (!ok)
-        string_printf("Curve continuity %S: points %zu, gaps %zu, crossed pole %u, maximum %.12g\n",
-                       row->name, sampler_count(samples), gaps, crossed, maximum);
+        fmt_print("Curve continuity {:s}: points {:d}, gaps {:d}, crossed pole {:d}, maximum {:.12g}\n",
+            FMT(row->name),
+            FMT(sampler_count(samples)),
+            FMT(gaps),
+            FMT(crossed),
+            FMT(maximum));
     num_destroy(&pole);
     expr_free(pole_expression);
     sampler_free(samples);
@@ -1855,8 +1863,10 @@ static void progression_sample_row(const void *data)
         expr_free(reduced);
     }
     if (!ok)
-        string_printf("Progression sample %S: got %.17g, expected %.17g\n", row->name,
-                       num_to_double(value), num_to_double(expected));
+        fmt_print("Progression sample {:s}: got {:.17g}, expected {:.17g}\n",
+            FMT(row->name),
+            FMT(num_to_double(value)),
+            FMT(num_to_double(expected)));
     num_destroy(&tolerance);
     num_destroy(&relative);
     num_destroy(&expected);
@@ -2230,7 +2240,7 @@ static void test_lab_extra_plot_title_fallback(void)
         lab_eval_plot_title(fields);
     clock_gettime(CLOCK_MONOTONIC, &end);
     double elapsed = end.tv_sec - start.tv_sec + (end.tv_nsec - start.tv_nsec) * 1e-9;
-    string_printf("Large plot title composition: %.6fs (%zu bytes)\n", elapsed, string_byte_length(large));
+    fmt_print("Large plot title composition: {:.6f}s ({:d} bytes)\n", FMT(elapsed), FMT(string_byte_length(large)));
     TEST_ASSERT_TRUE(ok && contains(fields, "plot_svg", "data-plot-chart") &&
                      contains(fields, "plot_svg", "&lt;formula&gt;&amp;"),
                      "large surface retains chart metadata and escaped fallback title");
@@ -2255,7 +2265,7 @@ static void test_lab_plot_title_readme(void)
               contains(fields, "plot_svg", "data-plot-title") && contains(fields, "plot_svg", "data-series");
     if (!ok)
         show_failure(fields);
-    string_printf("README plot title: %s\n", lab_eval_text(fields, "plot_title_TeX"));
+    fmt_print("README plot title: {:s}\n", FMT(lab_eval_text(fields, "plot_title_TeX")));
     json_free(fields);
     TEST_ASSERT_TRUE(ok, "README reciprocal-series plot displays the documented sigma title");
 }
@@ -2278,7 +2288,7 @@ static void test_lab_circular_progression_readme(void)
         show_failure(response);
     json_free(response);
     TEST_ASSERT_TRUE(ok, "README tangent progression produces its documented pole-safe automatic plot");
-    string_printf("Automatic x range: -pi/4000 to pi/4000\n");
+    fmt_print("Automatic x range: -pi/4000 to pi/4000\n");
 }
 
 static void test_lab_growth_progression_readme(void)
@@ -2299,7 +2309,7 @@ static void test_lab_growth_progression_readme(void)
         show_failure(response);
     json_free(response);
     TEST_ASSERT_TRUE(ok, "README sinh progression uses its documented growth-scaled automatic plot");
-    string_printf("Automatic x range: -0.002 to 0.002\n");
+    fmt_print("Automatic x range: -0.002 to 0.002\n");
 }
 
 static void test_lab_closed_derivative_readme(void)
@@ -2316,7 +2326,7 @@ static void test_lab_closed_derivative_readme(void)
     if (!ok)
         show_failure(response);
     TEST_ASSERT_TRUE(ok, "README sine-sum derivative uses the simplified closed form in every card");
-    string_printf("Closed derivative: %s\n", lab_eval_text(response, "derivative"));
+    fmt_print("Closed derivative: {:s}\n", FMT(lab_eval_text(response, "derivative")));
     json_free(response);
 }
 
@@ -2337,7 +2347,7 @@ static void test_lab_surface_readme(void)
         show_failure(fields);
     json_free(fields);
     TEST_ASSERT_TRUE(ok, "README two-variable expression produces a shaded paraboloid with its TeX title");
-    string_printf("Surface plot ready: u(x,y) = x^2 + y^2; height axis: u\n");
+    fmt_print("Surface plot ready: u(x,y) = x^2 + y^2; height axis: u\n");
 }
 
 static void test_lab_surface_slice_readme(void)
@@ -2353,7 +2363,7 @@ static void test_lab_surface_slice_readme(void)
         show_failure(fields);
     json_free(fields);
     TEST_ASSERT_TRUE(ok, "README slice uses native limits and labels without changing worksheet bindings");
-    string_printf("Surface slice ready: x,y axes; z = 0; slider limits: -2 to 2\n");
+    fmt_print("Surface slice ready: x,y axes; z = 0; slider limits: -2 to 2\n");
 }
 
 static void test_lab_auto_range_readme(void)
@@ -2371,7 +2381,7 @@ static void test_lab_auto_range_readme(void)
     num_destroy(&bounds[1]);
     json_free(fields);
     TEST_ASSERT_TRUE(ok, "README blank bounds plot inverse sine over its real interval");
-    string_printf("Automatic curve: asin(x), x from -1 to 1\n");
+    fmt_print("Automatic curve: asin(x), x from -1 to 1\n");
     /* README example in docs/mars-lab.md: a two-coordinate equation is a planar contour. */
     fields = request("/eval", "{\"expression\":\"x^2+y^2=1\",\"action\":\"plot\",\"wrt\":\"x\","
                               "\"plot_source_mode\":\"equation\"}", &status);
@@ -2382,7 +2392,7 @@ static void test_lab_auto_range_readme(void)
         show_failure(fields);
     json_free(fields);
     TEST_ASSERT_TRUE(ok, "README unit circle receives a padded equal-scale coordinate frame");
-    string_printf("Implicit curve: x^2+y^2=1; x and y from -1.2 to 1.2\n");
+    fmt_print("Implicit curve: x^2+y^2=1; x and y from -1.2 to 1.2\n");
 }
 
 static void test_lab_screenshots_readme(void)
@@ -2405,7 +2415,7 @@ static void test_lab_screenshots_readme(void)
     if (!ok) show_failure(fields);
     TEST_ASSERT_TRUE(ok, "README screenshot plots the principal inverse-cosine surface over [-3,3] squared");
     json_free(fields);
-    string_printf("README Expression screenshot: u(x,y) = acos(sin(2-x*y)); x,y from -3 to 3\n");
+    fmt_print("README Expression screenshot: u(x,y) = acos(sin(2-x*y)); x,y from -3 to 3\n");
 
     fields = request("/eval", "{\"expression\":\"(sqrt(x^2+y^2)-2)^2+z^2=1\",\"action\":\"plot\","
                              "\"wrt\":\"x\",\"plot_source_mode\":\"equation\",\"plot_scale\":\"auto\"}", &status);
@@ -2413,14 +2423,14 @@ static void test_lab_screenshots_readme(void)
     if (!ok) show_failure(fields);
     TEST_ASSERT_TRUE(ok, "README screenshot automatic torus is a complete closed surface");
     json_free(fields);
-    string_printf("README Equation screenshot: (sqrt(x^2+y^2)-2)^2+z^2=1; complete torus\n");
+    fmt_print("README Equation screenshot: (sqrt(x^2+y^2)-2)^2+z^2=1; complete torus\n");
 
     fields = request("/diffequation-eval", "{\"diffequation\":\"y''+6y*y'+4y^3=0; y'(0)=0\"}", &status);
     ok = status == 200 && contains(fields, "solutions", "C₁") && !contains(fields, "solutions", "C₂") &&
          contains(fields, "solutions", "2C₁x");
     if (!ok) show_failure(fields);
     TEST_ASSERT_TRUE(ok, "README screenshot zero-slope Emden family retains one arbitrary constant");
-    string_printf("README Differential Equation screenshot: %s\n", lab_eval_text(fields, "solutions"));
+    fmt_print("README Differential Equation screenshot: {:s}\n", FMT(lab_eval_text(fields, "solutions")));
     json_free(fields);
 
     /* README matrix screenshots in docs/mars-lab.md use a literal constant matrix, not a scalar binding. */
@@ -2437,7 +2447,7 @@ static void test_lab_screenshots_readme(void)
              (!matrices[i].constant || contains(fields, "expression", "C₁₁"));
         if (!ok) show_failure(fields);
         TEST_ASSERT_TRUE(ok, matrices[i].caption);
-        string_printf("%s\n", matrices[i].caption);
+        fmt_print("{:s}\n", FMT(matrices[i].caption));
         json_free(fields);
         string_free(payload);
     }
@@ -2449,7 +2459,7 @@ static void test_lab_screenshots_readme(void)
          !contains(fields, "symbolic", "∞");
     if (!ok) show_failure(fields);
     TEST_ASSERT_TRUE(ok, "README screenshot Gaussian integral evaluates its infinite endpoint");
-    string_printf("README Integrator screenshot: %s\n", lab_eval_text(fields, "symbolic"));
+    fmt_print("README Integrator screenshot: {:s}\n", FMT(lab_eval_text(fields, "symbolic")));
     json_free(fields);
 
     json_t *observer = test_lab_json(
@@ -2477,7 +2487,7 @@ static void test_lab_screenshots_readme(void)
          strstr(test_lab_text(presentation, "html"), "hPa (observer)");
     if (!ok) show_failure(fields);
     TEST_ASSERT_TRUE(ok, "README Almanac screenshot retains London's GMT moment, whole-metre altitude and pressure reference");
-    string_printf("README Almanac screenshot: London; 2026-11-12 19:27:23 GMT; 25 m; estimated observer pressure\n");
+    fmt_print("README Almanac screenshot: London; 2026-11-12 19:27:23 GMT; 25 m; estimated observer pressure\n");
     json_free(fields);
     json_free(snapshot);
     json_free(observer);
@@ -2982,7 +2992,7 @@ static void test_lab_extra_equation_decimal_notation(void)
         bool ok = status == 200u && test_lab_ok(response, true) && json_array_size(roots) == 1u &&
                   string_view_equals_literal(rhs, cases[i].expected);
         if (!ok)
-            string_printf("%s: expected %s; received %S\n", cases[i].input, cases[i].expected, root);
+            fmt_print("{:s}: expected {:s}; received {:s}\n", FMT(cases[i].input), FMT(cases[i].expected), FMT(root));
         json_free(response);
         string_free(payload);
         TEST_ASSERT_TRUE(ok, "equation numerics use decimals or Unicode powers of ten, never E notation");
@@ -3000,7 +3010,7 @@ static void test_lab_extra_equation_decimal_notation(void)
                   contains(response, "display_TeX", "\\frac{\\sqrt{-1957044392389164807} - 8913952525}{500000}") &&
                   !contains(response, "display_TeX", "62500000000") &&
                   !contains(response, "display_TeX", "31312710.278226636912") && contains(response, "svg", "<svg");
-        string_printf("  Compact quartic: %S\n", json_string_value(test_lab_member(response, "display_TeX")));
+        fmt_print("  Compact quartic: {:s}\n", FMT(json_string_value(test_lab_member(response, "display_TeX"))));
         bool small_root = false;
         for (size_t i = 0u; i < json_array_size(roots); ++i) {
             const string_t *root = json_string_value(json_array_get(roots, i));

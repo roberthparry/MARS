@@ -475,7 +475,7 @@ Excel custom codes and appending with `fmt_append()`.
 
 `number_t` provides its own formatting helpers:
 
-- `num_printf(...)`
+- `num_printf(...)` — deprecated; use `fmt_print()` with `FMT(number)`
 - `num_sprintf(...)`
 - `num_vsprintf(...)`
 - `num_to_string(...)`

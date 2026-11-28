@@ -18,6 +18,7 @@
 #include <time.h>
 #include <unistd.h>
 
+#include "format-t.h"
 #include "mars_paths.h"
 #include "tba_process.h"
 #include "tba_server.h"
@@ -81,8 +82,8 @@ int main(int argc, char **argv)
             continue;
         }
         if (!strcmp(argv[i], "--help")) {
-            string_printf("To-Be-Announced Lab (native C)\n"
-                          "Options: --host ADDRESS --port PORT --no-browser --browser PROGRAM --base-path PATH\n");
+            fmt_print("To-Be-Announced Lab (native C)\nOptions: --host ADDRESS --port PORT --no-browser "
+                      "--browser PROGRAM --base-path PATH\n");
             return 0;
         }
         const char *option = argv[i];
@@ -128,7 +129,7 @@ int main(int argc, char **argv)
         tba_app_free(app);
         return 1;
     }
-    string_printf("To-Be-Announced Lab running at %S\n", url);
+    fmt_print("To-Be-Announced Lab running at {:s}\n", FMT(value, url));
     fflush(stdout);
     pid_t workers[4] = {0};
     for (size_t i = 0; i < 4; ++i) {

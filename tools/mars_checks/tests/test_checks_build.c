@@ -26,7 +26,7 @@ static bool test_build_makefiles(const string_t *temporary)
         "tools/mars_checks/curl_probe.c", "tools/mars_checks/tests/fixtures/checks_curl_fixture.c",
         "tools/mars_checks/tests/fixtures/checks_sqlcipher_fixture.c",
         "docs/building.md",
-        "include/array-t.h", "include/string-t.h", "src/array/array.c", "src/array/array_mutex.h"
+        "include/attributes-t.h", "include/array-t.h", "include/string-t.h", "src/array/array.c", "src/array/array_mutex.h"
     };
     string_t *root = checks_text(MARS_CHECKS_ROOT_DIR);
     bool ok = test_checks_write(temporary, "src/.keep", "") && test_checks_write(temporary, "tests/.keep", "");

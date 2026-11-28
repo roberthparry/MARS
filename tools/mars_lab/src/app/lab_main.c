@@ -18,6 +18,7 @@
 #include <time.h>
 #include <unistd.h>
 
+#include "format-t.h"
 #include "mars_paths.h"
 #include "lab_process.h"
 #include "lab_runtime.h"
@@ -219,7 +220,7 @@ int main(int argc, char **argv)
     string_t *url = string_sprintf(ipv6 ? "http://[%s]:%u/" : "http://%s:%u/", access, lab_svr_port(server));
     string_free(host_text);
     if (!stopping && url) {
-        string_printf("MARS Lab (native C) running at %S\n", url);
+        fmt_print("MARS Lab (native C) running at {:s}\n", FMT(url));
         fflush(stdout);
         if (!no_browser) {
             const char *args[] = {browser, string_c_str(url), NULL};

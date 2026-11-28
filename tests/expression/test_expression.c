@@ -152,7 +152,7 @@ void check_q_at(const char *file, int line, int col, const char *label, qfloat_t
 
     if (abs_err < ABS_TOL || rel_err < REL_TOL) {
         printf("%s%sPASS%s %-32s  got=", C_BOLD, C_GREEN, C_RESET, label);
-        qf_printf("%.34q", got);
+        fmt_print("{:.34q}", FMT(got));
         printf("\n");
         return;
     }
@@ -160,13 +160,13 @@ void check_q_at(const char *file, int line, int col, const char *label, qfloat_t
     printf("%s%sFAIL%s %s: %s:%d:%d: got=", C_BOLD, C_RED, C_RESET, label, file, line, col);
     TEST_FAIL();
 
-    qf_printf("%.34q", got);
+    fmt_print("{:.34q}", FMT(got));
 
     printf(" want=");
-    qf_printf("%.34q", want);
+    fmt_print("{:.34q}", FMT(want));
 
     printf(" diff=");
-    qf_printf("%.34q", diff);
+    fmt_print("{:.34q}", FMT(diff));
 
     printf("\n");
 }

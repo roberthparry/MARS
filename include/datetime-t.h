@@ -510,8 +510,7 @@ datetime_t *datetime_init_cherokee_great_new_moon_festival(datetime_t *dttm, int
 /**
  * @brief format the selected date in the Christian civil calendar systems.
  *
- * The result uses datetime_format_text() internally and includes both the
- * Gregorian civil date and the corresponding Julian calendar date.
+ * Includes both the Gregorian civil date and the corresponding Julian calendar date.
  *
  * @param dttm the datetime to format.
  * @return owned text, or NULL if the date is invalid.
@@ -971,58 +970,6 @@ unsigned int datetime_hash(const datetime_t *dttm);
  * uninitialised datetimes.
  */
 double datetime_duration(const datetime_t *dttm1, const datetime_t *dttm2, datetime_span_t *span);
-
-/**
- * @brief convert a datetime to a formatted string. The format string can contain the following placeholders:
- *        %d   : day number - minimum digits.
- *        %dd  : day number - always 2 digits.
- *        %ddd : shortened day of week ( eg mon, tue, wed, ... )
- *        %Ddd : Shortened day of week ( eg Mon, Tue, Wed, ... )
- *        %DDD : SHORTENED day of week ( eg MON, TUE, WED, ... )
- *        %dddd: full day of week ( eg monday, tuesday, ... )
- *        %Dddd: Full day of week ( eg Monday, Tuesday, ... )
- *        %DDDD: FULL day of week ( eg MONDAY, TUESDAY, ... )
- *        %o   : cardinal for day number ( eg st, nd, th, ... )
- *        %O   : cardinal for day number ( eg ST, ND, TH, ... )
- *        %q   : superscript cardinal for day number ( eg ˢᵗ, ⁿᵈ, ᵗʰ, ... )
- *        %m   : month number - minimum digits.
- *        %mm  : month number - always 2 digits.
- *        %mmm : shortened month name ( eg jan, feb, ... )
- *        %Mmm : Shortened month name ( eg Jan, Feb, ... )
- *        %MMM : SHORTENED month name ( eg JAN, FEB, ... )
- *        %mmmm: full month name ( eg january, february, ... )
- *        %Mmmm: Full month name ( eg January, February, ... )
- *        %MMMM: FULL month name ( eg JANUARY, FEBRUARY, ... )
- *        %yy  : short year ( eg 97 )
- *        %yyyy: full year ( eg 1997 )
- *        @h   : hour - minimum digits.
- *        @hh  : hour - always 2 digits.
- *        @Hh  : hour in 24 hour clock - always 2 digits.
- *        @m   : minute - minimum digits.
- *        @mm  : minute - always 2 digits.
- *        @s   : second - minimum digits.
- *        @ss  : second - always 2 digits.
- *        @p   : pm / am.
- *        @P   : PM / AM.
- *        %%   : '%' char.
- *        @@   : '@' char.
- *        ^    : void character ( eg "@h^hr" -> "9hr" and "@^@h" -> "@9" )
- *        Fractions of seconds are currently not included.
- * @param dttm the datetime to convert to a formatted string.
- * @param format the format string to use for formatting the datetime. See the description above for the supported
- * placeholders.
- * @return a newly allocated C string containing the formatted datetime. The caller is responsible for freeing the
- * returned string. If allocation fails or the datetime is not initialised, returns NULL.
- */
-char *datetime_format(const datetime_t *dttm, const char *format);
-
-/**
- * @brief Format a datetime using a string object.
- *
- * This is the string_t-based counterpart to datetime_format(). The returned
- * string must be released with string_free().
- */
-string_t *datetime_format_text(const datetime_t *dttm, const string_t *format);
 
 /**
  * @brief status of a sunrise or sunset calculation.

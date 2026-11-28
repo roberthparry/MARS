@@ -294,7 +294,7 @@ static int test_num_printf_compat(const char *fmt, ...)
         if (fmt[pos] == '%' && fmt[pos + 1u] == 'q') {
             number_t value = va_arg(ap, number_t);
             number_t display = test_number_for_display(value);
-            int rc = num_printf("%N", display);
+            int rc = fmt_print("{:N}", FMT(display));
 
             if (rc >= 0)
                 written += rc;
@@ -316,7 +316,7 @@ static void test_print_number_line(const char *label, number_t value)
     number_t display = test_number_for_display(value);
 
     printf("  %-8s = ", label);
-    num_printf("%N\n", display);
+    fmt_print("{:N}\n", FMT(display));
     num_destroy(&display);
 }
 

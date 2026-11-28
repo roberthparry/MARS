@@ -13,6 +13,7 @@
 #include "qcomplex-t.h"
 #include "number-t.h"
 #include "datetime-t.h"
+#include "timeseries-t.h"
 #include "equation-t.h"
 #include "TeX-t.h"
 #include "test_harness.h"
@@ -181,14 +182,42 @@ void example_format_datetime(void)
                      "README datetime output byte count");
 }
 
+/* README example: native English name and ordinal case controls share the typed date parser. */
+void example_format_datetime_case(void)
+{
+    datetime_t *dt = datetime_init_ymd(datetime_alloc(), 2026, DT_June, 10);
+    if (!dt)
+        return;
+    int bytes = fmt_print("{dt:[upper]dddd do MMMM yyyy}\n{dt:[lower]ddd MMM yyyy}\n{dt:[upper]ddd [title]do "
+                          "MMMM yyyy}\n",
+        FMT(dt));
+    datetime_dealloc(dt);
+    TEST_ASSERT_TRUE(bytes == (int)sizeof("WEDNESDAY 10TH JUNE 2026\nwed jun 2026\nWED 10th June 2026\n") - 1,
+                     "README date case output byte count");
+}
+
+/* README example: native time-series inline, pretty and CSV styles share one borrowed binding. */
+void example_format_timeseries(void)
+{
+    const double values[] = {1.0, 2.0, 3.0};
+    timeseries_t *series = ts_new_from_doubles(values, 3u);
+    if (!series)
+        return;
+    int bytes = fmt_print("Inline: {series}\nPretty:\n{series:pretty}CSV:\n{series:csv}", FMT(series));
+    ts_free(series);
+    TEST_ASSERT_TRUE(bytes == (int)sizeof("Inline: 1; 2; 3\nPretty:\n1\n2\n3\nCSV:\ndate,value\n,1\n,2\n,3\n") - 1,
+                     "README time-series output byte count");
+}
+
 /* README example: six catalogue locales with translated date order and grammatical month forms. */
 void example_format_locales(void)
 {
     datetime_t *dt = datetime_init_ymd(datetime_alloc(), 2026, DT_June, 10);
     if (!dt)
         return;
-    int bytes = fmt_print("France: {dt:fr_FR}\nSpain: {dt:es_ES}\nWales: {dt:cy_GB}\n"
-                          "Greece: {dt:el_GR}\nRussia: {dt:ru_RU}\nJapan: {dt:ja_JP}\n", FMT(dt));
+    int bytes = fmt_print("France: {dt:fr_FR}\nSpain: {dt:es_ES}\nWales: {dt:cy_GB}\nGreece: "
+                          "{dt:el_GR}\nRussia: {dt:ru_RU}\nJapan: {dt:ja_JP}\n",
+        FMT(dt));
     datetime_dealloc(dt);
     TEST_ASSERT_TRUE(bytes == (int)sizeof("France: 10 juin 2026\nSpain: 10 de junio de 2026\n"
         "Wales: 10 Mehefin 2026\nGreece: 10 Ιουνίου 2026\nRussia: 10 июня 2026 г.\nJapan: 2026年6月10日\n") - 1,

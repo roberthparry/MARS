@@ -684,6 +684,10 @@ bool equ_is_solved_for(const equation_t *equation, const expr_t *wrt);
 
 ### `equ_printf()`
 
+Deprecated: use `fmt_print()` with `FMT(equation)`. The retained compatibility
+function still accepts its existing conversions; supported compilers emit a
+migration warning. `equ_print()` forwards its default presentation to typed output.
+
 Returns the public result described by printf.
 
 ```c

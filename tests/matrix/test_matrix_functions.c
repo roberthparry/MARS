@@ -9,6 +9,7 @@
  * run suites sequentially; this source is not part of the installed library.
  */
 
+#include "format-t.h"
 #include "string-t.h"
 #include "test_matrix.h"
 
@@ -1044,8 +1045,8 @@ static void test_eigen_d(void)
     /* eigenvalues only */
     number_t ev[2] = {NUM_ZERO, NUM_ZERO};
     mat_eigenvalues(A, ev);
-    num_printf("    eigenvalue[0] (mat_eigenvalues): %N\n", ev[0]);
-    num_printf("    eigenvalue[1] (mat_eigenvalues): %N\n", ev[1]);
+    fmt_print("    eigenvalue[0] (mat_eigenvalues): {:N}\n", FMT(ev[0]));
+    fmt_print("    eigenvalue[1] (mat_eigenvalues): {:N}\n", FMT(ev[1]));
 
     double lmin = fmin(num_to_double(ev[0]), num_to_double(ev[1]));
     double lmax = fmax(num_to_double(ev[0]), num_to_double(ev[1]));
@@ -1058,8 +1059,8 @@ static void test_eigen_d(void)
     mat_eigendecompose(A, ev2, &V);
 
     print_mnum("eigenvectors V (columns)", V);
-    num_printf("    eigenvalue2[0] (mat_eigendecompose): %N\n", ev2[0]);
-    num_printf("    eigenvalue2[1] (mat_eigendecompose): %N\n", ev2[1]);
+    fmt_print("    eigenvalue2[0] (mat_eigendecompose): {:N}\n", FMT(ev2[0]));
+    fmt_print("    eigenvalue2[1] (mat_eigendecompose): {:N}\n", FMT(ev2[1]));
     check_bool("eigenvectors V type is number", V && mat_typeof(V) == MAT_TYPE_NUMBER);
 
     /* verify A*v[k] = lambda[k]*v[k] for each column k */
@@ -1121,8 +1122,8 @@ static void test_eigen_mp_real(void)
     /* eigenvalues only */
     number_t ev[2] = {NUM_ZERO, NUM_ZERO};
     mat_eigenvalues(A, ev);
-    num_printf("    eigenvalue[0]: %N\n", ev[0]);
-    num_printf("    eigenvalue[1]: %N\n", ev[1]);
+    fmt_print("    eigenvalue[0]: {:N}\n", FMT(ev[0]));
+    fmt_print("    eigenvalue[1]: {:N}\n", FMT(ev[1]));
 
     int e0_smaller = num_lt(ev[0], ev[1]);
     number_t ev_min = e0_smaller ? num_clone(ev[0]) : num_clone(ev[1]);
@@ -1142,8 +1143,8 @@ static void test_eigen_mp_real(void)
     mat_eigendecompose(A, ev2, &V);
 
     print_mnum("eigenvectors V (columns)", V);
-    num_printf("    eigenvalue2[0]: %N\n", ev2[0]);
-    num_printf("    eigenvalue2[1]: %N\n", ev2[1]);
+    fmt_print("    eigenvalue2[0]: {:N}\n", FMT(ev2[0]));
+    fmt_print("    eigenvalue2[1]: {:N}\n", FMT(ev2[1]));
     check_bool("mp-real eigenvectors V type is number", V && mat_typeof(V) == MAT_TYPE_NUMBER);
 
     if (V) {
@@ -1206,8 +1207,8 @@ static void test_eigen_complex(void)
     /* eigenvalues only */
     number_t ev[2] = {NUM_ZERO, NUM_ZERO};
     mat_eigenvalues(A, ev);
-    num_printf("    eigenvalue[0]: %N\n", ev[0]);
-    num_printf("    eigenvalue[1]: %N\n", ev[1]);
+    fmt_print("    eigenvalue[0]: {:N}\n", FMT(ev[0]));
+    fmt_print("    eigenvalue[1]: {:N}\n", FMT(ev[1]));
 
     int e0_smaller = num_lt(ev[0], ev[1]);
     number_t ev_min = e0_smaller ? num_clone(ev[0]) : num_clone(ev[1]);
@@ -1226,8 +1227,8 @@ static void test_eigen_complex(void)
     matrix_t *V = NULL;
     mat_eigendecompose(A, ev2, &V);
     print_mnum("eigenvectors V (columns)", V);
-    num_printf("    eigenvalue2[0]: %N\n", ev2[0]);
-    num_printf("    eigenvalue2[1]: %N\n", ev2[1]);
+    fmt_print("    eigenvalue2[0]: {:N}\n", FMT(ev2[0]));
+    fmt_print("    eigenvalue2[1]: {:N}\n", FMT(ev2[1]));
     check_bool("complex eigenvectors V type is number", V && mat_typeof(V) == MAT_TYPE_NUMBER);
 
     if (V) {
@@ -1293,8 +1294,8 @@ static void test_eigen_num_hermitian(void)
     print_mnum("A", A);
 
     mat_eigenvalues(A, ev);
-    num_printf("    eigenvalue[0]: %N\n", ev[0]);
-    num_printf("    eigenvalue[1]: %N\n", ev[1]);
+    fmt_print("    eigenvalue[0]: {:N}\n", FMT(ev[0]));
+    fmt_print("    eigenvalue[1]: {:N}\n", FMT(ev[1]));
 
     {
         int e0_smaller = num_lt(ev[0], ev[1]);

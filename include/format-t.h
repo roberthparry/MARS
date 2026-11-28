@@ -254,11 +254,17 @@ fmt_arg_t fmt_named(const char *name, fmt_arg_t value);
 /** @brief Internal notation constructor selection, enabled by TeX-t.h. */
 #define MARS_FMT_SELECT_TeX_(value, next) next
 
+/* Preserve an owning-header association registered before this interface. */
+#ifndef MARS_FMT_SELECT_TS_
+/** @brief Internal time-series constructor selection, registered by timeseries-t.h. */
+#define MARS_FMT_SELECT_TS_(value, next) next
+#endif
+
 /** @brief Compose the enabled constructor selections; inactive hooks add no type or runtime dependency. */
 #define MARS_FMT_EXTENDED_(value) \
     MARS_FMT_SELECT_QF_(value, MARS_FMT_SELECT_QC_(value, MARS_FMT_SELECT_NUM_(value, \
     MARS_FMT_SELECT_MAT_(value, MARS_FMT_SELECT_EXPR_(value, MARS_FMT_SELECT_DATETIME_(value, \
-    MARS_FMT_SELECT_EQU_(value, MARS_FMT_SELECT_TeX_(value, fmt_arg_pointer))))))))
+    MARS_FMT_SELECT_EQU_(value, MARS_FMT_SELECT_TeX_(value, MARS_FMT_SELECT_TS_(value, fmt_arg_pointer)))))))))
 
 /**
  * @brief Select a descriptor constructor for a supported C expression.

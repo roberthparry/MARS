@@ -50,7 +50,9 @@ static void test_interval_parsing(void)
             num_destroy(&want); num_destroy(&b); num_destroy(&a); expr_free(bound);
         }
         if (!valid)
-            string_printf("Interval input: %s; canonical: %s\n", cases[i].source, text ? string_c_str(text) : "NULL");
+            fmt_print("Interval input: {:s}; canonical: {:s}\n",
+                FMT(cases[i].source),
+                FMT(text ? string_c_str(text) : "NULL"));
         ok = valid && ok;
         de_free(copy); string_free(text); de_free(de);
     }
@@ -67,7 +69,7 @@ static void test_interval_rejections(void)
     for (size_t i = 0; i < sizeof sources / sizeof *sources; ++i) {
         diffequ_t *de = de_from_string(sources[i]);
         if (de)
-            string_printf("Unexpected interval acceptance: %s\n", sources[i]);
+            fmt_print("Unexpected interval acceptance: {:s}\n", FMT(sources[i]));
         ok = !de && ok;
         de_free(de);
     }
@@ -106,8 +108,11 @@ static void test_parameter_restrictions(void)
         if (valid && i < 6u)
             valid = strstr(string_c_str(text), "where") && strstr(string_c_str(TeX), "\\ge");
         if (!valid)
-            string_printf("Parameter restriction: %s\nProblem: %S\nSolution: %S\nTeX: %S\n",
-                           sources[i], source, text, TeX);
+            fmt_print("Parameter restriction: {:s}\nProblem: {:s}\nSolution: {:s}\nTeX: {:s}\n",
+                FMT(sources[i]),
+                FMT(source),
+                FMT(text),
+                FMT(TeX));
         ok = valid && ok;
         string_free(TeX); string_free(text); de_solve_result_free(result);
         de_free(copy); string_free(problem); string_free(source); de_free(de);
@@ -130,7 +135,7 @@ static void test_parameter_restriction_evaluation(void)
         expr_t *at = bound ? expr_substitute(bound, de_independent_at(de, 0u), zero) : NULL;
         number_t number = at ? expr_eval(at) : num_clone(NUM_NAN);
         ok = i < 2u ? num_eq(number, NUM_ONE) : num_is_nan(number);
-        if (!ok) string_printf("Restricted evaluation: a=%s; value=%g\n", values[i], num_to_double(number));
+        if (!ok) fmt_print("Restricted evaluation: a={:s}; value={:g}\n", FMT(values[i]), FMT(num_to_double(number)));
         num_destroy(&number); expr_free(at); expr_free(zero); expr_free(bound); expr_free(value);
     }
     expr_free(parameter); de_solve_result_free(result); de_free(de);
@@ -140,7 +145,7 @@ static void test_parameter_restriction_evaluation(void)
     };
     for (size_t i = 0; i < sizeof invalid / sizeof *invalid; ++i) {
         de = de_from_string(invalid[i]);
-        if (de) string_printf("Unexpected parameter restriction: %s\n", invalid[i]);
+        if (de) fmt_print("Unexpected parameter restriction: {:s}\n", FMT(invalid[i]));
         ok = !de && ok;
         de_free(de);
     }
@@ -163,7 +168,7 @@ static void test_parameter_expression_serialisation(void)
         bool valid = expression && native && body && function && TeX && copy && from_body &&
                      strstr(string_c_str(function), "realpart(a)") && !strstr(string_c_str(TeX), "real_at_least");
         if (!valid)
-            string_printf("Ordering source: %s\nNative: %S\nFunction: %S\n", sources[i], native, body);
+            fmt_print("Ordering source: {:s}\nNative: {:s}\nFunction: {:s}\n", FMT(sources[i]), FMT(native), FMT(body));
         ok = valid && ok;
         expr_free(from_body); expr_free(copy); string_free(TeX); string_free(function);
         string_free(body); string_free(native); expr_free(expression);

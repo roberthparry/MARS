@@ -363,6 +363,7 @@ string_t *num_sprintf_text(const char *fmt, ...)
     return text;
 }
 
+/* Retain the original printf-style numeric formatting and stream semantics. */
 int num_printf(const char *fmt, ...)
 {
     int written;
@@ -375,7 +376,7 @@ int num_printf(const char *fmt, ...)
     if (!text)
         return -1;
 
-    written = string_printf("%S", text);
+    written = string_fprintf(stdout, "%S", text);
     string_free(text);
     return written;
 }

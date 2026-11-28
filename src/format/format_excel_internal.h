@@ -55,7 +55,9 @@ typedef enum {
     FX_POSITIVE_EXPONENT = 16u, /**< Include an explicit positive exponent sign. */
     FX_DATE_CONTEXT = 32u,    /**< Participates in Excel's neighbouring date-field lookup. */
     FX_HOUR_CONTEXT = 64u,    /**< An hour field makes a following short month field denote minutes. */
-    FX_SECOND_CONTEXT = 128u  /**< A second field makes a preceding short month field denote minutes. */
+    FX_SECOND_CONTEXT = 128u, /**< A second field makes a preceding short month field denote minutes. */
+    FX_UPPER_NAME = 256u,     /**< Upper-case English calendar names and ordinary ordinal suffixes. */
+    FX_LOWER_NAME = 512u      /**< Lower-case English calendar names and ordinary ordinal suffixes. */
 } fmt_excel_flags_t;
 
 /** @brief One source span with a resolved presentation role. */
@@ -81,6 +83,9 @@ typedef struct {
     bool general; /**< Contains the General keyword. */
     bool text; /**< Contains a text insertion placeholder. */
     bool grouping; /**< Contains a grouping comma before the last integer placeholder. */
+    bool has_seconds; /**< Contains seconds; omitted seconds must not round another date or time field. */
+    bool name_case_set; /**< A native calendar-name case directive was encountered during compilation. */
+    unsigned name_case; /**< Current compile-time name case, copied into subsequent tokens. */
     int shift; /**< Decimal scaling from percent and trailing commas. */
     size_t decimal; /**< Decimal token index, or SIZE_MAX. */
     size_t exponent; /**< Scientific exponent token index, or SIZE_MAX. */

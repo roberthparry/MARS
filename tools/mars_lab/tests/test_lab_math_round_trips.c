@@ -9,6 +9,7 @@
 #include <math.h>
 #include <string.h>
 
+#include "format-t.h"
 #include "test_lab_math_support.h"
 
 typedef struct {
@@ -173,7 +174,7 @@ static void test_transform_family_round_trips(void)
         const char *frequency = direction == 2 ? "s" : "ω";
         const double points[] = {direction == 2 ? 0.3 : -0.3, direction == 2 ? 0.7 : 0.3, 1.3};
         for (size_t i = 0; i < count; ++i) {
-            string_printf("round trip %s/%s\n", forward[direction], sources[i].name);
+            fmt_print("round trip {:s}/{:s}\n", FMT(forward[direction]), FMT(sources[i].name));
             const json_t *transformed = lab_math_round_trips_fields(lab_math_format("%s(%s,t,%s)", forward[direction],
                                                               sources[i].source, frequency), frequency);
             lab_math_round_trips_resolved(transformed);

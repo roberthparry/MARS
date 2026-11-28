@@ -8,6 +8,7 @@
  */
 #include <string.h>
 
+#include "format-t.h"
 #include "lab_presentation.h"
 #include "test_harness.h"
 #include "test_lab_support.h"
@@ -207,7 +208,7 @@ static void test_lab_syntax_number_display(void)
         bool match = adapted && !strcmp(test_lab_text(entry, "html"), cases[i].display) &&
                      lab_syntax_test_lossless(entry, source) &&
                      !strcmp(test_lab_text(fields, "result"), cases[i].source);
-        if (!match) string_printf("number display: %s -> %s\n", cases[i].source, test_lab_text(entry, "html"));
+        if (!match) fmt_print("number display: {:s} -> {:s}\n", FMT(cases[i].source), FMT(test_lab_text(entry, "html")));
         ok = ok && match;
         json_free(fields);
         string_free(source);

@@ -18,6 +18,7 @@
 #include <time.h>
 #include <unistd.h>
 
+#include "format-t.h"
 #include "string-t.h"
 #include "cfg_progress.h"
 #include "test_harness.h"
@@ -140,7 +141,7 @@ static void test_cfg_progress_output(void)
          string_find(output, "10/10 tiles imported") < 0 &&
          string_find(output, "100%") < 0 && string_find(output, "\r") < 0 && string_find(output, "\033") < 0;
     if (!ok)
-        string_printf("Progress transcript: %S\n", output);
+        fmt_print("Progress transcript: {:s}\n", FMT(output));
     string_free(later);
     string_free(output);
     TEST_ASSERT_TRUE(ok, "live reporting explains pauses, estimates remaining work and preserves truthful counts and failure");

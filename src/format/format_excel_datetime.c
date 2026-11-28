@@ -3,7 +3,7 @@
  * @brief Gregorian calendar and elapsed-time rendering for Excel custom codes.
  *
  * Provides locale-independent English calendar names, context-sensitive month/minute fields, fractional seconds,
- * twelve-hour time and elapsed durations. Numeric dates use Excel's 1900 serial convention, including serial 60;
+ * name case, twelve-hour time and elapsed durations. Numeric dates use Excel's 1900 serial convention, including serial 60;
  * native civil datetimes retain their actual Gregorian date and need no dependency on the datetime module.
  */
 #include <math.h>
@@ -83,11 +83,29 @@ static bool fx_calendar_literal(fx_calendar_state_t *state, const fmt_excel_toke
     return fmt_excel_literal(state->out, state->plan, token, &state->fill);
 }
 
-static bool fx_calendar_name(string_t *out, const fx_calendar_name_t *name, size_t width)
+static bool fx_calendar_case(string_t *out, const char *text, size_t length, unsigned flags)
+{
+    char buffer[16];
+    if (!(flags & (FX_UPPER_NAME | FX_LOWER_NAME)))
+        return string_append_bytes(out, text, length) == 0;
+    if (length > sizeof(buffer))
+        return false;
+    for (size_t i = 0; i < length; ++i) {
+        unsigned char ch = (unsigned char)text[i];
+        if ((flags & FX_UPPER_NAME) && ch >= 'a' && ch <= 'z')
+            ch -= 'a' - 'A';
+        else if ((flags & FX_LOWER_NAME) && ch >= 'A' && ch <= 'Z')
+            ch += 'a' - 'A';
+        buffer[i] = (char)ch;
+    }
+    return string_append_bytes(out, buffer, length) == 0;
+}
+
+static bool fx_calendar_name(string_t *out, const fx_calendar_name_t *name, size_t width, unsigned flags)
 {
     static const size_t lengths[6] = {0u, 0u, 0u, 3u, SIZE_MAX, 1u};
     size_t length = lengths[width];
-    return string_append_bytes(out, name->text, length == SIZE_MAX ? name->length : length) == 0;
+    return fx_calendar_case(out, name->text, length == SIZE_MAX ? name->length : length, flags);
 }
 
 static bool fx_calendar_year(fx_calendar_state_t *state, const fmt_excel_token_t *token)
@@ -101,20 +119,21 @@ static bool fx_calendar_month(fx_calendar_state_t *state, const fmt_excel_token_
 {
     if (token->length <= 2u)
         return fmt_excel_append_unsigned(state->out, state->month, token->length);
-    return fx_calendar_name(state->out, &fx_months[state->month - 1u], token->length);
+    return fx_calendar_name(state->out, &fx_months[state->month - 1u], token->length, token->flags);
 }
 
 static bool fx_calendar_day(fx_calendar_state_t *state, const fmt_excel_token_t *token)
 {
     if (token->length <= 2u)
         return fmt_excel_append_unsigned(state->out, state->day, token->length);
-    return fx_calendar_name(state->out, &fx_weekdays[state->weekday], token->length);
+    return fx_calendar_name(state->out, &fx_weekdays[state->weekday], token->length, token->flags);
 }
 
 static bool fx_calendar_ordinal(fx_calendar_state_t *state, const fmt_excel_token_t *token)
 {
+    const char *suffix = fx_day_suffix(state->day, (token->flags & FX_SUPERSCRIPT) != 0u);
     return fmt_excel_append_unsigned(state->out, state->day, token->length) &&
-           string_append_cstr(state->out, fx_day_suffix(state->day, (token->flags & FX_SUPERSCRIPT) != 0u)) == 0;
+           fx_calendar_case(state->out, suffix, strlen(suffix), token->flags);
 }
 
 static bool fx_calendar_hour(fx_calendar_state_t *state, const fmt_excel_token_t *token)
@@ -169,10 +188,10 @@ static bool fx_calendar_subsecond(fx_calendar_state_t *state, const fmt_excel_to
 
 static bool fx_calendar_long_date(fx_calendar_state_t *state, const fmt_excel_token_t *token)
 {
-    (void)token;
     const fx_calendar_name_t *weekday = &fx_weekdays[state->weekday], *month = &fx_months[state->month - 1u];
-    return string_append_bytes(state->out, weekday->text, weekday->length) == 0 &&
-           string_append_cstr(state->out, ", ") == 0 && string_append_bytes(state->out, month->text, month->length) == 0 &&
+    return fx_calendar_case(state->out, weekday->text, weekday->length, token->flags) &&
+           string_append_cstr(state->out, ", ") == 0 &&
+           fx_calendar_case(state->out, month->text, month->length, token->flags) &&
            string_append_char(state->out, ' ') == 0 && fmt_excel_append_unsigned(state->out, state->day, 1u) &&
            string_append_cstr(state->out, ", ") == 0 && fmt_excel_append_unsigned(state->out, (unsigned)state->year, 4u);
 }
@@ -215,7 +234,8 @@ static string_t *fx_calendar_render(const fmt_options_t *options, const fmt_exce
     uint64_t scale = 1u;
     for (unsigned i = 0u; i < precision; ++i)
         scale *= 10u;
-    long double rounded = floorl(second * (long double)scale + 0.5L) / (long double)scale;
+    long double rounded = section->has_seconds ? floorl(second * (long double)scale + 0.5L) / (long double)scale :
+                                                floorl(second);
     if (rounded >= 60.0L) {
         rounded = 0.0L;
         if (++minute == 60u) {

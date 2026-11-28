@@ -50,6 +50,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 
+#include "attributes-t.h"
 #include "string-t.h"
 #include "format-t.h"
 #include "number-t.h"
@@ -2360,8 +2361,9 @@ int expr_sprintf(char *out, size_t out_size, const char *fmt, ...);
  * @param fmt Borrowed NUL-terminated format string; expression conversions consume expr_t pointers.
  * @param ... Arguments matching fmt; expression arguments are borrowed, not consumed.
  * @return Result of string_printf for the formatted text; -1 if formatting fails.
+ * @deprecated Use fmt_print() with FMT() bindings; retained for compatibility.
  */
-int expr_printf(const char *fmt, ...);
+int expr_printf(const char *fmt, ...) MARS_DEPRECATED("Use fmt_print() with FMT() bindings instead.");
 
 /**
  * @brief Print the expression-style string representation of @p expr to stdout.

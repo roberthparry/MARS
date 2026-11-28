@@ -1928,6 +1928,11 @@ Typed `fmt_print()` uses `{:scientific}`, `{:pretty}`, `{:scientific_layout}`
 and `{:pretty_layout}` for these same four presentations. The README examples
 use these typed fields with `FMT(matrix)`; the output layout is unchanged.
 
+`mat_printf()` is deprecated and emits a compiler migration warning where
+supported. Use `fmt_print()` with `FMT(matrix)` for new output. The compatibility
+function remains functional; `mat_print()` now forwards its pretty layout to
+typed output, including its existing null fallback.
+
 ---
 
 ### `mat_adjugate()`

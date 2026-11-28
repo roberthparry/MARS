@@ -230,8 +230,6 @@ static void datetime_jdn_to_julian_ymd(long jdn, int *year, int *month, int *day
 /* Format the selected date in the Christian civil calendar systems. */
 string_t *datetime_christian_calendar_date_text(const datetime_t *dttm)
 {
-    string_t *format;
-    string_t *gregorian;
     string_t *out;
     int julianYear;
     int julianMonth;
@@ -240,22 +238,9 @@ string_t *datetime_christian_calendar_date_text(const datetime_t *dttm)
     if (!dttm || datetime_jdn(dttm) == LONG_MAX)
         return NULL;
 
-    format = string_new_with("%yyyy-%mm-%dd");
-    gregorian = format ? datetime_format_text(dttm, format) : NULL;
-    string_free(format);
-    if (!gregorian)
-        return NULL;
-
     datetime_jdn_to_julian_ymd(datetime_jdn(dttm), &julianYear, &julianMonth, &julianDay);
-    out = string_new();
-    if (!out || string_append_format(out, "Gregorian %s; Julian %04d-%02d-%02d", string_c_str(gregorian), julianYear,
-                                     julianMonth, julianDay) < 0) {
-        string_free(gregorian);
-        string_free(out);
-        return NULL;
-    }
-
-    string_free(gregorian);
+    out = string_sprintf("Gregorian %04d-%02u-%02u; Julian %04d-%02d-%02d", datetime_year(dttm),
+                         (unsigned)datetime_month(dttm), (unsigned)datetime_day(dttm), julianYear, julianMonth, julianDay);
     return out;
 }
 

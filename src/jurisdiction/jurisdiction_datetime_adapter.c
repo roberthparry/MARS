@@ -9,6 +9,8 @@
  * owns immutable jurisdiction snapshots and closes database handles after loading; warm rendering uses no SQL.
  * Accessors may materialise the datetime's lazy calendar caches, so shared mutable values require synchronisation.
  */
+#include <limits.h>
+#include <math.h>
 #include <pthread.h>
 #include <stdlib.h>
 #include <string.h>
@@ -19,9 +21,58 @@
 
 typedef struct {
     const char *name;
-    const char *pattern;
-    string_t *(*calendar)(const datetime_t *);
+    string_t *(*render)(const datetime_t *);
 } datetime_fmt_style_t;
+
+static string_t *datetime_fmt_iso(const datetime_t *value)
+{
+    return string_sprintf("%04d-%02u-%02uT%02u:%02u:%02u", datetime_year(value),
+        (unsigned)datetime_month(value), (unsigned)datetime_day(value), (unsigned)datetime_hour(value),
+        (unsigned)datetime_minute(value), (unsigned)datetime_second(value));
+}
+
+static string_t *datetime_fmt_date(const datetime_t *value)
+{
+    return string_sprintf("%04d-%02u-%02u", datetime_year(value),
+                         (unsigned)datetime_month(value), (unsigned)datetime_day(value));
+}
+
+static string_t *datetime_fmt_time(const datetime_t *value)
+{
+    return string_sprintf("%02u:%02u:%02u", (unsigned)datetime_hour(value),
+                         (unsigned)datetime_minute(value), (unsigned)datetime_second(value));
+}
+
+static string_t *datetime_fmt_year(const datetime_t *value)
+{
+    int year = datetime_year(value);
+    return string_sprintf("%02d", year % 100);
+}
+
+static string_t *datetime_fmt_month(const datetime_t *value)
+{
+    return string_sprintf("%u", (unsigned)datetime_month(value));
+}
+
+static string_t *datetime_fmt_day(const datetime_t *value)
+{
+    return string_sprintf("%u", (unsigned)datetime_day(value));
+}
+
+static string_t *datetime_fmt_hour(const datetime_t *value)
+{
+    return string_sprintf("%02u", (unsigned)datetime_hour(value));
+}
+
+static string_t *datetime_fmt_minute(const datetime_t *value)
+{
+    return string_sprintf("%u", (unsigned)datetime_minute(value));
+}
+
+static string_t *datetime_fmt_second(const datetime_t *value)
+{
+    return string_sprintf("%u", (unsigned)datetime_second(value));
+}
 
 static uint32_t datetime_fmt_hash(const char *name, uint32_t seed)
 {
@@ -37,27 +88,27 @@ static const datetime_fmt_style_t *datetime_fmt_find(const char *style)
         0, 0, -2, -7, 0, 0, 1, 0, 2, 1, 0, -9, -11, -13, -16, -18, -19, 0, 0, 3, 0,
     };
     static const datetime_fmt_style_t styles[21] = {
-        [0]  = {"muslim",    NULL,                        datetime_muslim_calendar_date_text},
-        [1]  = {"christian", NULL,                        datetime_christian_calendar_date_text},
-        [2]  = {"aztec",     NULL,                        datetime_aztec_calendar_date_text},
-        [3]  = {"iso",       "%yyyy-%mm-%ddT@Hh:@mm:@ss", NULL},
-        [4]  = {"chinese",   NULL,                        datetime_chinese_calendar_date_text},
-        [5]  = {"M",         "%m",                       NULL},
-        [6]  = {"time",      "@Hh:@mm:@ss",              NULL},
-        [7]  = {"datetime",  "%yyyy-%mm-%ddT@Hh:@mm:@ss", NULL},
-        [8]  = {"date",      "%yyyy-%mm-%dd",            NULL},
-        [9]  = {"h",         "@Hh",                      NULL},
-        [10] = {"jewish",    NULL,                        datetime_jewish_calendar_date_text},
-        [11] = {"y",         "%yy",                      NULL},
-        [12] = {"m",         "@m",                       NULL},
-        [13] = {"ethiopian", NULL,                        datetime_ethiopian_calendar_date_text},
-        [14] = {"hindu",     NULL,                        datetime_hindu_calendar_date_text},
-        [15] = {"buddhist",  NULL,                        datetime_buddhist_calendar_date_text},
-        [16] = {"d",         "%d",                       NULL},
-        [17] = {"s",         "@s",                       NULL},
-        [18] = {"cherokee",  NULL,                        datetime_cherokee_calendar_date_text},
-        [19] = {"lingua",    NULL,                        NULL},
-        [20] = {"mayan",     NULL,                        datetime_mayan_calendar_date_text},
+        [0]  = {"muslim",    datetime_muslim_calendar_date_text},
+        [1]  = {"christian", datetime_christian_calendar_date_text},
+        [2]  = {"aztec",     datetime_aztec_calendar_date_text},
+        [3]  = {"iso",       datetime_fmt_iso},
+        [4]  = {"chinese",   datetime_chinese_calendar_date_text},
+        [5]  = {"M",         datetime_fmt_month},
+        [6]  = {"time",      datetime_fmt_time},
+        [7]  = {"datetime",  datetime_fmt_iso},
+        [8]  = {"date",      datetime_fmt_date},
+        [9]  = {"h",         datetime_fmt_hour},
+        [10] = {"jewish",    datetime_jewish_calendar_date_text},
+        [11] = {"y",         datetime_fmt_year},
+        [12] = {"m",         datetime_fmt_minute},
+        [13] = {"ethiopian", datetime_ethiopian_calendar_date_text},
+        [14] = {"hindu",     datetime_hindu_calendar_date_text},
+        [15] = {"buddhist",  datetime_buddhist_calendar_date_text},
+        [16] = {"d",         datetime_fmt_day},
+        [17] = {"s",         datetime_fmt_second},
+        [18] = {"cherokee",  datetime_cherokee_calendar_date_text},
+        [19] = {"lingua",    NULL},
+        [20] = {"mayan",     datetime_mayan_calendar_date_text},
     };
     _Static_assert(sizeof(styles) / sizeof(*styles) == sizeof(displacement), "Regenerate the minimal perfect hash.");
     if (!*style)
@@ -185,11 +236,25 @@ static string_t *datetime_fmt_render(const void *data, const fmt_options_t *opti
             *error = (fmt_error_t){FMT_ERROR_ARGUMENT, SIZE_MAX, SIZE_MAX, "datetime pointer is NULL"};
         return NULL;
     }
+    if (datetime_year(value) == SHRT_MAX || (unsigned)datetime_month(value) < 1u ||
+        (unsigned)datetime_month(value) > 12u || datetime_day(value) < 1u || datetime_day(value) > 31u ||
+        datetime_hour(value) >= 24u || datetime_minute(value) >= 60u || !isfinite(datetime_second(value)) ||
+        datetime_second(value) < 0.0 || datetime_second(value) >= 60.0) {
+        if (error)
+            *error = (fmt_error_t){FMT_ERROR_ARGUMENT, SIZE_MAX, SIZE_MAX, "datetime is not initialised"};
+        return NULL;
+    }
     if (options->excel)
-        return fmt_excel_datetime(options, datetime_year(value), (unsigned)datetime_month(value), datetime_day(value),
-                                   datetime_hour(value), datetime_minute(value), datetime_second(value), error);
+        return fmt_excel_datetime(options,
+            datetime_year(value),
+            (unsigned)datetime_month(value),
+            datetime_day(value),
+            datetime_hour(value),
+            datetime_minute(value),
+            datetime_second(value),
+            error);
     const datetime_fmt_style_t *style = datetime_fmt_find(options->presentation);
-    if (!style || (!style->calendar && !style->pattern)) {
+    if (!style || !style->render) {
         datetime_fmt_locale_t *locale = datetime_fmt_locale_get(style ? "" : options->presentation);
         if (!locale || (!locale->locale && !style)) {
             if (error)
@@ -201,12 +266,7 @@ static string_t *datetime_fmt_render(const void *data, const fmt_options_t *opti
         /* A machine without an installed locale catalogue retains useful, deterministic datetime output. */
         style = datetime_fmt_find("iso");
     }
-    if (style->calendar)
-        return style->calendar(value);
-    string_t *pattern = string_new_with(style->pattern);
-    string_t *out = pattern ? datetime_format_text(value, pattern) : NULL;
-    string_free(pattern);
-    return out;
+    return style->render(value);
 }
 
 static const fmt_adapter_t datetime_fmt_adapter = {

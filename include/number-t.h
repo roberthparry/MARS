@@ -60,6 +60,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "attributes-t.h"
 #include "format-t.h"
 #include "qfloat-t.h"
 #include "qcomplex-t.h"
@@ -588,7 +589,15 @@ string_t *num_sprintf_text(const char *fmt, ...);
 int num_vsprintf(char *out, size_t out_size, const char *fmt,
                  va_list ap);                                      /**< caller-provided buffer, `va_list` form */
 int num_sprintf(char *out, size_t out_size, const char *fmt, ...); /**< caller-provided buffer, variadic form */
-int num_printf(const char *fmt, ...);                              /**< prints to standard output */
+
+/**
+ * @brief Print native number conversions to standard output using the retained printf-style interface.
+ * @param fmt Borrowed format string; number conversions consume borrowed number_t values.
+ * @param ... Arguments matching the format, evaluated once and retained only for this call.
+ * @return Written byte count, or -1 on formatting or output failure; no ownership is transferred.
+ * @deprecated Use fmt_print() with FMT() bindings; this interface remains available for compatibility.
+ */
+int num_printf(const char *fmt, ...) MARS_DEPRECATED("Use fmt_print() with FMT() bindings instead.");
 /** @} */
 
 /** @name Queries and comparisons

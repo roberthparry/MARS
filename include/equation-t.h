@@ -35,6 +35,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 
+#include "attributes-t.h"
 #include "format-t.h"
 #include "expression-t.h"
 #include "expr_context-t.h"
@@ -392,8 +393,9 @@ int equ_sprintf(char *out, size_t out_size, const char *fmt, ...);
  * @param[in] fmt Borrowed NUL-terminated format string; equation conversions consume equation_t pointers.
  * @param[in] ... Additional arguments matching fmt; equation arguments are borrowed, not consumed.
  * @return Result of string_printf when writing the formatted text, or -1 if formatting fails.
+ * @deprecated Use fmt_print() with FMT() bindings; retained for compatibility.
  */
-int equ_printf(const char *fmt, ...);
+int equ_printf(const char *fmt, ...) MARS_DEPRECATED("Use fmt_print() with FMT() bindings instead.");
 
 /**
  * @brief Print the expression-style string representation of @p equation.

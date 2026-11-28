@@ -402,7 +402,7 @@ API accepts both `string_t` and `string_builder_t` destinations.
 - `int string_append_vformat(string_t *s, const char *fmt, va_list ap)` — `va_list` append variant
 - `string_t *string_sprintf(const char *fmt, ...)` — create a new formatted string
 - `string_t *string_vsprintf(const char *fmt, va_list ap)` — `va_list` creation variant
-- `int string_printf(const char *fmt, ...)` — print formatted text to stdout
+- `int string_printf(const char *fmt, ...)` — deprecated stdout compatibility formatter; use `fmt_print()` with `FMT()`
 
 The printf-style functions use `%S` for `const string_t *`, `%W` for
 `string_view_t`, and `%R` for `rune_t`. With typed formatting, `FMT(value)`

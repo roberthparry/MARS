@@ -12,6 +12,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "format-t.h"
 #include "file-t.h"
 #include "sqlite-t.h"
 #include "json-t.h"
@@ -689,7 +690,7 @@ static bool test_cfg_locales_readme_fixture(const char *directory)
               test_cfg_locales_run(directory, args, 1, 0, &output) && output &&
               string_view_equals_literal(string_view_all(output), test_cfg_locales_check_message);
     if (ok)
-        string_printf("README example: mars_config locales --check\n%S", output);
+        fmt_print("README example: mars_config locales --check\n{:s}", FMT(output));
     string_free(output);
     string_free(guide);
     file_free(guide_file);

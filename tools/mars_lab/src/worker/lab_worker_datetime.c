@@ -18,6 +18,7 @@
 #include <sys/stat.h>
 #include <time.h>
 
+#include "format-t.h"
 #include "almanac-t.h"
 #include "array-t.h"
 #include "datetime-t.h"
@@ -669,8 +670,7 @@ done:
 
 static char *format_date(const datetime_t *dttm)
 {
-    string_t *format = string_new_with("%yyyy-%mm-%dd");
-    string_t *text = format ? datetime_format_text(dttm, format) : NULL;
+    string_t *text = fmt_string("{dttm:date}", FMT(dttm));
     const char *c_text = text ? string_c_str(text) : NULL;
     char *out = NULL;
 
@@ -682,14 +682,12 @@ static char *format_date(const datetime_t *dttm)
     }
 
     string_free(text);
-    string_free(format);
     return out;
 }
 
 static char *format_datetime_minutes(const datetime_t *dttm)
 {
-    string_t *format = string_new_with("%yyyy-%mm-%dd @Hh:@mm");
-    string_t *text = format ? datetime_format_text(dttm, format) : NULL;
+    string_t *text = fmt_string("{dttm:yyyy-MM-dd hh:mm}", FMT(dttm));
     const char *c_text = text ? string_c_str(text) : NULL;
     char *out = NULL;
 
@@ -701,13 +699,7 @@ static char *format_datetime_minutes(const datetime_t *dttm)
     }
 
     string_free(text);
-    string_free(format);
     return out;
-}
-
-static char *format_datetime_iso_minutes(const datetime_t *dttm)
-{
-    return datetime_format(dttm, "%yyyy-%mm-%dd @Hh:@mm");
 }
 
 static char *format_almanac_event_seconds(const almanac_event_time_t *event_time)
@@ -787,7 +779,7 @@ static void print_time_field(const char *name, const datetime_t *dttm)
 
 static void print_iso_time_field(const char *name, const datetime_t *dttm)
 {
-    char *text = format_datetime_iso_minutes(dttm);
+    char *text = format_datetime_minutes(dttm);
     printf("%s %s\n", name, text ? text : "unavailable");
     free(text);
 }

@@ -87,7 +87,15 @@ static void test_mat_printf_smoke(void)
     A = mat_create(2, 2, vals);
     saved_stdout = test_case_begin_stdout_capture("matrix-printf-smoke.txt", &path);
     check_bool("stdout capture for mat_printf available", saved_stdout >= 0);
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#endif
+    /* Deliberately exercise the retained deprecated entry point. */
     n = mat_printf("%m\n", A);
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC diagnostic pop
+#endif
     check_bool("stdout capture for mat_printf closes cleanly", test_case_end_stdout_capture(saved_stdout));
     check_bool("mat_printf returns positive count", n > 0);
     captured = fopen(path, "r");

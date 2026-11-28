@@ -9,6 +9,7 @@
  * run suites sequentially; this source is not part of the installed library.
  */
 
+#include "format-t.h"
 #include "string-t.h"
 #include "json-t.h"
 #define MARS_EXPR_INTERNAL_ACCESS
@@ -16,7 +17,6 @@
 #define MARS_EXPR_INTERNAL_ACCESS
 #include "expression/expr_binding_simplify.h"
 #include "test_database.h"
-
 #include "test_expr.h"
 
 static void check_parse_num(const char *label, const char *s, const char *want_text, int line);
@@ -682,7 +682,7 @@ static void function_series_endpoint_row(const void *data)
         ASSERT_NOT_NULL(derivation_TeX);
         ASSERT_NOT_NULL(sigma);
         if (!strstr(string_c_str(derivation_TeX), string_c_str(sigma)))
-            string_printf("Series %S: %S; wanted sigma %S\n", row->input, derivation_TeX, sigma);
+            fmt_print("Series {:s}: {:s}; wanted sigma {:s}\n", FMT(row->input), FMT(derivation_TeX), FMT(sigma));
         ASSERT_NOT_NULL(strstr(string_c_str(derivation_TeX), string_c_str(sigma)));
         if (closed_fragment) {
             TEST_ASSERT_TRUE(strstr(string_c_str(derivation_TeX), string_c_str(closed_fragment)) != NULL,
@@ -729,7 +729,11 @@ static void function_series_endpoint_row(const void *data)
                 char *got = expr_to_string(closed, styles[i]);
                 char *want = expr_to_string(normal_reference, styles[i]);
                 if (!got || !want || strcmp(got, want))
-                    string_printf("Closed progression %S, style %zu: %s; expected %s\n", row->input, i, got, want);
+                    fmt_print("Closed progression {:s}, style {:d}: {:s}; expected {:s}\n",
+                        FMT(row->input),
+                        FMT(i),
+                        FMT(got),
+                        FMT(want));
                 TEST_ASSERT_TRUE(got && want && !strcmp(got, want),
                                  "every native style uses the simplified closed-form algebra");
                 free(want); free(got);
@@ -853,7 +857,11 @@ static void atan_progression_row(const void *data)
         }
     }
     if (!ok)
-        string_printf("Arctangent progression %S: %s; %s; %s\n", row->name, plain, function, TeX);
+        fmt_print("Arctangent progression {:s}: {:s}; {:s}; {:s}\n",
+            FMT(row->name),
+            FMT(plain),
+            FMT(function),
+            FMT(TeX));
     expr_free(fresh);
     num_destroy(&compact_value);
     num_destroy(&value);
@@ -905,8 +913,11 @@ static void quotient_derivative_row(const void *data)
               !strstr(plain, "derivative(") && !strstr(function, "derivative(") &&
               strstr(TeX, "\\Lambda") && strstr(TeX, ":=") && strstr(TeX, "\\operatorname{Li}");
     if (!ok)
-        string_printf("Quotient derivative %S: got %.17g, expected %.17g\n%s\n", row->name,
-                      num_to_double(got), num_to_double(want), plain);
+        fmt_print("Quotient derivative {:s}: got {:.17g}, expected {:.17g}\n{:s}\n",
+            FMT(row->name),
+            FMT(num_to_double(got)),
+            FMT(num_to_double(want)),
+            FMT(plain));
     TEST_ASSERT_TRUE(ok, "Lambert forms evaluate the quotient derivative and always define Lambda in TeX");
     if (ok) {
         TEST_ASSERT_EXPR_NUMBER_CLOSE(got, want);
@@ -914,7 +925,7 @@ static void quotient_derivative_row(const void *data)
         number_t parsed_value = parsed ? expr_eval(parsed) : num_clone(NUM_NAN);
         if (!parsed || !num_is_finite(parsed_value)) {
             char *readback = parsed ? expr_to_string(parsed, style_UNBOUND) : NULL;
-            string_printf("Readback %S: %s\nsource: %s\n", row->name, readback, plain);
+            fmt_print("Readback {:s}: {:s}\nsource: {:s}\n", FMT(row->name), FMT(readback), FMT(plain));
             free(readback);
         }
         TEST_ASSERT_TRUE(parsed && num_is_finite(parsed_value), "Lambert forms and bindings survive round trips");
@@ -2272,7 +2283,7 @@ static void exact_decimal_literal_row(const void *data)
     bool ok = expression && same;
     if (!ok) {
         string_t *actual = num_to_string(value);
-        string_printf("Exact decimal %S: %S; wanted %S\n", row->input, actual, row->expected);
+        fmt_print("Exact decimal {:s}: {:s}; wanted {:s}\n", FMT(row->input), FMT(actual), FMT(row->expected));
         string_free(actual);
     }
     num_destroy(&expected);
@@ -3015,11 +3026,11 @@ static void check_expr_d(const char *label, const expr_t *node, double want, int
     if (err < TOL || rel < TOL) {
         printf(C_BOLD C_GREEN "PASS" C_RESET " %s\n", label);
         printf(C_BOLD "  expr   " C_RESET "%s\n", expr ? expr : "(null)");
-        qf_printf(C_BOLD "  value  " C_RESET "%.34q\n\n", qval);
+        fmt_print(C_BOLD "  value  " C_RESET "{qval:.34q}\n\n", FMT(qval));
     } else {
         printf(C_BOLD C_RED "FAIL" C_RESET " %s %s:%d:1\n", label, __FILE__, line);
         printf(C_BOLD "  expr   " C_RESET "%s\n", expr ? expr : "(null)");
-        qf_printf(C_BOLD "  got    " C_RESET "%.34q\n", qval);
+        fmt_print(C_BOLD "  got    " C_RESET "{qval:.34q}\n", FMT(qval));
         printf(C_BOLD "  want " C_RESET "%.17g\n\n", want);
         TEST_FAIL();
     }

@@ -703,7 +703,7 @@ L_0(1) = 0.7102431859378909
 
 Pass `qfloat_t` values **by value** to `%q`/`%Q` specifiers.
 
-- `int qf_printf(const char *fmt, ...)` — like `printf`; adds `%q` (decimal) and `%Q` (scientific)
+- `int qf_printf(const char *fmt, ...)` — deprecated stdout compatibility formatter; use `fmt_print()` with `FMT()`
 - `int qf_sprintf(char *out, size_t n, const char *fmt, ...)` — like `snprintf`
 - `int qf_vsprintf(char *out, size_t n, const char *fmt, va_list ap)` — `va_list` variant
 

@@ -25,6 +25,19 @@ of each native type being formatted. No additional integration header is require
 `datetime-t.h` registers its adapter without importing the formatting API;
 including `format-t.h` enables it in either header order.
 
+## Migrating stdout formatting
+
+The module-specific stdout functions `qf_printf()`, `qc_printf()`, `num_printf()`,
+`mat_printf()`, `expr_printf()`, `equ_printf()`, `ts_printf()` and `string_printf()`
+are deprecated. They remain functional for compatibility, and supported compilers
+warn at call sites with a recommendation to use `fmt_print()` and `FMT()`.
+Ordinary library, application and example output uses the typed route; dedicated
+compatibility tests still exercise the retained functions. The `*_sprintf*()`
+and `*_vsprintf*()` interfaces remain available, including for legacy runtime
+precision controls. Include `format-t.h` explicitly when migrating stdout calls.
+`attributes-t.h` supplies the shared `MARS_DEPRECATED(message)` annotation;
+compilers without deprecation attributes retain the documented interfaces.
+
 ## Named bindings
 
 ```c
@@ -109,6 +122,7 @@ Presentation names contain ASCII letters and underscores.
 | `equation_t *` | Native `expression`; `expression`, `function`, `latex`, `unbound` |
 | `datetime_t *` | Configured Lingua date; locale codes, `iso`, `date`, `time`, native calendar names, or custom date/time codes |
 | `TeX_t *` | Native TeX source; optional `latex` |
+| `timeseries_t *` | Native `inline`; `inline`, `pretty`, `csv` |
 
 Ordinary floats use their respective decimal precision by default. An explicit
 floating presentation defaults to six digits; general precision zero means one
@@ -317,7 +331,7 @@ Explicit unnamed constructors are `fmt_arg_signed()`, `fmt_arg_unsigned()`,
 `fmt_arg_pointer()`. The owning mathematical modules provide `fmt_arg_qfloat()`,
 `fmt_arg_qcomplex()`, `fmt_arg_number()`, `fmt_arg_matrix()` and
 `fmt_arg_expression()`. Datetimes, equations and notation provide
-`fmt_arg_datetime()`, `fmt_arg_equation()` and `fmt_arg_TeX()`. Including a type's header lets `FMT()` select its
+`fmt_arg_datetime()`, `fmt_arg_equation()`, `fmt_arg_TeX()` and `fmt_arg_timeseries()`. Including a type's header lets `FMT()` select its
 constructor automatically. Unsupported value types require an explicit custom adapter.
 Values are evaluated once; their evaluation order follows ordinary C rules.
 
@@ -528,6 +542,42 @@ Wednesday, 10ᵗʰ June 2026
 1:05:06 PM
 1:05:06pm
 ```
+
+Native date masks support `[lower]`, `[upper]` and `[title]` for subsequent
+English weekday/month names and ordinary ordinal suffixes. The default uses
+title-case names and lower-case suffixes. Quoted literals and superscript
+suffixes retain their spelling. These directives belong to native masks;
+`excel:` retains Excel's own syntax.
+
+```c
+#include "format-t.h"
+#include "datetime-t.h"
+
+int main(void)
+{
+    datetime_t *dt = datetime_init_ymd(datetime_alloc(), 2026, DT_June, 10);
+    if (!dt)
+        return 1;
+    int bytes = fmt_print("{dt:[upper]dddd do MMMM yyyy}\n{dt:[lower]ddd MMM yyyy}\n"
+                          "{dt:[upper]ddd [title]do MMMM yyyy}\n", FMT(dt));
+    datetime_dealloc(dt);
+    return bytes < 0;
+}
+```
+
+Output:
+
+```text
+WEDNESDAY 10TH JUNE 2026
+wed jun 2026
+WED 10th June 2026
+```
+
+When a mask omits seconds, hidden fractional seconds do not round the displayed
+date, hour or minute. When seconds are displayed, rounding follows their selected
+precision, including any necessary carry into the next minute or date.
+The `iso`, `datetime` and `time` keyword presentations retain whole seconds
+without rounding; custom masks can request fractional seconds explicitly.
 
 Locale codes select a Lingua date, rather than translating the month in an
 otherwise English mask. This example includes Greek, Cyrillic and Japanese

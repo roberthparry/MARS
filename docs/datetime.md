@@ -13,8 +13,6 @@ The public API remains in `include/datetime-t.h`. Implementation files under
 | `datetime.c` | Object lifetime, construction, parsing, serialisation, comparison and hashing |
 | `datetime_julian.c` | Julian-date conversion, lazy field access, civil-date validation and weekday navigation |
 | `datetime_arithmetic.c` | Date/time arithmetic, calendar spans and durations |
-| `datetime_format.c` | Date/time format tokens and string-builder helpers |
-| `datetime_format_adapter.c` | Typed interpolation of native civil fields and Excel custom codes |
 | `datetime_time_conversion.c` | Host timezone and DST queries, GMT conversion, Delta T, TT and TDB |
 | `datetime_lunar.c` | Lunar phase estimates and local new-moon searches |
 | `datetime_solar.c` | Solar position estimates, solstices and sunrise/sunset calculations |
@@ -378,48 +376,6 @@ All counts may be negative (subtract by passing a negative value).
 
 - `unsigned int datetime_hash(const datetime_t *dttm)` — hash suitable for use as a hash-table key
 
-### Formatting
-
-- `char *datetime_format(const datetime_t *dttm, const char *format)` — format the datetime using a format string; returns a newly allocated C string that the caller must free. Returns NULL on allocation failure.
-
-**Format placeholders:**
-
-| Placeholder | Output |
-|---|---|
-| `%d` | day number, minimum digits |
-| `%dd` | day number, always 2 digits |
-| `%ddd` | abbreviated weekday, lowercase (mon, tue, …) |
-| `%Ddd` | abbreviated weekday, title case (Mon, Tue, …) |
-| `%DDD` | abbreviated weekday, uppercase (MON, TUE, …) |
-| `%dddd` | full weekday, lowercase (monday, …) |
-| `%Dddd` | full weekday, title case (Monday, …) |
-| `%DDDD` | full weekday, uppercase (MONDAY, …) |
-| `%o` | ordinal suffix, lowercase (st, nd, rd, th) |
-| `%O` | ordinal suffix, uppercase (ST, ND, RD, TH) |
-| `%q` | superscript ordinal suffix (ˢᵗ, ⁿᵈ, ʳᵈ, ᵗʰ) |
-| `%m` | month number, minimum digits |
-| `%mm` | month number, always 2 digits |
-| `%mmm` | abbreviated month, lowercase (jan, …) |
-| `%Mmm` | abbreviated month, title case (Jan, …) |
-| `%MMM` | abbreviated month, uppercase (JAN, …) |
-| `%mmmm` | full month, lowercase (january, …) |
-| `%Mmmm` | full month, title case (January, …) |
-| `%MMMM` | full month, uppercase (JANUARY, …) |
-| `%yy` | 2-digit year (97) |
-| `%yyyy` | 4-digit year (1997) |
-| `@h` | hour, minimum digits |
-| `@hh` | hour, always 2 digits (12-hour) |
-| `@Hh` | hour, always 2 digits (24-hour) |
-| `@m` | minute, minimum digits |
-| `@mm` | minute, always 2 digits |
-| `@s` | second, minimum digits |
-| `@ss` | second, always 2 digits |
-| `@p` | am/pm |
-| `@P` | AM/PM |
-| `%%` | literal `%` |
-| `@@` | literal `@` |
-| `^` | void character (suppresses adjacent separator) |
-
 ### Sunrise and Sunset
 
 - `double datetime_sun_time(long julianDayNumber, double latitude, double longitude, bool isSunrise)` — sunrise or sunset time in GMT as decimal hours (e.g. 6.5 = 06:30). Returns -1.0 if the sun never rises, -2.0 if the sun never sets at that location on that date.
@@ -451,14 +407,6 @@ Creates or reconstructs the public value described by deserialise.
 
 ```c
 datetime_t *datetime_deserialise(const void *data, size_t len, const string_t *type, const string_t *encoding);
-```
-
-### `datetime_format_text()`
-
-Returns the public result described by format text.
-
-```c
-string_t *datetime_format_text(const datetime_t *dttm, const string_t *format);
 ```
 
 ### `datetime_from_string()`
@@ -703,20 +651,22 @@ const char *datetime_weekday_name(weekday_t weekday);
 
 ## Typed interpolation
 
-Including `datetime-t.h` enables `FMT(value)` through `fmt_arg_datetime()` for
-mutable or const datetime pointers. The binding borrows its datetime and leaves
-release to `datetime_dealloc()`. Default/`iso`, `date` and `time` presentations
-use native civil fields. Excel custom codes add English month/weekday names,
+Include `format-t.h` and `datetime-t.h` to use `FMT(value)` through
+`fmt_arg_datetime()` for mutable or const datetime pointers. The binding borrows
+its datetime and leaves release to `datetime_dealloc()`. The default selects
+the configured Lingua date; `iso`, `date` and `time` use native civil fields.
+Custom codes add English month/weekday names,
 contextual minutes, twelve-hour periods, elapsed fields and fractional seconds
 (up to nine places). Fractional seconds are stored as a `double` and are passed
-directly to the formatter, avoiding a serial-day round trip. The default ISO
-presentation retains whole-second output. Lazy calendar caches follow the
+directly to the formatter, avoiding a serial-day round trip. The explicit ISO
+presentation retains whole-second output without rounding into another second.
+Lazy calendar caches follow the
 module's usual synchronisation requirements.
 
 MARS adds `do` for an English ordinal day such as `10th`, and `do^` for
 `10ᵗʰ` with a superscript suffix. Both choose the suffix from the actual day,
-including the 11th–13th exceptions. Existing native format strings can use
-`%d%o` or `%d%q` with `datetime_format_text()`.
+including the 11th–13th exceptions. Use `fmt_string()` for owned text and
+`fmt_print()` or `fmt_append()` for direct output and appending.
 
 Native date codes use `M`/`MM` for months and `m`/`mm` for minutes; a doubled
 letter pads to two digits. `MMM`, `MMMM` and `MMMMM` select the abbreviated
@@ -725,5 +675,8 @@ upper-case period text and switch hours to twelve-hour form. Prefix a code with
 `excel:` to retain Excel's case-insensitive, contextual `m`/`mm` rules.
 
 See the [runnable datetime example and custom-code conventions](format.md#datetimes).
-Locale selectors preserve explicit currency text but do not change MARS's
-Gregorian calendar or English names; no external locale dependency is needed.
+Explicit catalogue locale names select Lingua wording, date order and calendar
+conventions as described above. Custom date-code masks use Gregorian civil
+components and English names, with `[lower]`, `[upper]` and `[title]` controlling
+the case of subsequent name and ordinary ordinal fields. No external locale
+dependency is needed.

@@ -15,6 +15,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "format-t.h"
 #include "number-t.h"
 #include "string-t.h"
 #include "dictionary-t.h"
@@ -775,7 +776,7 @@ static void output_matrix(runtime_t *runtime, const matrix_t *matrix, bool algeb
         }
     }
     if (complete) {
-        mat_printf("%.*m\n", (int)runtime->precision, numeric);
+        fmt_print("{numeric:pretty}\n", FMT(numeric));
     } else {
         char *text = mat_to_string(matrix, MAT_STRING_EXPRESSION);
         if (text && strlen(text) > 120u) {
@@ -809,9 +810,12 @@ static void output_equation(runtime_t *runtime, const equation_t *equation, bool
         num_destroy(&number);
     }
     equation_t *display = lhs && rhs ? equ_new(lhs, rhs) : NULL;
-    if (display)
-        equ_printf("%.*nu\n", (int)runtime->precision, display);
-    else
+    if (display) {
+        string_t *text = equ_sprintf_text("%.*nu", (int)runtime->precision, display);
+        if (text)
+            fmt_print("{text}\n", FMT(text));
+        string_free(text);
+    } else
         fail(runtime, "could not render equation output");
     equ_free(display);
     expr_free(rhs);
@@ -1060,7 +1064,10 @@ static value_t execute(runtime_t *runtime, scope_t *scope, char *start, char *en
             string_free(constant_name);
             number_t number = expr_eval(value);
             if (!algebraic && !num_is_nan(number)) {
-                num_printf("%.*n\n", (int)runtime->precision, number);
+                string_t *text = num_sprintf_text("%.*n", (int)runtime->precision, number);
+                if (text)
+                    fmt_print("{text}\n", FMT(text));
+                string_free(text);
             } else {
                 char *rendered = expr_to_string(value, style_EXPRESSION);
                 if (rendered) {

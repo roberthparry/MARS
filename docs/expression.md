@@ -4019,6 +4019,10 @@ expr_t *expr_pdf(const expr_t *expr);
 
 ### `expr_printf()`
 
+Deprecated: use `fmt_print()` with `FMT(expression)`. The retained compatibility
+function still accepts its existing conversions; supported compilers emit a
+migration warning. `expr_print()` forwards its default presentation to typed output.
+
 Returns the public result described by printf.
 
 ```c

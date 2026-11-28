@@ -16,12 +16,15 @@
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
+
 /* Keep the POSIX signal-stack typedef distinct from the MARS stack API. */
 #define stack_t posix_signal_stack_t
 #include <sys/wait.h>
+
 #undef stack_t
 #include <unistd.h>
 
+#include "format-t.h"
 #include "almanac-t.h"
 #include "file-t.h"
 #include "number-t.h"
@@ -75,8 +78,10 @@ static void test_lab_math_modes(void)
                   *test_lab_text(response, "calculation_time_ns") &&
                   *test_lab_text(test_lab_member(response, "presentation"), "calculation_time");
         if (!ok)
-            string_printf("native Lab route %s returned status %u: %s\n", cases[i].route, status,
-                          test_lab_text(response, "error"));
+            fmt_print("native Lab route {:s} returned status {:d}: {:s}\n",
+                FMT(cases[i].route),
+                FMT(status),
+                FMT(test_lab_text(response, "error")));
         json_free(response);
         TEST_ASSERT_TRUE(ok, "each mathematical mode returns the browser contract using its actual worker");
     }
@@ -730,8 +735,11 @@ static void test_lab_integrator_deadline_policy(void)
     for (size_t i = 0u; i < sizeof(cases) / sizeof(*cases); ++i) {
         unsigned actual = lab_eval_integrator_timeout(cases[i].precision, cases[i].cap);
         if (actual != cases[i].milliseconds)
-            string_printf("integrator deadline: digits=%u cap=%u expected=%u ms actual=%u ms\n",
-                          cases[i].precision, cases[i].cap, cases[i].milliseconds, actual);
+            fmt_print("integrator deadline: digits={:d} cap={:d} expected={:d} ms actual={:d} ms\n",
+                FMT(cases[i].precision),
+                FMT(cases[i].cap),
+                FMT(cases[i].milliseconds),
+                FMT(actual));
         TEST_ASSERT_TRUE(actual == cases[i].milliseconds && actual >= 30000u && actual <= 120000u,
                          "deadline preserves base and precision allowances and saturates without overflow");
     }
@@ -810,8 +818,10 @@ static void test_lab_integrator_error_text(void)
         bool matches = display && !strcmp(string_c_str(display), cases[i].display) && original && after &&
                        !string_compare(original, after) && num_get_default_prec_bits() == working;
         if (!matches)
-            string_printf("Error text case %zu: expected=%s actual=%s\n", i, cases[i].display,
-                          display ? string_c_str(display) : "allocation failure");
+            fmt_print("Error text case {:d}: expected={:s} actual={:s}\n",
+                FMT(i),
+                FMT(cases[i].display),
+                FMT(display ? string_c_str(display) : "allocation failure"));
         ok = matches && ok;
         string_free(after);
         string_free(display);
@@ -846,10 +856,13 @@ static void test_lab_integrator_high_precision_deadline(void)
     const json_t *presentation = test_lab_member(test_lab_member(response, "presentation"), "integrator");
     ok = ok && !strcmp(test_lab_text(presentation, "value_text"), test_lab_text(response, "value"));
     if (!ok)
-        string_printf("386-digit exp(Li(x)) route: HTTP=%u status=%s value=%s work=%s/%s error=%s\n",
-                      status, test_lab_text(response, "status"), test_lab_text(response, "value"),
-                      test_lab_text(response, "work_units"), test_lab_text(response, "work_cap"),
-                      test_lab_text(response, "error"));
+        fmt_print("386-digit exp(Li(x)) route: HTTP={:d} status={:s} value={:s} work={:s}/{:s} error={:s}\n",
+            FMT(status),
+            FMT(test_lab_text(response, "status")),
+            FMT(test_lab_text(response, "value")),
+            FMT(test_lab_text(response, "work_units")),
+            FMT(test_lab_text(response, "work_cap")),
+            FMT(test_lab_text(response, "error")));
     num_destroy(&estimate);
     json_free(response);
     TEST_ASSERT_TRUE(ok, "386-digit exp(Li(x)) on [0,1] converges through the native route with a 5000 work cap");

@@ -26,7 +26,7 @@ static bool bessel_near_zero(const expr_t *expression)
     number_t value = expression ? expr_eval(expression) : num_clone(NUM_NAN);
     bool ok = num_is_finite(value) && num_is_real(value) && fabs(num_to_double(value)) < 1e-12;
     if (!ok) {
-        expr_printf("Residual: %nu\n", expression);
+        fmt_print("Residual: {:expression}u\n", FMT(expression));
         printf("Residual value: %.17g\n", num_to_double(value));
     }
     num_destroy(&value);
@@ -75,7 +75,7 @@ static bool bessel_check_basis(const diffequ_t *problem, const equation_t *solut
             expr_t *value_at = point ? expr_substitute(formula, coordinate, point) : NULL;
             number_t evaluated = value_at ? expr_eval(value_at) : num_clone(NUM_NAN);
             ok = num_is_finite(evaluated) && num_is_real(evaluated) && bessel_near_zero(at);
-            if (!ok) expr_printf("Formula at point: %nu\n", value_at);
+            if (!ok) fmt_print("Formula at point: {:expression}u\n", FMT(value_at));
             num_destroy(&evaluated); num_destroy(&value);
             expr_free(value_at); expr_free(at); expr_free(point);
         }

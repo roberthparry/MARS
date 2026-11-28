@@ -618,7 +618,7 @@ requested rather than rounding through this fixed-precision interface.
 | `string_t *qc_sprintf_text(const char *fmt, ...);` | String-owning formatter with full `qcomplex_t` and `qfloat_t` support. |
 | `int qc_vsprintf(char *out, size_t out_size, const char *fmt, va_list ap);` | Compatibility formatter for caller-supplied C buffers. |
 | `int qc_sprintf(char *out, size_t out_size, const char *fmt, ...);` | Printf-style formatter with full `qcomplex_t` and `qfloat_t` support. |
-| `int qc_printf(const char *fmt, ...);` | Printf to stdout with full `qcomplex_t` and `qfloat_t` support. |
+| `int qc_printf(const char *fmt, ...);` | Deprecated stdout compatibility formatter; use `fmt_print()` with `FMT()`. |
 
 ---
 

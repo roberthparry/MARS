@@ -12,6 +12,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "format-t.h"
 #include "datetime-t.h"
 #include "jurisdiction-t.h"
 #include "string-t.h"
@@ -125,15 +126,13 @@ static bool apply_arg(holiday_lab_options_t *options, const char *arg)
 
 static char *format_display_date(const datetime_t *dttm)
 {
-    string_t *format = NULL;
     string_t *formatted = NULL;
     const char *c_text = NULL;
     char *out = NULL;
 
     if (!dttm)
         return NULL;
-    format = string_new_with("%Dddd %d%q %Mmmm %yyyy");
-    formatted = format ? datetime_format_text(dttm, format) : NULL;
+    formatted = fmt_string("{dttm:dddd do^ MMMM yyyy}", FMT(dttm));
     c_text = formatted ? string_c_str(formatted) : NULL;
 
     if (c_text) {
@@ -144,7 +143,6 @@ static char *format_display_date(const datetime_t *dttm)
     }
 
     string_free(formatted);
-    string_free(format);
     return out;
 }
 

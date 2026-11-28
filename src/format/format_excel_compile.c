@@ -25,6 +25,8 @@ static bool fx_resolve_date(fmt_excel_t *plan, fmt_excel_section_t *section, fmt
     size_t end = section->first + section->count;
     for (size_t i = section->first; i < end; ++i) {
         fmt_excel_token_t *token = &plan->tokens[i];
+        section->has_seconds |= token->kind == FX_SECOND || token->kind == FX_ELAPSED_SECOND ||
+                                token->kind == FX_LONG_TIME;
         if (plan->excel_compatibility && token->kind == FX_MONTH && token->length <= 2u) {
             size_t next = i + 1u;
             while (next < end && !(plan->tokens[next].flags & FX_DATE_CONTEXT))
@@ -153,6 +155,8 @@ static bool fx_resolve(fmt_excel_t *plan, fmt_excel_section_t *section, fmt_erro
     };
     if (section->date)
         return fx_resolve_date(plan, section, error);
+    if (section->name_case_set)
+        return fx_error(error, "calendar-name case directives require date fields");
     fx_resolver_t state = {plan, section, error, false};
     for (size_t i = section->first; i < section->first + section->count; ++i) {
         fmt_excel_token_t *token = &plan->tokens[i];

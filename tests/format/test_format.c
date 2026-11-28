@@ -23,6 +23,7 @@
 #include "expression-t.h"
 #include "matrix-t.h"
 #include "datetime-t.h"
+#include "timeseries-t.h"
 #include "equation-t.h"
 #include "TeX-t.h"
 #include "test_harness.h"
@@ -60,6 +61,7 @@ typedef struct {
     equation_t *equation;
     expr_t *expression;
     TeX_t *notation;
+    timeseries_t *series;
 } test_argument_t;
 
 static bool test_signed(const json_t *object, test_argument_t *argument)
@@ -189,6 +191,23 @@ static bool test_number(const json_t *object, test_argument_t *argument)
     return true;
 }
 
+static bool test_series(const json_t *object, test_argument_t *argument)
+{
+    const json_t *values = test_property(object, "values");
+    size_t count = json_array_size(values);
+    number_t *numbers = count ? calloc(count, sizeof(*numbers)) : NULL;
+    if (count && !numbers)
+        return false;
+    for (size_t i = 0; i < count; ++i)
+        numbers[i] = num_create_from_string(string_c_str(json_string_value(json_array_get(values, i))));
+    argument->series = ts_new(numbers, count);
+    for (size_t i = 0; i < count; ++i)
+        num_destroy(&numbers[i]);
+    free(numbers);
+    argument->value = fmt_arg_timeseries(argument->series);
+    return argument->series != NULL;
+}
+
 static bool test_datetime(const json_t *object, test_argument_t *argument)
 {
     const char *text = test_value(object);
@@ -246,6 +265,7 @@ static const test_argument_factory_t test_factories[] = {
     {"rune",       test_rune},
     {"string",     test_string},
     {"text",       test_cstring},
+    {"timeseries", test_series},
     {"uint",       test_unsigned},
     {"view",       test_view},
 };
@@ -340,6 +360,7 @@ static void test_format_check(const void *data, bool stream_case)
             equ_free(fixtures[i].equation);
             expr_free(fixtures[i].expression);
             TeX_free(fixtures[i].notation);
+            ts_free(fixtures[i].series);
         }
     }
     free(fixtures);
@@ -804,6 +825,7 @@ int tests_main(void)
     TEST_RUN_IN_GROUP(test_format_equation_header, tests, "format,headers,equation");
     TEST_RUN_IN_GROUP(test_format_datetime_header, tests, "format,headers,datetime");
     TEST_RUN_IN_GROUP(test_format_datetime_format_first, tests, "format,headers,datetime");
+    TEST_RUN_IN_GROUP(test_format_timeseries_header, tests, "format,headers,timeseries");
     TEST_RUN_IN_GROUP(test_format_qfloat_header, tests, "format,headers,qfloat");
     TEST_RUN_IN_GROUP(test_format_qcomplex_header, tests, "format,headers,qcomplex");
     TEST_RUN_IN_GROUP(test_format_number_header, tests, "format,headers,number");
@@ -837,6 +859,8 @@ int tests_main(void)
     TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_format_emoji, readme_examples, "format,readme,output");
     TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_format_owned_string, readme_examples, "format,readme,output");
     TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_format_datetime, readme_examples, "format,readme,output");
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_format_datetime_case, readme_examples, "format,readme,output");
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_format_timeseries, readme_examples, "format,readme,output");
     TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_format_locales, readme_examples, "format,readme,locale,output");
     TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_datetime_lingua_new_year, readme_examples, "datetime,readme,locale,output");
     TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_format_symbolic, readme_examples, "format,readme,output");

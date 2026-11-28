@@ -71,15 +71,13 @@ static void holiday_case_row_destroy(void *elem)
 
 static char *datetime_to_iso_date(const datetime_t *dttm)
 {
-    string_t *format = NULL;
     string_t *formatted = NULL;
     const char *text = NULL;
     char *out = NULL;
 
     if (!dttm)
         return NULL;
-    format = string_new_with("%yyyy-%MM-%dd");
-    formatted = format ? datetime_format_text(dttm, format) : NULL;
+    formatted = fmt_string("{dttm:date}", FMT(dttm));
     text = formatted ? string_c_str(formatted) : NULL;
     if (text) {
         size_t len = strlen(text);
@@ -89,7 +87,6 @@ static char *datetime_to_iso_date(const datetime_t *dttm)
             memcpy(out, text, len + 1u);
     }
     string_free(formatted);
-    string_free(format);
     return out;
 }
 

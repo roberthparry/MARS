@@ -24,6 +24,7 @@
 #include <stdarg.h>
 #include <stddef.h>
 
+#include "attributes-t.h"
 #include "format-t.h"
 #include "qfloat-t.h"
 
@@ -892,8 +893,9 @@ string_t *qc_sprintf_text(const char *fmt, ...);
  * @param fmt Format string.
  * @param ... Additional arguments.
  * @return Number of characters written.
+ * @deprecated Use fmt_print() with FMT() bindings; retained for compatibility.
  */
-int qc_printf(const char *fmt, ...);
+int qc_printf(const char *fmt, ...) MARS_DEPRECATED("Use fmt_print() with FMT() bindings instead.");
 
 /**
  * @brief Copy native complex components into a typed formatting binding.

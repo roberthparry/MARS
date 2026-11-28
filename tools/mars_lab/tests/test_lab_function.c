@@ -9,6 +9,7 @@
  */
 #include <string.h>
 
+#include "format-t.h"
 #include "lab_evaluate.h"
 #include "test_harness.h"
 #include "test_lab_support.h"
@@ -41,8 +42,11 @@ static bool test_lab_function_output(const char *source, const char *expected, b
         ok = exact ? length == strlen(expected) && !memcmp(raw, expected, length) : strstr(raw, expected) != NULL;
     }
     if (!ok)
-        string_printf("Function source: %s\nExpected: %s\nOutput: %s\nError: %s\n", source, expected,
-                      test_lab_text(response, "output"), test_lab_text(response, "error"));
+        fmt_print("Function source: {:s}\nExpected: {:s}\nOutput: {:s}\nError: {:s}\n",
+            FMT(source),
+            FMT(expected),
+            FMT(test_lab_text(response, "output")),
+            FMT(test_lab_text(response, "error")));
     string_free(output);
     json_free(response);
     return ok;
@@ -160,7 +164,10 @@ static void test_lab_function_rejected_programmes(void)
         json_t *response = test_lab_function_request("/function-run", "source", sources[i], &status);
         bool ok = status == 422 && test_lab_ok(response, false) && strstr(test_lab_text(response, "error"), "line ");
         if (!ok)
-            string_printf("Rejected programme %zu: status %u, %s\n", i, status, test_lab_text(response, "error"));
+            fmt_print("Rejected programme {:d}: status {:d}, {:s}\n",
+                FMT(i),
+                FMT(status),
+                FMT(test_lab_text(response, "error")));
         json_free(response);
         TEST_ASSERT_TRUE(ok, "malformed or unsupported source returns a native line diagnostic");
     }
@@ -188,8 +195,11 @@ static void test_lab_function_generated_cards(void)
         bool ok = status == 200 && test_lab_ok(response, true) && *programme &&
                   test_lab_function_output(programme, cases[i].expected, true);
         if (!ok)
-            string_printf("Generated card %zu (%s): status %u, %s\n", i, cases[i].source, status,
-                          test_lab_text(response, "error"));
+            fmt_print("Generated card {:d} ({:s}): status {:d}, {:s}\n",
+                FMT(i),
+                FMT(cases[i].source),
+                FMT(status),
+                FMT(test_lab_text(response, "error")));
         json_free(response);
         TEST_ASSERT_TRUE(ok, "the displayed Function card executes without Python rewriting");
     }
@@ -230,7 +240,7 @@ static void test_lab_function_readme_examples(void)
     for (size_t i = 0; i < sizeof cases / sizeof *cases; ++i) {
         TEST_ASSERT_TRUE(test_lab_function_output(cases[i].source, cases[i].expected, true),
                          "README Function example produces its documented output");
-        string_printf("README Function example %zu: %s\n", i + 1, cases[i].expected);
+        fmt_print("README Function example {:d}: {:s}\n", FMT(i + 1), FMT(cases[i].expected));
     }
 }
 

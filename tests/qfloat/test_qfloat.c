@@ -10,6 +10,7 @@
  * run suites sequentially; this source is not part of the installed library.
  */
 
+#include "format-t.h"
 #include "string-t.h"
 #include "test_harness.h"
 #include "test_database.h"
@@ -38,8 +39,12 @@ static void test_qf_exp_reference_case(const void *data)
     bool ok = !qf_isnan(got) && !qf_isinf(got) && qf_gt(expected, QF_ZERO) && qf_le(error, tolerance);
 
     if (!ok)
-        qf_printf("exp(%q): got %q, expected %q, relative error %q, tolerance %q\n",
-                  input, got, expected, error, tolerance);
+        fmt_print("exp({:q}): got {:q}, expected {:q}, relative error {:q}, tolerance {:q}\n",
+            FMT(input),
+            FMT(got),
+            FMT(expected),
+            FMT(error),
+            FMT(tolerance));
     TEST_ASSERT_TRUE(ok, "native exponential satisfies its independent high-precision reference");
 }
 

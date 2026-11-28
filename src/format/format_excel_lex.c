@@ -2,7 +2,7 @@
  * @file format_excel_lex.c
  * @brief Tokenise numeric and date masks using directly indexed byte and directive handlers.
  *
- * Each leading byte selects its grammar handler. Repetition widths, ordinal styles, period case and exponent
+ * Each leading byte selects its grammar handler. Repetition widths, ordinal styles, name/period case and exponent
  * signs are resolved into tokens once; named colours use a checked perfect-hash lookup rather than a name scan.
  */
 #include <ctype.h>
@@ -46,7 +46,7 @@ static size_t fx_character_length(const char *text)
 static void fx_token(fmt_excel_t *plan, fmt_excel_kind_t kind, size_t start, size_t length)
 {
     plan->tokens[plan->count] = (fmt_excel_token_t){.kind = kind, .start = start, .length = length,
-        .next = plan->count + 1u, .flags = fx_kind_context[kind]};
+        .next = plan->count + 1u, .flags = fx_kind_context[kind] | plan->section[plan->sections - 1u].name_case};
     ++plan->count;
 }
 
@@ -230,6 +230,23 @@ static bool fx_directive_currency(fmt_excel_t *plan, fmt_excel_section_t *sectio
     return true;
 }
 
+static bool fx_directive_case(fmt_excel_t *plan, fmt_excel_section_t *section, size_t first,
+                               size_t length, fmt_error_t *error)
+{
+    /* Three directive names occupy three checked slots. The first-byte hash has no empty entries. */
+    static const struct { const char *name; unsigned flags; } names[3] = {
+        {"upper", FX_UPPER_NAME}, {"lower", FX_LOWER_NAME}, {"title", 0u},
+    };
+    unsigned key = fmt_excel_lower((unsigned char)plan->code[first]);
+    unsigned slot = (key ^ (key >> 3u)) % 3u;
+    if (plan->excel_compatibility || length != 5u ||
+        fmt_excel_ascii_compare(plan->code + first, names[slot].name, 5u))
+        return fx_error(error, "unsupported native calendar-name case directive");
+    section->name_case = names[slot].flags;
+    section->name_case_set = true;
+    return true;
+}
+
 static bool fx_bracket(fmt_excel_t *plan, fmt_excel_section_t *section, size_t *at, fmt_error_t *error)
 {
     static const uint8_t directive_index[128] = {
@@ -238,11 +255,14 @@ static bool fx_bracket(fmt_excel_t *plan, fmt_excel_section_t *section, size_t *
         ['='] = 2u,
         ['>'] = 2u,
         ['h'] = 3u,
+        ['l'] = 4u,
         ['m'] = 3u,
         ['s'] = 3u,
+        ['t'] = 4u,
+        ['u'] = 4u,
     };
-    static const fx_directive_fn directives[4] = {
-        fx_directive_colour, fx_directive_currency, fx_directive_condition, fx_directive_elapsed,
+    static const fx_directive_fn directives[5] = {
+        fx_directive_colour, fx_directive_currency, fx_directive_condition, fx_directive_elapsed, fx_directive_case,
     };
     size_t first = ++*at;
     while (*at < plan->length && plan->code[*at] != ']')

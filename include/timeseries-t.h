@@ -22,7 +22,7 @@
  * - regression, ARIMA, ARIMAX, SARIMA, and SARIMAX models
  * - datetime-aware slicing, alignment, lagging, differencing, and forecasting
  *
- * MARS's datetime layer currently has second resolution, but this module's
+ * MARS's datetime layer carries fractional seconds, but this module's
  * frequency semantics intentionally start at daily granularity. Sub-daily
  * frequencies are left for future expansion.
  *
@@ -31,6 +31,8 @@
  * shared work budgets are cooperative; callers must check operation failure and
  * computation_status() before using outputs. See docs/timeseries.md for checkpoint
  * coverage, ownership and the corresponding executable example.
+ * Include format-t.h for borrowed FMT() interpolation in inline, pretty and CSV presentations. The legacy
+ * ts_printf() stdout formatter is deprecated; native data-to-text and printf-style text producers remain available.
  */
 
 #ifndef MARS_TIMESERIES_H
@@ -40,6 +42,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 
+#include "attributes-t.h"
 #include "datetime-t.h"
 #include "matrix-t.h"
 #include "number-t.h"
@@ -586,8 +589,9 @@ int ts_sprintf(char *out, size_t out_size, const char *fmt, ...);
  * pretty or CSV.
  * @param ... Arguments matching fmt, including non-NULL timeseries_t * values for series conversions.
  * @return The string output layer's written count, or -1 on formatting or output failure.
+ * @deprecated Use fmt_print() with FMT() bindings; retained for compatibility.
  */
-int ts_printf(const char *fmt, ...);
+int ts_printf(const char *fmt, ...) MARS_DEPRECATED("Use fmt_print() with FMT() bindings instead.");
 
 /**
  * @brief Print a series in pretty style to standard output.
@@ -1615,5 +1619,23 @@ int ts_backtest_arima(const timeseries_t *y, const matrix_t *xreg, const ts_arim
  * @param out Owned forecast storage that is zero-initialised or valid; NULL is a no-op.
  */
 void ts_forecast_clear(ts_forecast_t *out);
+
+/** @brief Opaque formatting binding, completed by format-t.h when typed formatting is used. */
+typedef struct _fmt_arg_t fmt_arg_t;
+
+/**
+ * @brief Borrow a series for typed inline, pretty or CSV interpolation.
+ * @param value Borrowed series; keep it alive and unchanged until formatting finishes. NULL is rejected on rendering.
+ * @return Allocation-free binding; no ownership is transferred and capture cannot fail.
+ * @note Include format-t.h and this header to use FMT(). Release owned formatted text with string_free();
+ * an empty inline or pretty series produces empty text, while CSV retains its header. Serialise access to shared
+ * mutable series and datetime indices with the series' ordinary operations.
+ */
+fmt_arg_t fmt_arg_timeseries(const timeseries_t *value);
+
+#undef MARS_FMT_SELECT_TS_
+/** @brief Register time-series pointer selection without changing other native type associations. */
+#define MARS_FMT_SELECT_TS_(value, next) \
+    _Generic((value), timeseries_t *: fmt_arg_timeseries, const timeseries_t *: fmt_arg_timeseries, default: next)
 
 #endif /* MARS_TIMESERIES_H */

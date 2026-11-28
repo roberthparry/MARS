@@ -201,6 +201,7 @@ string_t *qc_sprintf_text(const char *fmt, ...)
     return out;
 }
 
+/* Retain the original printf-style complex formatting and stream semantics. */
 int qc_printf(const char *fmt, ...)
 {
     string_t *text;
@@ -214,7 +215,7 @@ int qc_printf(const char *fmt, ...)
     if (!text)
         return -1;
 
-    written = string_printf("%S", text);
+    written = string_fprintf(stdout, "%S", text);
     string_free(text);
     return written;
 }

@@ -149,8 +149,10 @@ static void differentiability_row(const void *data)
     bool expected = !strcmp(string_c_str(row->expected), "yes");
     bool actual = expr_is_differentiable(expression);
     if (!expression || actual != expected)
-        string_printf("Differentiability %S: expected %s, got %s\n", row->name,
-                      expected ? "yes" : "no", actual ? "yes" : "no");
+        fmt_print("Differentiability {:s}: expected {:s}, got {:s}\n",
+            FMT(row->name),
+            FMT(expected ? "yes" : "no"),
+            FMT(actual ? "yes" : "no"));
     TEST_ASSERT_TRUE(expression && actual == expected,
                      "calculus capability checks argument values without treating their storage as an operation");
     expr_free(expression);

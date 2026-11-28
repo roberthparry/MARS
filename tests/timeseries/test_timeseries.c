@@ -9,6 +9,7 @@
  * run suites sequentially; this source is not part of the installed library.
  */
 
+#include "format-t.h"
 #include "string-t.h"
 #include "file-t.h"
 #include "test_timeseries.h"
@@ -358,7 +359,7 @@ static void test_arima_smoke(void)
     double third_value;
     double last_fitted_value;
     datetime_t *forecast_date = NULL;
-    char *forecast_date_text = NULL;
+    string_t *forecast_date_text = NULL;
 
     TEST_ASSERT_NOT_NULL(y);
     spec.p = 1u;
@@ -397,16 +398,17 @@ static void test_arima_smoke(void)
     forecast_date = datetime_alloc();
     TEST_ASSERT_NOT_NULL(forecast_date);
     TEST_ASSERT_TRUE(ts_get_datetime(fc.mean, 1u, forecast_date) == 0, "second forecast date available");
-    forecast_date_text = datetime_format(forecast_date, "%dd/%mm/%yyyy");
+    forecast_date_text = fmt_string("{forecast_date:dd/MM/yyyy}", FMT(forecast_date));
     TEST_ASSERT_NOT_NULL(forecast_date_text);
-    TEST_ASSERT_TRUE(strcmp(forecast_date_text, "31/07/2026") == 0, "monthly forecasts preserve month-end dates");
+    TEST_ASSERT_TRUE(strcmp(string_c_str(forecast_date_text), "31/07/2026") == 0,
+                     "monthly forecasts preserve month-end dates");
     num_destroy(&last_got);
     num_destroy(&first_forecast);
     num_destroy(&third_forecast);
     num_destroy(&first_lower);
     num_destroy(&last_fitted);
     datetime_dealloc(forecast_date);
-    free(forecast_date_text);
+    string_free(forecast_date_text);
 
     num_destroy(&level);
     ts_forecast_clear(&fc);

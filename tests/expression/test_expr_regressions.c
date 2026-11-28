@@ -11,13 +11,12 @@
 
 #include <math.h>
 
+#include "format-t.h"
 #include "string-t.h"
 #include "expr_context-t.h"
 #include "computation-t.h"
-
 #define MARS_EXPR_INTERNAL_ACCESS
 #include "expression/expr_internal.h"
-
 #include "test_expr.h"
 
 struct simplify_budget_case {
@@ -5084,7 +5083,10 @@ static void test_reciprocal_trigonometric_products(void)
         matches = matches && (num_is_finite(actual) != cases[i].pole_at_zero);
         num_destroy(&actual);
         if (!matches)
-            string_printf("Reciprocal identity: %s -> %s (wanted %s)\n", cases[i].source, text, cases[i].body);
+            fmt_print("Reciprocal identity: {:s} -> {:s} (wanted {:s})\n",
+                FMT(cases[i].source),
+                FMT(text),
+                FMT(cases[i].body));
         ok = matches && ok;
         free(text); expr_free(simple); expr_free(input); expr_bindings_free(bindings);
     }

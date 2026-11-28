@@ -44,6 +44,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 
+#include "attributes-t.h"
 #include "format-t.h"
 
 typedef struct _string_t string_t;
@@ -541,8 +542,9 @@ string_t *qf_sprintf_text(const char *fmt, ...);
  * @param fmt Format string.
  * @param ... Additional arguments.
  * @return Number of characters written.
+ * @deprecated Use fmt_print() with FMT() bindings; retained for compatibility.
  */
-int qf_printf(const char *fmt, ...);
+int qf_printf(const char *fmt, ...) MARS_DEPRECATED("Use fmt_print() with FMT() bindings instead.");
 
 /* -------------------------------------------------------------------------
    Basic arithmetic

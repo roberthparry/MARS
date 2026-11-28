@@ -641,6 +641,50 @@ ON CONFLICT(name) DO UPDATE SET operation=excluded.operation,input=excluded.inpu
 
 -- Native datetime presentation names occupy every slot in the module-owned minimal perfect hash.
 INSERT INTO format_cases(name,operation,input,expected) VALUES
+    ('timeseries_inline','render','{"pattern":"{series}","args":[{"name":"series","type":"timeseries","values":["1","2","3"]}]}','1; 2; 3'),
+    ('timeseries_explicit_inline','render','{"pattern":"{:inline}","args":[{"type":"timeseries","values":["1","2","3"]}]}','1; 2; 3'),
+    ('timeseries_pretty','render','{"pattern":"{:pretty}","args":[{"type":"timeseries","values":["1","2","3"]}]}','1
+2
+3
+'),
+    ('timeseries_csv','render','{"pattern":"{:csv}","args":[{"type":"timeseries","values":["1","2","3"]}]}','date,value
+,1
+,2
+,3
+'),
+    ('timeseries_empty','render','{"pattern":"{}","args":[{"type":"timeseries","values":[]}]}',''),
+    ('timeseries_empty_csv','render','{"pattern":"{:csv}","args":[{"type":"timeseries","values":[]}]}','date,value
+'),
+    ('timeseries_unknown','error','{"pattern":"{:unknown}","args":[{"type":"timeseries","values":["1"]}]}','type'),
+    ('timeseries_short_name','error','{"pattern":"{:p}","args":[{"type":"timeseries","values":["1"]}]}','type'),
+    ('timeseries_precision','error','{"pattern":"{:.2pretty}","args":[{"type":"timeseries","values":["1"]}]}','type')
+ON CONFLICT(name) DO UPDATE SET operation=excluded.operation,input=excluded.input,expected=excluded.expected;
+
+INSERT INTO format_cases(name,operation,input,expected) VALUES
+    ('native_name_case_upper','render','{"pattern":"{dt:[upper]dddd do MMMM yyyy}","args":[{"name":"dt","type":"datetime","value":"2026-06-10T13:05:06"}]}','WEDNESDAY 10TH JUNE 2026'),
+    ('native_name_case_lower','render','{"pattern":"{dt:[lower]ddd MMM yyyy}","args":[{"name":"dt","type":"datetime","value":"2026-06-10T13:05:06"}]}','wed jun 2026'),
+    ('native_name_case_reset','render','{"pattern":"{dt:[upper]ddd [title]do MMMM yyyy}","args":[{"name":"dt","type":"datetime","value":"2026-06-10T13:05:06"}]}','WED 10th June 2026'),
+    ('native_name_case_literals','render','{"pattern":"{dt:[lower]dddd \"LITERAL\" [upper]MMMM}","args":[{"name":"dt","type":"datetime","value":"2026-06-10T13:05:06"}]}','wednesday LITERAL JUNE'),
+    ('native_name_case_upper_first','render','{"pattern":"{dt:[UPPER]do [lower]MMMM}","args":[{"name":"dt","type":"datetime","value":"2026-04-01T00:00:00"}]}','1ST april'),
+    ('native_name_case_raised','render','{"pattern":"{dt:[upper]do^ MMMM}","args":[{"name":"dt","type":"datetime","value":"2026-04-01T00:00:00"}]}','1ˢᵗ APRIL'),
+    ('native_name_case_long','render','{"pattern":"{dt:[upper][$-F800]}","args":[{"name":"dt","type":"datetime","value":"2026-06-10T00:00:00"}]}','WEDNESDAY, JUNE 10, 2026'),
+    ('native_name_case_unknown','error','{"pattern":"{dt:[lowercase]dddd}","args":[{"name":"dt","type":"datetime","value":"2026-06-10T00:00:00"}]}','syntax'),
+    ('native_name_case_excel_rejected','error','{"pattern":"{dt:excel:[upper]dddd}","args":[{"name":"dt","type":"datetime","value":"2026-06-10T00:00:00"}]}','syntax'),
+    ('native_name_case_numeric_rejected','error','{"pattern":"{dt:[upper]0.00}","args":[{"name":"dt","type":"datetime","value":"2026-06-10T00:00:00"}]}','syntax'),
+    ('native_omitted_seconds_date','render','{"pattern":"{dt:yyyy-MM-dd}","args":[{"name":"dt","type":"datetime","value":"2026-12-31T23:59:59.875"}]}','2026-12-31'),
+    ('native_omitted_seconds_minutes','render','{"pattern":"{dt:yyyy-MM-dd hh:mm}","args":[{"name":"dt","type":"datetime","value":"2026-12-31T23:59:59.875"}]}','2026-12-31 23:59'),
+    ('native_omitted_seconds_period','render','{"pattern":"{dt:h:mmam/pm}","args":[{"name":"dt","type":"datetime","value":"2026-12-31T23:59:59.875"}]}','11:59pm'),
+    ('native_displayed_seconds_round','render','{"pattern":"{dt:yyyy-MM-dd hh:mm:ss}","args":[{"name":"dt","type":"datetime","value":"2026-12-31T23:59:59.875"}]}','2027-01-01 00:00:00'),
+    ('native_iso_whole_seconds','render','{"pattern":"{dt:iso}","args":[{"name":"dt","type":"datetime","value":"2026-12-31T23:59:59.875"}]}','2026-12-31T23:59:59'),
+    ('native_time_whole_seconds','render','{"pattern":"{dt:time}","args":[{"name":"dt","type":"datetime","value":"2026-12-31T23:59:59.875"}]}','23:59:59'),
+    ('native_iso_early_year','render','{"pattern":"{dt:iso}","args":[{"name":"dt","type":"datetime","value":"1-01-01T00:00:00"}]}','0001-01-01T00:00:00'),
+    ('native_iso_wide_year','render','{"pattern":"{dt:iso}","args":[{"name":"dt","type":"datetime","value":"12026-06-10T13:05:06"}]}','12026-06-10T13:05:06'),
+    ('native_datetime_invalid_seconds','error','{"pattern":"{dt:iso}","args":[{"name":"dt","type":"datetime","value":"2026-06-10T13:05:nan"}]}','argument'),
+    ('native_datetime_invalid_month','error','{"pattern":"{dt:date}","args":[{"name":"dt","type":"datetime","value":"2026-13-10T00:00:00"}]}','argument'),
+    ('native_datetime_invalid_hour','error','{"pattern":"{dt:time}","args":[{"name":"dt","type":"datetime","value":"2026-06-10T24:05:06"}]}','argument')
+ON CONFLICT(name) DO UPDATE SET operation=excluded.operation,input=excluded.input,expected=excluded.expected;
+
+INSERT INTO format_cases(name,operation,input,expected) VALUES
     ('lingua_default','render','{"pattern":"{dt}","args":[{"name":"dt","type":"datetime","value":"2026-06-10T13:05:06"}]}','10 juin 2026'),
     ('lingua_explicit_default','render','{"pattern":"{dt:lingua}","args":[{"name":"dt","type":"datetime","value":"2026-06-10T13:05:06"}]}','10 juin 2026'),
     ('lingua_french','render','{"pattern":"{dt:fr_FR}","args":[{"name":"dt","type":"datetime","value":"2026-06-10T13:05:06"}]}','10 juin 2026'),

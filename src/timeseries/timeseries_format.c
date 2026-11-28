@@ -9,6 +9,7 @@
  * constructing or transforming results.
  */
 
+#include "format-t.h"
 #include "string-t.h"
 #define MARS_TIMESERIES_INTERNAL_ACCESS
 #include "timeseries_internal.h"
@@ -32,18 +33,9 @@ static char *ts_cstring_from_text(string_t *text)
 
 static string_t *ts_format_date_text(const datetime_t *date)
 {
-    string_t *format;
-    string_t *text = NULL;
-
     if (!date)
         return NULL;
-
-    format = string_new_with("%dd/%mm/%yyyy");
-    if (!format)
-        return NULL;
-    text = datetime_format_text(date, format);
-    string_free(format);
-    return text;
+    return fmt_string("{date:dd/MM/yyyy}", FMT(date));
 }
 
 string_t *ts_to_text(const timeseries_t *series, ts_string_style_t style)
@@ -196,6 +188,7 @@ string_t *ts_sprintf_text(const char *fmt, ...)
     return text;
 }
 
+/* Retain the original printf-style series formatting and stream semantics. */
 int ts_printf(const char *fmt, ...)
 {
     va_list ap;
@@ -208,19 +201,16 @@ int ts_printf(const char *fmt, ...)
     if (!text)
         return -1;
 
-    written = string_printf("%S", text);
+    written = string_fprintf(stdout, "%S", text);
     string_free(text);
     return written;
 }
 
+/* Print a borrowed series through its native pretty adapter. */
 void ts_print(const timeseries_t *series)
 {
-    string_t *text = ts_to_text(series, TS_STRING_PRETTY);
-
-    if (!text)
-        return;
-    string_printf("%S", text);
-    string_free(text);
+    if (series)
+        (void)fmt_print("{series:pretty}", FMT(series));
 }
 
 string_t *ts_forecast_to_text(const ts_forecast_t *forecast, ts_string_style_t style)

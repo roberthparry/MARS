@@ -478,7 +478,15 @@ static void test_qf_printf_stdout(void)
     TEST_ASSERT_TRUE(saved_stdout >= 0, "qfloat stdout capture should begin successfully");
     TEST_ASSERT_NOT_NULL(output_path);
 
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#endif
+    /* Deliberately exercise the retained deprecated entry point. */
     int n = qf_printf("value=%Q\n", x);
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC diagnostic pop
+#endif
     TEST_ASSERT_TRUE(test_case_end_stdout_capture(saved_stdout),
                      "qfloat stdout capture should restore stdout successfully");
 

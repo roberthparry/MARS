@@ -23,9 +23,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "format-t.h"
 #include "expression-t.h"
 #include "string-t.h"
-
 #define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_bindings.h"
 #define MARS_EXPR_INTERNAL_ACCESS
@@ -243,6 +243,7 @@ int expr_sprintf(char *out, size_t out_size, const char *fmt, ...)
     return n;
 }
 
+/* Retain the original printf-style expression formatting and stream semantics. */
 int expr_printf(const char *fmt, ...)
 {
     va_list ap;
@@ -255,15 +256,20 @@ int expr_printf(const char *fmt, ...)
     if (!text)
         return -1;
 
-    written = string_printf("%S", text);
+    written = string_fprintf(stdout, "%S", text);
     string_free(text);
     return written;
 }
 
+/* Print the default expression presentation through typed stream output. */
 void expr_print(const expr_t *expr)
 {
-    if (expr_printf("%n\n", expr) < 0)
-        string_printf("NULL\n");
+    bool scientific = expr_set_number_scientific_local(false);
+    int precision = expr_set_number_precision_local(-1);
+    if (fmt_print("{expr}\n", FMT(expr)) < 0)
+        fmt_print("NULL\n");
+    expr_set_number_precision_local(precision);
+    expr_set_number_scientific_local(scientific);
 }
 
 bool expr_serialize(const expr_t *expr, string_t **out_type, string_t **out_encoding, void **out_data, size_t *out_len)

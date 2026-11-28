@@ -46,8 +46,13 @@ static bool check_formula(const equation_t *solution, const char *coordinate, do
         if (initial && i == 0u)
             valid = valid && fabs(num_to_double(y) - value) < 1e-8 && fabs(num_to_double(dy) - velocity) < 1e-8;
         if (!valid)
-            string_printf("Energy solution: %S; at %g: y=%g y'=%g y''=%g expected=%g\n", source,
-                start + shifts[i], num_to_double(y), num_to_double(dy), actual, expected);
+            fmt_print("Energy solution: {:s}; at {:g}: y={:g} y'={:g} y''={:g} expected={:g}\n",
+                FMT(source),
+                FMT(start + shifts[i]),
+                FMT(num_to_double(y)),
+                FMT(num_to_double(dy)),
+                FMT(actual),
+                FMT(expected));
         num_destroy(&ddy); num_destroy(&dy); num_destroy(&y);
     }
     expr_free(second); expr_free(first); expr_free(formula); expr_bindings_free(bindings); string_free(source);
@@ -79,7 +84,7 @@ static void test_energy_real_families(void)
         for (size_t branch = 0; valid && branch < cases[i].count; ++branch)
             valid = check_formula(de_solve_result_at(result, branch), cases[i].coordinate,
                                    cases[i].amplitude, cases[i].slope, 0, false, 0, 0);
-        if (!valid) string_printf("Autonomous force input: %s\n", cases[i].source);
+        if (!valid) fmt_print("Autonomous force input: {:s}\n", FMT(cases[i].source));
         ok = valid && ok;
         de_solve_result_free(result); de_free(de);
     }
@@ -103,7 +108,7 @@ static void test_energy_initial_values(void)
         bool valid = result && de_solve_result_solver(result) == DE_SOLVER_AUTONOMOUS_ENERGY &&
                      de_solve_result_count(result) == 1u && check_formula(de_solve_result_at(result, 0u), "x",
                         cases[i].amplitude, cases[i].slope, cases[i].point, true, cases[i].value, cases[i].velocity);
-        if (!valid) string_printf("Autonomous initial data: %s\n", cases[i].source);
+        if (!valid) fmt_print("Autonomous initial data: {:s}\n", FMT(cases[i].source));
         ok = valid && ok;
         de_solve_result_free(result); de_free(de);
     }

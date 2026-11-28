@@ -16,6 +16,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+#include "format-t.h"
 #include "string-t.h"
 #include "webserver-t.h"
 #include "test_harness.h"
@@ -24,6 +25,7 @@ TEST_SUITE_CONFIG(TEST_CONFIG_GLOBAL);
 
 #define main webserver_example_main
 #include "../../scratch/webserver_hello.c"
+
 #undef main
 
 static bool contains(const string_t *text, const char *part)
@@ -285,7 +287,7 @@ static void test_websrv_malformed(void)
         string_t *reply = send_text(server, cases[i].input);
         string_t *expected = string_sprintf("HTTP/1.1 %s ", cases[i].status);
         ok = reply && contains(reply, string_c_str(expected));
-        if (!ok) string_printf("rejection case %zu failed\n", i);
+        if (!ok) fmt_print("rejection case {:d} failed\n", FMT(i));
         string_free(expected);
         string_free(reply);
     }

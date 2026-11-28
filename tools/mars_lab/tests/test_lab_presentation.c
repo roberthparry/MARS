@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "format-t.h"
 #include "diffequation-t.h"
 #include "expression-t.h"
 #include "lab_presentation.h"
@@ -324,7 +325,7 @@ static void test_lab_presentation_editor_edits(void)
              de_condition_argument_count(problem, 0u) == 1u && num_to_double(value) == 6.0 &&
              strstr(source, "y'(0)=0") && strstr(source, "a>=0");
         if (!ok)
-            string_printf("ODE edit failed: %s\n", source);
+            fmt_print("ODE edit failed: {:s}\n", FMT(source));
         num_destroy(&value);
         de_free(problem);
         json_free(result);

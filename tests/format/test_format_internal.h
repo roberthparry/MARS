@@ -34,6 +34,9 @@ void test_format_locale_catalogue(void);
 /** @brief Run the multilingual README programme, checking its byte count and releasing its date after printing. */
 void example_format_locales(void);
 
+/** @brief Run the date-case README example; verify its output count and release its local datetime. */
+void example_format_datetime_case(void);
+
 /** @brief Run the datetime guide's first-day multilingual example; check its byte count and release its date. */
 void example_datetime_lingua_new_year(void);
 
@@ -182,6 +185,12 @@ void test_format_datetime_header(void);
  * @note Takes no arguments or ownership. Releases local dates and strings and reports failures to the harness.
  */
 void test_format_datetime_format_first(void);
+
+/** @brief Check mutable/const native series captures and NULL diagnostics, releasing all local fixture values. */
+void test_format_timeseries_header(void);
+
+/** @brief Run the native series README example, checking its output byte count and releasing its series. */
+void example_format_timeseries(void);
 
 /**
  * @brief Verify typed equation interpolation with only the owning public header.

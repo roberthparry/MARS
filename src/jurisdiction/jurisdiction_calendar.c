@@ -14,6 +14,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "format-t.h"
 #define MARS_JURISDICTION_INTERNAL_ACCESS
 #include "jurisdiction_internal.h"
 
@@ -41,8 +42,7 @@ bool jurisdiction_parse_date_text(const char *text, short *year, month_t *month,
 
 char *jurisdiction_format_date(const datetime_t *dttm)
 {
-    string_t *format = string_new_with("%yyyy-%MM-%dd");
-    string_t *text = format ? datetime_format_text(dttm, format) : NULL;
+    string_t *text = fmt_string("{dttm:date}", FMT(dttm));
     const char *c_text = text ? string_c_str(text) : NULL;
     char *out = NULL;
 
@@ -54,7 +54,6 @@ char *jurisdiction_format_date(const datetime_t *dttm)
     }
 
     string_free(text);
-    string_free(format);
     return out;
 }
 

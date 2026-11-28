@@ -14,6 +14,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "format-t.h"
 #include "matrix-t.h"
 #include "string-t.h"
 
@@ -133,6 +134,7 @@ string_t *mat_sprintf_text(const char *fmt, ...)
     return text;
 }
 
+/* Retain the original printf-style matrix formatting and stream semantics. */
 int mat_printf(const char *fmt, ...)
 {
     va_list ap;
@@ -145,13 +147,14 @@ int mat_printf(const char *fmt, ...)
     if (!text)
         return -1;
 
-    written = string_printf("%S", text);
+    written = string_fprintf(stdout, "%S", text);
     string_free(text);
     return written;
 }
 
+/* Print the native pretty layout through typed stream output. */
 void mat_print(const matrix_t *A)
 {
-    if (mat_printf("%ml\n", A) < 0)
-        string_printf("(null)\n");
+    if (fmt_print("{A:pretty_layout}\n", FMT(A)) < 0)
+        fmt_print("(null)\n");
 }

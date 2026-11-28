@@ -14,6 +14,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "format-t.h"
 #include "string-t.h"
 #include "TeX-t.h"
 #include "expression-t.h"
@@ -308,8 +309,10 @@ static void test_TeX_expression_style_cases_row(const void *data)
     string_t *serialised = expression ? expr_to_text(expression, style_EXPRESSION) : NULL;
     TeX_t *notation = serialised ? TeX_from_expression(serialised) : NULL;
     if (!notation || strcmp(TeX_source(notation), string_c_str(row->expected)))
-        string_printf("Expression notation %S: got %s; expected %S\n", row->input,
-                       notation ? TeX_source(notation) : "NULL", row->expected);
+        fmt_print("Expression notation {:s}: got {:s}; expected {:s}\n",
+            FMT(row->input),
+            FMT(notation ? TeX_source(notation) : "NULL"),
+            FMT(row->expected));
     TEST_ASSERT_TRUE(notation && strcmp(TeX_source(notation), string_c_str(row->expected)) == 0, string_c_str(row->input));
     TeX_free(notation);
     string_free(serialised);

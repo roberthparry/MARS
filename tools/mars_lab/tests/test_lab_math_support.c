@@ -14,6 +14,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "format-t.h"
 #include "file-t.h"
 #include "regex-t.h"
 #include "lab_process.h"
@@ -69,8 +70,10 @@ const json_t *lab_math_worker(const char *worker, const char *source, const char
     bool ok = digits && lab_proc_run_worker(equation ? equation_args : expression_args, NULL, NULL,
                                             lab_math_worker_timeout_ms, 4u * 1024u * 1024u, &output, status);
     if (!ok)
-        string_printf("Mathematical worker failed: errno=%d, deadline=%d ms, source=%s\n",
-                      errno, lab_math_worker_timeout_ms, source);
+        fmt_print("Mathematical worker failed: errno={:d}, deadline={:d} ms, source={:s}\n",
+            FMT(errno),
+            FMT(lab_math_worker_timeout_ms),
+            FMT(source));
     lab_math_check(ok, source);
     json_t *fields = output ? lab_eval_fields(output) : NULL;
     lab_math_check(fields != NULL, "decode mathematical worker fields");
@@ -88,7 +91,7 @@ const json_t *lab_math_fields(const char *source, const char *variable, const ch
     const char *raw = "";
     const json_t *fields = lab_math_worker("mars_lab", source, variable, action, precision, &status, &raw);
     if (status)
-        string_printf("worker source: %s\n%s\n", source, raw);
+        fmt_print("worker source: {:s}\n{:s}\n", FMT(source), FMT(raw));
     lab_math_check(status == 0, source);
     return fields;
 }
@@ -167,8 +170,10 @@ const char *lab_math_programme(const char *source, unsigned precision)
     bool ok = input && lab_proc_run_worker(args, NULL, input, lab_math_worker_timeout_ms,
                                            4u * 1024u * 1024u, &output, &status);
     if (!ok)
-        string_printf("Mathematical function worker failed: errno=%d, deadline=%d ms, source=%s\n",
-                      errno, lab_math_worker_timeout_ms, source);
+        fmt_print("Mathematical function worker failed: errno={:d}, deadline={:d} ms, source={:s}\n",
+            FMT(errno),
+            FMT(lab_math_worker_timeout_ms),
+            FMT(source));
     lab_math_check(ok && status == 0, source);
     string_free(input);
 

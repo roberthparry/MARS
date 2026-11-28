@@ -9,6 +9,7 @@
  * run suites sequentially; this source is not part of the installed library.
  */
 
+#include "format-t.h"
 #include "string-t.h"
 #include "json-t.h"
 #define MARS_SHARED_EXPR_INTERNAL_ACCESS
@@ -16,7 +17,6 @@
 #define MARS_EXPR_INTERNAL_ACCESS
 #include "expression/expr_internal.h"
 #include "test_database.h"
-
 #include "test_expr.h"
 
 typedef struct {
@@ -3014,7 +3014,10 @@ static void test_reciprocal_product_TeX_row(const void *data)
     bool ok = TeX && string_find(TeX, string_c_str(row->expected)) >= 0 && before && after &&
               !strcmp(string_c_str(before), string_c_str(after));
     if (!ok)
-        string_printf("Reciprocal product: %S\nExpected: %S\nActual: %S\n", row->input, row->expected, TeX);
+        fmt_print("Reciprocal product: {:s}\nExpected: {:s}\nActual: {:s}\n",
+            FMT(row->input),
+            FMT(row->expected),
+            FMT(TeX));
     string_free(after); string_free(TeX); string_free(before);
     expr_free(expression); expr_free(parsed);
     TEST_ASSERT_TRUE(ok, "algebraic reciprocal factors use one fraction without changing their native expression");
@@ -3039,8 +3042,11 @@ static void negative_sum_row(const void *data)
         char *text = expression ? expr_to_string(expression, styles[i]) : NULL;
         bool ok = text && fragment && strstr(text, string_c_str(fragment));
         if (!ok)
-            string_printf("Negative sum %S, style %zu: %s; wanted %S\n", row->name, i,
-                           text ? text : "NULL", fragment);
+            fmt_print("Negative sum {:s}, style {:d}: {:s}; wanted {:s}\n",
+                FMT(row->name),
+                FMT(i),
+                FMT(text ? text : "NULL"),
+                FMT(fragment));
         ASSERT_TRUE(ok);
         if (i == 0u) {
             expr_t *round_trip = text ? expr_from_string(text, NULL) : NULL;
@@ -5148,8 +5154,8 @@ void check_roundtrip(const char *label, expr_t *f, int line)
     } else {
         printf(C_BOLD C_RED "FAIL" C_RESET " %s value mismatch %s:%d:1\n", label, __FILE__, line);
         printf(C_BOLD "  string  " C_RESET "%s\n", s);
-        qf_printf(C_BOLD "  got     " C_RESET "%.34q\n", got);
-        qf_printf(C_BOLD "  want  " C_RESET "%.34q\n", want);
+        fmt_print(C_BOLD "  got     " C_RESET "{got:.34q}\n", FMT(got));
+        fmt_print(C_BOLD "  want  " C_RESET "{want:.34q}\n", FMT(want));
         printf("\n");
         TEST_FAIL();
     }

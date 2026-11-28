@@ -17,8 +17,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "format-t.h"
 #include "TeX-t.h"
-
 #define MARS_SHARED_TeX_INTERNAL_ACCESS
 #include "internal/TeX_internal.h"
 #define MARS_SHARED_EXPR_INTERNAL_ACCESS
@@ -565,6 +565,7 @@ int equ_sprintf(char *out, size_t out_size, const char *fmt, ...)
     return n;
 }
 
+/* Retain the original printf-style equation formatting and stream semantics. */
 int equ_printf(const char *fmt, ...)
 {
     va_list ap;
@@ -577,15 +578,20 @@ int equ_printf(const char *fmt, ...)
     if (!text)
         return -1;
 
-    written = string_printf("%S", text);
+    written = string_fprintf(stdout, "%S", text);
     string_free(text);
     return written;
 }
 
+/* Print the default equation presentation through typed stream output. */
 void equ_print(const equation_t *equation)
 {
-    if (equ_printf("%n\n", equation) < 0)
-        string_printf("NULL\n");
+    bool scientific = expr_set_number_scientific_local(false);
+    int precision = expr_set_number_precision_local(-1);
+    if (fmt_print("{equation}\n", FMT(equation)) < 0)
+        fmt_print("NULL\n");
+    expr_set_number_precision_local(precision);
+    expr_set_number_scientific_local(scientific);
 }
 
 bool equ_serialize(const equation_t *equation, string_t **out_type, string_t **out_encoding, void **out_data,

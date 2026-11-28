@@ -16,6 +16,7 @@
 #include <string.h>
 #include <unistd.h>
 
+#include "format-t.h"
 #include "string-t.h"
 #include "test_harness.h"
 #include "test_config.h"
@@ -329,7 +330,7 @@ static void test_stdout_capture_is_available_in_case(void)
 
     snprintf(last_stdout_capture_file, sizeof(last_stdout_capture_file), "%s", path);
 
-    string_printf("captured-line\n");
+    fmt_print("captured-line\n");
     TEST_ASSERT_TRUE(test_case_end_stdout_capture(saved_stdout), "stdout capture should restore stdout successfully");
 
     f = fopen(path, "r");
@@ -519,7 +520,7 @@ int tests_main(void)
 {
     seed_local_config_with_stale_entries();
 
-    string_printf("Running test_config tests...\n");
+    fmt_print("Running test_config tests...\n");
     TEST_SECTION("Configuration");
 
     TEST_RUN_CASE(test_tool_suite_paths_remain_distinct, "config,paths");

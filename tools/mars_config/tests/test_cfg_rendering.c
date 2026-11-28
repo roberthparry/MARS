@@ -27,6 +27,7 @@
 #include <string.h>
 #include <time.h>
 
+#include "format-t.h"
 #include "file-t.h"
 #include "datetime-t.h"
 #include "sqlite-t.h"
@@ -1239,7 +1240,7 @@ static bool test_cfg_rendering_readme_holidays(sqlite_t *db, const string_t *gui
              test_cfg_rendering_settings(db, cases[i].jurisdiction, cases[i].locale) &&
              test_cfg_rendering_expect_literal(db, query, cases[i].expected);
         if (ok)
-            string_printf("README example (supplied holiday labels):\n%S\n", output);
+            fmt_print("README example (supplied holiday labels):\n{:s}\n", FMT(output));
         string_free(setup);
         string_free(output);
     }
@@ -1324,7 +1325,7 @@ static bool test_cfg_rendering_readme_fixture(const char *directory)
              test_cfg_rendering_settings(db, cases[i].jurisdiction, cases[i].locale) &&
              test_cfg_rendering_expect_literal(db, cases[i].sql, cases[i].expected);
         if (ok)
-            string_printf("README example:\n%S\n", output);
+            fmt_print("README example:\n{:s}\n", FMT(output));
         else
             string_fprintf(stderr, "README SQL/output mismatch: %s\n%S\n", cases[i].sql, output);
         string_free(output);

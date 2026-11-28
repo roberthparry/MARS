@@ -7,6 +7,7 @@
  * complete output, while temporary storage is bounded to one typed row.
  */
 
+#include "format-t.h"
 #include "csv-t.h"
 #define MARS_TIMESERIES_INTERNAL_ACCESS
 #include "timeseries_internal.h"
@@ -38,10 +39,7 @@ static string_t *ts_csv_date(const timeseries_t *series, size_t i)
 {
     if (!series->has_index || !series->index[i])
         return string_new();
-    string_t *format = string_new_with("%dd/%mm/%yyyy");
-    string_t *date = format ? datetime_format_text(series->index[i], format) : NULL;
-    string_free(format);
-    return date;
+    return fmt_string("{date:dd/MM/yyyy}", FMT(date, series->index[i]));
 }
 
 static bool ts_csv_numbers(csv_t *csv, const string_t *label, const number_t *values, size_t count,

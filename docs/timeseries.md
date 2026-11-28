@@ -672,6 +672,51 @@ void ts_print(const timeseries_t *series);
 
 ### `ts_printf()`
 
+Deprecated: use `fmt_print()` with `FMT(series)`. Presentations `inline` (the
+default), `pretty` and `csv` delegate to `ts_to_text()` without copying the series.
+`fmt_arg_timeseries()` captures a borrowed mutable or const pointer; keep the
+series and any datetime indices alive and synchronise shared mutation until
+formatting finishes. NULL pointers produce an argument error. Empty inline and
+pretty views produce empty text; CSV retains its header. Typed precision is not
+supported, matching the native series formatter's ignored precision.
+The compatibility function remains functional and supported compilers emit a
+migration warning. `ts_print()` forwards the pretty presentation to typed output.
+
+Include `format-t.h` and `timeseries-t.h` for direct typed series output. One
+borrowed binding can be reused in each native presentation without constructing
+display strings in the caller.
+
+```c
+#include "format-t.h"
+#include "timeseries-t.h"
+
+int main(void)
+{
+    const double values[] = {1.0, 2.0, 3.0};
+    timeseries_t *series = ts_new_from_doubles(values, 3u);
+    if (!series)
+        return 1;
+    int bytes = fmt_print("Inline: {series}\nPretty:\n{series:pretty}CSV:\n{series:csv}", FMT(series));
+    ts_free(series);
+    return bytes < 0;
+}
+```
+
+Output:
+
+```text
+Inline: 1; 2; 3
+Pretty:
+1
+2
+3
+CSV:
+date,value
+,1
+,2
+,3
+```
+
 Returns the public result described by printf.
 
 ```c

@@ -44,6 +44,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 
+#include "attributes-t.h"
 #include "format-t.h"
 #include "expression-t.h"
 #include "expr_context-t.h"
@@ -1997,7 +1998,22 @@ string_t *mat_vsprintf_text(const char *fmt, va_list ap);
 string_t *mat_sprintf_text(const char *fmt, ...);
 
 int mat_sprintf(char *out, size_t out_size, const char *fmt, ...);
-int mat_printf(const char *fmt, ...);
+
+/**
+ * @brief Print native matrix conversions through the retained printf-style interface.
+ * @param fmt Borrowed format string; matrix conversions consume borrowed matrix pointers.
+ * @param ... Arguments matching fmt, retained only for this call; matrices remain caller-owned.
+ * @return Written byte count, or -1 on formatting or output failure.
+ * @deprecated Use fmt_print() with FMT() bindings; this interface remains available for compatibility.
+ */
+int mat_printf(const char *fmt, ...) MARS_DEPRECATED("Use fmt_print() with FMT() bindings instead.");
+
+/**
+ * @brief Print a matrix in its default pretty layout, followed by a newline.
+ * @param A Borrowed matrix to print; NULL prints the text "(null)" followed by a newline.
+ * @return Nothing. Formatting and output failures cannot be reported through this convenience interface.
+ * @note The matrix remains caller-owned and must remain valid throughout the call.
+ */
 void mat_print(const matrix_t *A);
 
 /**

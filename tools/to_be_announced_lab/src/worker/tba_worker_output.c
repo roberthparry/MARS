@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "format-t.h"
 #include "datetime-t.h"
 #include "matrix-t.h"
 #include "number-t.h"
@@ -69,7 +70,9 @@ static char *tba_worker_series_date_text(const timeseries_t *series, size_t inde
         datetime_dealloc(dt);
         return NULL;
     }
-    text = datetime_format(dt, "%dd/%mm/%yyyy");
+    string_t *formatted = fmt_string("{dt:dd/MM/yyyy}", FMT(dt));
+    text = formatted ? strdup(string_c_str(formatted)) : NULL;
+    string_free(formatted);
     datetime_dealloc(dt);
     return text;
 }

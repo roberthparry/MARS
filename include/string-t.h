@@ -44,6 +44,8 @@
 #include <stdio.h>
 #include <wchar.h>
 
+#include "attributes-t.h"
+
 /* =========================================================================
    Opaque type
    ========================================================================= */
@@ -1035,8 +1037,9 @@ string_t *string_sprintf(const char *fmt, ...);
  * @param fmt  printf-style format string. Must not be @c NULL.
  * @param ...  Format arguments.
  * @return     Number of bytes printed, or negative on error.
+ * @deprecated Use fmt_print() with FMT() bindings; retained for compatibility.
  */
-int string_printf(const char *fmt, ...);
+int string_printf(const char *fmt, ...) MARS_DEPRECATED("Use fmt_print() with FMT() bindings instead.");
 
 /**
  * @brief Print formatted text to a file stream.
